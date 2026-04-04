@@ -317,53 +317,57 @@
 		{#each items as item, i}
 			<div
 				class="item-row"
+				class:priced-row={isPriced}
 				class:checked={item.checked}
 				class:selected={selectedIds.has(item.id)}
 				class:drag-source={touchDragFrom === i}
 				class:drag-target={touchDragOver === i && touchDragFrom !== null && touchDragFrom !== i}
 				data-item-index={i}
 			>
-				<!-- Check-off -->
-				<button class="check-btn" onclick={() => toggleCheck(item)} aria-label={item.checked ? 'Uncheck' : 'Check'}>
-					{item.checked ? '☑' : '☐'}
-				</button>
-
-				<!-- Name -->
-				<button
-					class="item-name"
-					class:strikethrough={item.checked}
-					class:editing={editingId === item.id}
-					onclick={() => startEditName(item)}
-					onpointerdown={(e) => onPointerDown(e, item.id)}
-					onpointermove={cancelLongPress}
-					onpointerup={cancelLongPress}
-					onpointercancel={cancelLongPress}
-				>
-					{item.name}
-				</button>
-
-				<!-- Price column (priced lists only) -->
 				{#if isPriced}
-					<button
-						class="price-btn"
-						class:editing={pricingItemId === item.id}
-						onclick={() =>
-							pricingItemId === item.id ? commitPrice() : startEditPrice(item)}
-					>
-						{pricingItemId === item.id
-							? (priceBuffer || '0')
-							: formatPrice(item.price)}
+					<!-- Priced: name wraps top line, controls on bottom line -->
+					<div class="priced-top">
+						<button class="check-btn" onclick={() => toggleCheck(item)} aria-label={item.checked ? 'Uncheck' : 'Check'}>
+							{item.checked ? '☑' : '☐'}
+						</button>
+						<button
+							class="item-name"
+							class:strikethrough={item.checked}
+							class:editing={editingId === item.id}
+							onclick={() => startEditName(item)}
+							onpointerdown={(e) => onPointerDown(e, item.id)}
+							onpointermove={cancelLongPress}
+							onpointerup={cancelLongPress}
+							onpointercancel={cancelLongPress}
+						>{item.name}</button>
+					</div>
+					<div class="priced-bottom">
+						<button
+							class="price-btn"
+							class:editing={pricingItemId === item.id}
+							onclick={() => pricingItemId === item.id ? commitPrice() : startEditPrice(item)}
+						>{pricingItemId === item.id ? (priceBuffer || '0') : formatPrice(item.price)}</button>
+						<button class="del-btn" onclick={() => deleteItem(item.id)} aria-label="Delete">🗑</button>
+						<button class="drag-handle" aria-label="Drag to reorder" ontouchstart={(e) => startItemDrag(e, i)}>⠿</button>
+					</div>
+				{:else}
+					<!-- Plain: single row -->
+					<button class="check-btn" onclick={() => toggleCheck(item)} aria-label={item.checked ? 'Uncheck' : 'Check'}>
+						{item.checked ? '☑' : '☐'}
 					</button>
+					<button
+						class="item-name"
+						class:strikethrough={item.checked}
+						class:editing={editingId === item.id}
+						onclick={() => startEditName(item)}
+						onpointerdown={(e) => onPointerDown(e, item.id)}
+						onpointermove={cancelLongPress}
+						onpointerup={cancelLongPress}
+						onpointercancel={cancelLongPress}
+					>{item.name}</button>
+					<button class="del-btn" onclick={() => deleteItem(item.id)} aria-label="Delete">🗑</button>
+					<button class="drag-handle" aria-label="Drag to reorder" ontouchstart={(e) => startItemDrag(e, i)}>⠿</button>
 				{/if}
-
-				<!-- Delete -->
-				<button class="del-btn" onclick={() => deleteItem(item.id)} aria-label="Delete">🗑</button>
-
-				<button
-					class="drag-handle"
-					aria-label="Drag to reorder"
-					ontouchstart={(e) => startItemDrag(e, i)}
-				>⠿</button>
 			</div>
 		{/each}
 	</div>
