@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { docState } from '$lib/yjsStore.svelte';
-	import { onDestroy } from 'svelte';
+	import { onDestroy, tick } from 'svelte';
 	import {
 		readItems,
 		readLists,
@@ -40,17 +40,22 @@
 	type InputMode = 'add' | 'edit';
 	let inputMode = $state<InputMode>('add');
 	let universalValue = $state('');
-	let universalInputEl = $state<HTMLInputElement | null>(null);
+	// bind:this requires a plain let (not $state) to receive the real DOM node
+	let universalInputEl: HTMLInputElement | null = null;
+
+	function focusInput() {
+		tick().then(() => universalInputEl?.focus());
+	}
 
 	function addItem() {
 		if (!universalValue.trim()) return;
 		createItem(listId, universalValue.trim());
 		universalValue = '';
+		universalInputEl?.focus(); // keep focus for rapid entry
 	}
 
-	// ── Edit item ─────────────────────────────────────────────────────────────────
+	// ── Edit item name via universal input ────────────────────────────────────────
 	let editingId = $state<string | null>(null);
-	let editName = $state('');
 
 	// Which item's price is currently being edited via the keypad
 	let pricingItemId = $state<string | null>(null);
@@ -58,16 +63,23 @@
 
 	function startEditName(item: Item) {
 		editingId = item.id;
-		editName = item.name;
+		inputMode = 'edit';
+		universalValue = item.name;
 		pricingItemId = null;
+		focusInput();
 	}
 
 	function submitEditName() {
 		if (!editingId) return;
-		const trimmed = editName.trim();
+		const trimmed = universalValue.trim();
 		if (trimmed) updateItem(editingId, { name: trimmed });
-		// If cleared, discard edit rather than saving empty name
+		cancelEdit();
+	}
+
+	function cancelEdit() {
 		editingId = null;
+		inputMode = 'add';
+		universalValue = '';
 	}
 
 	function startEditPrice(item: Item) {
@@ -76,7 +88,6 @@
 		priceBuffer = item.price !== null
 			? (item.price < 0 ? '-' : '') + Math.abs(item.price).toFixed(2).replace(/\.?0+$/, '')
 			: '';
-		// Leave the edit of the name as-is; cancel it cleanly
 		cancelEdit();
 	}
 
@@ -252,9 +263,9 @@
 					}}
 				/>
 				{#if inputMode === 'edit'}
-					<button class="universal-btn done-btn" onclick={submitEditName}>Done</button>
+					<button class="universal-btn done-btn" onclick={submitEditName}>OK</button>
 				{:else}
-					<button class="universal-btn add-btn" onclick={addItem} disabled={!universalValue.trim()}>Add</button>
+					<button class="universal-btn add-btn" onclick={addItem} disabled={!universalValue.trim()}>OK</button>
 				{/if}
 			</div>
 		</div>
@@ -328,12 +339,12 @@
 		{/each}
 	</div>
 
-	<!-- Floating add button (visible when not pricing) -->
+	<!-- Floating + button -->
 	{#if !pricingItemId || !isPriced}
 		<button
 			class="fab"
 			aria-label="Add item"
-			onclick={() => { cancelEdit(); universalInputEl?.focus(); }}
+			onclick={() => { cancelEdit(); focusInput(); }}
 		>＋</button>
 	{/if}
 
