@@ -27,6 +27,23 @@
 - **Reordering:** Folders and lists can also be reordered via drag handles, in addition to items within a list.
 - **Price format:** Always 2 decimal places. Negative prices are allowed; a minus key occupies the 4th column of the numeric keypad.
 - **Access:** The app is loaded as a PWA via a URL (initially the host mini PC). No separate install step beyond adding to home screen.
-- **Login:** A login screen accepts username and password. Auth tokens are stored server-side; browser cookies are not used (self-signed HTTPS certs cause rapid cookie expiry).
+- **Login:** A login screen accepts username and password. Auth tokens are stored server-side; browser cookies are explained below.
 - **Export:** No data export at this time; all data is in-app only.
 - **Folder renaming:** Folders can be renamed after creation.
+- **Session persistence:** After closing and reopening the PWA, the user remains logged in for 2 weeks. A signed cookie (`prices_n_lists_session`) is set on login, signed with a server secret (or random per-process key as fallback), and expires after `SESSION_EXPIRY_DAYS` days (default 30).
+- **Multi-user:** Each `.htpasswd` user has their own independent data on the server; data is not shared between users.
+- **Keypad backspace:** A backspace key is included in the 4th column of the numeric keypad for correcting price entry.
+- **Item check-off:** Items in plain lists can be checked/ticked off (e.g. for use as a shopping list).
+- **List summary:** The folder/home screen shows summary info for each list (e.g. item count, total for priced lists).
+- **Folder delete:** Deleting a folder cascade-deletes all contained lists and items; a confirmation prompt is required.
+- **Checked item appearance:** Checked items remain in place with a strikethrough; they are not hidden or moved.
+- **Logout:** An explicit logout button is provided; logging out clears local Yjs data.
+- **Plain list summary:** Plain lists show a count of checked and unchecked items on the folder/home screen.
+- **Yjs stack:** Server uses `y-websocket` as the sync provider with LevelDB for persistence.
+- **Item limit:** No limit on the number of items per list.
+- **Check-off on priced lists:** Items in priced lists can also be checked off; checked items are struck through and remain visible; the total still includes them.
+- **Bulk uncheck:** A bulk action allows unchecking all items or removing all checked items at once.
+- **Theme:** Light and dark mode selectable in settings.
+- **Server port:** Configurable via a CLI flag at startup.
+- **Build & deploy:** App built with `npm run build`; static output served by the Node.js server.
+- **Duplicate item names:** Duplicate item names within a list are permitted.
