@@ -248,13 +248,11 @@
 	<!-- Universal input bar: always present so iOS keyboard opens at a fixed position -->
 	{#if !pricingItemId || !isPriced}
 		<div class="universal-bar">
-			{#if inputMode === 'edit' && editingId}
-				<div class="edit-hint">✏ Editing item — <button class="hint-cancel" onclick={cancelEdit}>Cancel</button></div>
-			{/if}
 			<div class="universal-row">
 				<input
 					bind:this={universalInputEl}
 					class="universal-input"
+					class:editing={inputMode === 'edit'}
 					placeholder={inputMode === 'edit' ? 'Edit name…' : 'Add item…'}
 					bind:value={universalValue}
 					onkeydown={(e) => {
@@ -263,6 +261,7 @@
 					}}
 				/>
 				{#if inputMode === 'edit'}
+					<button class="universal-btn cancel-btn" onclick={cancelEdit}>✕</button>
 					<button class="universal-btn done-btn" onclick={submitEditName}>OK</button>
 				{:else}
 					<button class="universal-btn add-btn" onclick={addItem} disabled={!universalValue.trim()}>OK</button>
@@ -526,23 +525,9 @@
 	/* ── Universal input bar ──────────────────────────────────────── */
 	.universal-bar {
 		padding: 0.5rem 0.75rem 0.4rem;
-		border-bottom: 2px solid var(--accent);
+		border-bottom: 1px solid var(--border);
 		background: var(--bg2);
 		flex-shrink: 0;
-	}
-	.edit-hint {
-		font-size: 0.75rem;
-		color: var(--accent);
-		margin-bottom: 0.35rem;
-	}
-	.hint-cancel {
-		background: none;
-		border: none;
-		color: var(--accent);
-		font-size: 0.75rem;
-		cursor: pointer;
-		padding: 0;
-		text-decoration: underline;
 	}
 	.universal-row {
 		display: flex;
@@ -559,6 +544,7 @@
 		outline: none;
 	}
 	.universal-input:focus { border-color: var(--accent); }
+	.universal-input.editing { border-color: var(--accent); background: var(--bg); }
 	.universal-btn {
 		padding: 0.6rem 1rem;
 		border: none;
@@ -571,6 +557,7 @@
 	.add-btn { background: var(--accent); color: #fff; }
 	.add-btn:disabled { opacity: 0.4; }
 	.done-btn { background: #22c55e; color: #fff; }
+	.cancel-btn { background: var(--bg3); color: var(--text2); }
 	/* ── Floating + button ──────────────────────────────────────────── */
 	.fab {
 		position: absolute;
