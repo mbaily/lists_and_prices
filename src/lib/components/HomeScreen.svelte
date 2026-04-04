@@ -53,6 +53,9 @@
 			.filter((l) => l.folderId === currentFolderId)
 			.sort((a, b) => a.order - b.order)
 	);
+	let currentFolderColor = $derived(
+		allFolders.find((f) => f.id === currentFolderId)?.color ?? '#6366f1'
+	);
 
 	// ── Guard: trim breadcrumb if a folder in it was deleted (e.g. by a peer) ───
 	$effect(() => {
@@ -92,6 +95,11 @@
 	let newListType = $state<'plain' | 'priced'>('plain');
 	let newListColor = $state('#6366f1');
 	let showNewList = $state(false);
+
+	function openNewList() {
+		newListColor = currentFolderColor;
+		showNewList = true;
+	}
 
 	function submitNewList() {
 		const name =
@@ -353,7 +361,7 @@
 		<div class="action-bar">
 			<button onclick={() => (showNewFolder = true)}>+ Folder</button>
 			{#if currentFolderId}
-				<button onclick={() => (showNewList = true)}>+ List</button>
+				<button onclick={() => openNewList()}>+ List</button>
 			{/if}
 		</div>
 
