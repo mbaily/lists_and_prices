@@ -28,8 +28,8 @@
 		{ label: '', key: '' },
 
 		{ label: '0', key: '0' },
-		{ label: '00', key: '00' },
 		{ label: '.', key: '.' },
+		{ label: '00', key: '00' },
 		{ label: '✓', key: 'enter', action: true }
 	];
 
