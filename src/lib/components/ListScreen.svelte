@@ -499,24 +499,31 @@
 		transition: background 0.15s, opacity 0.15s;
 		min-height: 52px;
 	}
-	/* Priced rows stack vertically */
-	.item-row.priced-row {
-		flex-direction: column;
-		align-items: stretch;
-		gap: 0;
-		padding: 0.4rem 0.75rem 0.3rem;
+	/* Priced rows: two-line layout on touch devices only */
+	@media (pointer: coarse) {
+		.item-row.priced-row {
+			flex-direction: column;
+			align-items: stretch;
+			gap: 0;
+			padding: 0.4rem 0.75rem 0.3rem;
+		}
+		.priced-top {
+			display: flex;
+			align-items: center;
+			gap: 0.4rem;
+		}
+		.priced-bottom {
+			display: flex;
+			align-items: center;
+			gap: 0.4rem;
+			padding-left: 0.25rem;
+			justify-content: flex-end;
+		}
 	}
-	.priced-top {
-		display: flex;
-		align-items: center;
-		gap: 0.4rem;
-	}
-	.priced-bottom {
-		display: flex;
-		align-items: center;
-		gap: 0.4rem;
-		padding-left: 0.25rem;
-		justify-content: flex-end;
+	/* On pointer:fine (desktop), priced rows fall back to the standard single-row flex */
+	@media (pointer: fine) {
+		.priced-top { display: contents; }
+		.priced-bottom { display: contents; }
 	}
 	.item-row.selected { background: var(--bg3); }
 	.item-row.drag-source { opacity: 0.4; }
