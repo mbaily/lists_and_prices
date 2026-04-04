@@ -1,6 +1,6 @@
 # List & Calculator App
 
-- **Stack:** Svelte 5, Yjs, PWA, node.js server.
+- **Stack:** Svelte 5, Yjs, PWA, node.js server. Use svelte 5 runes.
 - **Target:** iPhone only
 - **Features:** Create lists or priced lists; basic calculator
 - **Multiple lists:** Unlimited lists; naming is optional — skipping auto-assigns date/time as the name
@@ -47,3 +47,12 @@
 - **Server port:** Configurable via a CLI flag at startup.
 - **Build & deploy:** App built with `npm run build`; static output served by the Node.js server.
 - **Duplicate item names:** Duplicate item names within a list are permitted.
+- **Checked items and total:** Checking off an item (e.g. placed in trolley) does not affect the price total; the total always reflects the full list.
+- **Bulk action scope:** Bulk uncheck/delete-checked applies to the whole list if nothing is selected, or to the current selection if items are selected.
+- **Moving lists and folders:** Lists can be moved to a different folder; folders can be moved inside other folders.
+- **Currency position:** Currency symbol position follows the user's device locale.
+- **Offline without login:** A user must log in at least once while online; after that, full offline use is supported via Yjs — changes sync automatically when the server is reachable again.
+- **User management CLI:** Server supports `--add-user`, `--remove-user`, and `--create-cert` command-line flags for managing `.htpasswd` and TLS certificates.
+- **PWA updates:** Updates are applied silently in the background; the current app version is visible in settings.
+- **Move validation:** Moving a folder into one of its own descendants is not permitted; the user is warned if they attempt it.
+- **Decimal separator:** Always `.` regardless of locale (e.g. `1.99` not `1,99`).
