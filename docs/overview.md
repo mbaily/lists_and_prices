@@ -1,0 +1,26 @@
+# List & Calculator App
+
+- **Stack:** Svelte 5, Yjs, PWA, node.js server.
+- **Target:** iPhone only
+- **Features:** Create lists or priced lists; basic calculator
+- **Multiple lists:** Unlimited lists; naming is optional — skipping auto-assigns date/time as the name
+- **Folders:** All lists must live inside a folder; folders require a name; create folders at root or nested inside other folders; no depth limit
+- **Data:** All data lives client-side (IndexedDB via Yjs); syncs to server when online
+- **Offline-first:** Yjs CRDTs handle conflict-free sync; full functionality without network
+- **PWA:** Installable, works offline, service worker caches assets
+- **UX:** Tap-only interaction — no cursor manipulation needed; new items/prices added with single taps
+- **Totals:** List total calculated automatically as items and prices are added
+- **Keypad:** Priced lists show a full-width numeric keypad; 4 columns — 3 for digits, 1 for Enter/action keys; keypad takes visual precedence on screen. Decimal point and numbers 0-9 included in a standard numeric keypad layout. 
+- **Colors:** You can give each list or folder a unique colour. A solid colour picker is shown with pre-selected colors, however many.
+- **Editing & deleting:** Items (name and price), lists, and folders can all be edited or deleted after creation.
+- **Reordering:** Items within a list can be reordered via drag handles.
+- **List type conversion:** A plain list can be converted to a priced list and vice versa; the price column is dynamically shown or hidden accordingly.
+- **Calculator:** The only calculation is the running total of item prices in a priced list; it recalculates automatically whenever a price changes. Prices are entered via the numeric keypad.
+- **Auth & sync:** Multi-device sync via Yjs. Server requires HTTPS (self-signed certs) and HTTP Basic Auth via `.htpasswd`. Server CLI supports `--create-cert` to generate certs and `--add-user` to create/update `.htpasswd` entries.
+- **Item editing:** Tap any item to edit its name or price inline; items can also be deleted individually.
+- **Settings:** A user settings screen allows selection of currency symbol used in priced lists.
+- **Item naming:** Item names are entered via the OS native keyboard (iOS/Android); triggered from a standard Svelte 5 text input field.
+- **Navigation:** Tap folders or lists to open them; an always-visible Up button navigates to the parent level; breadcrumb trail is shown and is per-user.
+- **Delete confirmation:** Deleting a list or folder requires a confirmation prompt; deleting individual items does not.
+- **Sync status:** An indicator shows current sync state (online/offline, syncing, up to date).
+- **First launch:** On first launch the user is prompted to create a folder and provide a name before any lists can be created.
