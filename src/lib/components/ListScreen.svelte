@@ -6,6 +6,7 @@
 		createItem,
 		updateItem,
 		deleteItem,
+		updateList,
 		reorderItems,
 		type Item,
 		type ListMeta
@@ -104,8 +105,12 @@
 	const _numFmt = new Intl.NumberFormat(undefined, {
 		style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2
 	});
-	const _symbolBefore = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' })
-		.format(1).startsWith('$');
+	// Detect whether currency symbol goes before the number.
+	// Test with USD: format as currency and check if first char is non-digit/non-space.
+	const _symbolBefore = (() => {
+		const s = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(1);
+		return /^[^\d\s]/.test(s); // true if starts with a symbol character
+	})();
 
 	function formatPrice(price: number | null): string {
 		if (price === null) return '—';
@@ -200,7 +205,6 @@
 	});
 
 	// ── Type conversion ───────────────────────────────────────────────────────────
-	import { updateList } from '$lib/data';
 	function toggleType() {
 		if (!listMeta) return;
 		updateList(listId, { type: listMeta.type === 'plain' ? 'priced' : 'plain' });

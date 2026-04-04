@@ -63,6 +63,10 @@
 		if (lastValid < breadcrumb.length - 1) {
 			breadcrumb = breadcrumb.slice(0, lastValid + 1);
 		}
+		// Close list screen if the open list has been deleted by a peer
+		if (openListId !== null && !allLists.some((l) => l.id === openListId)) {
+			openListId = null;
+		}
 	});
 
 	// ── Breadcrumb label ────────────────────────────────────────────────────────
