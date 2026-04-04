@@ -12,8 +12,7 @@
 
 <svelte:head>
 	<meta name="apple-mobile-web-app-capable" content="yes" />
-	<meta name="apple-mobile-web-app-status-bar-style" content="default" />
-	<title>Lists & Prices</title>
+	<meta name="apple-mobile-web-app-status-bar-style" content="default" />	<link rel="icon" href="/favicon.svg" type="image/svg+xml" />	<title>Lists & Prices</title>
 </svelte:head>
 
 {@render children()}

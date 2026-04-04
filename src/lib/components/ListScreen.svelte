@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { docState } from '$lib/yjsStore.svelte';
+	import { onDestroy } from 'svelte';
 	import {
 		readItems,
 		readLists,
@@ -165,6 +166,8 @@
 	function cancelLongPress() {
 		if (longPressTimer !== null) { clearTimeout(longPressTimer); longPressTimer = null; }
 	}
+
+	onDestroy(() => cancelLongPress());
 
 	// ── Touch drag reorder ────────────────────────────────────────────────────────
 	// HTML5 drag doesn't work on iOS — use touch events instead.

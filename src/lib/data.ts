@@ -214,28 +214,31 @@ export function listTotal(listId: string): number {
 // ─── Reorder helpers ──────────────────────────────────────────────────────────
 
 export function reorderItems(listId: string, fromIndex: number, toIndex: number) {
+	const doc = getDoc();
 	const items = readItems(listId);
 	const [moved] = items.splice(fromIndex, 1);
 	items.splice(toIndex, 0, moved);
-	items.forEach((item, idx) => updateItem(item.id, { order: idx }));
+	doc.transact(() => items.forEach((item, idx) => updateItem(item.id, { order: idx })));
 }
 
 export function reorderFolders(parentId: string | null, fromIndex: number, toIndex: number) {
+	const doc = getDoc();
 	const all = readFolders()
 		.filter((f) => f.parentId === parentId)
 		.sort((a, b) => a.order - b.order);
 	const [moved] = all.splice(fromIndex, 1);
 	all.splice(toIndex, 0, moved);
-	all.forEach((f, idx) => updateFolder(f.id, { order: idx }));
+	doc.transact(() => all.forEach((f, idx) => updateFolder(f.id, { order: idx })));
 }
 
 export function reorderLists(folderId: string, fromIndex: number, toIndex: number) {
+	const doc = getDoc();
 	const all = readLists()
 		.filter((l) => l.folderId === folderId)
 		.sort((a, b) => a.order - b.order);
 	const [moved] = all.splice(fromIndex, 1);
 	all.splice(toIndex, 0, moved);
-	all.forEach((l, idx) => updateList(l.id, { order: idx }));
+	doc.transact(() => all.forEach((l, idx) => updateList(l.id, { order: idx })));
 }
 
 // ─── Internal utilities ───────────────────────────────────────────────────────
