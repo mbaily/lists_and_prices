@@ -24,3 +24,9 @@
 - **Delete confirmation:** Deleting a list or folder requires a confirmation prompt; deleting individual items does not.
 - **Sync status:** An indicator shows current sync state (online/offline, syncing, up to date).
 - **First launch:** On first launch the user is prompted to create a folder and provide a name before any lists can be created.
+- **Reordering:** Folders and lists can also be reordered via drag handles, in addition to items within a list.
+- **Price format:** Always 2 decimal places. Negative prices are allowed; a minus key occupies the 4th column of the numeric keypad.
+- **Access:** The app is loaded as a PWA via a URL (initially the host mini PC). No separate install step beyond adding to home screen.
+- **Login:** A login screen accepts username and password. Auth tokens are stored server-side; browser cookies are not used (self-signed HTTPS certs cause rapid cookie expiry).
+- **Export:** No data export at this time; all data is in-app only.
+- **Folder renaming:** Folders can be renamed after creation.
