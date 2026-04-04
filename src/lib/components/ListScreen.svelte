@@ -250,19 +250,23 @@
 	{#if !pricingItemId || !isPriced}
 		<div class="universal-bar">
 			<div class="universal-row">
-				<input
-					bind:this={universalInputEl}
-					class="universal-input"
-					class:editing={inputMode === 'edit'}
-					placeholder={inputMode === 'edit' ? 'Edit name…' : 'Add item…'}
-					bind:value={universalValue}
-					onkeydown={(e) => {
-						if (e.key === 'Enter') inputMode === 'edit' ? submitEditName() : addItem();
-						if (e.key === 'Escape') cancelEdit();
-					}}
-				/>
+				<div class="input-wrap">
+					<input
+						bind:this={universalInputEl}
+						class="universal-input"
+						class:editing={inputMode === 'edit'}
+						placeholder={inputMode === 'edit' ? 'Edit name…' : 'Add item…'}
+						bind:value={universalValue}
+						onkeydown={(e) => {
+							if (e.key === 'Enter') inputMode === 'edit' ? submitEditName() : addItem();
+							if (e.key === 'Escape') cancelEdit();
+						}}
+					/>
+					{#if inputMode === 'edit'}
+						<button class="input-clear" onclick={cancelEdit} aria-label="Cancel edit">✕</button>
+					{/if}
+				</div>
 				{#if inputMode === 'edit'}
-					<button class="universal-btn cancel-btn" onclick={cancelEdit}>✕</button>
 					<button class="universal-btn done-btn" onclick={submitEditName}>OK</button>
 				{:else}
 					<button class="universal-btn add-btn" onclick={addItem} disabled={!universalValue.trim()}>OK</button>
@@ -534,18 +538,37 @@
 		display: flex;
 		gap: 0.5rem;
 	}
-	.universal-input {
+	.input-wrap {
+		position: relative;
 		flex: 1;
-		padding: 0.6rem 0.8rem;
+		min-width: 0;
+	}
+	.universal-input {
+		width: 100%;
+		padding: 0.6rem 2.2rem 0.6rem 0.8rem; /* right pad leaves room for ✕ */
 		border: 1px solid var(--border);
 		border-radius: 10px;
 		font-size: 1rem;
 		background: var(--bg);
 		color: var(--text);
 		outline: none;
+		box-sizing: border-box;
 	}
 	.universal-input:focus { border-color: var(--accent); }
-	.universal-input.editing { border-color: var(--accent); background: var(--bg); }
+	.universal-input.editing { border-color: var(--accent); }
+	.input-clear {
+		position: absolute;
+		right: 0.4rem;
+		top: 50%;
+		transform: translateY(-50%);
+		background: none;
+		border: none;
+		color: var(--text2);
+		font-size: 1rem;
+		cursor: pointer;
+		padding: 0.2rem 0.3rem;
+		line-height: 1;
+	}
 	.universal-btn {
 		padding: 0.6rem 1rem;
 		border: none;
@@ -558,13 +581,6 @@
 	.add-btn { background: var(--accent); color: #fff; }
 	.add-btn:disabled { opacity: 0.4; }
 	.done-btn { background: #22c55e; color: #fff; }
-	.cancel-btn {
-		background: var(--bg3);
-		color: var(--text2);
-		padding: 0.6rem 0.7rem;
-		font-size: 1rem;
-		font-weight: 400;
-	}
 	/* ── Floating + button ──────────────────────────────────────────── */
 	.fab {
 		position: absolute;
