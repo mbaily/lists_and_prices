@@ -42,6 +42,8 @@
 	let universalValue = $state('');
 	// bind:this requires a plain let (not $state) to receive the real DOM node
 	let universalInputEl: HTMLInputElement | null = null;
+	// True while the input is focused (keyboard is open) — drives the confirm FAB
+	let inputFocused = $state(false);
 
 	function focusInput() {
 		tick().then(() => universalInputEl?.focus());
@@ -51,7 +53,7 @@
 		if (!universalValue.trim()) return;
 		createItem(listId, universalValue.trim());
 		universalValue = '';
-		// Blur dismisses the iOS keyboard after adding
+		// Blur dismisses the iOS keyboard and hides the confirm FAB
 		universalInputEl?.blur();
 	}
 
@@ -74,6 +76,7 @@
 		if (!editingId) return;
 		const trimmed = universalValue.trim();
 		if (trimmed) updateItem(editingId, { name: trimmed });
+		universalInputEl?.blur();
 		cancelEdit();
 	}
 
@@ -81,6 +84,7 @@
 		editingId = null;
 		inputMode = 'add';
 		universalValue = '';
+		universalInputEl?.blur();
 	}
 
 	function startEditPrice(item: Item) {
@@ -260,8 +264,8 @@
 						class="universal-input"
 						class:editing={inputMode === 'edit'}
 						placeholder={inputMode === 'edit' ? 'Edit name…' : 'Add item…'}
-						bind:value={universalValue}
-						onkeydown={(e) => { if (e.key === 'Escape') cancelEdit(); }}
+						bind:value={universalValue}					onfocus={() => (inputFocused = true)}
+					onblur={() => (inputFocused = false)}						onkeydown={(e) => { if (e.key === 'Escape') cancelEdit(); }}
 					/>
 					{#if inputMode === 'edit'}
 						<button type="button" class="input-clear" onclick={cancelEdit} aria-label="Cancel edit">✕</button>
@@ -344,13 +348,26 @@
 		{/each}
 	</div>
 
-	<!-- Floating + button -->
+	<!-- Floating blue + button (bottom-right): open keyboard / start adding -->
 	{#if !pricingItemId || !isPriced}
 		<button
-			class="fab"
+			class="fab fab-right"
 			aria-label="Add item"
 			onclick={() => { cancelEdit(); focusInput(); }}
 		>＋</button>
+	{/if}
+
+	<!-- Floating green confirm button (bottom-left): appears while keyboard is open -->
+	{#if inputFocused}
+		<button
+			class="fab fab-left fab-confirm"
+			aria-label="Confirm"
+			onpointerdown={(e) => {
+				// pointerdown fires before the input loses focus, so we can still act
+				e.preventDefault();
+				inputMode === 'edit' ? submitEditName() : addItem();
+			}}
+		>✓</button>
 	{/if}
 
 	<!-- Numeric keypad -->
@@ -582,15 +599,13 @@
 	.add-btn { background: var(--accent); color: #fff; }
 	.add-btn:disabled { opacity: 0.4; }
 	.done-btn { background: #22c55e; color: #fff; }
-	/* ── Floating + button ──────────────────────────────────────────── */
+	/* ── Floating action buttons ────────────────────────────────────── */
 	.fab {
 		position: absolute;
 		bottom: 1.25rem;
-		right: 1.25rem;
 		width: 56px;
 		height: 56px;
 		border-radius: 50%;
-		background: var(--accent);
 		color: #fff;
 		font-size: 2rem;
 		line-height: 1;
@@ -602,6 +617,9 @@
 		justify-content: center;
 		z-index: 10;
 	}
+	.fab-right { right: 1.25rem; background: var(--accent); }
+	.fab-left  { left: 1.25rem; }
+	.fab-confirm { background: #22c55e; font-size: 1.8rem; }
 	.keypad-area {
 		flex-shrink: 0;
 		border-top: 2px solid var(--accent);
