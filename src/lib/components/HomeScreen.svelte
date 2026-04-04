@@ -262,13 +262,16 @@
 		{#each childFolders as folder, i}
 			<div
 				class="row folder-row"
+				class:done={folder.done}
 				class:drag-source={touchDragKind === 'folder' && touchDragFrom === i}
 				class:drag-target={touchDragKind === 'folder' && touchDragOver === i && touchDragFrom !== i}
 				data-drag-kind="folder"
 				data-drag-index={i}
 				style="--row-color:{folder.color}"
 			>
-				<span class="dot"></span>
+				<button class="check-circle" onclick={() => updateFolder(folder.id, { done: !folder.done })} aria-label={folder.done ? 'Unmark complete' : 'Mark complete'}>
+					{folder.done ? '☑' : '☐'}
+				</button>
 				{#if renamingId === folder.id}
 					<input
 						class="rename-input"
@@ -305,13 +308,16 @@
 		{#each childLists as list, i}
 			<div
 				class="row list-row"
+				class:done={list.done}
 				class:drag-source={touchDragKind === 'list' && touchDragFrom === i}
 				class:drag-target={touchDragKind === 'list' && touchDragOver === i && touchDragFrom !== i}
 				data-drag-kind="list"
 				data-drag-index={i}
 				style="--row-color:{list.color}"
 			>
-				<span class="dot"></span>
+				<button class="check-circle" onclick={() => updateList(list.id, { done: !list.done })} aria-label={list.done ? 'Unmark complete' : 'Mark complete'}>
+					{list.done ? '☑' : '☐'}
+				</button>
 				{#if renamingId === list.id}
 					<input
 						class="rename-input"
@@ -493,6 +499,22 @@
 	}
 	.row.drag-source { opacity: 0.4; }
 	.row.drag-target { background: var(--bg3); box-shadow: inset 0 2px 0 var(--accent); }
+	.row.done { opacity: 0.55; }
+	.row.done .row-name { text-decoration: line-through; color: var(--text2); }
+	.check-circle {
+		background: none;
+		border: none;
+		font-size: 1.3rem;
+		cursor: pointer;
+		padding: 0;
+		flex-shrink: 0;
+		min-width: 36px;
+		min-height: 44px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--row-color, var(--accent));
+	}
 	.dot {
 		width: 10px;
 		height: 10px;

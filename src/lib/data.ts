@@ -17,6 +17,7 @@ export interface Folder {
 	color: string;
 	parentId: string | null;
 	order: number;
+	done: boolean;
 }
 
 export function readFolders(): Folder[] {
@@ -29,7 +30,8 @@ function yMapToFolder(m: Y.Map<unknown>): Folder {
 		name: m.get('name') as string,
 		color: (m.get('color') as string) ?? '#6366f1',
 		parentId: (m.get('parentId') as string | null) ?? null,
-		order: (m.get('order') as number) ?? 0
+		order: (m.get('order') as number) ?? 0,
+		done: (m.get('done') as boolean) ?? false
 	};
 }
 
@@ -93,6 +95,7 @@ export interface ListMeta {
 	folderId: string;
 	type: 'plain' | 'priced';
 	order: number;
+	done: boolean;
 }
 
 export function readLists(): ListMeta[] {
@@ -106,7 +109,8 @@ function yMapToList(m: Y.Map<unknown>): ListMeta {
 		color: (m.get('color') as string) ?? '#6366f1',
 		folderId: m.get('folderId') as string,
 		type: (m.get('type') as 'plain' | 'priced') ?? 'plain',
-		order: (m.get('order') as number) ?? 0
+		order: (m.get('order') as number) ?? 0,
+		done: (m.get('done') as boolean) ?? false
 	};
 }
 
