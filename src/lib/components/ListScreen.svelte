@@ -169,34 +169,7 @@
 
 	onDestroy(() => cancelLongPress());
 
-	// ── iOS keyboard: keep screen anchored above SIP ───────────────────────────
-	// When the keyboard opens, iOS shrinks visualViewport.height and may scroll
-	// the page (visualViewport.offsetTop). We resize + re-anchor the screen div
-	// so the item-list shrinks and the add-bar stays just above the keyboard.
-	let screenEl = $state<HTMLElement | null>(null);
-
-	$effect(() => {
-		if (!screenEl || typeof window === 'undefined') return;
-		const vv = window.visualViewport;
-		if (!vv) return;
-
-		function onViewport() {
-			if (!screenEl) return;
-			screenEl.style.height = `${vv.height}px`;
-			// If iOS scrolled the page to show the input, translate back
-			screenEl.style.transform = vv.offsetTop ? `translateY(${vv.offsetTop}px)` : '';
-		}
-
-		onViewport();
-		vv.addEventListener('resize', onViewport);
-		vv.addEventListener('scroll', onViewport);
-		return () => {
-			vv.removeEventListener('resize', onViewport);
-			vv.removeEventListener('scroll', onViewport);
-		};
-	});
-
-	// ── Touch drag reorder ────────────────────────────────────────────────────────
+	// ── Touch drag reorder ────────────────────────────────────────────────────────────────
 	// HTML5 drag doesn't work on iOS — use touch events instead.
 	let touchDragFrom = $state<number | null>(null);
 	let touchDragOver = $state<number | null>(null);
@@ -243,7 +216,7 @@
 	const isPriced = $derived(listMeta?.type === 'priced');
 </script>
 
-<div class="screen" class:has-keypad={pricingItemId && isPriced} bind:this={screenEl}>
+<div class="screen" class:has-keypad={pricingItemId && isPriced}>
 	<!-- Header -->
 	<header>
 		<button class="back-btn" onclick={onBack}>← Back</button>
@@ -361,9 +334,12 @@
 	.screen {
 		display: flex;
 		flex-direction: column;
-		height: 100dvh;
+		/* position:fixed is anchored to the visual viewport on iOS Safari,
+		   so the screen automatically shrinks when the SIP keyboard opens.
+		   No JS needed — the add-bar stays visible above the keyboard. */
+		position: fixed;
+		inset: 0;
 		background: var(--bg);
-		overflow: hidden;
 	}
 	header {
 		display: flex;
