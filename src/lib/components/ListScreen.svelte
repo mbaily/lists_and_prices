@@ -42,8 +42,6 @@
 	let universalValue = $state('');
 	// bind:this requires a plain let (not $state) to receive the real DOM node
 	let universalInputEl: HTMLInputElement | null = null;
-	// True while the input is focused (keyboard is open) — drives the confirm FAB
-	let inputFocused = $state(false);
 
 	function focusInput() {
 		tick().then(() => universalInputEl?.focus());
@@ -264,8 +262,8 @@
 						class="universal-input"
 						class:editing={inputMode === 'edit'}
 						placeholder={inputMode === 'edit' ? 'Edit name…' : 'Add item…'}
-						bind:value={universalValue}					onfocus={() => (inputFocused = true)}
-					onblur={() => (inputFocused = false)}						onkeydown={(e) => { if (e.key === 'Escape') cancelEdit(); }}
+						bind:value={universalValue}
+						onkeydown={(e) => { if (e.key === 'Escape') cancelEdit(); }}
 					/>
 					{#if inputMode === 'edit'}
 						<button type="button" class="input-clear" onclick={cancelEdit} aria-label="Cancel edit">✕</button>
@@ -357,8 +355,8 @@
 		>＋</button>
 	{/if}
 
-	<!-- Floating green confirm button (bottom-left): appears while keyboard is open -->
-	{#if inputFocused}
+	<!-- Floating green confirm button (bottom-left): visible while there is text to confirm -->
+	{#if universalValue.trim()}
 		<button
 			class="fab fab-left fab-confirm"
 			aria-label="Confirm"
