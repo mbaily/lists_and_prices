@@ -34,13 +34,18 @@
 	const checkedCount = $derived(items.filter((i) => i.checked).length);
 	const uncheckedCount = $derived(items.filter((i) => !i.checked).length);
 
-	// ── Add item ─────────────────────────────────────────────────────────────────
-	let newItemName = $state('');
+	// ── Universal input (add + edit) ─────────────────────────────────────────
+	// A single text input always at the top — iOS opens keyboard in the same
+	// place every time, preventing the scroll-jump on focus.
+	type InputMode = 'add' | 'edit';
+	let inputMode = $state<InputMode>('add');
+	let universalValue = $state('');
+	let universalInputEl = $state<HTMLInputElement | null>(null);
 
 	function addItem() {
-		if (!newItemName.trim()) return;
-		createItem(listId, newItemName.trim());
-		newItemName = '';
+		if (!universalValue.trim()) return;
+		createItem(listId, universalValue.trim());
+		universalValue = '';
 	}
 
 	// ── Edit item ─────────────────────────────────────────────────────────────────
@@ -71,7 +76,8 @@
 		priceBuffer = item.price !== null
 			? (item.price < 0 ? '-' : '') + Math.abs(item.price).toFixed(2).replace(/\.?0+$/, '')
 			: '';
-		editingId = null;
+		// Leave the edit of the name as-is; cancel it cleanly
+		cancelEdit();
 	}
 
 	function handleKeypadInput(key: string) {
@@ -228,6 +234,32 @@
 		</div>
 	</header>
 
+	<!-- Universal input bar: always present so iOS keyboard opens at a fixed position -->
+	{#if !pricingItemId || !isPriced}
+		<div class="universal-bar">
+			{#if inputMode === 'edit' && editingId}
+				<div class="edit-hint">✏ Editing item — <button class="hint-cancel" onclick={cancelEdit}>Cancel</button></div>
+			{/if}
+			<div class="universal-row">
+				<input
+					bind:this={universalInputEl}
+					class="universal-input"
+					placeholder={inputMode === 'edit' ? 'Edit name…' : 'Add item…'}
+					bind:value={universalValue}
+					onkeydown={(e) => {
+						if (e.key === 'Enter') inputMode === 'edit' ? submitEditName() : addItem();
+						if (e.key === 'Escape') cancelEdit();
+					}}
+				/>
+				{#if inputMode === 'edit'}
+					<button class="universal-btn done-btn" onclick={submitEditName}>Done</button>
+				{:else}
+					<button class="universal-btn add-btn" onclick={addItem} disabled={!universalValue.trim()}>Add</button>
+				{/if}
+			</div>
+		</div>
+	{/if}
+
 	<!-- Summary bar -->
 	<div class="summary-bar">
 		{#if isPriced}
@@ -257,27 +289,18 @@
 				</button>
 
 				<!-- Name -->
-				{#if editingId === item.id}
-					<input
-						class="edit-input"
-						bind:value={editName}
-						onblur={submitEditName}
-						onkeydown={(e) => e.key === 'Enter' && submitEditName()}
-						autofocus
-					/>
-				{:else}
-					<button
-						class="item-name"
-						class:strikethrough={item.checked}
-						onclick={() => startEditName(item)}
-						onpointerdown={(e) => onPointerDown(e, item.id)}
-						onpointermove={cancelLongPress}
-						onpointerup={cancelLongPress}
-						onpointercancel={cancelLongPress}
-					>
-						{item.name}
-					</button>
-				{/if}
+				<button
+					class="item-name"
+					class:strikethrough={item.checked}
+					class:editing={editingId === item.id}
+					onclick={() => startEditName(item)}
+					onpointerdown={(e) => onPointerDown(e, item.id)}
+					onpointermove={cancelLongPress}
+					onpointerup={cancelLongPress}
+					onpointercancel={cancelLongPress}
+				>
+					{item.name}
+				</button>
 
 				<!-- Price column (priced lists only) -->
 				{#if isPriced}
@@ -305,17 +328,13 @@
 		{/each}
 	</div>
 
-	<!-- Add item bar (shown when keypad is not active) -->
+	<!-- Floating add button (visible when not pricing) -->
 	{#if !pricingItemId || !isPriced}
-		<div class="add-bar">
-			<input
-				class="add-input"
-				placeholder="Add item…"
-				bind:value={newItemName}
-				onkeydown={(e) => e.key === 'Enter' && addItem()}
-			/>
-			<button class="add-btn" onclick={addItem} disabled={!newItemName.trim()}>Add</button>
-		</div>
+		<button
+			class="fab"
+			aria-label="Add item"
+			onclick={() => { cancelEdit(); universalInputEl?.focus(); }}
+		>＋</button>
 	{/if}
 
 	<!-- Numeric keypad -->
@@ -398,6 +417,8 @@
 		flex: 1;
 		overflow-y: auto;
 		-webkit-overflow-scrolling: touch;
+		/* Leave room for the FAB at the bottom */
+		padding-bottom: 5rem;
 	}
 	.item-row {
 		display: flex;
@@ -443,15 +464,7 @@
 		white-space: nowrap;
 	}
 	.item-name.strikethrough { text-decoration: line-through; color: var(--text2); }
-	.edit-input {
-		flex: 1;
-		padding: 0.25rem 0.5rem;
-		border: 1px solid var(--accent);
-		border-radius: 6px;
-		font-size: 0.95rem;
-		background: var(--bg2);
-		color: var(--text);
-	}
+	.item-name.editing { color: var(--accent); font-style: italic; }
 	.price-btn {
 		min-width: 72px;
 		padding: 0.25rem 0.4rem;
@@ -499,15 +512,32 @@
 		-webkit-user-select: none;
 	}
 	.drag-handle:active { color: var(--accent); }
-	.add-bar {
-		display: flex;
-		gap: 0.5rem;
-		padding: 0.6rem 0.75rem;
-		border-top: 1px solid var(--border);
+	/* ── Universal input bar ──────────────────────────────────────── */
+	.universal-bar {
+		padding: 0.5rem 0.75rem 0.4rem;
+		border-bottom: 2px solid var(--accent);
 		background: var(--bg2);
 		flex-shrink: 0;
 	}
-	.add-input {
+	.edit-hint {
+		font-size: 0.75rem;
+		color: var(--accent);
+		margin-bottom: 0.35rem;
+	}
+	.hint-cancel {
+		background: none;
+		border: none;
+		color: var(--accent);
+		font-size: 0.75rem;
+		cursor: pointer;
+		padding: 0;
+		text-decoration: underline;
+	}
+	.universal-row {
+		display: flex;
+		gap: 0.5rem;
+	}
+	.universal-input {
 		flex: 1;
 		padding: 0.6rem 0.8rem;
 		border: 1px solid var(--border);
@@ -515,18 +545,41 @@
 		font-size: 1rem;
 		background: var(--bg);
 		color: var(--text);
+		outline: none;
 	}
-	.add-btn {
+	.universal-input:focus { border-color: var(--accent); }
+	.universal-btn {
 		padding: 0.6rem 1rem;
-		background: var(--accent);
-		color: #fff;
 		border: none;
 		border-radius: 10px;
 		font-size: 0.95rem;
 		font-weight: 600;
 		cursor: pointer;
+		flex-shrink: 0;
 	}
+	.add-btn { background: var(--accent); color: #fff; }
 	.add-btn:disabled { opacity: 0.4; }
+	.done-btn { background: #22c55e; color: #fff; }
+	/* ── Floating + button ──────────────────────────────────────────── */
+	.fab {
+		position: absolute;
+		bottom: 1.25rem;
+		right: 1.25rem;
+		width: 56px;
+		height: 56px;
+		border-radius: 50%;
+		background: var(--accent);
+		color: #fff;
+		font-size: 2rem;
+		line-height: 1;
+		border: none;
+		cursor: pointer;
+		box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 10;
+	}
 	.keypad-area {
 		flex-shrink: 0;
 		border-top: 2px solid var(--accent);
