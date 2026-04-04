@@ -208,7 +208,7 @@
 </script>
 
 {#if openListId}
-	<ListScreen listId={openListId} onBack={() => (openListId = null)} />
+	<ListScreen listId={openListId} onBack={() => (openListId = null)} onHome={() => { openListId = null; breadcrumb = [null]; }} />
 {:else if showSettings}
 	<SettingsScreen onBack={() => (showSettings = false)} {onLogout} />
 {:else}

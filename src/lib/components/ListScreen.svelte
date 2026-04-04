@@ -16,7 +16,7 @@
 	import NumericKeypad from './NumericKeypad.svelte';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 
-	let { listId, onBack }: { listId: string; onBack: () => void } = $props();
+	let { listId, onBack, onHome }: { listId: string; onBack: () => void; onHome: () => void } = $props();
 
 	let items = $derived.by(() => {
 		void docState.version;
@@ -260,6 +260,7 @@
 <div class="screen" class:has-keypad={pricingItemId && isPriced}>
 	<!-- Header -->
 	<header>
+		<button class="home-btn" onclick={onHome} aria-label="Home">🏠</button>
 		<button class="back-btn" onclick={onBack}>← Back</button>
 		<span class="list-title">{listMeta?.name ?? '…'}</span>
 		<div class="header-right">
@@ -437,6 +438,14 @@
 		color: var(--accent);
 		cursor: pointer;
 		padding: 0;
+	}
+	.home-btn {
+		background: none;
+		border: none;
+		font-size: 1.1rem;
+		cursor: pointer;
+		padding: 0;
+		line-height: 1;
 	}
 	.list-title {
 		flex: 1;
