@@ -620,7 +620,7 @@
 		z-index: 10;
 	}
 	.fab-right { right: 1.25rem; background: var(--accent); }
-	.fab-left  { left: 1.25rem; }
+	.fab-left  { left: 1.25rem; background: var(--accent); }
 	.fab-confirm { background: #22c55e; font-size: 1.8rem; }
 	.keypad-area {
 		flex-shrink: 0;
