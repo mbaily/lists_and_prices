@@ -55,6 +55,27 @@
 		universalInputEl?.blur();
 	}
 
+	// ── Clipboard import ───────────────────────────────────────────────────
+	async function importFromClipboard() {
+		let text: string;
+		try {
+			text = await navigator.clipboard.readText();
+		} catch {
+			alert('Could not read clipboard. Make sure you have granted clipboard permission.');
+			return;
+		}
+		const lines = text
+			.split(/\r?\n/)
+			.map((l) => l.trim())
+			.filter((l) => l.length > 0)        // strip blank / whitespace-only
+			.filter((l) => /[a-zA-Z]/.test(l)); // strip lines with no alphabetic char
+		if (lines.length === 0) {
+			alert('No valid items found in clipboard.');
+			return;
+		}
+		for (const name of lines) createItem(listId, name);
+	}
+
 	// ── Edit item name via universal input ────────────────────────────────────────
 	let editingId = $state<string | null>(null);
 
@@ -273,6 +294,7 @@
 					<button type="submit" class="universal-btn done-btn">OK</button>
 				{:else}
 					<button type="submit" class="universal-btn add-btn" disabled={!universalValue.trim()}>OK</button>
+					<button type="button" class="universal-btn paste-btn" onclick={importFromClipboard} title="Import from clipboard">📋</button>
 				{/if}
 			</form>
 		</div>
@@ -601,6 +623,12 @@
 	.add-btn { background: var(--accent); color: #fff; }
 	.add-btn:disabled { opacity: 0.4; }
 	.done-btn { background: #22c55e; color: #fff; }
+	.paste-btn {
+		background: var(--bg3);
+		color: var(--text);
+		padding: 0.6rem 0.7rem;
+		font-size: 1.1rem;
+	}
 	/* ── Floating action buttons ────────────────────────────────────── */
 	.fab {
 		position: absolute;
