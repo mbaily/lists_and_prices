@@ -249,7 +249,11 @@
 	<!-- Universal input bar: always present so iOS keyboard opens at a fixed position -->
 	{#if !pricingItemId || !isPriced}
 		<div class="universal-bar">
-			<div class="universal-row">
+			<!-- form fires submit on iOS keyboard return/tick, more reliable than keydown -->
+			<form
+				class="universal-row"
+				onsubmit={(e) => { e.preventDefault(); inputMode === 'edit' ? submitEditName() : addItem(); }}
+			>
 				<div class="input-wrap">
 					<input
 						bind:this={universalInputEl}
@@ -257,21 +261,18 @@
 						class:editing={inputMode === 'edit'}
 						placeholder={inputMode === 'edit' ? 'Edit name…' : 'Add item…'}
 						bind:value={universalValue}
-						onkeydown={(e) => {
-							if (e.key === 'Enter') inputMode === 'edit' ? submitEditName() : addItem();
-							if (e.key === 'Escape') cancelEdit();
-						}}
+						onkeydown={(e) => { if (e.key === 'Escape') cancelEdit(); }}
 					/>
 					{#if inputMode === 'edit'}
-						<button class="input-clear" onclick={cancelEdit} aria-label="Cancel edit">✕</button>
+						<button type="button" class="input-clear" onclick={cancelEdit} aria-label="Cancel edit">✕</button>
 					{/if}
 				</div>
 				{#if inputMode === 'edit'}
-					<button class="universal-btn done-btn" onclick={submitEditName}>OK</button>
+					<button type="submit" class="universal-btn done-btn">OK</button>
 				{:else}
-					<button class="universal-btn add-btn" onclick={addItem} disabled={!universalValue.trim()}>OK</button>
+					<button type="submit" class="universal-btn add-btn" disabled={!universalValue.trim()}>OK</button>
 				{/if}
-			</div>
+			</form>
 		</div>
 	{/if}
 
