@@ -15,12 +15,12 @@ function loadSettings(): Settings {
 	if (typeof localStorage === 'undefined') return { currency: '$', theme: 'light' };
 	try {
 		const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? 'null');
-		if (saved) return { handedness: 'left', ...saved };
+		if (saved) return { handedness: 'right', ...saved };
 	} catch { /* fall through */ }
 	// No saved settings — detect OS preference rather than hardcoding light
 	const prefersDark =
 		typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches;
-	return { currency: '$', theme: prefersDark ? 'dark' : 'light', handedness: 'left' };
+	return { currency: '$', theme: prefersDark ? 'dark' : 'light', handedness: 'right' };
 }
 
 function saveSettings(s: Settings) {
