@@ -414,15 +414,19 @@
 	.check-btn {
 		background: none;
 		border: none;
-		font-size: 1.4rem;
+		font-size: 1.82rem;
 		cursor: pointer;
 		padding: 0;
 		flex-shrink: 0;
-		min-width: 44px;
-		min-height: 44px;
+		min-width: 50px;
+		min-height: 50px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
+	}
+	@media (pointer: fine) {
+		/* Mouse/trackpad users: revert to original size */
+		.check-btn { font-size: 1.4rem; min-width: 44px; min-height: 44px; }
 	}
 	.item-name {
 		flex: 1;
