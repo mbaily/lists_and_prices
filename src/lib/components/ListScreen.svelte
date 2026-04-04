@@ -51,7 +51,8 @@
 		if (!universalValue.trim()) return;
 		createItem(listId, universalValue.trim());
 		universalValue = '';
-		universalInputEl?.focus(); // keep focus for rapid entry
+		// Blur dismisses the iOS keyboard after adding
+		universalInputEl?.blur();
 	}
 
 	// ── Edit item name via universal input ────────────────────────────────────────
@@ -557,7 +558,13 @@
 	.add-btn { background: var(--accent); color: #fff; }
 	.add-btn:disabled { opacity: 0.4; }
 	.done-btn { background: #22c55e; color: #fff; }
-	.cancel-btn { background: var(--bg3); color: var(--text2); }
+	.cancel-btn {
+		background: var(--bg3);
+		color: var(--text2);
+		padding: 0.6rem 0.7rem;
+		font-size: 1rem;
+		font-weight: 400;
+	}
 	/* ── Floating + button ──────────────────────────────────────────── */
 	.fab {
 		position: absolute;
