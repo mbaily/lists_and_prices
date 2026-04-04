@@ -141,9 +141,11 @@
 	}
 
 	function submitRename() {
-		if (!renamingId || !renameValue.trim()) return;
-		if (renameTarget === 'folder') updateFolder(renamingId, { name: renameValue.trim() });
-		else updateList(renamingId, { name: renameValue.trim() });
+		if (renamingId && renameValue.trim()) {
+			if (renameTarget === 'folder') updateFolder(renamingId, { name: renameValue.trim() });
+			else updateList(renamingId, { name: renameValue.trim() });
+		}
+		// Always close the rename input, even if empty (discard)
 		renamingId = null;
 	}
 
@@ -350,9 +352,9 @@
 		{#if movingFolderId || movingListId}
 			<div class="move-panel">
 				<p>{movingFolderId ? 'Move folder to:' : 'Move list to:'}</p>
-				<button onclick={() => movingFolderId ? moveFolderTo(null) : moveListTo(currentFolderId!)}>
-					Root
-				</button>
+				{#if movingFolderId}
+					<button onclick={() => moveFolderTo(null)}>Root</button>
+				{/if}
 				{#each allFolders as f}
 					<button
 						onclick={() =>

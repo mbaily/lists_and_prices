@@ -12,7 +12,7 @@ interface Settings {
 }
 
 function loadSettings(): Settings {
-	if (typeof localStorage === 'undefined') return { currency: '$', theme: 'light' };
+	if (typeof localStorage === 'undefined') return { currency: '$', theme: 'light', handedness: 'right' };
 	try {
 		const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? 'null');
 		if (saved) return { handedness: 'right', ...saved };
