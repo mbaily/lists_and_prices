@@ -486,6 +486,25 @@
 		transition: background 0.15s, opacity 0.15s;
 		min-height: 52px;
 	}
+	/* Priced rows stack vertically */
+	.item-row.priced-row {
+		flex-direction: column;
+		align-items: stretch;
+		gap: 0;
+		padding: 0.4rem 0.75rem 0.3rem;
+	}
+	.priced-top {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+	}
+	.priced-bottom {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding-left: 0.25rem;
+		justify-content: flex-end;
+	}
 	.item-row.selected { background: var(--bg3); }
 	.item-row.drag-source { opacity: 0.4; }
 	.item-row.drag-target { background: var(--bg3); box-shadow: inset 0 2px 0 var(--accent); }
@@ -516,9 +535,10 @@
 		cursor: pointer;
 		padding: 0;
 		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+		/* Allow wrapping in priced rows; plain rows also benefit from wrap */
+		white-space: normal;
+		word-break: break-word;
+		overflow-wrap: break-word;
 	}
 	.item-name.strikethrough { text-decoration: line-through; color: var(--text2); }
 	.item-name.editing { color: var(--accent); font-style: italic; }
