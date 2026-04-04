@@ -57,6 +57,22 @@
 		</section>
 
 		<section>
+			<h2>Handedness</h2>
+			<div class="toggle-row">
+				<button
+					class="theme-btn"
+					class:active={settings.handedness === 'left'}
+					onclick={() => updateSettings({ handedness: 'left' })}
+				>🤛 Left-handed</button>
+				<button
+					class="theme-btn"
+					class:active={settings.handedness === 'right'}
+					onclick={() => updateSettings({ handedness: 'right' })}
+				>🤚 Right-handed</button>
+			</div>
+		</section>
+
+		<section>
 			<h2>Account</h2>
 			<button class="logout-btn" onclick={onLogout}>Sign out</button>
 		</section>

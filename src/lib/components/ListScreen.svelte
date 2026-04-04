@@ -346,22 +346,26 @@
 		{/each}
 	</div>
 
-	<!-- Floating blue + button (bottom-right): open keyboard / start adding -->
+	<!-- Floating blue + button: open keyboard / start adding -->
+	<!-- Position depends on handedness: left-handed = right side, right-handed = left side -->
 	{#if !pricingItemId || !isPriced}
 		<button
-			class="fab fab-right"
+			class="fab"
+			class:fab-right={settings.handedness !== 'right'}
+			class:fab-left={settings.handedness === 'right'}
 			aria-label="Add item"
 			onclick={() => { cancelEdit(); focusInput(); }}
 		>＋</button>
 	{/if}
 
-	<!-- Floating green confirm button (bottom-left): visible while there is text to confirm -->
+	<!-- Floating green confirm button: opposite side to blue button -->
 	{#if universalValue.trim()}
 		<button
-			class="fab fab-left fab-confirm"
+			class="fab fab-confirm"
+			class:fab-left={settings.handedness !== 'right'}
+			class:fab-right={settings.handedness === 'right'}
 			aria-label="Confirm"
 			onpointerdown={(e) => {
-				// pointerdown fires before the input loses focus, so we can still act
 				e.preventDefault();
 				inputMode === 'edit' ? submitEditName() : addItem();
 			}}
