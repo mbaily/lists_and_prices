@@ -1,0 +1,21 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import { applyTheme } from '$lib/settings.svelte';
+	import '../app.css';
+
+	let { children } = $props();
+
+	onMount(() => {
+		applyTheme();
+	});
+</script>
+
+<svelte:head>
+	<meta name="apple-mobile-web-app-capable" content="yes" />
+	<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+	<title>Lists & Prices</title>
+</svelte:head>
+
+{@render children()}
+
+

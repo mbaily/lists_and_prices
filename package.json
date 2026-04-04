@@ -1,0 +1,43 @@
+{
+	"name": "list-svelt5",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"start": "npx tsx server/index.ts",
+		"prepare": "svelte-kit sync || echo ''",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+	},
+	"devDependencies": {
+		"@sveltejs/adapter-auto": "^7.0.0",
+		"@sveltejs/kit": "^2.50.2",
+		"@sveltejs/vite-plugin-svelte": "^6.2.4",
+		"@types/bcryptjs": "^2.4.6",
+		"@types/better-sqlite3": "^7.6.13",
+		"bcryptjs": "^3.0.3",
+		"cookie-parser": "^1.4.7",
+		"cookie-signature": "^1.2.2",
+		"express": "^5.2.1",
+		"node-forge": "^1.4.0",
+		"svelte": "^5.54.0",
+		"svelte-check": "^4.4.2",
+		"ts-node": "^10.9.2",
+		"tsx": "^4.21.0",
+		"typescript": "^5.9.3",
+		"vite": "^7.3.1",
+		"ws": "^8.20.0"
+	},
+	"dependencies": {
+		"@sveltejs/adapter-static": "^3.0.10",
+		"better-sqlite3": "^12.8.0",
+		"vite-plugin-pwa": "^1.2.0",
+		"workbox-window": "^7.4.0",
+		"y-indexeddb": "^9.0.12",
+		"y-websocket": "^1.5.4",
+		"yjs": "^13.6.30"
+	}
+}
