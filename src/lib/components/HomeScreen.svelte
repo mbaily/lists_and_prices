@@ -144,14 +144,19 @@
 	$effect(() => {
 		// allFolders is a reactive dependency; re-run whenever folders change.
 		const ids = new Set(allFolders.map((f) => f.id));
-		// Find the deepest breadcrumb entry that still exists (null = root, ARCHIVE_ID = virtual — always valid)
-		const lastValid = breadcrumb.findLastIndex((id) => id === null || id === ARCHIVE_ID || ids.has(id));
-		if (lastValid < breadcrumb.length - 1) {
-			breadcrumb = breadcrumb.slice(0, lastValid + 1);
-		}
-		// Close list screen if the open list has been deleted by a peer
-		if (openListId !== null && !allLists.some((l) => l.id === openListId)) {
-			openListId = null;
+		// Only trim stale navigation state after Yjs has loaded data from IndexedDB.
+		// Before the first update (version === 0) allFolders/allLists are empty and
+		// the IDs from the URL hash would be incorrectly treated as deleted.
+		if (docState.version > 0) {
+			// Find the deepest breadcrumb entry that still exists (null = root, ARCHIVE_ID = virtual — always valid)
+			const lastValid = breadcrumb.findLastIndex((id) => id === null || id === ARCHIVE_ID || ids.has(id));
+			if (lastValid < breadcrumb.length - 1) {
+				breadcrumb = breadcrumb.slice(0, lastValid + 1);
+			}
+			// Close list screen if the open list has been deleted by a peer
+			if (openListId !== null && !allLists.some((l) => l.id === openListId)) {
+				openListId = null;
+			}
 		}
 		// Clear rename state if the target was deleted by a peer
 		if (renamingId !== null) {
