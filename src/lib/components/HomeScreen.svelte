@@ -300,6 +300,11 @@
 	$effect(() => {
 		void currentFolderId; // track navigation
 		renamingId = null;
+		// Close create forms so they don't linger in the wrong folder context
+		showNewFolder = false;
+		showNewList = false;
+		newFolderName = '';
+		newListName = '';
 		// Do NOT clear the tag — the user navigates specifically to find the move target
 	});
 </script>
