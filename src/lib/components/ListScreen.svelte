@@ -618,7 +618,7 @@
 		align-items: center;
 		gap: 0.25rem;
 		flex-wrap: wrap;
-		font-size: 0.85rem;
+		font-size: 1rem;
 		min-width: 0;
 	}
 	.crumb {
@@ -681,7 +681,7 @@
 	.home-btn {
 		background: none;
 		border: none;
-		font-size: 1.1rem;
+		font-size: 1.25rem;
 		cursor: pointer;
 		padding: 0;
 		line-height: 1;

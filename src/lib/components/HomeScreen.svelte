@@ -595,7 +595,7 @@
 		align-items: center;
 		gap: 0.25rem;
 		flex-wrap: wrap;
-		font-size: 0.85rem;
+		font-size: 1rem;
 	}
 	.crumb {
 		background: none;
