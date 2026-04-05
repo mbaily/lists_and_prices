@@ -23,6 +23,7 @@
 	import SyncBadge from './SyncBadge.svelte';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import RowMenu from './RowMenu.svelte';
+	import InfoDialog from './InfoDialog.svelte';
 
 	let { onLogout }: { onLogout: () => void } = $props();
 
@@ -225,6 +226,18 @@
 	function askDelete(msg: string, action: () => void) {
 		confirmMsg = msg;
 		confirmAction = () => action();
+	}
+
+	// ── Info dialog ────────────────────────────────────────────────────────────
+	type InfoTarget = { kind: 'folder'; data: Folder } | { kind: 'list'; data: ListMeta };
+	let infoTarget = $state<InfoTarget | null>(null);
+
+	function fmtDate(iso: string | null | undefined): string {
+		if (!iso) return 'Unknown';
+		return new Date(iso).toLocaleString(undefined, {
+			day: 'numeric', month: 'short', year: 'numeric',
+			hour: '2-digit', minute: '2-digit'
+		});
 	}
 
 	// ── Rename ───────────────────────────────────────────────────────────────────
@@ -495,6 +508,7 @@
 				{/if}
 				<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'folder', i)}>☰</button>
 				<RowMenu items={[
+					{ label: 'ℹ️ Info', action: () => infoTarget = { kind: 'folder', data: folder } },
 					{ label: '✏ Rename', action: () => startRename(folder.id, folder.name, 'folder') },
 					{ label: folder.archived ? '📤 Unarchive' : '📥 Archive', action: () => folder.archived ? unarchiveFolder(folder.id) : archiveFolder(folder.id) },
 					...(hasTag && taggedFolderId !== folder.id
@@ -545,6 +559,7 @@
 				>★</button>
 				<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'list', i)}>☰</button>
 				<RowMenu items={[
+					{ label: 'ℹ️ Info', action: () => infoTarget = { kind: 'list', data: list } },
 					{ label: '✏ Rename', action: () => startRename(list.id, list.name, 'list') },
 					{ label: list.archived ? '📤 Unarchive' : '📥 Archive', action: () => list.archived ? unarchiveList(list.id) : archiveList(list.id) },
 					...(hasTag
@@ -618,6 +633,26 @@
 				message={confirmMsg}
 				onConfirm={() => { confirmAction?.(); confirmAction = null; }}
 				onCancel={() => (confirmAction = null)}
+			/>
+		{/if}
+
+		<!-- Info dialog -->
+		{#if infoTarget}
+			{@const d = infoTarget.data}
+			<InfoDialog
+				title={d.name}
+				rows={infoTarget.kind === 'folder'
+					? [
+						{ label: 'Type', value: 'Folder' },
+						{ label: 'Created', value: fmtDate(d.createdAt) },
+						{ label: 'Modified', value: fmtDate(d.updatedAt) }
+					]
+					: [
+						{ label: 'Type', value: (d as ListMeta).type === 'priced' ? 'Priced list' : 'Plain list' },
+						{ label: 'Created', value: fmtDate(d.createdAt) },
+						{ label: 'Modified', value: fmtDate(d.updatedAt) }
+					]}
+				onClose={() => infoTarget = null}
 			/>
 		{/if}
 		</div><!-- end .content -->

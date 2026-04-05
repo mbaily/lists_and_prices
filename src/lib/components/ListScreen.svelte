@@ -21,6 +21,7 @@
 	import NumericKeypad from './NumericKeypad.svelte';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import RowMenu from './RowMenu.svelte';
+	import InfoDialog from './InfoDialog.svelte';
 
 	let { listId, onHome, onOpenList, onNavigateTo }: {
 		listId: string;
@@ -436,6 +437,17 @@
 		confirmAction = () => action();
 	}
 
+	// ── Info dialog ───────────────────────────────────────────────────────────
+	let infoItem = $state<Item | null>(null);
+
+	function fmtDate(iso: string | null | undefined): string {
+		if (!iso) return 'Unknown';
+		return new Date(iso).toLocaleString(undefined, {
+			day: 'numeric', month: 'short', year: 'numeric',
+			hour: '2-digit', minute: '2-digit'
+		});
+	}
+
 	// ── Scroll anchor: compensate when summary bar grows/shrinks ─────────────────
 	// Svelte 5 $effect runs AFTER the DOM update, so both before/after would be
 	// identical if we measured there. Instead:
@@ -650,6 +662,7 @@
 					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else}{part.value}{/if}{/each}</button>
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
+						{ label: 'ℹ️ Info', action: () => infoItem = item },
 						...(canAddChildren ? [
 							{ label: '➕ Add Subtask', action: () => { newItemParentId = item.id; newItemIsNote = false; focusInput(); } },
 							{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
@@ -705,6 +718,20 @@
 			message={confirmMsg}
 			onConfirm={() => { confirmAction?.(); confirmAction = null; }}
 			onCancel={() => (confirmAction = null)}
+		/>
+	{/if}
+
+	<!-- Info dialog -->
+	{#if infoItem}
+		{@const it = infoItem}
+		<InfoDialog
+			title={it.name}
+			rows={[
+				{ label: 'Type', value: it.heading ? 'Heading' : it.note ? 'Note' : 'Task' },
+				{ label: 'Created', value: fmtDate(it.createdAt) },
+				{ label: 'Modified', value: fmtDate(it.updatedAt) }
+			]}
+			onClose={() => infoItem = null}
 		/>
 	{/if}
 </div>

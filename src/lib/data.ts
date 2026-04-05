@@ -19,6 +19,8 @@ export interface Folder {
 	order: number;
 	done: boolean;
 	archived: boolean;
+	createdAt: string | null;
+	updatedAt: string | null;
 }
 
 export function readFolders(): Folder[] {
@@ -33,7 +35,9 @@ function yMapToFolder(m: Y.Map<unknown>): Folder {
 		parentId: (m.get('parentId') as string | null) ?? null,
 		order: (m.get('order') as number) ?? 0,
 		done: (m.get('done') as boolean) ?? false,
-		archived: (m.get('archived') as boolean) ?? false
+		archived: (m.get('archived') as boolean) ?? false,
+		createdAt: (m.get('createdAt') as string | null) ?? null,
+		updatedAt: (m.get('updatedAt') as string | null) ?? null
 	};
 }
 
@@ -44,19 +48,24 @@ export function createFolder(name: string, parentId: string | null, color = '#63
 	const maxOrder = existing.filter((f) => f.get('parentId') === parentId).length;
 	const m = new Y.Map<unknown>();
 	const id = uid();
+	const now = new Date().toISOString();
 	m.set('id', id);
 	m.set('name', name);
 	m.set('color', color);
 	m.set('parentId', parentId);
 	m.set('order', maxOrder);
+	m.set('createdAt', now);
+	m.set('updatedAt', now);
 	folders.push([m]);
 	return id;
 }
 
-export function updateFolder(id: string, patch: Partial<Omit<Folder, 'id'>>) {
+export function updateFolder(id: string, patch: Partial<Omit<Folder, 'id' | 'createdAt' | 'updatedAt'>>) {
 	const m = findYMap(getFolders(getDoc()), id);
 	if (!m) return;
 	for (const [k, v] of Object.entries(patch)) m.set(k, v);
+	const keys = Object.keys(patch);
+	if (!(keys.length === 1 && keys[0] === 'order')) m.set('updatedAt', new Date().toISOString());
 }
 
 export function deleteFolder(id: string) {
@@ -122,6 +131,8 @@ export interface ListMeta {
 	done: boolean;
 	favourite: boolean;
 	archived: boolean;
+	createdAt: string | null;
+	updatedAt: string | null;
 }
 
 export function readLists(): ListMeta[] {
@@ -138,7 +149,9 @@ function yMapToList(m: Y.Map<unknown>): ListMeta {
 		order: (m.get('order') as number) ?? 0,
 		done: (m.get('done') as boolean) ?? false,
 		favourite: (m.get('favourite') as boolean) ?? false,
-		archived: (m.get('archived') as boolean) ?? false
+		archived: (m.get('archived') as boolean) ?? false,
+		createdAt: (m.get('createdAt') as string | null) ?? null,
+		updatedAt: (m.get('updatedAt') as string | null) ?? null
 	};
 }
 
@@ -155,20 +168,25 @@ export function createList(
 	);
 	const m = new Y.Map<unknown>();
 	const id = uid();
+	const now = new Date().toISOString();
 	m.set('id', id);
 	m.set('name', name);
 	m.set('color', color);
 	m.set('folderId', folderId);
 	m.set('type', type);
 	m.set('order', existing.length);
+	m.set('createdAt', now);
+	m.set('updatedAt', now);
 	lists.push([m]);
 	return id;
 }
 
-export function updateList(id: string, patch: Partial<Omit<ListMeta, 'id'>>) {
+export function updateList(id: string, patch: Partial<Omit<ListMeta, 'id' | 'createdAt' | 'updatedAt'>>) {
 	const m = findYMap(getLists(getDoc()), id);
 	if (!m) return;
 	for (const [k, v] of Object.entries(patch)) m.set(k, v);
+	const keys = Object.keys(patch);
+	if (!(keys.length === 1 && keys[0] === 'order')) m.set('updatedAt', new Date().toISOString());
 }
 
 export function deleteList(id: string) {
@@ -196,6 +214,8 @@ export interface Item {
 	heading: boolean;
 	parentId: string | null;
 	note: boolean;
+	createdAt: string | null;
+	updatedAt: string | null;
 }
 
 export function readItems(listId: string): Item[] {
@@ -215,7 +235,9 @@ function yMapToItem(m: Y.Map<unknown>): Item {
 		order: (m.get('order') as number) ?? 0,
 		heading: (m.get('heading') as boolean) ?? false,
 		parentId: (m.get('parentId') as string | null) ?? null,
-		note: (m.get('note') as boolean) ?? false
+		note: (m.get('note') as boolean) ?? false,
+		createdAt: (m.get('createdAt') as string | null) ?? null,
+		updatedAt: (m.get('updatedAt') as string | null) ?? null
 	};
 }
 
@@ -229,22 +251,27 @@ export function createItem(listId: string, name: string, price: number | null = 
 	const siblings = existing.filter((i) => (i.get('parentId') ?? null) === parentId);
 	const m = new Y.Map<unknown>();
 	const id = uid();
+	const now = new Date().toISOString();
 	m.set('id', id);
 	m.set('listId', listId);
 	m.set('name', name);
 	m.set('price', price);
 	m.set('checked', false);
 	m.set('order', siblings.length);
+	m.set('createdAt', now);
+	m.set('updatedAt', now);
 	if (parentId !== null) m.set('parentId', parentId);
 	if (note) m.set('note', note);
 	items.push([m]);
 	return id;
 }
 
-export function updateItem(id: string, patch: Partial<Omit<Item, 'id' | 'listId'>>) {
+export function updateItem(id: string, patch: Partial<Omit<Item, 'id' | 'listId' | 'createdAt' | 'updatedAt'>>) {
 	const m = findYMap(getItems(getDoc()), id);
 	if (!m) return;
 	for (const [k, v] of Object.entries(patch)) m.set(k, v);
+	const keys = Object.keys(patch);
+	if (!(keys.length === 1 && keys[0] === 'order')) m.set('updatedAt', new Date().toISOString());
 }
 
 export function deleteItem(id: string) {
