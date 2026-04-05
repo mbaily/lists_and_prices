@@ -303,10 +303,10 @@
 			if (touchDragFrom !== null && touchDragOver !== null && touchDragFrom !== touchDragOver) {
 				if (kind === 'folder') {
 					// Don't reorder inside the virtual archive root
-					if (currentFolderId !== ARCHIVE_ID) reorderFolders(currentFolderId, touchDragFrom, touchDragOver);
+					if (currentFolderId !== ARCHIVE_ID) reorderFolders(currentFolderId, touchDragFrom, touchDragOver, childFolders.map((f) => f.id));
 				} else {
 					// Lists always have a real folderId (archive root shows no lists)
-					if (currentFolderId && currentFolderId !== ARCHIVE_ID) reorderLists(currentFolderId, touchDragFrom, touchDragOver);
+					if (currentFolderId && currentFolderId !== ARCHIVE_ID) reorderLists(currentFolderId, touchDragFrom, touchDragOver, childLists.map((l) => l.id));
 				}
 			}
 			touchDragKind = null;

@@ -304,24 +304,27 @@ export function reorderSiblings(listId: string, parentId: string | null, fromIdx
 	doc.transact(() => siblings.forEach((item, idx) => updateItem(item.id, { order: idx })));
 }
 
-export function reorderFolders(parentId: string | null, fromIndex: number, toIndex: number) {
+export function reorderFolders(parentId: string | null, fromIndex: number, toIndex: number, visibleIds?: string[]) {
 	const doc = getDoc();
-	const all = readFolders()
-		.filter((f) => f.parentId === parentId)
-		.sort((a, b) => a.order - b.order);
+	// If the caller provides a pre-filtered ordered list of IDs, use that.
+	// Otherwise fall back to all siblings (used internally / from tests).
+	const all = visibleIds
+		? readFolders().filter((f) => visibleIds.includes(f.id)).sort((a, b) => visibleIds.indexOf(a.id) - visibleIds.indexOf(b.id))
+		: readFolders().filter((f) => f.parentId === parentId).sort((a, b) => a.order - b.order);
 	const [moved] = all.splice(fromIndex, 1);
 	all.splice(toIndex, 0, moved);
 	doc.transact(() => all.forEach((f, idx) => updateFolder(f.id, { order: idx })));
 }
 
-export function reorderLists(folderId: string, fromIndex: number, toIndex: number) {
+export function reorderLists(folderId: string, fromIndex: number, toIndex: number, visibleIds?: string[]) {
 	const doc = getDoc();
-	const all = readLists()
-		.filter((l) => l.folderId === folderId)
-		.sort((a, b) => a.order - b.order);
+	const all = visibleIds
+		? readLists().filter((l) => visibleIds.includes(l.id)).sort((a, b) => visibleIds.indexOf(a.id) - visibleIds.indexOf(b.id))
+		: readLists().filter((l) => l.folderId === folderId).sort((a, b) => a.order - b.order);
 	const [moved] = all.splice(fromIndex, 1);
 	all.splice(toIndex, 0, moved);
 	doc.transact(() => all.forEach((l, idx) => updateList(l.id, { order: idx })));
+}
 }
 
 // ─── Internal utilities ───────────────────────────────────────────────────────
