@@ -43,8 +43,8 @@ export async function checkSession(): Promise<boolean> {
 	try {
 		res = await fetch('/api/session');
 	} catch {
-		// Network failure — fall through to show login screen
-		return false;
+		// Network failure — keep existing auth state (app may be offline / PWA)
+		return auth.username !== null;
 	}
 	if (res.ok) {
 		const body = await res.json();
