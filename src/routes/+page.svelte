@@ -17,8 +17,8 @@
 	});
 
 	async function handleLogout() {
+		await logout(); // clears auth.username first
 		destroyYjs();
-		await logout();
 	}
 </script>
 

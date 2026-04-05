@@ -214,7 +214,7 @@ export function deleteItem(id: string) {
 }
 
 export function listTotal(listId: string): number {
-	return readItems(listId).reduce((sum, i) => sum + (i.price ?? 0), 0);
+	return Math.round(readItems(listId).reduce((s, i) => s + Math.round((i.price ?? 0) * 100), 0)) / 100;
 }
 
 // ─── Reorder helpers ──────────────────────────────────────────────────────────

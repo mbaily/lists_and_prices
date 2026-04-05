@@ -40,8 +40,11 @@
 
 	function listPath(list: ListMeta): string {
 		const parts: string[] = [];
+		const visited = new Set<string>();
 		let fid: string | null = list.folderId;
 		while (fid !== null) {
+			if (visited.has(fid)) break; // guard against cyclic parentId
+			visited.add(fid);
 			const f = allFolders.find((x) => x.id === fid);
 			if (!f) break;
 			parts.unshift(f.name);
@@ -131,6 +134,7 @@
 	}
 
 	function startEditPrice(item: Item) {
+		cancelLongPress(); // prevent long-press selection firing after price editor opens
 		pricingItemId = item.id;
 		// Use toFixed to avoid float stringification artefacts (e.g. 1.1000000000000001)
 		priceBuffer = item.price !== null

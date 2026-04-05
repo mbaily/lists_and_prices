@@ -37,9 +37,11 @@ export async function checkSession(): Promise<boolean> {
 	const res = await fetch('/api/session');
 	if (res.ok) {
 		const body = await res.json();
-		auth.username = body.username;
-		localStorage.setItem(AUTH_KEY, body.username);
-		return true;
+		if (typeof body.username === 'string' && body.username) {
+			auth.username = body.username;
+			localStorage.setItem(AUTH_KEY, body.username);
+			return true;
+		}
 	}
 	auth.username = null;
 	localStorage.removeItem(AUTH_KEY);
