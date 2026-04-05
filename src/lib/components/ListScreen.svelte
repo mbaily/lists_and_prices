@@ -8,11 +8,11 @@
 		createItem,
 		createItemsBatch,
 		updateItem,
-		deleteItem,
+		deleteItemCascade,
 		deleteItemsBatch,
 		setItemsChecked,
 		updateList,
-		reorderItems,
+		reorderTopLevelItems,
 		isListEffectivelyArchived,
 		type Item,
 		type ListMeta
@@ -113,8 +113,30 @@
 		if (last < name.length) result.push({ type: 'text', value: name.slice(last) });
 		return result.length ? result : [{ type: 'text', value: name }];
 	}
-	const checkedCount = $derived(items.filter((i) => !i.heading && i.checked).length);
-	const uncheckedCount = $derived(items.filter((i) => !i.heading && !i.checked).length);
+
+	// ── Tree order (subtasks / subnotes) ──────────────────────────────────────────
+	type TreeItem = { item: Item; level: number; tlIdx: number; rootTlIdx: number };
+	function buildTreeOrder(allItems: Item[]): TreeItem[] {
+		const result: TreeItem[] = [];
+		const topLevel = allItems.filter((i) => i.parentId === null).sort((a, b) => a.order - b.order);
+		function addSubtree(item: Item, level: number, rootTlIdx: number) {
+			const children = allItems
+				.filter((i) => i.parentId === item.id)
+				.sort((a, b) => a.order - b.order);
+			for (const child of children) {
+				result.push({ item: child, level, tlIdx: -1, rootTlIdx });
+				if (level < 2 && !child.note) addSubtree(child, level + 1, rootTlIdx);
+			}
+		}
+		topLevel.forEach((item, idx) => {
+			result.push({ item, level: 0, tlIdx: idx, rootTlIdx: idx });
+			if (!item.heading) addSubtree(item, 1, idx);
+		});
+		return result;
+	}
+	const treeItems = $derived(buildTreeOrder(items));
+	const checkedCount = $derived(items.filter((i) => !i.heading && !i.note && i.checked).length);
+	const uncheckedCount = $derived(items.filter((i) => !i.heading && !i.note && !i.checked).length);
 	// Count of items that "Del checked" would actually delete
 	const delCheckedCount = $derived(
 		selectedIds.size > 0
@@ -267,8 +289,8 @@
 
 	function bulkUncheck() {
 		const ids = selectedIds.size > 0
-			? [...selectedIds].filter((id) => !items.find((i) => i.id === id)?.heading)
-			: items.filter((i) => !i.heading).map((i) => i.id);
+			? [...selectedIds].filter((id) => { const it = items.find((i) => i.id === id); return it && !it.heading && !it.note; })
+			: items.filter((i) => !i.heading && !i.note).map((i) => i.id);
 		setItemsChecked(ids, false);
 		selectedIds = new Set();
 	}
@@ -305,11 +327,11 @@
 	let touchDragFrom = $state<number | null>(null);
 	let touchDragOver = $state<number | null>(null);
 
-	function startItemDrag(e: PointerEvent, index: number) {
+	function startItemDrag(e: PointerEvent, tlIdx: number) {
 		e.stopPropagation();
 		cancelLongPress();
-		touchDragFrom = index;
-		touchDragOver = index;
+		touchDragFrom = tlIdx;
+		touchDragOver = tlIdx;
 	}
 
 	$effect(() => {
@@ -324,7 +346,7 @@
 		}
 		function onEnd() {
 			if (touchDragFrom !== null && touchDragOver !== null && touchDragFrom !== touchDragOver) {
-				reorderItems(listId, touchDragFrom, touchDragOver);
+				reorderTopLevelItems(listId, touchDragFrom, touchDragOver);
 			}
 			touchDragFrom = null;
 			touchDragOver = null;
@@ -370,6 +392,8 @@
 		editingId = null;
 		inputMode = 'add';
 		universalValue = '';
+		newItemParentId = null;
+		newItemIsNote = false;
 		pricingItemId = null;
 		priceBuffer = '';
 		selectedIds = new Set();
@@ -454,7 +478,7 @@
 						bind:this={universalInputEl}
 						class="universal-input"
 						class:editing={inputMode === 'edit'}
-						placeholder={inputMode === 'edit' ? 'Edit name…' : 'Add item…'}
+						placeholder={inputMode === 'edit' ? 'Edit name…' : newItemParentId ? (newItemIsNote ? 'Add subnote…' : 'Add subtask…') : 'Add item…'}
 						bind:value={universalValue}
 						onkeydown={(e) => { if (e.key === 'Escape') cancelEdit(); }}
 					/>
@@ -469,6 +493,12 @@
 					<button type="button" class="universal-btn paste-btn" onclick={importFromClipboard} title="Import from clipboard">📋</button>
 				{/if}
 			</form>
+			{#if newItemParentId}
+				<div class="subtask-hint">
+					{newItemIsNote ? '📝 Subnote' : '➕ Subtask'} → <em>{items.find((i) => i.id === newItemParentId)?.name ?? '…'}</em>
+					<button type="button" onclick={() => { newItemParentId = null; newItemIsNote = false; universalValue = ''; }} aria-label="Cancel">✕</button>
+				</div>
+			{/if}
 		</div>
 	{/if}
 
@@ -506,17 +536,21 @@
 				{/each}
 			</div>
 		{/if}
-		{#each items as item, i}
+		{#each treeItems as {item, level, tlIdx, rootTlIdx}}
+			{@const canAddChildren = !item.note && !item.heading && level < 2}
+			{@const linkParts = parseNameParts(item.name)}
 			<div
 				class="item-row"
 				class:heading={item.heading}
-				class:priced-row={isPriced && !item.heading}
+				class:note={item.note}
+				class:priced-row={isPriced && !item.heading && !item.note}
 				class:checked={item.checked}
 				class:selected={selectedIds.has(item.id)}
-				class:drag-source={touchDragFrom === i}
-					class:drag-above={touchDragOver === i && touchDragFrom !== null && touchDragFrom !== null && touchDragFrom > i}
-					class:drag-below={touchDragOver === i && touchDragFrom !== null && touchDragFrom !== null && touchDragFrom < i}
-				data-item-index={i}
+				class:drag-source={touchDragFrom !== null && rootTlIdx === touchDragFrom}
+				class:drag-above={tlIdx >= 0 && touchDragOver === tlIdx && touchDragFrom !== null && touchDragFrom > tlIdx}
+				class:drag-below={tlIdx >= 0 && touchDragOver === tlIdx && touchDragFrom !== null && touchDragFrom < tlIdx}
+				data-item-index={rootTlIdx}
+				style={level > 0 ? `padding-left:calc(0.75rem + ${level} * 1.5rem)` : undefined}
 			>
 				{#if item.heading}
 					<!-- Heading: full-width bold label, no checkbox, no price -->
@@ -524,11 +558,26 @@
 						class="item-name heading-name"
 						class:editing={editingId === item.id}
 						onclick={() => startEditName(item)}
-					>{#each parseNameParts(item.name) as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else}{part.value}{/if}{/each}</button>
-					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, i)}>☰</button>
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else}{part.value}{/if}{/each}</button>
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, tlIdx)}>☰</button>
 					<RowMenu items={[
 						{ label: '📌 Unheading', action: () => updateItem(item.id, { heading: false }) },
-						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItem(item.id)) }
+						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
+					]} />
+				{:else if item.note}
+					<!-- Note: no checkbox, italic text -->
+					<span class="note-icon">📝</span>
+					<button
+						class="item-name note-name"
+						class:editing={editingId === item.id}
+						onclick={() => startEditName(item)}
+						onpointerdown={(e) => onPointerDown(e, item.id)}
+						onpointermove={cancelLongPress}
+						onpointerup={cancelLongPress}
+						onpointercancel={cancelLongPress}
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else}{part.value}{/if}{/each}</button>
+					<RowMenu items={[
+						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 					]} />
 				{:else if isPriced}
 					<!-- Priced: name wraps top line, controls on bottom line -->
@@ -545,7 +594,7 @@
 							onpointermove={cancelLongPress}
 							onpointerup={cancelLongPress}
 							onpointercancel={cancelLongPress}
-						>{#each parseNameParts(item.name) as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else}{part.value}{/if}{/each}</button>
+						>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else}{part.value}{/if}{/each}</button>
 					</div>
 					<div class="priced-bottom">
 						<button
@@ -553,10 +602,16 @@
 							class:editing={pricingItemId === item.id}
 							onclick={() => pricingItemId === item.id ? commitPrice() : startEditPrice(item)}
 						>{pricingItemId === item.id ? (priceBuffer || '0') : formatPrice(item.price)}</button>
-						<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, i)}>☰</button>
+						{#if tlIdx >= 0}
+							<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, tlIdx)}>☰</button>
+						{/if}
 						<RowMenu items={[
-							{ label: '📌 Make Heading', action: () => updateItem(item.id, { heading: true, checked: false, price: null }) },
-							{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItem(item.id)) }
+							...(canAddChildren ? [
+								{ label: '➕ Add Subtask', action: () => { newItemParentId = item.id; newItemIsNote = false; focusInput(); } },
+								{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
+							] : []),
+							...(level === 0 ? [{ label: '📌 Make Heading', action: () => updateItem(item.id, { heading: true, checked: false, price: null }) }] : []),
+							{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 						]} />
 					</div>
 				{:else}
@@ -573,11 +628,17 @@
 						onpointermove={cancelLongPress}
 						onpointerup={cancelLongPress}
 						onpointercancel={cancelLongPress}
-					>{#each parseNameParts(item.name) as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else}{part.value}{/if}{/each}</button>
-					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, i)}>☰</button>
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else}{part.value}{/if}{/each}</button>
+					{#if tlIdx >= 0}
+						<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, tlIdx)}>☰</button>
+					{/if}
 					<RowMenu items={[
-						{ label: '📌 Make Heading', action: () => updateItem(item.id, { heading: true, checked: false }) },
-						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItem(item.id)) }
+						...(canAddChildren ? [
+							{ label: '➕ Add Subtask', action: () => { newItemParentId = item.id; newItemIsNote = false; focusInput(); } },
+							{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
+						] : []),
+						...(level === 0 ? [{ label: '📌 Make Heading', action: () => updateItem(item.id, { heading: true, checked: false }) }] : []),
+						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 					]} />
 				{/if}
 			</div>
@@ -592,7 +653,7 @@
 			class:fab-right={settings.handedness !== 'right'}
 			class:fab-left={settings.handedness === 'right'}
 			aria-label="Add item"
-			onclick={() => { cancelEdit(); focusInput(); }}
+			onclick={() => { newItemParentId = null; newItemIsNote = false; cancelEdit(); focusInput(); }}
 		>＋</button>
 	{/if}
 
@@ -851,6 +912,37 @@
 		color: var(--accent);
 		text-decoration: underline;
 		word-break: break-all;
+	}
+	/* ── Subnotes ────────────────────────────────────────────────────────── */
+	.note-icon {
+		font-size: 0.85rem;
+		flex-shrink: 0;
+		opacity: 0.6;
+	}
+	.note-name {
+		font-style: italic;
+		color: var(--text2);
+		font-size: 0.9rem;
+	}
+	/* ── Subtask hint bar ────────────────────────────────────────────────── */
+	.subtask-hint {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.2rem 0.4rem 0;
+		font-size: 0.8rem;
+		color: var(--text2);
+	}
+	.subtask-hint em { color: var(--text); font-style: normal; font-weight: 600; }
+	.subtask-hint button {
+		background: none;
+		border: none;
+		cursor: pointer;
+		color: var(--text2);
+		padding: 0 0.2rem;
+		font-size: 0.9rem;
+		line-height: 1;
+		margin-left: auto;
 	}
 	.price-btn {
 		min-width: 72px;

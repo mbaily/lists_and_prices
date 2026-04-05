@@ -194,6 +194,8 @@ export interface Item {
 	checked: boolean;
 	order: number;
 	heading: boolean;
+	parentId: string | null;
+	note: boolean;
 }
 
 export function readItems(listId: string): Item[] {
@@ -211,16 +213,20 @@ function yMapToItem(m: Y.Map<unknown>): Item {
 		price: (m.get('price') as number | null) ?? null,
 		checked: (m.get('checked') as boolean) ?? false,
 		order: (m.get('order') as number) ?? 0,
-		heading: (m.get('heading') as boolean) ?? false
+		heading: (m.get('heading') as boolean) ?? false,
+		parentId: (m.get('parentId') as string | null) ?? null,
+		note: (m.get('note') as boolean) ?? false
 	};
 }
 
-export function createItem(listId: string, name: string, price: number | null = null): string {
+export function createItem(listId: string, name: string, price: number | null = null, parentId: string | null = null, note = false): string {
 	const doc = getDoc();
 	const items = getItems(doc);
 	const existing = (items.toArray() as Y.Map<unknown>[]).filter(
 		(i) => i.get('listId') === listId
 	);
+	// Order within siblings (same parentId)
+	const siblings = existing.filter((i) => (i.get('parentId') ?? null) === parentId);
 	const m = new Y.Map<unknown>();
 	const id = uid();
 	m.set('id', id);
@@ -228,7 +234,9 @@ export function createItem(listId: string, name: string, price: number | null = 
 	m.set('name', name);
 	m.set('price', price);
 	m.set('checked', false);
-	m.set('order', existing.length);
+	m.set('order', siblings.length);
+	if (parentId !== null) m.set('parentId', parentId);
+	if (note) m.set('note', note);
 	items.push([m]);
 	return id;
 }
@@ -243,8 +251,21 @@ export function deleteItem(id: string) {
 	removeYMap(getItems(getDoc()), id);
 }
 
+function _deleteItemCascadeInner(id: string) {
+	const doc = getDoc();
+	const children = (getItems(doc).toArray() as Y.Map<unknown>[])
+		.filter((m) => m.get('parentId') === id)
+		.map((m) => m.get('id') as string);
+	for (const cid of children) _deleteItemCascadeInner(cid);
+	removeYMap(getItems(doc), id);
+}
+
+export function deleteItemCascade(id: string) {
+	getDoc().transact(() => _deleteItemCascadeInner(id));
+}
+
 export function deleteItemsBatch(ids: string[]): void {
-	getDoc().transact(() => { for (const id of ids) deleteItem(id); });
+	getDoc().transact(() => { for (const id of ids) _deleteItemCascadeInner(id); });
 }
 
 export function setItemsChecked(ids: string[], checked: boolean): void {
@@ -267,6 +288,14 @@ export function reorderItems(listId: string, fromIndex: number, toIndex: number)
 	const [moved] = items.splice(fromIndex, 1);
 	items.splice(toIndex, 0, moved);
 	doc.transact(() => items.forEach((item, idx) => updateItem(item.id, { order: idx })));
+}
+
+export function reorderTopLevelItems(listId: string, fromIndex: number, toIndex: number) {
+	const doc = getDoc();
+	const topLevel = readItems(listId).filter((i) => i.parentId === null);
+	const [moved] = topLevel.splice(fromIndex, 1);
+	topLevel.splice(toIndex, 0, moved);
+	doc.transact(() => topLevel.forEach((item, idx) => updateItem(item.id, { order: idx })));
 }
 
 export function reorderFolders(parentId: string | null, fromIndex: number, toIndex: number) {
