@@ -54,9 +54,10 @@
 
 	let childFolders = $derived(
 		currentFolderId === ARCHIVE_ID
-			// Archive root: only root-level (parentId === null) effectively-archived folders
+			// Archive root: folders that are directly archived AND whose parent is NOT archived
+			// (these are the "tops" of archived subtrees — sub-folders are reached by navigating in)
 			? allFolders
-					.filter((f) => f.parentId === null && isFolderEffectivelyArchived(f.id, allFolders))
+					.filter((f) => f.archived && (f.parentId === null || !isFolderEffectivelyArchived(f.parentId, allFolders)))
 					.sort((a, b) => a.order - b.order)
 			: isInArchiveView
 			// Inside an archived folder: show all children (they inherit archived status from parent)
@@ -70,8 +71,11 @@
 	);
 	let childLists = $derived(
 		currentFolderId === ARCHIVE_ID
-			// Archive root: no lists here (lists live inside folders)
-			? []
+			// Archive root: lists that are directly archived AND whose folder is NOT archived
+			// (lists inside archived folders are reached by navigating into the archived folder)
+			? allLists
+					.filter((l) => l.archived && !isFolderEffectivelyArchived(l.folderId, allFolders))
+					.sort((a, b) => a.order - b.order)
 			: isInArchiveView
 			// Inside an archived folder: show all lists (they inherit archived status from parent)
 			? allLists
@@ -83,10 +87,9 @@
 					.sort((a, b) => a.order - b.order)
 	);
 	let hasArchived = $derived(
-		// Only true when the archive root view would actually have content:
-		// root-level folders that are directly archived, or any effectively-archived list.
-		allFolders.some((f) => f.parentId === null && f.archived) ||
-		allLists.some((l) => isListEffectivelyArchived(l, allFolders))
+		// True when the archive root would have any content
+		allFolders.some((f) => f.archived && (f.parentId === null || !isFolderEffectivelyArchived(f.parentId, allFolders))) ||
+		allLists.some((l) => l.archived && !isFolderEffectivelyArchived(l.folderId, allFolders))
 	);
 	let currentFolderColor = $derived(
 		allFolders.find((f) => f.id === currentFolderId)?.color ?? '#6366f1'
