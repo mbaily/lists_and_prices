@@ -152,6 +152,9 @@
 	let universalValue = $state('');
 	// bind:this requires a plain let (not $state) to receive the real DOM node
 	let universalInputEl: HTMLInputElement | null = null;
+	// Subtask / subnote context when adding a child item
+	let newItemParentId = $state<string | null>(null);
+	let newItemIsNote = $state(false);
 
 	function focusInput() {
 		tick().then(() => universalInputEl?.focus());
@@ -159,8 +162,10 @@
 
 	function addItem() {
 		if (!universalValue.trim()) return;
-		createItem(listId, universalValue.trim());
+		createItem(listId, universalValue.trim(), null, newItemParentId, newItemIsNote);
 		universalValue = '';
+		newItemParentId = null;
+		newItemIsNote = false;
 		// Blur dismisses the iOS keyboard and hides the confirm FAB
 		universalInputEl?.blur();
 	}
