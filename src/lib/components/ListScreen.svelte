@@ -319,8 +319,8 @@
 	});
 
 	// ── Scroll-shrink favourites bar ──────────────────────────────────────────────
-	let favBarEl: HTMLElement | null = null;
-	let itemListEl: HTMLElement | null = null;
+	let favBarEl = $state<HTMLElement | null>(null);
+	let itemListEl = $state<HTMLElement | null>(null);
 
 	$effect(() => {
 		if (!itemListEl || !favBarEl) return;
