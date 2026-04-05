@@ -787,7 +787,7 @@
 	.item-row.heading {
 		background: var(--bg2);
 		border-top: 1px solid var(--border);
-		padding: 0.25rem 0;
+		padding: 0.25rem 0.75rem;
 	}
 	.heading-name {
 		font-weight: 700;
