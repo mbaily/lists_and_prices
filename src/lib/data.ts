@@ -95,6 +95,21 @@ export function isDescendant(folderId: string, targetId: string, _visited = new 
 	return children.some((cid) => isDescendant(cid, targetId, _visited));
 }
 
+export function isFolderEffectivelyArchived(id: string, folders: Folder[], visited = new Set<string>()): boolean {
+	if (visited.has(id)) return false;
+	visited.add(id);
+	const f = folders.find((x) => x.id === id);
+	if (!f) return false;
+	if (f.archived) return true;
+	if (f.parentId === null) return false;
+	return isFolderEffectivelyArchived(f.parentId, folders, visited);
+}
+
+export function isListEffectivelyArchived(list: ListMeta, folders: Folder[]): boolean {
+	if (list.archived) return true;
+	return isFolderEffectivelyArchived(list.folderId, folders, new Set());
+}
+
 // ─── Lists ────────────────────────────────────────────────────────────────────
 
 export interface ListMeta {

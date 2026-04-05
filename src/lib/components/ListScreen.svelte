@@ -13,6 +13,7 @@
 		setItemsChecked,
 		updateList,
 		reorderItems,
+		isListEffectivelyArchived,
 		type Item,
 		type ListMeta
 	} from '$lib/data';
@@ -39,7 +40,7 @@
 		void docState.version;
 		try { return readFolders(); } catch { return []; }
 	});
-	let favouriteLists = $derived(allLists.filter((l) => l.favourite));
+	let favouriteLists = $derived(allLists.filter((l) => l.favourite && !isListEffectivelyArchived(l, allFolders)));
 
 	function listPath(list: ListMeta): string {
 		const parts: string[] = [];

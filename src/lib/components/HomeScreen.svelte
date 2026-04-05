@@ -11,6 +11,8 @@
 		reorderFolders,
 		reorderLists,
 		isDescendant,
+		isFolderEffectivelyArchived,
+		isListEffectivelyArchived,
 		type Folder,
 		type ListMeta
 	} from '$lib/data';
@@ -46,22 +48,6 @@
 
 	// Special virtual folder id for the Archived view
 	const ARCHIVE_ID = '__archive__';
-
-	// A folder/list is effectively archived if it or any ancestor folder has archived=true
-	function isFolderEffectivelyArchived(id: string, folders: Folder[], visited = new Set<string>()): boolean {
-		if (visited.has(id)) return false;
-		visited.add(id);
-		const f = folders.find((x) => x.id === id);
-		if (!f) return false;
-		if (f.archived) return true;
-		if (f.parentId === null) return false;
-		return isFolderEffectivelyArchived(f.parentId, folders, visited);
-	}
-
-	function isListEffectivelyArchived(list: ListMeta, folders: Folder[]): boolean {
-		if (list.archived) return true;
-		return isFolderEffectivelyArchived(list.folderId, folders, new Set());
-	}
 
 	// True whenever ARCHIVE_ID is anywhere in the breadcrumb (including as currentFolderId)
 	let isInArchiveView = $derived(breadcrumb.includes(ARCHIVE_ID));
@@ -306,7 +292,6 @@
 	function unarchiveFolder(id: string) { updateFolder(id, { archived: false }); }
 	function archiveList(id: string) { updateList(id, { archived: true }); }
 	function unarchiveList(id: string) { updateList(id, { archived: false }); }
-	// Clear transient UI state whenever the user navigates to a different folder
 	$effect(() => {
 		void currentFolderId; // track navigation
 		renamingId = null;
