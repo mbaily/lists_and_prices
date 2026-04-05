@@ -344,7 +344,7 @@
 	// ── URL hash sync ────────────────────────────────────────────────────────────
 	// Keep the address bar in sync so the page can be refreshed without losing state.
 	// Use pushState so the browser back button works between navigations.
-	let _lastHash = '';
+	let _lastHash = typeof window !== 'undefined' ? window.location.hash : '';
 	$effect(() => {
 		const hash = buildHash(breadcrumb, openListId);
 		if (hash !== _lastHash) {

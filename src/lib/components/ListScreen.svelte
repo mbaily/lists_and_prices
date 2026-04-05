@@ -207,6 +207,8 @@
 		inputMode = 'edit';
 		universalValue = item.name;
 		pricingItemId = null;
+		newItemParentId = null;
+		newItemIsNote = false;
 		focusInput();
 	}
 
@@ -222,6 +224,8 @@
 		editingId = null;
 		inputMode = 'add';
 		universalValue = '';
+		newItemParentId = null;
+		newItemIsNote = false;
 		universalInputEl?.blur();
 	}
 
