@@ -6,7 +6,7 @@
 	}: { message: string; onConfirm: () => void; onCancel: () => void } = $props();
 </script>
 
-<div class="backdrop">
+<div class="backdrop" onclick={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
 	<div class="dialog">
 		<p>{message}</p>
 		<div class="actions">
