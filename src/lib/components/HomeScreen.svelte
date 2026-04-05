@@ -177,7 +177,7 @@
 	let touchDragFrom = $state<number | null>(null);
 	let touchDragOver = $state<number | null>(null);
 
-	function startDrag(e: TouchEvent, kind: DragKind, index: number) {
+	function startDrag(e: PointerEvent, kind: DragKind, index: number) {
 		e.stopPropagation();
 		touchDragKind = kind;
 		touchDragFrom = index;
@@ -187,10 +187,9 @@
 	$effect(() => {
 		if (touchDragFrom === null) return;
 		const kind = touchDragKind;
-		function onMove(e: TouchEvent) {
+		function onMove(e: PointerEvent) {
 			e.preventDefault();
-			const touch = e.touches[0];
-			const el = document.elementFromPoint(touch.clientX, touch.clientY);
+			const el = document.elementFromPoint(e.clientX, e.clientY);
 			const row = el?.closest('[data-drag-kind]') as HTMLElement | null;
 			if (row?.dataset.dragKind === kind && row.dataset.dragIndex !== undefined) {
 				touchDragOver = parseInt(row.dataset.dragIndex, 10);
@@ -205,11 +204,11 @@
 			touchDragFrom = null;
 			touchDragOver = null;
 		}
-		document.addEventListener('touchmove', onMove, { passive: false });
-		document.addEventListener('touchend', onEnd, { once: true });
+		document.addEventListener('pointermove', onMove, { passive: false });
+		document.addEventListener('pointerup', onEnd, { once: true });
 		return () => {
-			document.removeEventListener('touchmove', onMove);
-			document.removeEventListener('touchend', onEnd);
+			document.removeEventListener('pointermove', onMove);
+			document.removeEventListener('pointerup', onEnd);
 		};
 	});
 
@@ -301,7 +300,7 @@
 					<button onclick={() => (movingFolderId = movingFolderId === folder.id ? null : folder.id)} aria-label="Move">
 						{movingFolderId === folder.id ? '✕' : '↗'}
 					</button>
-					<button class="drag-handle" aria-label="Drag to reorder" ontouchstart={(e) => startDrag(e, 'folder', i)}>⠿</button>
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'folder', i)}>⠣</button>
 				</div>
 			</div>
 		{/each}
@@ -343,7 +342,7 @@
 					<button onclick={() => (movingListId = movingListId === list.id ? null : list.id)} aria-label="Move">
 						{movingListId === list.id ? '✕' : '↗'}
 					</button>
-					<button class="drag-handle" aria-label="Drag to reorder" ontouchstart={(e) => startDrag(e, 'list', i)}>⠿</button>
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'list', i)}>⠣</button>
 				</div>
 			</div>
 		{/each}

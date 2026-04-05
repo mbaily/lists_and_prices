@@ -210,24 +210,22 @@
 
 	onDestroy(() => cancelLongPress());
 
-	// ── Touch drag reorder ────────────────────────────────────────────────────────────────
-	// HTML5 drag doesn't work on iOS — use touch events instead.
+	// ── Drag reorder (pointer events — works on both touch and mouse) ──────────────
 	let touchDragFrom = $state<number | null>(null);
 	let touchDragOver = $state<number | null>(null);
 
-	function startItemDrag(e: TouchEvent, index: number) {
+	function startItemDrag(e: PointerEvent, index: number) {
 		e.stopPropagation();
-		cancelLongPress(); // don't trigger select when dragging
+		cancelLongPress();
 		touchDragFrom = index;
 		touchDragOver = index;
 	}
 
 	$effect(() => {
 		if (touchDragFrom === null) return;
-		function onMove(e: TouchEvent) {
+		function onMove(e: PointerEvent) {
 			e.preventDefault();
-			const touch = e.touches[0];
-			const el = document.elementFromPoint(touch.clientX, touch.clientY);
+			const el = document.elementFromPoint(e.clientX, e.clientY);
 			const row = el?.closest('[data-item-index]') as HTMLElement | null;
 			if (row?.dataset.itemIndex !== undefined) {
 				touchDragOver = parseInt(row.dataset.itemIndex, 10);
@@ -240,11 +238,11 @@
 			touchDragFrom = null;
 			touchDragOver = null;
 		}
-		document.addEventListener('touchmove', onMove, { passive: false });
-		document.addEventListener('touchend', onEnd, { once: true });
+		document.addEventListener('pointermove', onMove, { passive: false });
+		document.addEventListener('pointerup', onEnd, { once: true });
 		return () => {
-			document.removeEventListener('touchmove', onMove);
-			document.removeEventListener('touchend', onEnd);
+			document.removeEventListener('pointermove', onMove);
+			document.removeEventListener('pointerup', onEnd);
 		};
 	});
 
@@ -349,7 +347,7 @@
 							onclick={() => pricingItemId === item.id ? commitPrice() : startEditPrice(item)}
 						>{pricingItemId === item.id ? (priceBuffer || '0') : formatPrice(item.price)}</button>
 						<button class="del-btn" onclick={() => deleteItem(item.id)} aria-label="Delete">🗑</button>
-						<button class="drag-handle" aria-label="Drag to reorder" ontouchstart={(e) => startItemDrag(e, i)}>⠿</button>
+						<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, i)}>⠣</button>
 					</div>
 				{:else}
 					<!-- Plain: single row -->
@@ -367,7 +365,7 @@
 						onpointercancel={cancelLongPress}
 					>{item.name}</button>
 					<button class="del-btn" onclick={() => deleteItem(item.id)} aria-label="Delete">🗑</button>
-					<button class="drag-handle" aria-label="Drag to reorder" ontouchstart={(e) => startItemDrag(e, i)}>⠿</button>
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, i)}>⠣</button>
 				{/if}
 			</div>
 		{/each}
