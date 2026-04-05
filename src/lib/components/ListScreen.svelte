@@ -333,28 +333,28 @@
 	}
 
 	// ── Scroll anchor: compensate when summary bar grows/shrinks ─────────────────
-	// When checkedCount transitions 0→1 or 1→0 the bulk buttons appear/disappear,
-	// changing the summary bar height. We capture the first visible item's offset
-	// before the change and restore it after so the visible content doesn't jump.
-	let _prevCheckedCount = 0;
+	// Svelte 5 $effect runs AFTER the DOM update, so both before/after would be
+	// identical if we measured there. Instead:
+	//   $effect.pre  — runs synchronously BEFORE the DOM update → capture anchor
+	//   $effect      — runs AFTER the DOM update → apply correction in same frame
+	let _anchorEl: HTMLElement | null = null;
+	let _anchorTop = 0;
+
+	$effect.pre(() => {
+		// Track checkedCount so this re-runs on every check/uncheck.
+		void checkedCount;
+		if (!itemListEl) return;
+		const row = itemListEl.querySelector('[data-item-index]') as HTMLElement | null;
+		_anchorEl = row;
+		_anchorTop = row ? row.getBoundingClientRect().top : 0;
+	});
+
 	$effect(() => {
-		const prev = _prevCheckedCount;
-		const curr = checkedCount;
-		_prevCheckedCount = curr;
-		// Only act on the 0↔1 transition (that's when bulk buttons appear/disappear)
-		if ((prev === 0 && curr > 0) || (prev > 0 && curr === 0)) {
-			if (!itemListEl) return;
-			// Find the first visible item row and its current distance from the top
-			const row = itemListEl.querySelector('[data-item-index]') as HTMLElement | null;
-			if (!row) return;
-			const before = row.getBoundingClientRect().top;
-			// After the DOM has updated, re-measure and adjust scrollTop by the delta
-			tick().then(() => {
-				if (!itemListEl) return;
-				const after = row.getBoundingClientRect().top;
-				itemListEl.scrollTop += after - before;
-			});
-		}
+		// Track checkedCount so this re-runs in sync with $effect.pre above.
+		void checkedCount;
+		if (!_anchorEl || !itemListEl) return;
+		const delta = _anchorEl.getBoundingClientRect().top - _anchorTop;
+		if (delta !== 0) itemListEl.scrollTop += delta;
 	});
 </script>
 
