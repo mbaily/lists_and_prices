@@ -277,7 +277,11 @@ export function createItemsBatch(listId: string, names: string[]): void {
 }
 
 export function listTotal(listId: string): number {
-	return Math.round(readItems(listId).reduce((s, i) => s + Math.round((i.price ?? 0) * 100), 0)) / 100;
+	return Math.round(
+		readItems(listId)
+			.filter((i) => i.parentId === null)
+			.reduce((s, i) => s + Math.round((i.price ?? 0) * 100), 0)
+	) / 100;
 }
 
 // ─── Reorder helpers ──────────────────────────────────────────────────────────

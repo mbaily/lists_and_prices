@@ -95,8 +95,12 @@
 	}
 
 	// Sum in integer cents to avoid float accumulation (e.g. 0.1+0.2 = 0.300...04)
+	// Only sum top-level items (parentId === null) — subtask prices are breakdowns,
+	// not additive, to avoid double-counting.
 	const total = $derived(
-		Math.round(items.reduce((s, i) => s + Math.round((i.price ?? 0) * 100), 0)) / 100
+		Math.round(items
+			.filter((i) => i.parentId === null)
+			.reduce((s, i) => s + Math.round((i.price ?? 0) * 100), 0)) / 100
 	);
 
 	// ── URL detection ─────────────────────────────────────────────────────────────
