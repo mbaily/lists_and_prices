@@ -290,12 +290,14 @@ export function reorderItems(listId: string, fromIndex: number, toIndex: number)
 	doc.transact(() => items.forEach((item, idx) => updateItem(item.id, { order: idx })));
 }
 
-export function reorderTopLevelItems(listId: string, fromIndex: number, toIndex: number) {
+export function reorderSiblings(listId: string, parentId: string | null, fromIdx: number, toIdx: number) {
 	const doc = getDoc();
-	const topLevel = readItems(listId).filter((i) => i.parentId === null);
-	const [moved] = topLevel.splice(fromIndex, 1);
-	topLevel.splice(toIndex, 0, moved);
-	doc.transact(() => topLevel.forEach((item, idx) => updateItem(item.id, { order: idx })));
+	const siblings = readItems(listId)
+		.filter((i) => i.parentId === parentId)
+		.sort((a, b) => a.order - b.order);
+	const [moved] = siblings.splice(fromIdx, 1);
+	siblings.splice(toIdx, 0, moved);
+	doc.transact(() => siblings.forEach((item, idx) => updateItem(item.id, { order: idx })));
 }
 
 export function reorderFolders(parentId: string | null, fromIndex: number, toIndex: number) {

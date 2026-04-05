@@ -12,7 +12,7 @@
 		deleteItemsBatch,
 		setItemsChecked,
 		updateList,
-		reorderTopLevelItems,
+		reorderSiblings,
 		isListEffectivelyArchived,
 		type Item,
 		type ListMeta
@@ -115,7 +115,7 @@
 	}
 
 	// ── Tree order (subtasks / subnotes) ──────────────────────────────────────────
-	type TreeItem = { item: Item; level: number; tlIdx: number; rootTlIdx: number };
+	type TreeItem = { item: Item; level: number; tlIdx: number; rootTlIdx: number; sibIdx: number };
 	function buildTreeOrder(allItems: Item[]): TreeItem[] {
 		const result: TreeItem[] = [];
 		const topLevel = allItems.filter((i) => i.parentId === null).sort((a, b) => a.order - b.order);
@@ -123,13 +123,13 @@
 			const children = allItems
 				.filter((i) => i.parentId === item.id)
 				.sort((a, b) => a.order - b.order);
-			for (const child of children) {
-				result.push({ item: child, level, tlIdx: -1, rootTlIdx });
+			children.forEach((child, sibIdx) => {
+				result.push({ item: child, level, tlIdx: -1, rootTlIdx, sibIdx });
 				if (level < 2 && !child.note) addSubtree(child, level + 1, rootTlIdx);
-			}
+			});
 		}
 		topLevel.forEach((item, idx) => {
-			result.push({ item, level: 0, tlIdx: idx, rootTlIdx: idx });
+			result.push({ item, level: 0, tlIdx: idx, rootTlIdx: idx, sibIdx: idx });
 			if (!item.heading) addSubtree(item, 1, idx);
 		});
 		return result;
@@ -344,9 +344,9 @@
 		function onMove(e: PointerEvent) {
 			e.preventDefault();
 			const el = document.elementFromPoint(e.clientX, e.clientY);
-			const row = el?.closest('[data-item-index]') as HTMLElement | null;
-			if (row?.dataset.itemIndex !== undefined) {
-				touchDragOver = parseInt(row.dataset.itemIndex, 10);
+			const row = el?.closest('[data-sibling-index]') as HTMLElement | null;
+			if (row?.dataset.siblingIndex !== undefined && row.dataset.parentKey === touchDragParentKey) {
+				touchDragOver = parseInt(row.dataset.siblingIndex, 10);
 			}
 		}
 		function onEnd() {
@@ -404,6 +404,7 @@
 		selectedIds = new Set();
 		touchDragFrom = null;
 		touchDragOver = null;
+		touchDragParentKey = null;
 		// Reset scroll-shrink when switching lists — set scrollTop to 0;
 		// the scroll listener will fire and restore max-height to fullHeight automatically.
 		if (itemListEl) itemListEl.scrollTop = 0;
@@ -435,7 +436,7 @@
 		// Track checkedCount so this re-runs on every check/uncheck.
 		void checkedCount;
 		if (!itemListEl) return;
-		const row = itemListEl.querySelector('[data-item-index]') as HTMLElement | null;
+		const row = itemListEl.querySelector('[data-sibling-index]') as HTMLElement | null;
 		_anchorEl = row;
 		_anchorTop = row ? row.getBoundingClientRect().top : 0;
 	});
@@ -541,9 +542,10 @@
 				{/each}
 			</div>
 		{/if}
-		{#each treeItems as {item, level, tlIdx, rootTlIdx}}
+		{#each treeItems as {item, level, tlIdx, rootTlIdx, sibIdx}}
 			{@const canAddChildren = !item.note && !item.heading && level < 2}
 			{@const linkParts = parseNameParts(item.name)}
+			{@const parentKey = item.parentId ?? '__top__'}
 			<div
 				class="item-row"
 				class:heading={item.heading}
@@ -551,10 +553,11 @@
 				class:priced-row={isPriced && !item.heading && !item.note}
 				class:checked={item.checked}
 				class:selected={selectedIds.has(item.id)}
-				class:drag-source={touchDragFrom !== null && rootTlIdx === touchDragFrom}
-				class:drag-above={tlIdx >= 0 && touchDragOver === tlIdx && touchDragFrom !== null && touchDragFrom > tlIdx}
-				class:drag-below={tlIdx >= 0 && touchDragOver === tlIdx && touchDragFrom !== null && touchDragFrom < tlIdx}
-				data-item-index={rootTlIdx}
+				class:drag-source={touchDragParentKey === parentKey && sibIdx === touchDragFrom}
+				class:drag-above={touchDragParentKey === parentKey && touchDragOver === sibIdx && touchDragFrom !== null && touchDragFrom > sibIdx}
+				class:drag-below={touchDragParentKey === parentKey && touchDragOver === sibIdx && touchDragFrom !== null && touchDragFrom < sibIdx}
+				data-sibling-index={sibIdx}
+				data-parent-key={parentKey}
 				style={level > 0 ? `padding-left:calc(0.75rem + ${level} * 1.5rem)` : undefined}
 			>
 				{#if item.heading}
@@ -564,7 +567,7 @@
 						class:editing={editingId === item.id}
 						onclick={() => startEditName(item)}
 					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else}{part.value}{/if}{/each}</button>
-					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, tlIdx)}>☰</button>
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
 						{ label: '📌 Unheading', action: () => updateItem(item.id, { heading: false }) },
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
@@ -581,6 +584,7 @@
 						onpointerup={cancelLongPress}
 						onpointercancel={cancelLongPress}
 					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else}{part.value}{/if}{/each}</button>
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 					]} />
@@ -607,9 +611,7 @@
 							class:editing={pricingItemId === item.id}
 							onclick={() => pricingItemId === item.id ? commitPrice() : startEditPrice(item)}
 						>{pricingItemId === item.id ? (priceBuffer || '0') : formatPrice(item.price)}</button>
-						{#if tlIdx >= 0}
-							<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, tlIdx)}>☰</button>
-						{/if}
+						<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 						<RowMenu items={[
 							...(canAddChildren ? [
 								{ label: '➕ Add Subtask', action: () => { newItemParentId = item.id; newItemIsNote = false; focusInput(); } },
@@ -634,9 +636,7 @@
 						onpointerup={cancelLongPress}
 						onpointercancel={cancelLongPress}
 					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else}{part.value}{/if}{/each}</button>
-					{#if tlIdx >= 0}
-						<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, tlIdx)}>☰</button>
-					{/if}
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
 						...(canAddChildren ? [
 							{ label: '➕ Add Subtask', action: () => { newItemParentId = item.id; newItemIsNote = false; focusInput(); } },
