@@ -21,7 +21,13 @@
 	import NumericKeypad from './NumericKeypad.svelte';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 
-	let { listId, onBack, onHome, onOpenList }: { listId: string; onBack: () => void; onHome: () => void; onOpenList: (id: string) => void } = $props();
+	let { listId, onBack, onHome, onOpenList, onNavigateTo }: {
+		listId: string;
+		onBack: () => void;
+		onHome: () => void;
+		onOpenList: (id: string) => void;
+		onNavigateTo: (folderId: string | null) => void;
+	} = $props();
 
 	let items = $derived.by(() => {
 		void docState.version;
@@ -41,6 +47,38 @@
 		try { return readFolders(); } catch { return []; }
 	});
 	let favouriteLists = $derived(allLists.filter((l) => l.favourite && !isListEffectivelyArchived(l, allFolders)));
+
+	// ── Breadcrumb ────────────────────────────────────────────────────────────────
+	// Build an ordered array of { id, name } entries from root down to current list.
+	// null id = root home.
+	type CrumbItem = { id: string | null; name: string };
+	let breadcrumbItems = $derived.by((): CrumbItem[] => {
+		if (!listMeta) return [];
+		const folders: CrumbItem[] = [];
+		const visited = new Set<string>();
+		let fid: string | null = listMeta.folderId;
+		while (fid !== null) {
+			if (visited.has(fid)) break;
+			visited.add(fid);
+			const f = allFolders.find((x) => x.id === fid);
+			if (!f) break;
+			folders.unshift({ id: f.id, name: f.name });
+			fid = f.parentId;
+		}
+		return [
+			{ id: null, name: '🏠' },
+			...folders,
+			{ id: 'LIST', name: listMeta.name }
+		];
+	});
+
+	function navigateToCrumb(crumb: CrumbItem) {
+		if (crumb.id === null) {
+			onHome();
+		} else if (crumb.id !== 'LIST') {
+			onNavigateTo(crumb.id);
+		}
+	}
 
 	function listPath(list: ListMeta): string {
 		const parts: string[] = [];
@@ -363,8 +401,18 @@
 	<!-- Header -->
 	<header>
 		<button class="home-btn" onclick={onHome} aria-label="Home">🏠</button>
-		<button class="back-btn" onclick={onBack}>← Back</button>
-		<span class="list-title">{listMeta?.name ?? '…'}</span>
+		<div class="breadcrumb">
+			{#each breadcrumbItems as crumb, i}
+				{#if i > 0}<span class="sep">/</span>{/if}
+				{#if crumb.id === 'LIST'}
+					<span class="crumb current">{crumb.name}</span>
+				{:else if crumb.id === null}
+					<!-- Home already shown as the home-btn -->
+				{:else}
+					<button class="crumb" onclick={() => navigateToCrumb(crumb)}>{crumb.name}</button>
+				{/if}
+			{/each}
+		</div>
 		<div class="header-right">
 			<button class="type-btn" onclick={toggleType} title="Convert list type">
 				{isPriced ? '📋' : '💰'}
@@ -556,27 +604,40 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		padding: 0.75rem 1rem;
+		padding: 0.5rem 1rem;
 		background: var(--bg2);
 		border-bottom: 1px solid var(--border);
 		flex-shrink: 0;
 	}
-	.back-btn {
+	.breadcrumb {
+		flex: 1;
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		flex-wrap: wrap;
+		font-size: 0.85rem;
+		min-width: 0;
+	}
+	.crumb {
 		background: none;
 		border: none;
-		font-size: 1rem;
 		color: var(--accent);
 		cursor: pointer;
 		padding: 0;
+		font-size: inherit;
+		white-space: nowrap;
 	}
-	.home-btn {
-		background: none;
-		border: none;
-		font-size: 1.1rem;
-		cursor: pointer;
-		padding: 0;
-		line-height: 1;
+	.crumb.current {
+		color: var(--text);
+		font-weight: 600;
+		cursor: default;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 180px;
+		display: inline-block;
 	}
+	.sep { color: var(--text2); }
 	/* ── Favourites bar ─────────────────────────────────────────────────────── */
 	/* Lives inside .item-list — scrolls away naturally, no JS needed */
 	.fav-bar {
@@ -613,6 +674,15 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+	}
+	.home-btn {
+		background: none;
+		border: none;
+		font-size: 1.1rem;
+		cursor: pointer;
+		padding: 0;
+		line-height: 1;
+		flex-shrink: 0;
 	}
 	.type-btn {
 		background: none;

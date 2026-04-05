@@ -300,7 +300,7 @@
 </script>
 
 {#if openListId}
-	<ListScreen listId={openListId} onBack={() => (openListId = null)} onHome={() => { openListId = null; breadcrumb = [null]; }} onOpenList={(id) => (openListId = id)} />
+	<ListScreen listId={openListId} onBack={() => (openListId = null)} onHome={() => { openListId = null; breadcrumb = [null]; }} onOpenList={(id) => (openListId = id)} onNavigateTo={(folderId) => { openListId = null; const idx = breadcrumb.lastIndexOf(folderId); if (idx !== -1) breadcrumb = breadcrumb.slice(0, idx + 1); else breadcrumb = [null, folderId]; }} />
 {:else if showSettings}
 	<SettingsScreen onBack={() => (showSettings = false)} {onLogout} />
 {:else}
