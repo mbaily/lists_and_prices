@@ -167,10 +167,11 @@
 
 <style>
 	.screen {
-		min-height: 100dvh;
+		height: 100dvh;
 		background: var(--bg);
 		display: flex;
 		flex-direction: column;
+		overflow: hidden;
 	}
 	header {
 		display: flex;
@@ -194,6 +195,8 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1.5rem;
+		overflow-y: auto;
+		flex: 1;
 	}
 	section { display: flex; flex-direction: column; gap: 0.75rem; }
 	h2 { margin: 0; font-size: 0.85rem; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; }

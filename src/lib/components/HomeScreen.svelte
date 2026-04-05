@@ -83,7 +83,9 @@
 					.sort((a, b) => a.order - b.order)
 	);
 	let hasArchived = $derived(
-		allFolders.some((f) => isFolderEffectivelyArchived(f.id, allFolders)) ||
+		// Only true when the archive root view would actually have content:
+		// root-level folders that are directly archived, or any effectively-archived list.
+		allFolders.some((f) => f.parentId === null && f.archived) ||
 		allLists.some((l) => isListEffectivelyArchived(l, allFolders))
 	);
 	let currentFolderColor = $derived(
