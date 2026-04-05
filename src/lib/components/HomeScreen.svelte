@@ -63,20 +63,35 @@
 		return isFolderEffectivelyArchived(list.folderId, folders, new Set());
 	}
 
+	// True whenever ARCHIVE_ID is anywhere in the breadcrumb (including as currentFolderId)
+	let isInArchiveView = $derived(breadcrumb.includes(ARCHIVE_ID));
+
 	let childFolders = $derived(
 		currentFolderId === ARCHIVE_ID
+			// Archive root: only root-level (parentId === null) effectively-archived folders
 			? allFolders
-					.filter((f) => isFolderEffectivelyArchived(f.id, allFolders))
+					.filter((f) => f.parentId === null && isFolderEffectivelyArchived(f.id, allFolders))
 					.sort((a, b) => a.order - b.order)
+			: isInArchiveView
+			// Inside an archived folder: show all children (they inherit archived status from parent)
+			? allFolders
+					.filter((f) => f.parentId === currentFolderId)
+					.sort((a, b) => a.order - b.order)
+			// Normal view: exclude effectively-archived
 			: allFolders
 					.filter((f) => f.parentId === currentFolderId && !isFolderEffectivelyArchived(f.id, allFolders))
 					.sort((a, b) => a.order - b.order)
 	);
 	let childLists = $derived(
 		currentFolderId === ARCHIVE_ID
+			// Archive root: no lists here (lists live inside folders)
+			? []
+			: isInArchiveView
+			// Inside an archived folder: show all lists (they inherit archived status from parent)
 			? allLists
-					.filter((l) => isListEffectivelyArchived(l, allFolders))
+					.filter((l) => l.folderId === currentFolderId)
 					.sort((a, b) => a.order - b.order)
+			// Normal view: exclude effectively-archived
 			: allLists
 					.filter((l) => l.folderId === currentFolderId && !isListEffectivelyArchived(l, allFolders))
 					.sort((a, b) => a.order - b.order)
@@ -462,7 +477,7 @@
 
 		<!-- Action bar -->
 		<div class="action-bar">
-			{#if currentFolderId !== ARCHIVE_ID}
+			{#if !isInArchiveView}
 				<button onclick={() => (showNewFolder = true)}>+ Folder</button>
 				{#if currentFolderId}
 					<button onclick={() => openNewList()}>+ List</button>
