@@ -470,6 +470,8 @@
 						>{pricingItemId === item.id ? (priceBuffer || '0') : formatPrice(item.price)}</button>
 					<button class="del-btn" onclick={() => askDelete(`Delete "${item.name}"?`, () => deleteItem(item.id))} aria-label="Delete">🗑</button>
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, i)}>☰</button>
+				</div>
+			{:else}
 				<!-- Plain: single row -->
 				<button class="check-btn" onclick={() => toggleCheck(item)} aria-label={item.checked ? 'Uncheck' : 'Check'}>
 					{item.checked ? '☑' : '☐'}
