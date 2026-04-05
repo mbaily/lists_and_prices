@@ -1,9 +1,56 @@
 <script lang="ts">
 	import { settings, updateSettings } from '$lib/settings.svelte';
+	import { exportBackup, importBackup, type BackupFile } from '$lib/data';
 
 	let { onBack, onLogout }: { onBack: () => void; onLogout: () => void } = $props();
 
 	const APP_VERSION = __APP_VERSION__;
+
+	// ── Backup ──────────────────────────────────────────────────────────────────
+	function downloadBackup() {
+		const data = exportBackup();
+		const json = JSON.stringify(data, null, 2);
+		const blob = new Blob([json], { type: 'application/json' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		const date = new Date().toISOString().slice(0, 10);
+		a.href = url;
+		a.download = `pnl-backup-${date}.json`;
+		a.click();
+		URL.revokeObjectURL(url);
+	}
+
+	// ── Restore ─────────────────────────────────────────────────────────────────
+	let restoreMode = $state<'replace' | 'merge'>('merge');
+	let restoreFileInput: HTMLInputElement | null = null;
+	let restoreStatus = $state<string | null>(null);
+	let restoreError = $state<string | null>(null);
+
+	function onFileSelected(e: Event) {
+		const file = (e.target as HTMLInputElement).files?.[0];
+		if (!file) return;
+		const reader = new FileReader();
+		reader.onload = () => {
+			try {
+				const backup = JSON.parse(reader.result as string) as BackupFile;
+				if (backup.version !== 1 || !Array.isArray(backup.folders)) {
+					restoreError = 'Invalid backup file.';
+					return;
+				}
+				const modeLabel = restoreMode === 'replace' ? 'REPLACE ALL data' : 'merge (overwrite matching)';
+				if (!confirm(`Restore backup and ${modeLabel}?\n\nThis cannot be undone.`)) return;
+				importBackup(backup, restoreMode);
+				restoreStatus = `Restored ${backup.folders.length} folders, ${backup.lists.length} lists, ${backup.items.length} items.`;
+				restoreError = null;
+			} catch (err) {
+				restoreError = `Failed to parse backup: ${err}`;
+				restoreStatus = null;
+			} finally {
+				if (restoreFileInput) restoreFileInput.value = '';
+			}
+		};
+		reader.readAsText(file);
+	}
 
 	const currencies = [
 		{ symbol: '$', label: 'USD $' },
@@ -75,6 +122,39 @@
 		<section>
 			<h2>Account</h2>
 			<button class="logout-btn" onclick={onLogout}>Sign out</button>
+		</section>
+
+		<section>
+			<h2>Backup &amp; Restore</h2>
+			<button class="action-btn" onclick={downloadBackup}>⬇ Download backup</button>
+
+			<div class="restore-modes">
+				<label class="mode-label">
+					<input type="radio" name="restoreMode" value="merge" bind:group={restoreMode} />
+					Merge — overwrite matching IDs, keep everything else
+				</label>
+				<label class="mode-label">
+					<input type="radio" name="restoreMode" value="replace" bind:group={restoreMode} />
+					Replace all — delete existing data, restore from file
+				</label>
+			</div>
+
+			<!-- Hidden file input; triggered by the visible button -->
+			<input
+				bind:this={restoreFileInput}
+				type="file"
+				accept=".json,application/json"
+				style="display:none"
+				onchange={onFileSelected}
+			/>
+			<button class="action-btn restore-btn" onclick={() => restoreFileInput?.click()}>⬆ Restore from file</button>
+
+			{#if restoreStatus}
+				<p class="restore-ok">{restoreStatus}</p>
+			{/if}
+			{#if restoreError}
+				<p class="restore-err">{restoreError}</p>
+			{/if}
 		</section>
 
 		<footer>
@@ -160,6 +240,34 @@
 		font-weight: 600;
 		cursor: pointer;
 	}
+	.action-btn {
+		padding: 0.7rem 1rem;
+		background: var(--accent);
+		color: #fff;
+		border: none;
+		border-radius: 10px;
+		font-size: 0.95rem;
+		font-weight: 600;
+		cursor: pointer;
+		align-self: flex-start;
+	}
+	.restore-btn { background: var(--bg3); color: var(--text); border: 1px solid var(--border); }
+	.restore-modes {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+	.mode-label {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.5rem;
+		font-size: 0.9rem;
+		color: var(--text);
+		cursor: pointer;
+	}
+	.mode-label input { margin-top: 2px; flex-shrink: 0; }
+	.restore-ok { margin: 0; font-size: 0.85rem; color: #22c55e; }
+	.restore-err { margin: 0; font-size: 0.85rem; color: #ef4444; }
 	footer { margin-top: auto; text-align: center; }
 	.version { font-size: 0.8rem; color: var(--text2); }
 </style>

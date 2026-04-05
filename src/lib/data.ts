@@ -299,3 +299,83 @@ function removeYMap(arr: Y.Array<unknown>, id: string) {
 	const idx = maps.findIndex((m) => m.get('id') === id);
 	if (idx !== -1) arr.delete(idx, 1);
 }
+
+// ─── Backup / Restore ─────────────────────────────────────────────────────────
+
+export interface BackupFile {
+	version: number;
+	exported: string; // ISO timestamp
+	folders: Folder[];
+	lists: ListMeta[];
+	items: ReturnType<typeof _readAllItems>;
+}
+
+function _readAllItems() {
+	return (getItems(getDoc()).toArray() as Y.Map<unknown>[]).map(yMapToItem);
+}
+
+/** Serialise the entire doc to a plain JS object ready to JSON.stringify. */
+export function exportBackup(): BackupFile {
+	return {
+		version: 1,
+		exported: new Date().toISOString(),
+		folders: readFolders(),
+		lists: readLists(),
+		items: _readAllItems()
+	};
+}
+
+/**
+ * Restore from a BackupFile.
+ * mode='replace' — wipe all existing data first, then insert everything from the backup.
+ * mode='merge'   — upsert by ID: update matching records, insert new ones; nothing is deleted.
+ */
+export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): void {
+	const doc = getDoc();
+	const fArr = getFolders(doc);
+	const lArr = getLists(doc);
+	const iArr = getItems(doc);
+
+	doc.transact(() => {
+		if (mode === 'replace') {
+			// Clear all arrays
+			if (fArr.length) fArr.delete(0, fArr.length);
+			if (lArr.length) lArr.delete(0, lArr.length);
+			if (iArr.length) iArr.delete(0, iArr.length);
+
+			// Insert folders
+			for (const f of backup.folders) {
+				const m = new Y.Map<unknown>();
+				for (const [k, v] of Object.entries(f)) m.set(k, v);
+				fArr.push([m]);
+			}
+			// Insert lists
+			for (const l of backup.lists) {
+				const m = new Y.Map<unknown>();
+				for (const [k, v] of Object.entries(l)) m.set(k, v);
+				lArr.push([m]);
+			}
+			// Insert items
+			for (const i of backup.items) {
+				const m = new Y.Map<unknown>();
+				for (const [k, v] of Object.entries(i)) m.set(k, v);
+				iArr.push([m]);
+			}
+		} else {
+			// Merge: upsert each record by id
+			function upsert(arr: Y.Array<unknown>, record: Record<string, unknown>) {
+				const existing = findYMap(arr, record.id as string);
+				if (existing) {
+					for (const [k, v] of Object.entries(record)) existing.set(k, v);
+				} else {
+					const m = new Y.Map<unknown>();
+					for (const [k, v] of Object.entries(record)) m.set(k, v);
+					arr.push([m]);
+				}
+			}
+			for (const f of backup.folders) upsert(fArr, f as unknown as Record<string, unknown>);
+			for (const l of backup.lists) upsert(lArr, l as unknown as Record<string, unknown>);
+			for (const i of backup.items) upsert(iArr, i as unknown as Record<string, unknown>);
+		}
+	});
+}
