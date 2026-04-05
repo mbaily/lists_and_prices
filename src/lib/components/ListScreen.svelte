@@ -595,6 +595,7 @@
 	.bulk-btn.danger { color: #ef4444; border-color: #ef4444; }
 	.item-list {
 		flex: 1;
+		overflow-x: hidden;
 		overflow-y: auto;
 		-webkit-overflow-scrolling: touch;
 		/* Leave room for the FAB at the bottom */

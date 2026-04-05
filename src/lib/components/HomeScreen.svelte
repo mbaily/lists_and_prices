@@ -487,6 +487,7 @@
 	}
 	.content {
 		flex: 1;
+		overflow-x: hidden;
 		overflow-y: auto;
 		-webkit-overflow-scrolling: touch;
 		padding-bottom: 1rem;
