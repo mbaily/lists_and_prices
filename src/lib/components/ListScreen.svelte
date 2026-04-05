@@ -322,6 +322,40 @@
 	// The fav-bar lives inside .item-list as its first child so it scrolls away
 	// naturally — no JS listener, no layout feedback loop.
 	let itemListEl: HTMLElement | null = null;
+
+	// ── Delete confirmation ───────────────────────────────────────────────────────
+	let confirmMsg = $state('');
+	let confirmAction = $state<(() => void) | null>(null);
+
+	function askDelete(msg: string, action: () => void) {
+		confirmMsg = msg;
+		confirmAction = () => action();
+	}
+
+	// ── Scroll anchor: compensate when summary bar grows/shrinks ─────────────────
+	// When checkedCount transitions 0→1 or 1→0 the bulk buttons appear/disappear,
+	// changing the summary bar height. We capture the first visible item's offset
+	// before the change and restore it after so the visible content doesn't jump.
+	let _prevCheckedCount = 0;
+	$effect(() => {
+		const prev = _prevCheckedCount;
+		const curr = checkedCount;
+		_prevCheckedCount = curr;
+		// Only act on the 0↔1 transition (that's when bulk buttons appear/disappear)
+		if ((prev === 0 && curr > 0) || (prev > 0 && curr === 0)) {
+			if (!itemListEl) return;
+			// Find the first visible item row and its current distance from the top
+			const row = itemListEl.querySelector('[data-item-index]') as HTMLElement | null;
+			if (!row) return;
+			const before = row.getBoundingClientRect().top;
+			// After the DOM has updated, re-measure and adjust scrollTop by the delta
+			tick().then(() => {
+				if (!itemListEl) return;
+				const after = row.getBoundingClientRect().top;
+				itemListEl.scrollTop += after - before;
+			});
+		}
+	});
 </script>
 
 <div class="screen" class:has-keypad={pricingItemId && isPriced}>
@@ -376,7 +410,12 @@
 		<span class="check-counts">✓ {checkedCount} / ✗ {uncheckedCount}</span>
 		{#if items.some((i) => i.checked)}
 			<button class="bulk-btn" onclick={bulkUncheck}>Uncheck{selectedIds.size > 0 ? ' sel.' : ' all'}</button>
-			<button class="bulk-btn danger" onclick={bulkDeleteChecked}>Del checked</button>
+			<button class="bulk-btn danger" onclick={() => askDelete(
+				selectedIds.size > 0
+					? `Delete ${items.filter(i => selectedIds.has(i.id) && i.checked).length} checked item(s)?`
+					: `Delete all ${checkedCount} checked item(s)?`,
+				bulkDeleteChecked
+			)}>Del checked</button>
 		{/if}
 	</div>
 
@@ -429,25 +468,25 @@
 							class:editing={pricingItemId === item.id}
 							onclick={() => pricingItemId === item.id ? commitPrice() : startEditPrice(item)}
 						>{pricingItemId === item.id ? (priceBuffer || '0') : formatPrice(item.price)}</button>
-						<button class="del-btn" onclick={() => deleteItem(item.id)} aria-label="Delete">🗑</button>
-						<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, i)}>⠣</button>
-					</div>
-				{:else}
-					<!-- Plain: single row -->
-					<button class="check-btn" onclick={() => toggleCheck(item)} aria-label={item.checked ? 'Uncheck' : 'Check'}>
-						{item.checked ? '☑' : '☐'}
-					</button>
-					<button
-						class="item-name"
-						class:strikethrough={item.checked}
-						class:editing={editingId === item.id}
-						onclick={() => startEditName(item)}
-						onpointerdown={(e) => onPointerDown(e, item.id)}
-						onpointermove={cancelLongPress}
-						onpointerup={cancelLongPress}
-						onpointercancel={cancelLongPress}
-					>{item.name}</button>
-					<button class="del-btn" onclick={() => deleteItem(item.id)} aria-label="Delete">🗑</button>
+					<button class="del-btn" onclick={() => askDelete(`Delete "${item.name}"?`, () => deleteItem(item.id))} aria-label="Delete">🗑</button>
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, i)}>⠣</button>
+				</div>
+			{:else}
+				<!-- Plain: single row -->
+				<button class="check-btn" onclick={() => toggleCheck(item)} aria-label={item.checked ? 'Uncheck' : 'Check'}>
+					{item.checked ? '☑' : '☐'}
+				</button>
+				<button
+					class="item-name"
+					class:strikethrough={item.checked}
+					class:editing={editingId === item.id}
+					onclick={() => startEditName(item)}
+					onpointerdown={(e) => onPointerDown(e, item.id)}
+					onpointermove={cancelLongPress}
+					onpointerup={cancelLongPress}
+					onpointercancel={cancelLongPress}
+				>{item.name}</button>
+				<button class="del-btn" onclick={() => askDelete(`Delete "${item.name}"?`, () => deleteItem(item.id))} aria-label="Delete">🗑</button>
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, i)}>⠣</button>
 				{/if}
 			</div>
@@ -489,6 +528,15 @@
 			</div>
 			<NumericKeypad onKey={handleKeypadInput} />
 		</div>
+	{/if}
+
+	<!-- Delete confirmation dialog -->
+	{#if confirmAction}
+		<ConfirmDialog
+			message={confirmMsg}
+			onConfirm={() => { confirmAction?.(); confirmAction = null; }}
+			onCancel={() => (confirmAction = null)}
+		/>
 	{/if}
 </div>
 
