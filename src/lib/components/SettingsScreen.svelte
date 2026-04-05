@@ -16,7 +16,9 @@
 		const date = new Date().toISOString().slice(0, 10);
 		a.href = url;
 		a.download = `pnl-backup-${date}.json`;
+		document.body.appendChild(a);
 		a.click();
+		document.body.removeChild(a);
 		URL.revokeObjectURL(url);
 	}
 
@@ -33,7 +35,7 @@
 		reader.onload = () => {
 			try {
 				const backup = JSON.parse(reader.result as string) as BackupFile;
-				if (backup.version !== 1 || !Array.isArray(backup.folders)) {
+				if (backup.version !== 1 || !Array.isArray(backup.folders) || !Array.isArray(backup.lists) || !Array.isArray(backup.items)) {
 					restoreError = 'Invalid backup file.';
 					return;
 				}

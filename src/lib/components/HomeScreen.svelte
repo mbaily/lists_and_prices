@@ -300,7 +300,23 @@
 </script>
 
 {#if openListId}
-	<ListScreen listId={openListId} onBack={() => (openListId = null)} onHome={() => { openListId = null; breadcrumb = [null]; }} onOpenList={(id) => (openListId = id)} onNavigateTo={(folderId) => { openListId = null; const idx = breadcrumb.lastIndexOf(folderId); if (idx !== -1) breadcrumb = breadcrumb.slice(0, idx + 1); else breadcrumb = [null, folderId]; }} />
+	<ListScreen listId={openListId} onBack={() => (openListId = null)} onHome={() => { openListId = null; breadcrumb = [null]; }} onOpenList={(id) => (openListId = id)} onNavigateTo={(folderId) => {
+		openListId = null;
+		// Reconstruct the full ancestor path to folderId so the breadcrumb is correct
+		// regardless of which folder the user was in when they opened the list.
+		const trail: (string | null)[] = [null];
+		const visited = new Set<string>();
+		let fid: string | null = folderId;
+		const ancestors: string[] = [];
+		while (fid !== null) {
+			if (visited.has(fid)) break;
+			visited.add(fid);
+			ancestors.unshift(fid);
+			const f = allFolders.find((x) => x.id === fid);
+			fid = f?.parentId ?? null;
+		}
+		breadcrumb = [...trail, ...ancestors];
+	}} />
 {:else if showSettings}
 	<SettingsScreen onBack={() => (showSettings = false)} {onLogout} />
 {:else}
