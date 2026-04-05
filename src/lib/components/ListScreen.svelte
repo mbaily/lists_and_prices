@@ -285,6 +285,23 @@
 
 	const isPriced = $derived(listMeta?.type === 'priced');
 
+	// If a peer deletes the item currently being priced or named, clear stale state
+	$effect(() => {
+		const ids = new Set(items.map((i) => i.id));
+		if (pricingItemId !== null && !ids.has(pricingItemId)) {
+			pricingItemId = null;
+			priceBuffer = '';
+		}
+		if (editingId !== null && !ids.has(editingId)) {
+			cancelEdit();
+		}
+		// Also clear any selected IDs that no longer exist
+		if (selectedIds.size > 0) {
+			const next = new Set([...selectedIds].filter((id) => ids.has(id)));
+			if (next.size !== selectedIds.size) selectedIds = next;
+		}
+	});
+
 	// Reset all transient editing/drag state when navigating to a different list
 	$effect(() => {
 		void listId; // track prop change
