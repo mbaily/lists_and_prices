@@ -154,13 +154,15 @@ export function updateList(id: string, patch: Partial<Omit<ListMeta, 'id'>>) {
 
 export function deleteList(id: string) {
 	const doc = getDoc();
-	// Delete all items in this list
-	const allItems = getItems(doc).toArray() as Y.Map<unknown>[];
-	const itemIds = allItems
-		.filter((i) => i.get('listId') === id)
-		.map((i) => i.get('id') as string);
-	for (const iid of itemIds) deleteItem(iid);
-	removeYMap(getLists(doc), id);
+	doc.transact(() => {
+		// Delete all items in this list
+		const allItems = getItems(doc).toArray() as Y.Map<unknown>[];
+		const itemIds = allItems
+			.filter((i) => i.get('listId') === id)
+			.map((i) => i.get('id') as string);
+		for (const iid of itemIds) deleteItem(iid);
+		removeYMap(getLists(doc), id);
+	});
 }
 
 // ─── Items ────────────────────────────────────────────────────────────────────
@@ -218,6 +220,18 @@ export function updateItem(id: string, patch: Partial<Omit<Item, 'id' | 'listId'
 
 export function deleteItem(id: string) {
 	removeYMap(getItems(getDoc()), id);
+}
+
+export function deleteItemsBatch(ids: string[]): void {
+	getDoc().transact(() => { for (const id of ids) deleteItem(id); });
+}
+
+export function setItemsChecked(ids: string[], checked: boolean): void {
+	getDoc().transact(() => { for (const id of ids) updateItem(id, { checked }); });
+}
+
+export function createItemsBatch(listId: string, names: string[]): void {
+	getDoc().transact(() => { for (const name of names) createItem(listId, name); });
 }
 
 export function listTotal(listId: string): number {

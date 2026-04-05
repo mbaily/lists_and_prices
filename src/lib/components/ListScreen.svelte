@@ -6,8 +6,11 @@
 		readLists,
 		readFolders,
 		createItem,
+		createItemsBatch,
 		updateItem,
 		deleteItem,
+		deleteItemsBatch,
+		setItemsChecked,
 		updateList,
 		reorderItems,
 		type Item,
@@ -100,7 +103,7 @@
 			alert('No valid items found in clipboard.');
 			return;
 		}
-		for (const name of lines) createItem(listId, name);
+		createItemsBatch(listId, lines);
 	}
 
 	// ── Edit item name via universal input ────────────────────────────────────────
@@ -205,8 +208,8 @@
 	}
 
 	function bulkUncheck() {
-		const targets = selectedIds.size > 0 ? [...selectedIds] : items.map((i) => i.id);
-		for (const id of targets) updateItem(id, { checked: false });
+		const ids = selectedIds.size > 0 ? [...selectedIds] : items.map((i) => i.id);
+		setItemsChecked(ids, false);
 		selectedIds = new Set();
 	}
 
@@ -215,7 +218,7 @@
 			selectedIds.size > 0
 				? items.filter((i) => selectedIds.has(i.id) && i.checked).map((i) => i.id)
 				: items.filter((i) => i.checked).map((i) => i.id);
-		for (const id of targets) deleteItem(id);
+		deleteItemsBatch(targets);
 		selectedIds = new Set();
 	}
 
