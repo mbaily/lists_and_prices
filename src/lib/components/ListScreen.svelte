@@ -99,6 +99,12 @@
 	);
 	const checkedCount = $derived(items.filter((i) => i.checked).length);
 	const uncheckedCount = $derived(items.filter((i) => !i.checked).length);
+	// Count of items that "Del checked" would actually delete
+	const delCheckedCount = $derived(
+		selectedIds.size > 0
+			? items.filter((i) => selectedIds.has(i.id) && i.checked).length
+			: checkedCount
+	);
 
 	// ── Universal input (add + edit) ─────────────────────────────────────────
 	// A single text input always at the top — iOS opens keyboard in the same
@@ -455,9 +461,6 @@
 		{#if items.some((i) => i.checked)}
 			<button class="bulk-btn" onclick={bulkUncheck}>Uncheck{selectedIds.size > 0 ? ' sel.' : ' all'}</button>
 		{/if}
-		{@const delCheckedCount = selectedIds.size > 0
-			? items.filter(i => selectedIds.has(i.id) && i.checked).length
-			: checkedCount}
 		{#if delCheckedCount > 0}
 			<button class="bulk-btn danger" onclick={() => askDelete(
 				selectedIds.size > 0
