@@ -286,6 +286,7 @@
 		{/if}
 
 		<!-- Up button -->
+		<div class="content">
 		{#if breadcrumb.length > 1}
 			<button class="up-btn" onclick={() => (breadcrumb = breadcrumb.slice(0, -1))}>
 				↑ Up
@@ -472,15 +473,23 @@
 				onCancel={() => (confirmAction = null)}
 			/>
 		{/if}
+		</div><!-- end .content -->
 	</div>
 {/if}
 
 <style>
 	.screen {
-		min-height: 100dvh;
+		height: 100dvh;
 		background: var(--bg);
 		display: flex;
 		flex-direction: column;
+		overflow: hidden;
+	}
+	.content {
+		flex: 1;
+		overflow-y: auto;
+		-webkit-overflow-scrolling: touch;
+		padding-bottom: 1rem;
 	}
 	header {
 		display: flex;
