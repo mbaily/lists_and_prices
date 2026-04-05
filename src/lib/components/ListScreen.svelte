@@ -331,12 +331,14 @@
 	// ── Drag reorder (pointer events — works on both touch and mouse) ──────────────
 	let touchDragFrom = $state<number | null>(null);
 	let touchDragOver = $state<number | null>(null);
+	let touchDragParentKey = $state<string | null>(null); // item.parentId ?? '__top__'
 
-	function startItemDrag(e: PointerEvent, tlIdx: number) {
+	function startItemDrag(e: PointerEvent, sibIdx: number, parentKey: string) {
 		e.stopPropagation();
 		cancelLongPress();
-		touchDragFrom = tlIdx;
-		touchDragOver = tlIdx;
+		touchDragFrom = sibIdx;
+		touchDragOver = sibIdx;
+		touchDragParentKey = parentKey;
 	}
 
 	$effect(() => {
@@ -350,11 +352,13 @@
 			}
 		}
 		function onEnd() {
-			if (touchDragFrom !== null && touchDragOver !== null && touchDragFrom !== touchDragOver) {
-				reorderTopLevelItems(listId, touchDragFrom, touchDragOver);
+			if (touchDragFrom !== null && touchDragOver !== null && touchDragFrom !== touchDragOver && touchDragParentKey !== null) {
+				const parentId = touchDragParentKey === '__top__' ? null : touchDragParentKey;
+				reorderSiblings(listId, parentId, touchDragFrom, touchDragOver);
 			}
 			touchDragFrom = null;
 			touchDragOver = null;
+			touchDragParentKey = null;
 		}
 		document.addEventListener('pointermove', onMove, { passive: false });
 		document.addEventListener('pointerup', onEnd, { once: true });
