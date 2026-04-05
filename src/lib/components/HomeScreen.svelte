@@ -244,6 +244,14 @@
 
 	// ── First-launch guard ───────────────────────────────────────────────────────
 	let showFirstLaunch = $derived(allFolders.length === 0 && !showNewFolder);
+
+	// Clear transient UI state whenever the user navigates to a different folder
+	$effect(() => {
+		void currentFolderId; // track navigation
+		renamingId = null;
+		movingFolderId = null;
+		movingListId = null;
+	});
 </script>
 
 {#if openListId}
