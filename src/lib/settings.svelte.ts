@@ -15,7 +15,7 @@ function loadSettings(): Settings {
 	if (typeof localStorage === 'undefined') return { currency: '$', theme: 'light', handedness: 'right' };
 	try {
 		const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? 'null');
-		if (saved) return { handedness: 'right', ...saved };
+			if (saved) return { currency: '$', theme: 'light' as const, handedness: 'right' as const, ...saved };
 	} catch { /* fall through */ }
 	// No saved settings — detect OS preference rather than hardcoding light
 	const prefersDark =

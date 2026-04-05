@@ -37,6 +37,8 @@ export function initYjs(username: string, wsUrl: string) {
 		connect: true
 	});
 
+	syncState.status = 'connecting';
+
 	doc.on('update', () => { docState.version++; });
 
 	_wsProvider.on('status', ({ status }: { status: string }) => {
