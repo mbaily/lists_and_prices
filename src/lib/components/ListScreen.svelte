@@ -124,6 +124,7 @@
 	function buildTreeOrder(allItems: Item[]): TreeItem[] {
 		const result: TreeItem[] = [];
 		const topLevel = allItems.filter((i) => i.parentId === null).sort((a, b) => a.order - b.order);
+		const validIds = new Set(allItems.map((i) => i.id));
 		function addSubtree(item: Item, level: number, rootTlIdx: number) {
 			const children = allItems
 				.filter((i) => i.parentId === item.id)
@@ -136,6 +137,12 @@
 		topLevel.forEach((item, idx) => {
 			result.push({ item, level: 0, tlIdx: idx, rootTlIdx: idx, sibIdx: idx });
 			if (!item.heading) addSubtree(item, 1, idx);
+		});
+		// Append orphaned items (parent was deleted by a peer without cascading)
+		const rendered = new Set(result.map((t) => t.item.id));
+		const orphans = allItems.filter((i) => i.parentId !== null && !validIds.has(i.parentId) && !rendered.has(i.id));
+		orphans.forEach((item, idx) => {
+			result.push({ item, level: 0, tlIdx: topLevel.length + idx, rootTlIdx: topLevel.length + idx, sibIdx: topLevel.length + idx });
 		});
 		return result;
 	}
@@ -396,6 +403,9 @@
 		}
 		if (editingId !== null && !ids.has(editingId)) {
 			cancelEdit();
+		}
+		if (infoItem !== null && !ids.has(infoItem.id)) {
+			infoItem = null;
 		}
 		// Also clear any selected IDs that no longer exist
 		if (selectedIds.size > 0) {
