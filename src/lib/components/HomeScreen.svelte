@@ -336,12 +336,12 @@
 			<div class="breadcrumb">
 				{#each breadcrumb as crumbId, i}
 					{#if i < breadcrumb.length - 1}
-						<button class="crumb" onclick={() => (breadcrumb = breadcrumb.slice(0, i + 1))}>
+						<button class="crumb" class:home-crumb={crumbId === null} onclick={() => (breadcrumb = breadcrumb.slice(0, i + 1))}>
 						{crumbId === null ? '🏠' : folderName(crumbId)}
 					</button>
 					<span class="sep">/</span>
-				{:else}
-					<span class="crumb current">{crumbId === null ? '🏠' : folderName(crumbId)}</span>
+					{:else}
+						<span class="crumb current" class:home-crumb={crumbId === null}>{crumbId === null ? '🏠' : folderName(crumbId)}</span>
 					{/if}
 				{/each}
 			</div>
@@ -610,6 +610,7 @@
 		font-weight: 600;
 		cursor: default;
 	}
+	.home-crumb { font-size: 1.25rem; }
 	.sep { color: var(--text2); }
 	.header-actions {
 		display: flex;
