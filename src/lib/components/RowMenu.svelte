@@ -16,8 +16,8 @@
 		if (e.key === 'Escape') close();
 	}
 
-	function handleOutside(e: MouseEvent) {
-		if (btnEl && !btnEl.closest('.row-menu')?.contains(e.target as Node)) close();
+	function handleOutside(e: PointerEvent) {
+		if (e.target && btnEl && !btnEl.closest('.row-menu')?.contains(e.target as Node)) close();
 	}
 
 	$effect(() => {
