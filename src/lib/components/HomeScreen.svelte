@@ -222,24 +222,28 @@
 		renamingId = null;
 	}
 
-	// ── Move ─────────────────────────────────────────────────────────────────────
-	let movingListId = $state<string | null>(null);
-	let movingFolderId = $state<string | null>(null);
+	// ── Move (tag-then-drop model) ───────────────────────────────────────────
+	// "Tag" marks an item for moving. Any folder row then shows "Move Tagged Here".
+	let taggedListId = $state<string | null>(null);
+	let taggedFolderId = $state<string | null>(null);
+	let hasTag = $derived(taggedListId !== null || taggedFolderId !== null);
 
-	function moveListTo(targetFolderId: string) {
-		if (!movingListId) return;
-		updateList(movingListId, { folderId: targetFolderId });
-		movingListId = null;
-	}
+	function tagFolder(id: string) { taggedFolderId = id; taggedListId = null; }
+	function tagList(id: string) { taggedListId = id; taggedFolderId = null; }
+	function clearTag() { taggedFolderId = null; taggedListId = null; }
 
-	function moveFolderTo(targetParentId: string | null) {
-		if (!movingFolderId) return;
-		if (targetParentId !== null && isDescendant(movingFolderId, targetParentId)) {
-			alert('Cannot move a folder into one of its own sub-folders.');
-			return;
+	function moveTaggedTo(targetFolderId: string | null) {
+		if (taggedFolderId) {
+			if (targetFolderId !== null && isDescendant(taggedFolderId, targetFolderId)) {
+				alert('Cannot move a folder into one of its own sub-folders.');
+				return;
+			}
+			updateFolder(taggedFolderId, { parentId: targetFolderId });
+		} else if (taggedListId) {
+			if (targetFolderId === null) return; // lists must live in a folder
+			updateList(taggedListId, { folderId: targetFolderId });
 		}
-		updateFolder(movingFolderId, { parentId: targetParentId });
-		movingFolderId = null;
+		clearTag();
 	}
 
 	// ── Touch drag reorder ────────────────────────────────────────────────────────
@@ -252,9 +256,8 @@
 
 	function startDrag(e: PointerEvent, kind: DragKind, index: number) {
 		e.stopPropagation();
-		// Close any open move panel so drag and move can't conflict
-		movingFolderId = null;
-		movingListId = null;
+		// Close any open tag so drag and move can't conflict
+		clearTag();
 		touchDragKind = kind;
 		touchDragFrom = index;
 		touchDragOver = index;
@@ -299,8 +302,7 @@
 	$effect(() => {
 		void currentFolderId; // track navigation
 		renamingId = null;
-		movingFolderId = null;
-		movingListId = null;
+		clearTag();
 	});
 </script>
 
@@ -407,7 +409,12 @@
 				<RowMenu items={[
 					{ label: '✏ Rename', action: () => startRename(folder.id, folder.name, 'folder') },
 					{ label: folder.archived ? '📤 Unarchive' : '📥 Archive', action: () => folder.archived ? unarchiveFolder(folder.id) : archiveFolder(folder.id) },
-					{ label: '↗ Move', action: () => { movingListId = null; movingFolderId = movingFolderId === folder.id ? null : folder.id; } },
+					...(hasTag && taggedFolderId !== folder.id
+						? [{ label: '📂 Move Tagged Here', action: () => moveTaggedTo(folder.id) }]
+						: []),
+					...(hasTag
+						? [{ label: '✕ Clear Tag', action: clearTag }]
+						: [{ label: '🏷 Tag (to move)', action: () => tagFolder(folder.id) }]),
 					{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete folder "${folder.name}" and all its contents?`, () => deleteFolder(folder.id)) }
 				]} />
 			</div>
@@ -452,26 +459,19 @@
 				<RowMenu items={[
 					{ label: '✏ Rename', action: () => startRename(list.id, list.name, 'list') },
 					{ label: list.archived ? '📤 Unarchive' : '📥 Archive', action: () => list.archived ? unarchiveList(list.id) : archiveList(list.id) },
-					{ label: '↗ Move', action: () => { movingFolderId = null; movingListId = movingListId === list.id ? null : list.id; } },
+					...(hasTag
+						? [{ label: '✕ Clear Tag', action: clearTag }]
+						: [{ label: '🏷 Tag (to move)', action: () => tagList(list.id) }]),
 					{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete list "${list.name}"?`, () => deleteList(list.id)) }
 				]} />
 			</div>
 		{/each}
 
-		<!-- Move target UI -->
-		{#if movingFolderId || movingListId}
-			<div class="move-panel">
-				<p>{movingFolderId ? 'Move folder to:' : 'Move list to:'}</p>
-				{#if movingFolderId}
-					<button onclick={() => moveFolderTo(null)}>Root</button>
-				{/if}
-				{#each allFolders as f}
-					<button
-						onclick={() =>
-							movingFolderId ? moveFolderTo(f.id) : moveListTo(f.id)}
-					>{f.name}</button>
-				{/each}
-				<button onclick={() => { movingFolderId = null; movingListId = null; }}>Cancel</button>
+		<!-- Tag indicator strip -->
+		{#if hasTag}
+			<div class="tag-strip">
+				<span>🏷 {taggedFolderId ? '📁 ' + (allFolders.find(f => f.id === taggedFolderId)?.name ?? '…') : '📋 ' + (allLists.find(l => l.id === taggedListId)?.name ?? '…')} tagged — open a folder and tap ⋮ → Move Tagged Here</span>
+				<button onclick={clearTag}>✕</button>
 			</div>
 		{/if}
 
@@ -848,25 +848,25 @@
 		font-size: 0.95rem;
 		cursor: pointer;
 	}
-	.move-panel {
-		background: var(--bg2);
-		border: 1px solid var(--border);
-		border-radius: 12px;
-		margin: 0.5rem 1rem;
-		padding: 0.75rem;
+	.tag-strip {
 		display: flex;
-		flex-wrap: wrap;
-		gap: 0.5rem;
 		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem 1rem;
+		background: color-mix(in srgb, var(--accent) 12%, var(--bg2));
+		border-bottom: 1px solid var(--border);
+		font-size: 0.82rem;
+		color: var(--text2);
 	}
-	.move-panel p { margin: 0; font-size: 0.85rem; width: 100%; color: var(--text2); }
-	.move-panel button {
-		padding: 0.4rem 0.8rem;
-		border: 1px solid var(--border);
-		border-radius: 8px;
-		background: var(--bg3);
-		color: var(--text);
-		font-size: 0.85rem;
+	.tag-strip span { flex: 1; }
+	.tag-strip button {
+		background: none;
+		border: none;
+		font-size: 1rem;
+		color: var(--text2);
 		cursor: pointer;
+		padding: 0.25rem;
+		min-width: 32px;
+		min-height: 32px;
 	}
 </style>
