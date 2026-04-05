@@ -313,6 +313,24 @@
 		selectedIds = new Set();
 		touchDragFrom = null;
 		touchDragOver = null;
+		// Reset scroll-shrink when switching lists
+		if (favBarEl) favBarEl.style.maxHeight = '';
+		if (itemListEl) itemListEl.scrollTop = 0;
+	});
+
+	// ── Scroll-shrink favourites bar ──────────────────────────────────────────────
+	let favBarEl: HTMLElement | null = null;
+	let itemListEl: HTMLElement | null = null;
+
+	$effect(() => {
+		if (!itemListEl || !favBarEl) return;
+		const fullHeight = favBarEl.scrollHeight;
+		function onScroll() {
+			const shrink = Math.min(itemListEl!.scrollTop, fullHeight);
+			favBarEl!.style.maxHeight = `${fullHeight - shrink}px`;
+		}
+		itemListEl.addEventListener('scroll', onScroll, { passive: true });
+		return () => itemListEl!.removeEventListener('scroll', onScroll);
 	});
 </script>
 
@@ -331,7 +349,7 @@
 
 	<!-- Favourites bar -->
 	{#if favouriteLists.length > 0}
-		<div class="fav-bar">
+		<div class="fav-bar" bind:this={favBarEl}>
 			<span class="fav-label">★</span>
 			{#each favouriteLists as fav}
 				<button
@@ -388,7 +406,7 @@
 	</div>
 
 	<!-- Item list -->
-	<div class="item-list">
+	<div class="item-list" bind:this={itemListEl}>
 		{#each items as item, i}
 			<div
 				class="item-row"
@@ -532,6 +550,8 @@
 		background: var(--bg2);
 		border-bottom: 1px solid var(--border);
 		flex-shrink: 0;
+		overflow: hidden;
+		/* max-height driven by JS scroll listener; no transition needed — it tracks 1:1 */
 	}
 	.fav-label { color: #f59e0b; font-size: 1rem; flex-shrink: 0; }
 	.fav-chip {
