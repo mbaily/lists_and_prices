@@ -403,7 +403,7 @@
 						📁 {folder.name}
 					</button>
 				{/if}
-				<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'folder', i)}>⠣</button>
+				<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'folder', i)}>☰</button>
 				<RowMenu items={[
 					{ label: '✏ Rename', action: () => startRename(folder.id, folder.name, 'folder') },
 					{ label: folder.archived ? '📤 Unarchive' : '📥 Archive', action: () => folder.archived ? unarchiveFolder(folder.id) : archiveFolder(folder.id) },
@@ -448,7 +448,7 @@
 					onclick={() => updateList(list.id, { favourite: !list.favourite })}
 					aria-label={list.favourite ? 'Unfavourite' : 'Favourite'}
 				>★</button>
-				<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'list', i)}>⠣</button>
+				<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'list', i)}>☰</button>
 				<RowMenu items={[
 					{ label: '✏ Rename', action: () => startRename(list.id, list.name, 'list') },
 					{ label: list.archived ? '📤 Unarchive' : '📥 Archive', action: () => list.archived ? unarchiveList(list.id) : archiveList(list.id) },
@@ -722,7 +722,7 @@
 	.drag-handle {
 		cursor: grab;
 		color: var(--text2);
-		font-size: 1.3rem;
+		font-size: 1.1rem;
 		user-select: none;
 		-webkit-user-select: none;
 		touch-action: none;
@@ -731,6 +731,9 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		background: none;
+		border: none;
+		padding: 0;
 	}
 	.drag-handle:active { color: var(--accent); }
 	.rename-input {
