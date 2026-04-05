@@ -358,16 +358,18 @@
 
 	<!-- Favourites bar -->
 	{#if favouriteLists.length > 0}
-		<div class="fav-bar" bind:this={favBarEl}>
-			<span class="fav-label">★</span>
-			{#each favouriteLists as fav}
-				<button
-					class="fav-chip"
-					class:fav-chip-active={fav.id === listId}
-					style="--chip-color:{fav.color}"
-					onclick={() => { if (fav.id !== listId) onOpenList(fav.id); }}
-				>{listPath(fav)}</button>
-			{/each}
+		<div class="fav-bar-wrap" bind:this={favBarEl}>
+			<div class="fav-bar">
+				<span class="fav-label">★</span>
+				{#each favouriteLists as fav}
+					<button
+						class="fav-chip"
+						class:fav-chip-active={fav.id === listId}
+						style="--chip-color:{fav.color}"
+						onclick={() => { if (fav.id !== listId) onOpenList(fav.id); }}
+					>{listPath(fav)}</button>
+				{/each}
+			</div>
 		</div>
 	{/if}
 
@@ -550,6 +552,13 @@
 		line-height: 1;
 	}
 	/* ── Favourites bar ─────────────────────────────────────────────────────── */
+	/* Outer wrapper: gets overflow:hidden + max-height from JS — clips *everything* inside */
+	.fav-bar-wrap {
+		overflow: hidden;
+		flex-shrink: 0;
+		/* max-height driven by JS scroll listener */
+	}
+	/* Inner bar: natural appearance, no overflow/max-height constraints */
 	.fav-bar {
 		display: flex;
 		flex-wrap: wrap;
@@ -558,9 +567,6 @@
 		padding: 0.4rem 0.75rem;
 		background: var(--bg2);
 		border-bottom: 1px solid var(--border);
-		flex-shrink: 0;
-		overflow: hidden;
-		/* max-height driven by JS scroll listener; no transition needed — it tracks 1:1 */
 	}
 	.fav-label { color: #f59e0b; font-size: 1rem; flex-shrink: 0; }
 	.fav-chip {
