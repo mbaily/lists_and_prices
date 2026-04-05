@@ -186,6 +186,7 @@
 		if (!newFolderName.trim()) return;
 		createFolder(newFolderName.trim(), currentFolderId, newFolderColor);
 		newFolderName = '';
+		newFolderColor = '#6366f1';
 		showNewFolder = false;
 	}
 
@@ -197,6 +198,7 @@
 
 	function openNewList() {
 		newListColor = currentFolderColor;
+		newListType = 'plain';
 		showNewList = true;
 	}
 
@@ -216,6 +218,8 @@
 		}
 		createList(name, currentFolderId!, newListType, newListColor);
 		newListName = '';
+		newListType = 'plain';
+		newListColor = '#6366f1';
 		showNewList = false;
 	}
 
@@ -350,7 +354,10 @@
 		showNewFolder = false;
 		showNewList = false;
 		newFolderName = '';
+		newFolderColor = '#6366f1';
 		newListName = '';
+		newListType = 'plain';
+		newListColor = '#6366f1';
 		// Do NOT clear the tag — the user navigates specifically to find the move target
 	});
 
@@ -596,7 +603,7 @@
 					<ColorPicker bind:value={newFolderColor} />
 					<div class="modal-actions">
 						<button onclick={submitNewFolder} disabled={!newFolderName.trim()}>Create</button>
-						<button onclick={() => { showNewFolder = false; newFolderName = ''; }}>Cancel</button>
+						<button onclick={() => { showNewFolder = false; newFolderName = ''; newFolderColor = '#6366f1'; }}>Cancel</button>
 					</div>
 				</div>
 			</div>
@@ -621,7 +628,7 @@
 					<ColorPicker bind:value={newListColor} />
 					<div class="modal-actions">
 						<button onclick={submitNewList}>Create</button>
-						<button onclick={() => { showNewList = false; newListName = ''; }}>Cancel</button>
+						<button onclick={() => { showNewList = false; newListName = ''; newListType = 'plain'; newListColor = '#6366f1'; }}>Cancel</button>
 					</div>
 				</div>
 			</div>
