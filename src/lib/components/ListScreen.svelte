@@ -324,13 +324,16 @@
 
 	$effect(() => {
 		if (!itemListEl || !favBarEl) return;
-		const fullHeight = favBarEl.scrollHeight;
+		// Read scrollHeight inside the handler so it stays accurate if favourites change
+		const bar = favBarEl;
+		const list = itemListEl;
 		function onScroll() {
-			const shrink = Math.min(itemListEl!.scrollTop, fullHeight);
-			favBarEl!.style.maxHeight = `${fullHeight - shrink}px`;
+			const fullHeight = bar.scrollHeight;
+			const shrink = Math.min(list.scrollTop, fullHeight);
+			bar.style.maxHeight = `${fullHeight - shrink}px`;
 		}
-		itemListEl.addEventListener('scroll', onScroll, { passive: true });
-		return () => itemListEl!.removeEventListener('scroll', onScroll);
+		list.addEventListener('scroll', onScroll, { passive: true });
+		return () => list.removeEventListener('scroll', onScroll);
 	});
 </script>
 
