@@ -57,6 +57,22 @@
 		allFolders.find((f) => f.id === currentFolderId)?.color ?? '#6366f1'
 	);
 
+	// ── Favourites ───────────────────────────────────────────────────────────────
+	let favouriteLists = $derived(allLists.filter((l) => l.favourite));
+
+	function listPath(list: ListMeta): string {
+		const parts: string[] = [];
+		let fid: string | null = list.folderId;
+		while (fid !== null) {
+			const f = allFolders.find((x) => x.id === fid);
+			if (!f) break;
+			parts.unshift(f.name);
+			fid = f.parentId;
+		}
+		parts.push(list.name);
+		return parts.join(' › ');
+	}
+
 	// ── Guard: trim breadcrumb if a folder in it was deleted (e.g. by a peer) ───
 	$effect(() => {
 		// allFolders is a reactive dependency; re-run whenever folders change.
@@ -244,6 +260,20 @@
 			</div>
 		</header>
 
+		<!-- Favourites bar -->
+		{#if favouriteLists.length > 0}
+			<div class="fav-bar">
+				<span class="fav-label">★</span>
+				{#each favouriteLists as fav}
+					<button
+						class="fav-chip"
+						style="--chip-color:{fav.color}"
+						onclick={() => (openListId = fav.id)}
+					>{listPath(fav)}</button>
+				{/each}
+			</div>
+		{/if}
+
 		<!-- Up button -->
 		{#if breadcrumb.length > 1}
 			<button class="up-btn" onclick={() => (breadcrumb = breadcrumb.slice(0, -1))}>
@@ -334,8 +364,12 @@
 						{list.type === 'priced' ? '💰' : '📋'} {list.name}
 					</button>
 				{/if}
-				<div class="row-actions">
-					<button onclick={() => startRename(list.id, list.name, 'list')} aria-label="Rename">✏</button>
+				<div class="row-actions">					<button
+						class="fav-btn"
+						class:active={list.favourite}
+						onclick={() => updateList(list.id, { favourite: !list.favourite })}
+						aria-label={list.favourite ? 'Unfavourite' : 'Favourite'}
+					>★</button>					<button onclick={() => startRename(list.id, list.name, 'list')} aria-label="Rename">✏</button>
 					<button
 						onclick={() =>
 							askDelete(`Delete list "${list.name}"?`, () => deleteList(list.id))}
@@ -505,6 +539,49 @@
 	.row.drag-below { background: var(--bg3); box-shadow: inset 0 -2px 0 var(--accent); }
 	.row.done { opacity: 0.55; }
 	.row.done .row-name { text-decoration: line-through; color: var(--text2); }
+	/* ── Favourites bar ────────────────────────────────────────────────────────── */
+	.fav-bar {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.4rem 1rem;
+		background: var(--bg2);
+		border-bottom: 1px solid var(--border);
+	}
+	.fav-label {
+		color: #f59e0b;
+		font-size: 1rem;
+		flex-shrink: 0;
+	}
+	.fav-chip {
+		background: none;
+		border: 1px solid var(--chip-color, var(--accent));
+		border-radius: 999px;
+		padding: 0.2rem 0.65rem;
+		font-size: 0.82rem;
+		color: var(--chip-color, var(--accent));
+		cursor: pointer;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 200px;
+	}
+	.fav-chip:hover { background: color-mix(in srgb, var(--chip-color) 12%, transparent); }
+	.fav-btn {
+		background: none;
+		border: none;
+		font-size: 1.1rem;
+		cursor: pointer;
+		padding: 0;
+		color: var(--text2);
+		min-width: 28px;
+		min-height: 44px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.fav-btn.active { color: #f59e0b; }
 	.check-circle {
 		background: none;
 		border: none;

@@ -96,6 +96,7 @@ export interface ListMeta {
 	type: 'plain' | 'priced';
 	order: number;
 	done: boolean;
+	favourite: boolean;
 }
 
 export function readLists(): ListMeta[] {
@@ -110,7 +111,8 @@ function yMapToList(m: Y.Map<unknown>): ListMeta {
 		folderId: m.get('folderId') as string,
 		type: (m.get('type') as 'plain' | 'priced') ?? 'plain',
 		order: (m.get('order') as number) ?? 0,
-		done: (m.get('done') as boolean) ?? false
+		done: (m.get('done') as boolean) ?? false,
+		favourite: (m.get('favourite') as boolean) ?? false
 	};
 }
 
