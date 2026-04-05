@@ -282,7 +282,7 @@
 					<button
 						class="fav-chip"
 						style="--chip-color:{fav.color}"
-						onclick={() => (openListId = fav.id)}
+						onclick={() => { openListId = fav.id; renamingId = null; }}
 					>{listPath(fav)}</button>
 				{/each}
 			</div>
@@ -375,7 +375,7 @@
 						autofocus
 					/>
 				{:else}
-					<button class="row-name" onclick={() => (openListId = list.id)}>
+					<button class="row-name" onclick={() => { openListId = list.id; renamingId = null; }}>
 						{list.type === 'priced' ? '💰' : '📋'} {list.name}
 					</button>
 				{/if}
