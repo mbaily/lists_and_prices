@@ -20,6 +20,7 @@
 	import SettingsScreen from './SettingsScreen.svelte';
 	import SyncBadge from './SyncBadge.svelte';
 	import ConfirmDialog from './ConfirmDialog.svelte';
+	import RowMenu from './RowMenu.svelte';
 
 	let { onLogout }: { onLogout: () => void } = $props();
 
@@ -43,15 +44,46 @@
 		try { return readLists(); } catch { return []; }
 	});
 
+	// Special virtual folder id for the Archived view
+	const ARCHIVE_ID = '__archive__';
+
+	// A folder/list is effectively archived if it or any ancestor folder has archived=true
+	function isFolderEffectivelyArchived(id: string, folders: Folder[], visited = new Set<string>()): boolean {
+		if (visited.has(id)) return false;
+		visited.add(id);
+		const f = folders.find((x) => x.id === id);
+		if (!f) return false;
+		if (f.archived) return true;
+		if (f.parentId === null) return false;
+		return isFolderEffectivelyArchived(f.parentId, folders, visited);
+	}
+
+	function isListEffectivelyArchived(list: ListMeta, folders: Folder[]): boolean {
+		if (list.archived) return true;
+		return isFolderEffectivelyArchived(list.folderId, folders, new Set());
+	}
+
 	let childFolders = $derived(
-		allFolders
-			.filter((f) => f.parentId === currentFolderId)
-			.sort((a, b) => a.order - b.order)
+		currentFolderId === ARCHIVE_ID
+			? allFolders
+					.filter((f) => isFolderEffectivelyArchived(f.id, allFolders))
+					.sort((a, b) => a.order - b.order)
+			: allFolders
+					.filter((f) => f.parentId === currentFolderId && !isFolderEffectivelyArchived(f.id, allFolders))
+					.sort((a, b) => a.order - b.order)
 	);
 	let childLists = $derived(
-		allLists
-			.filter((l) => l.folderId === currentFolderId)
-			.sort((a, b) => a.order - b.order)
+		currentFolderId === ARCHIVE_ID
+			? allLists
+					.filter((l) => isListEffectivelyArchived(l, allFolders))
+					.sort((a, b) => a.order - b.order)
+			: allLists
+					.filter((l) => l.folderId === currentFolderId && !isListEffectivelyArchived(l, allFolders))
+					.sort((a, b) => a.order - b.order)
+	);
+	let hasArchived = $derived(
+		allFolders.some((f) => isFolderEffectivelyArchived(f.id, allFolders)) ||
+		allLists.some((l) => isListEffectivelyArchived(l, allFolders))
 	);
 	let currentFolderColor = $derived(
 		allFolders.find((f) => f.id === currentFolderId)?.color ?? '#6366f1'
@@ -80,8 +112,8 @@
 	$effect(() => {
 		// allFolders is a reactive dependency; re-run whenever folders change.
 		const ids = new Set(allFolders.map((f) => f.id));
-		// Find the deepest breadcrumb entry that still exists (null = root always valid)
-		const lastValid = breadcrumb.findLastIndex((id) => id === null || ids.has(id));
+		// Find the deepest breadcrumb entry that still exists (null = root, ARCHIVE_ID = virtual — always valid)
+		const lastValid = breadcrumb.findLastIndex((id) => id === null || id === ARCHIVE_ID || ids.has(id));
 		if (lastValid < breadcrumb.length - 1) {
 			breadcrumb = breadcrumb.slice(0, lastValid + 1);
 		}
@@ -101,8 +133,7 @@
 
 	// ── Breadcrumb label ────────────────────────────────────────────────────────
 	function folderName(id: string | null): string {
-		if (id === null) return 'Home';
-		return allFolders.find((f) => f.id === id)?.name ?? '…';
+		if (id === null) return 'Home';		if (id === ARCHIVE_ID) return 'Archived';		return allFolders.find((f) => f.id === id)?.name ?? '…';
 	}
 
 	// ── Create folder ────────────────────────────────────────────────────────────
@@ -244,7 +275,11 @@
 
 	// ── First-launch guard ───────────────────────────────────────────────────────
 	let showFirstLaunch = $derived(allFolders.length === 0 && !showNewFolder);
-
+	// ── Archive helpers ───────────────────────────────────────────────────────
+	function archiveFolder(id: string) { updateFolder(id, { archived: true }); }
+	function unarchiveFolder(id: string) { updateFolder(id, { archived: false }); }
+	function archiveList(id: string) { updateList(id, { archived: true }); }
+	function unarchiveList(id: string) { updateList(id, { archived: false }); }
 	// Clear transient UI state whenever the user navigates to a different folder
 	$effect(() => {
 		void currentFolderId; // track navigation
@@ -312,11 +347,21 @@
 			</div>
 		{/if}
 
+		<!-- Archived virtual folder entry (shown at root when there's anything archived) -->
+		{#if currentFolderId === null && hasArchived}
+			<div class="row folder-row">
+				<span class="check-circle" style="color:#94a3b8">📦</span>
+				<button class="row-name" onclick={() => (breadcrumb = [...breadcrumb, ARCHIVE_ID])}
+				>Archived</button>
+			</div>
+		{/if}
+
 		<!-- Folders -->
 		{#each childFolders as folder, i}
 			<div
 				class="row folder-row"
 				class:done={folder.done}
+				class:archived={folder.archived}
 				class:drag-source={touchDragKind === 'folder' && touchDragFrom === i}
 				class:drag-above={touchDragKind === 'folder' && touchDragOver === i && touchDragFrom !== null && touchDragFrom > i}
 				class:drag-below={touchDragKind === 'folder' && touchDragOver === i && touchDragFrom !== null && touchDragFrom < i}
@@ -343,19 +388,13 @@
 						📁 {folder.name}
 					</button>
 				{/if}
-				<div class="row-actions">
-					<button onclick={() => startRename(folder.id, folder.name, 'folder')} aria-label="Rename">✏</button>
-					<button
-						onclick={() =>
-							askDelete(`Delete folder "${folder.name}" and all its contents?`, () =>
-								deleteFolder(folder.id))}
-						aria-label="Delete"
-					>🗑</button>
-					<button onclick={() => { movingListId = null; movingFolderId = movingFolderId === folder.id ? null : folder.id; }} aria-label="Move">
-						{movingFolderId === folder.id ? '✕' : '↗'}
-					</button>
-					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'folder', i)}>⠣</button>
-				</div>
+				<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'folder', i)}>⠣</button>
+				<RowMenu items={[
+					{ label: '✏ Rename', action: () => startRename(folder.id, folder.name, 'folder') },
+					{ label: folder.archived ? '📤 Unarchive' : '📥 Archive', action: () => folder.archived ? unarchiveFolder(folder.id) : archiveFolder(folder.id) },
+					{ label: '↗ Move', action: () => { movingListId = null; movingFolderId = movingFolderId === folder.id ? null : folder.id; } },
+					{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete folder "${folder.name}" and all its contents?`, () => deleteFolder(folder.id)) }
+				]} />
 			</div>
 		{/each}
 
@@ -364,6 +403,7 @@
 			<div
 				class="row list-row"
 				class:done={list.done}
+				class:archived={list.archived}
 				class:drag-source={touchDragKind === 'list' && touchDragFrom === i}
 				class:drag-above={touchDragKind === 'list' && touchDragOver === i && touchDragFrom !== null && touchDragFrom > i}
 				class:drag-below={touchDragKind === 'list' && touchDragOver === i && touchDragFrom !== null && touchDragFrom < i}
@@ -387,22 +427,19 @@
 						{list.type === 'priced' ? '💰' : '📋'} {list.name}
 					</button>
 				{/if}
-				<div class="row-actions">					<button
-						class="fav-btn"
-						class:active={list.favourite}
-						onclick={() => updateList(list.id, { favourite: !list.favourite })}
-						aria-label={list.favourite ? 'Unfavourite' : 'Favourite'}
-					>★</button>					<button onclick={() => startRename(list.id, list.name, 'list')} aria-label="Rename">✏</button>
-					<button
-						onclick={() =>
-							askDelete(`Delete list "${list.name}"?`, () => deleteList(list.id))}
-						aria-label="Delete"
-					>🗑</button>
-					<button onclick={() => { movingFolderId = null; movingListId = movingListId === list.id ? null : list.id; }} aria-label="Move">
-						{movingListId === list.id ? '✕' : '↗'}
-					</button>
-					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'list', i)}>⠣</button>
-				</div>
+				<button
+					class="fav-btn"
+					class:active={list.favourite}
+					onclick={() => updateList(list.id, { favourite: !list.favourite })}
+					aria-label={list.favourite ? 'Unfavourite' : 'Favourite'}
+				>★</button>
+				<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'list', i)}>⠣</button>
+				<RowMenu items={[
+					{ label: '✏ Rename', action: () => startRename(list.id, list.name, 'list') },
+					{ label: list.archived ? '📤 Unarchive' : '📥 Archive', action: () => list.archived ? unarchiveList(list.id) : archiveList(list.id) },
+					{ label: '↗ Move', action: () => { movingFolderId = null; movingListId = movingListId === list.id ? null : list.id; } },
+					{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete list "${list.name}"?`, () => deleteList(list.id)) }
+				]} />
 			</div>
 		{/each}
 
@@ -425,9 +462,11 @@
 
 		<!-- Action bar -->
 		<div class="action-bar">
-			<button onclick={() => (showNewFolder = true)}>+ Folder</button>
-			{#if currentFolderId}
-				<button onclick={() => openNewList()}>+ List</button>
+			{#if currentFolderId !== ARCHIVE_ID}
+				<button onclick={() => (showNewFolder = true)}>+ Folder</button>
+				{#if currentFolderId}
+					<button onclick={() => openNewList()}>+ List</button>
+				{/if}
 			{/if}
 		</div>
 
@@ -571,6 +610,8 @@
 	.row.drag-below { background: var(--bg3); box-shadow: inset 0 -2px 0 var(--accent); }
 	.row.done { opacity: 0.55; }
 	.row.done .row-name { text-decoration: line-through; color: var(--text2); }
+	.row.archived { opacity: 0.6; }
+	.row.archived .row-name { font-style: italic; }
 	/* ── Favourites bar ────────────────────────────────────────────────────────── */
 	.fav-bar {
 		display: flex;
