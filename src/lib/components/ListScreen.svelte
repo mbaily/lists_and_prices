@@ -469,9 +469,7 @@
 							onclick={() => pricingItemId === item.id ? commitPrice() : startEditPrice(item)}
 						>{pricingItemId === item.id ? (priceBuffer || '0') : formatPrice(item.price)}</button>
 					<button class="del-btn" onclick={() => askDelete(`Delete "${item.name}"?`, () => deleteItem(item.id))} aria-label="Delete">🗑</button>
-					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, i)}>⠣</button>
-				</div>
-			{:else}
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, i)}>☰</button>
 				<!-- Plain: single row -->
 				<button class="check-btn" onclick={() => toggleCheck(item)} aria-label={item.checked ? 'Uncheck' : 'Check'}>
 					{item.checked ? '☑' : '☐'}
@@ -487,7 +485,7 @@
 					onpointercancel={cancelLongPress}
 				>{item.name}</button>
 				<button class="del-btn" onclick={() => askDelete(`Delete "${item.name}"?`, () => deleteItem(item.id))} aria-label="Delete">🗑</button>
-					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, i)}>⠣</button>
+				<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, i)}>☰</button>
 				{/if}
 			</div>
 		{/each}
@@ -755,9 +753,10 @@
 	.drag-handle {
 		background: none;
 		border: none;
+		padding: 0;
 		cursor: grab;
 		color: var(--text2);
-		font-size: 1.3rem;
+		font-size: 1.1rem;
 		user-select: none;
 		flex-shrink: 0;
 		min-width: 44px;
