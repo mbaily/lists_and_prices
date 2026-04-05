@@ -206,6 +206,9 @@
 
 	function startDrag(e: PointerEvent, kind: DragKind, index: number) {
 		e.stopPropagation();
+		// Close any open move panel so drag and move can't conflict
+		movingFolderId = null;
+		movingListId = null;
 		touchDragKind = kind;
 		touchDragFrom = index;
 		touchDragOver = index;
