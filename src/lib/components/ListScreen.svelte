@@ -251,7 +251,9 @@
 	}
 
 	function bulkUncheck() {
-		const ids = selectedIds.size > 0 ? [...selectedIds] : items.map((i) => i.id);
+		const ids = selectedIds.size > 0
+			? [...selectedIds].filter((id) => !items.find((i) => i.id === id)?.heading)
+			: items.filter((i) => !i.heading).map((i) => i.id);
 		setItemsChecked(ids, false);
 		selectedIds = new Set();
 	}
