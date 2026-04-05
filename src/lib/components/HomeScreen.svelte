@@ -302,7 +302,7 @@
 	$effect(() => {
 		void currentFolderId; // track navigation
 		renamingId = null;
-		clearTag();
+		// Do NOT clear the tag — the user navigates specifically to find the move target
 	});
 </script>
 
@@ -470,7 +470,10 @@
 		<!-- Tag indicator strip -->
 		{#if hasTag}
 			<div class="tag-strip">
-				<span>🏷 {taggedFolderId ? '📁 ' + (allFolders.find(f => f.id === taggedFolderId)?.name ?? '…') : '📋 ' + (allLists.find(l => l.id === taggedListId)?.name ?? '…')} tagged — open a folder and tap ⋮ → Move Tagged Here</span>
+				<span>🏷 {taggedFolderId ? '📁 ' + (allFolders.find(f => f.id === taggedFolderId)?.name ?? '…') : '📋 ' + (allLists.find(l => l.id === taggedListId)?.name ?? '…')} tagged — navigate to destination and tap ⋮ → Move Tagged Here</span>
+				{#if taggedFolderId}
+					<button class="tag-root-btn" onclick={() => moveTaggedTo(null)} title="Move to root">🏠</button>
+				{/if}
 				<button onclick={clearTag}>✕</button>
 			</div>
 		{/if}
