@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { settings, updateSettings } from '$lib/settings.svelte';
 	import { exportBackup, importBackup, type BackupFile } from '$lib/data';
+	import ConfirmDialog from './ConfirmDialog.svelte';
 
 	let { onBack, onLogout }: { onBack: () => void; onLogout: () => void } = $props();
 
@@ -27,6 +28,7 @@
 	let restoreFileInput: HTMLInputElement | null = null;
 	let restoreStatus = $state<string | null>(null);
 	let restoreError = $state<string | null>(null);
+	let pendingBackup = $state<BackupFile | null>(null);
 
 	function onFileSelected(e: Event) {
 		const file = (e.target as HTMLInputElement).files?.[0];
@@ -39,10 +41,7 @@
 					restoreError = 'Invalid backup file.';
 					return;
 				}
-				const modeLabel = restoreMode === 'replace' ? 'REPLACE ALL data' : 'merge (overwrite matching)';
-				if (!confirm(`Restore backup and ${modeLabel}?\n\nThis cannot be undone.`)) return;
-				importBackup(backup, restoreMode);
-				restoreStatus = `Restored ${backup.folders.length} folders, ${backup.lists.length} lists, ${backup.items.length} items.`;
+				pendingBackup = backup;
 				restoreError = null;
 			} catch (err) {
 				restoreError = `Failed to parse backup: ${err}`;
@@ -52,6 +51,17 @@
 			}
 		};
 		reader.readAsText(file);
+	}
+
+	function confirmRestore() {
+		if (!pendingBackup) return;
+		try {
+			importBackup(pendingBackup, restoreMode);
+			restoreStatus = `Restored ${pendingBackup.folders.length} folders, ${pendingBackup.lists.length} lists, ${pendingBackup.items.length} items.`;
+		} catch (err) {
+			restoreError = `Restore failed: ${err}`;
+		}
+		pendingBackup = null;
 	}
 
 	const currencies = [
@@ -164,6 +174,15 @@
 		</footer>
 	</div>
 </div>
+
+{#if pendingBackup}
+	{@const modeLabel = restoreMode === 'replace' ? 'REPLACE ALL data with' : 'merge in'}
+	<ConfirmDialog
+		message={`Restore and ${modeLabel} ${pendingBackup.folders.length} folders, ${pendingBackup.lists.length} lists, ${pendingBackup.items.length} items? This cannot be undone.`}
+		onConfirm={confirmRestore}
+		onCancel={() => pendingBackup = null}
+	/>
+{/if}
 
 <style>
 	.screen {
