@@ -193,6 +193,7 @@ export interface Item {
 	price: number | null;
 	checked: boolean;
 	order: number;
+	heading: boolean;
 }
 
 export function readItems(listId: string): Item[] {
@@ -209,7 +210,8 @@ function yMapToItem(m: Y.Map<unknown>): Item {
 		name: m.get('name') as string,
 		price: (m.get('price') as number | null) ?? null,
 		checked: (m.get('checked') as boolean) ?? false,
-		order: (m.get('order') as number) ?? 0
+		order: (m.get('order') as number) ?? 0,
+		heading: (m.get('heading') as boolean) ?? false
 	};
 }
 

@@ -20,6 +20,7 @@
 	import { settings } from '$lib/settings.svelte';
 	import NumericKeypad from './NumericKeypad.svelte';
 	import ConfirmDialog from './ConfirmDialog.svelte';
+	import RowMenu from './RowMenu.svelte';
 
 	let { listId, onHome, onOpenList, onNavigateTo }: {
 		listId: string;
@@ -97,8 +98,8 @@
 	const total = $derived(
 		Math.round(items.reduce((s, i) => s + Math.round((i.price ?? 0) * 100), 0)) / 100
 	);
-	const checkedCount = $derived(items.filter((i) => i.checked).length);
-	const uncheckedCount = $derived(items.filter((i) => !i.checked).length);
+	const checkedCount = $derived(items.filter((i) => !i.heading && i.checked).length);
+	const uncheckedCount = $derived(items.filter((i) => !i.heading && !i.checked).length);
 	// Count of items that "Del checked" would actually delete
 	const delCheckedCount = $derived(
 		selectedIds.size > 0
@@ -489,7 +490,8 @@
 		{#each items as item, i}
 			<div
 				class="item-row"
-				class:priced-row={isPriced}
+				class:heading={item.heading}
+				class:priced-row={isPriced && !item.heading}
 				class:checked={item.checked}
 				class:selected={selectedIds.has(item.id)}
 				class:drag-source={touchDragFrom === i}
@@ -497,7 +499,19 @@
 					class:drag-below={touchDragOver === i && touchDragFrom !== null && touchDragFrom !== null && touchDragFrom < i}
 				data-item-index={i}
 			>
-				{#if isPriced}
+				{#if item.heading}
+					<!-- Heading: full-width bold label, no checkbox, no price -->
+					<button
+						class="item-name heading-name"
+						class:editing={editingId === item.id}
+						onclick={() => startEditName(item)}
+					>{item.name}</button>
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, i)}>☰</button>
+					<RowMenu items={[
+						{ label: '📌 Unheading', action: () => updateItem(item.id, { heading: false }) },
+						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItem(item.id)) }
+					]} />
+				{:else if isPriced}
 					<!-- Priced: name wraps top line, controls on bottom line -->
 					<div class="priced-top">
 						<button class="check-btn" onclick={() => toggleCheck(item)} aria-label={item.checked ? 'Uncheck' : 'Check'}>
@@ -520,26 +534,32 @@
 							class:editing={pricingItemId === item.id}
 							onclick={() => pricingItemId === item.id ? commitPrice() : startEditPrice(item)}
 						>{pricingItemId === item.id ? (priceBuffer || '0') : formatPrice(item.price)}</button>
-					<button class="del-btn" onclick={() => askDelete(`Delete "${item.name}"?`, () => deleteItem(item.id))} aria-label="Delete">🗑</button>
+						<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, i)}>☰</button>
+						<RowMenu items={[
+							{ label: '📌 Make Heading', action: () => updateItem(item.id, { heading: true, checked: false, price: null }) },
+							{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItem(item.id)) }
+						]} />
+					</div>
+				{:else}
+					<!-- Plain: single row -->
+					<button class="check-btn" onclick={() => toggleCheck(item)} aria-label={item.checked ? 'Uncheck' : 'Check'}>
+						{item.checked ? '☑' : '☐'}
+					</button>
+					<button
+						class="item-name"
+						class:strikethrough={item.checked}
+						class:editing={editingId === item.id}
+						onclick={() => startEditName(item)}
+						onpointerdown={(e) => onPointerDown(e, item.id)}
+						onpointermove={cancelLongPress}
+						onpointerup={cancelLongPress}
+						onpointercancel={cancelLongPress}
+					>{item.name}</button>
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, i)}>☰</button>
-				</div>
-			{:else}
-				<!-- Plain: single row -->
-				<button class="check-btn" onclick={() => toggleCheck(item)} aria-label={item.checked ? 'Uncheck' : 'Check'}>
-					{item.checked ? '☑' : '☐'}
-				</button>
-				<button
-					class="item-name"
-					class:strikethrough={item.checked}
-					class:editing={editingId === item.id}
-					onclick={() => startEditName(item)}
-					onpointerdown={(e) => onPointerDown(e, item.id)}
-					onpointermove={cancelLongPress}
-					onpointerup={cancelLongPress}
-					onpointercancel={cancelLongPress}
-				>{item.name}</button>
-				<button class="del-btn" onclick={() => askDelete(`Delete "${item.name}"?`, () => deleteItem(item.id))} aria-label="Delete">🗑</button>
-				<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, i)}>☰</button>
+					<RowMenu items={[
+						{ label: '📌 Make Heading', action: () => updateItem(item.id, { heading: true, checked: false }) },
+						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItem(item.id)) }
+					]} />
 				{/if}
 			</div>
 		{/each}
@@ -762,6 +782,18 @@
 	.item-row.drag-source { opacity: 0.4; }
 	.item-row.drag-above { background: var(--bg3); box-shadow: inset 0 2px 0 var(--accent); }
 	.item-row.drag-below { background: var(--bg3); box-shadow: inset 0 -2px 0 var(--accent); }
+	.item-row.heading {
+		background: var(--bg2);
+		border-top: 1px solid var(--border);
+		padding: 0.25rem 0;
+	}
+	.heading-name {
+		font-weight: 700;
+		font-size: 1rem;
+		letter-spacing: 0.02em;
+		color: var(--text);
+		text-transform: uppercase;
+	}
 	.check-btn {
 		background: none;
 		border: none;
