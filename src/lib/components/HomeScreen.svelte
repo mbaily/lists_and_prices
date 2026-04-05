@@ -26,13 +26,39 @@
 
 	let { onLogout }: { onLogout: () => void } = $props();
 
+	// ── URL hash navigation ──────────────────────────────────────────────────────
+	// Format: #f/id1/id2  (folder path, skipping the implicit null root)
+	//         #l/listId   (open list)
+	//         #           (root / home)
+	function buildHash(crumbs: (string | null)[], listId: string | null): string {
+		if (listId) return `#l/${listId}`;
+		// crumbs[0] is always null (root) — skip it
+		const ids = crumbs.slice(1).filter((id): id is string => id !== null);
+		return ids.length ? `#f/${ids.join('/')}` : '#';
+	}
+
+	function parseHash(): { breadcrumb: (string | null)[], openListId: string | null } {
+		if (typeof window === 'undefined') return { breadcrumb: [null], openListId: null };
+		const hash = window.location.hash.slice(1); // strip '#'
+		if (hash.startsWith('l/')) {
+			return { breadcrumb: [null], openListId: hash.slice(2) || null };
+		}
+		if (hash.startsWith('f/')) {
+			const parts = hash.slice(2).split('/').filter(Boolean);
+			return { breadcrumb: [null, ...parts], openListId: null };
+		}
+		return { breadcrumb: [null], openListId: null };
+	}
+
+	const _init = parseHash();
+
 	// ── Navigation state ────────────────────────────────────────────────────────
 	// breadcrumb is an array of folder ids. null means root.
-	let breadcrumb = $state<(string | null)[]>([null]);
+	let breadcrumb = $state<(string | null)[]>(_init.breadcrumb);
 	let currentFolderId = $derived(breadcrumb[breadcrumb.length - 1]);
 
 	// ── View state ──────────────────────────────────────────────────────────────
-	let openListId = $state<string | null>(null);
+	let openListId = $state<string | null>(_init.openListId);
 	let showSettings = $state(false);
 
 	// ── Live data (re-read on every Yjs change) ─────────────────────────────────
@@ -308,6 +334,31 @@
 		newFolderName = '';
 		newListName = '';
 		// Do NOT clear the tag — the user navigates specifically to find the move target
+	});
+
+	// ── URL hash sync ────────────────────────────────────────────────────────────
+	// Keep the address bar in sync so the page can be refreshed without losing state.
+	// Use pushState so the browser back button works between navigations.
+	let _lastHash = '';
+	$effect(() => {
+		const hash = buildHash(breadcrumb, openListId);
+		if (hash !== _lastHash) {
+			history.pushState(null, '', hash || '#');
+			_lastHash = hash;
+		}
+	});
+
+	// Restore state when the user presses the browser back/forward button.
+	$effect(() => {
+		if (typeof window === 'undefined') return;
+		function onPopState() {
+			const { breadcrumb: crumbs, openListId: listId } = parseHash();
+			breadcrumb = crumbs;
+			openListId = listId;
+			_lastHash = window.location.hash;
+		}
+		window.addEventListener('popstate', onPopState);
+		return () => window.removeEventListener('popstate', onPopState);
 	});
 </script>
 
