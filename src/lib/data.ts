@@ -325,7 +325,6 @@ export function reorderLists(folderId: string, fromIndex: number, toIndex: numbe
 	all.splice(toIndex, 0, moved);
 	doc.transact(() => all.forEach((l, idx) => updateList(l.id, { order: idx })));
 }
-}
 
 // ─── Internal utilities ───────────────────────────────────────────────────────
 
