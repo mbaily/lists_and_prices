@@ -422,7 +422,7 @@
 					<ColorPicker bind:value={newFolderColor} />
 					<div class="modal-actions">
 						<button onclick={submitNewFolder} disabled={!newFolderName.trim()}>Create</button>
-						<button onclick={() => (showNewFolder = false)}>Cancel</button>
+						<button onclick={() => { showNewFolder = false; newFolderName = ''; }}>Cancel</button>
 					</div>
 				</div>
 			</div>
@@ -447,7 +447,7 @@
 					<ColorPicker bind:value={newListColor} />
 					<div class="modal-actions">
 						<button onclick={submitNewList}>Create</button>
-						<button onclick={() => (showNewList = false)}>Cancel</button>
+						<button onclick={() => { showNewList = false; newListName = ''; }}>Cancel</button>
 					</div>
 				</div>
 			</div>

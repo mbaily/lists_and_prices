@@ -277,6 +277,19 @@
 	}
 
 	const isPriced = $derived(listMeta?.type === 'priced');
+
+	// Reset all transient editing/drag state when navigating to a different list
+	$effect(() => {
+		void listId; // track prop change
+		editingId = null;
+		inputMode = 'add';
+		universalValue = '';
+		pricingItemId = null;
+		priceBuffer = '';
+		selectedIds = new Set();
+		touchDragFrom = null;
+		touchDragOver = null;
+	});
 </script>
 
 <div class="screen" class:has-keypad={pricingItemId && isPriced}>
