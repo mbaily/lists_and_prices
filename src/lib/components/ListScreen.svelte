@@ -66,17 +66,15 @@
 			fid = f.parentId;
 		}
 		return [
-			{ id: null, name: '🏠' },
+			// null home crumb omitted — the 🏠 button in the header handles home navigation
 			...folders,
 			{ id: 'LIST', name: listMeta.name }
 		];
 	});
 
 	function navigateToCrumb(crumb: CrumbItem) {
-		if (crumb.id === null) {
-			onHome();
-		} else if (crumb.id !== 'LIST') {
-			onNavigateTo(crumb.id);
+		if (crumb.id !== 'LIST') {
+			onNavigateTo(crumb.id!);
 		}
 	}
 
@@ -406,8 +404,6 @@
 				{#if i > 0}<span class="sep">/</span>{/if}
 				{#if crumb.id === 'LIST'}
 					<span class="crumb current">{crumb.name}</span>
-				{:else if crumb.id === null}
-					<!-- Home already shown as the home-btn -->
 				{:else}
 					<button class="crumb" onclick={() => navigateToCrumb(crumb)}>{crumb.name}</button>
 				{/if}
