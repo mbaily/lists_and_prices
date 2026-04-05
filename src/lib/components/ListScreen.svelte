@@ -932,14 +932,16 @@
 	}
 	/* ── Subnotes ────────────────────────────────────────────────────────── */
 	.note-icon {
-		font-size: 0.85rem;
+		font-size: 1.1rem;
 		flex-shrink: 0;
-		opacity: 0.6;
+		min-width: 50px;
+		min-height: 50px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 	}
 	.note-name {
-		font-style: italic;
-		color: var(--text2);
-		font-size: 0.9rem;
+		font-size: 1rem;
 	}
 	/* ── Subtask hint bar ────────────────────────────────────────────────── */
 	.subtask-hint {
