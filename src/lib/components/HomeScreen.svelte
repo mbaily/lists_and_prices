@@ -302,7 +302,7 @@
 </script>
 
 {#if openListId}
-	<ListScreen listId={openListId} onBack={() => (openListId = null)} onHome={() => { openListId = null; breadcrumb = [null]; }} onOpenList={(id) => (openListId = id)} onNavigateTo={(folderId) => {
+	<ListScreen listId={openListId} onHome={() => { openListId = null; breadcrumb = [null]; }} onOpenList={(id) => (openListId = id)} onNavigateTo={(folderId) => {
 		openListId = null;
 		// Reconstruct the full ancestor path to folderId so the breadcrumb is correct
 		// regardless of which folder the user was in when they opened the list.

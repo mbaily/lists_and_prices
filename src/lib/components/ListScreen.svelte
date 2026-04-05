@@ -21,9 +21,8 @@
 	import NumericKeypad from './NumericKeypad.svelte';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 
-	let { listId, onBack, onHome, onOpenList, onNavigateTo }: {
+	let { listId, onHome, onOpenList, onNavigateTo }: {
 		listId: string;
-		onBack: () => void;
 		onHome: () => void;
 		onOpenList: (id: string) => void;
 		onNavigateTo: (folderId: string | null) => void;
@@ -134,8 +133,8 @@
 		const lines = text
 			.split(/\r?\n/)
 			.map((l) => l.trim())
-			.filter((l) => l.length > 0)        // strip blank / whitespace-only
-			.filter((l) => /[a-zA-Z]/.test(l)); // strip lines with no alphabetic char
+			.filter((l) => l.length > 0)        // strip blank / whitespace-only lines
+			.filter((l) => /\p{L}/u.test(l));   // strip lines with no letter in any script
 		if (lines.length === 0) {
 			alert('No valid items found in clipboard.');
 			return;
