@@ -13,11 +13,16 @@ export async function login(
 	username: string,
 	password: string
 ): Promise<{ ok: boolean; error?: string }> {
-	const res = await fetch('/api/login', {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ username, password })
-	});
+	let res: Response;
+	try {
+		res = await fetch('/api/login', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ username, password })
+		});
+	} catch {
+		return { ok: false, error: 'Network error — check your connection.' };
+	}
 	if (res.ok) {
 		auth.username = username;
 		localStorage.setItem(AUTH_KEY, username);
@@ -34,7 +39,13 @@ export async function logout() {
 }
 
 export async function checkSession(): Promise<boolean> {
-	const res = await fetch('/api/session');
+	let res: Response;
+	try {
+		res = await fetch('/api/session');
+	} catch {
+		// Network failure — fall through to show login screen
+		return false;
+	}
 	if (res.ok) {
 		const body = await res.json();
 		if (typeof body.username === 'string' && body.username) {

@@ -454,9 +454,14 @@
 		<span class="check-counts">✓ {checkedCount} / ✗ {uncheckedCount}</span>
 		{#if items.some((i) => i.checked)}
 			<button class="bulk-btn" onclick={bulkUncheck}>Uncheck{selectedIds.size > 0 ? ' sel.' : ' all'}</button>
+		{/if}
+		{@const delCheckedCount = selectedIds.size > 0
+			? items.filter(i => selectedIds.has(i.id) && i.checked).length
+			: checkedCount}
+		{#if delCheckedCount > 0}
 			<button class="bulk-btn danger" onclick={() => askDelete(
 				selectedIds.size > 0
-					? `Delete ${items.filter(i => selectedIds.has(i.id) && i.checked).length} checked item(s)?`
+					? `Delete ${delCheckedCount} checked item(s)?`
 					: `Delete all ${checkedCount} checked item(s)?`,
 				bulkDeleteChecked
 			)}>Del checked</button>
