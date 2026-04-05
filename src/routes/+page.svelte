@@ -17,8 +17,8 @@
 	});
 
 	async function handleLogout() {
-		await logout(); // clears auth.username first
-		destroyYjs();
+		destroyYjs(); // tear down Yjs before clearing auth to avoid stale updates
+		await logout(); // clears auth.username → triggers re-render to LoginScreen
 	}
 </script>
 
