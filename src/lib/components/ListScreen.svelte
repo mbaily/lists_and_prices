@@ -319,28 +319,9 @@
 	});
 
 	// ── Scroll-shrink favourites bar ──────────────────────────────────────────────
-	let favBarEl = $state<HTMLElement | null>(null);
-	let itemListEl = $state<HTMLElement | null>(null);
-
-	$effect(() => {
-		if (!itemListEl || !favBarEl) return;
-		const bar = favBarEl;
-		const list = itemListEl;
-		// getBoundingClientRect().height captures the true rendered height including border,
-		// measured BEFORE any max-height manipulation alters the layout.
-		const fullHeight = bar.getBoundingClientRect().height;
-		list.style.paddingBottom = `${fullHeight}px`;
-		function onScroll() {
-			const shrink = Math.min(list.scrollTop, fullHeight);
-			bar.style.maxHeight = `${fullHeight - shrink}px`;
-		}
-		list.addEventListener('scroll', onScroll, { passive: true });
-		return () => {
-			list.removeEventListener('scroll', onScroll);
-			list.style.paddingBottom = '';
-			bar.style.maxHeight = '';
-		};
-	});
+	// The fav-bar lives inside .item-list as its first child so it scrolls away
+	// naturally — no JS listener, no layout feedback loop.
+	let itemListEl: HTMLElement | null = null;
 </script>
 
 <div class="screen" class:has-keypad={pricingItemId && isPriced}>
@@ -355,23 +336,6 @@
 			</button>
 		</div>
 	</header>
-
-	<!-- Favourites bar -->
-	{#if favouriteLists.length > 0}
-		<div class="fav-bar-wrap" bind:this={favBarEl}>
-			<div class="fav-bar">
-				<span class="fav-label">★</span>
-				{#each favouriteLists as fav}
-					<button
-						class="fav-chip"
-						class:fav-chip-active={fav.id === listId}
-						style="--chip-color:{fav.color}"
-						onclick={() => { if (fav.id !== listId) onOpenList(fav.id); }}
-					>{listPath(fav)}</button>
-				{/each}
-			</div>
-		</div>
-	{/if}
 
 	<!-- Universal input bar: always present so iOS keyboard opens at a fixed position -->
 	{#if !pricingItemId || !isPriced}
@@ -416,8 +380,21 @@
 		{/if}
 	</div>
 
-	<!-- Item list -->
+	<!-- Item list (fav-bar is first child — it scrolls away naturally) -->
 	<div class="item-list" bind:this={itemListEl}>
+		{#if favouriteLists.length > 0}
+			<div class="fav-bar">
+				<span class="fav-label">★</span>
+				{#each favouriteLists as fav}
+					<button
+						class="fav-chip"
+						class:fav-chip-active={fav.id === listId}
+						style="--chip-color:{fav.color}"
+						onclick={() => { if (fav.id !== listId) onOpenList(fav.id); }}
+					>{listPath(fav)}</button>
+				{/each}
+			</div>
+		{/if}
 		{#each items as item, i}
 			<div
 				class="item-row"
@@ -552,13 +529,7 @@
 		line-height: 1;
 	}
 	/* ── Favourites bar ─────────────────────────────────────────────────────── */
-	/* Outer wrapper: gets overflow:hidden + max-height from JS — clips *everything* inside */
-	.fav-bar-wrap {
-		overflow: hidden;
-		flex-shrink: 0;
-		/* max-height driven by JS scroll listener */
-	}
-	/* Inner bar: natural appearance, no overflow/max-height constraints */
+	/* Lives inside .item-list — scrolls away naturally, no JS needed */
 	.fav-bar {
 		display: flex;
 		flex-wrap: wrap;
