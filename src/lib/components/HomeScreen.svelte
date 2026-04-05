@@ -89,6 +89,14 @@
 		if (openListId !== null && !allLists.some((l) => l.id === openListId)) {
 			openListId = null;
 		}
+		// Clear rename state if the target was deleted by a peer
+		if (renamingId !== null) {
+			const allIds = new Set([
+				...allFolders.map((f) => f.id),
+				...allLists.map((l) => l.id)
+			]);
+			if (!allIds.has(renamingId)) renamingId = null;
+		}
 	});
 
 	// ── Breadcrumb label ────────────────────────────────────────────────────────
