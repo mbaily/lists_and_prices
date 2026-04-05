@@ -98,6 +98,21 @@
 	const total = $derived(
 		Math.round(items.reduce((s, i) => s + Math.round((i.price ?? 0) * 100), 0)) / 100
 	);
+
+	// ── URL detection ─────────────────────────────────────────────────────────────
+	type NamePart = { type: 'text' | 'url'; value: string };
+	function parseNameParts(name: string): NamePart[] {
+		const urlRe = /https?:\/\/[^\s]+/g;
+		const result: NamePart[] = [];
+		let last = 0, m: RegExpExecArray | null;
+		while ((m = urlRe.exec(name)) !== null) {
+			if (m.index > last) result.push({ type: 'text', value: name.slice(last, m.index) });
+			result.push({ type: 'url', value: m[0] });
+			last = m.index + m[0].length;
+		}
+		if (last < name.length) result.push({ type: 'text', value: name.slice(last) });
+		return result.length ? result : [{ type: 'text', value: name }];
+	}
 	const checkedCount = $derived(items.filter((i) => !i.heading && i.checked).length);
 	const uncheckedCount = $derived(items.filter((i) => !i.heading && !i.checked).length);
 	// Count of items that "Del checked" would actually delete
@@ -507,7 +522,7 @@
 						class="item-name heading-name"
 						class:editing={editingId === item.id}
 						onclick={() => startEditName(item)}
-					>{item.name}</button>
+					>{#each parseNameParts(item.name) as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else}{part.value}{/if}{/each}</button>
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, i)}>☰</button>
 					<RowMenu items={[
 						{ label: '📌 Unheading', action: () => updateItem(item.id, { heading: false }) },
@@ -528,7 +543,7 @@
 							onpointermove={cancelLongPress}
 							onpointerup={cancelLongPress}
 							onpointercancel={cancelLongPress}
-						>{item.name}</button>
+						>{#each parseNameParts(item.name) as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else}{part.value}{/if}{/each}</button>
 					</div>
 					<div class="priced-bottom">
 						<button
@@ -556,7 +571,7 @@
 						onpointermove={cancelLongPress}
 						onpointerup={cancelLongPress}
 						onpointercancel={cancelLongPress}
-					>{item.name}</button>
+					>{#each parseNameParts(item.name) as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else}{part.value}{/if}{/each}</button>
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, i)}>☰</button>
 					<RowMenu items={[
 						{ label: '📌 Make Heading', action: () => updateItem(item.id, { heading: true, checked: false }) },
@@ -830,6 +845,11 @@
 	}
 	.item-name.strikethrough { text-decoration: line-through; color: var(--text2); }
 	.item-name.editing { color: var(--accent); font-style: italic; }
+	.item-url {
+		color: var(--accent);
+		text-decoration: underline;
+		word-break: break-all;
+	}
 	.price-btn {
 		min-width: 72px;
 		padding: 0.25rem 0.4rem;
