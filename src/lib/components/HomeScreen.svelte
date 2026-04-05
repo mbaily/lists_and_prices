@@ -284,9 +284,11 @@
 		}
 		document.addEventListener('pointermove', onMove, { passive: false });
 		document.addEventListener('pointerup', onEnd, { once: true });
+		document.addEventListener('pointercancel', onEnd, { once: true });
 		return () => {
 			document.removeEventListener('pointermove', onMove);
 			document.removeEventListener('pointerup', onEnd);
+			document.removeEventListener('pointercancel', onEnd);
 		};
 	});
 
