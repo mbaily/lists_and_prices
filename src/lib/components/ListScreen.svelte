@@ -320,7 +320,8 @@
 				class:checked={item.checked}
 				class:selected={selectedIds.has(item.id)}
 				class:drag-source={touchDragFrom === i}
-				class:drag-target={touchDragOver === i && touchDragFrom !== null && touchDragFrom !== i}
+					class:drag-above={touchDragOver === i && touchDragFrom !== null && touchDragFrom !== null && touchDragFrom > i}
+					class:drag-below={touchDragOver === i && touchDragFrom !== null && touchDragFrom !== null && touchDragFrom < i}
 				data-item-index={i}
 			>
 				{#if isPriced}
@@ -525,7 +526,8 @@
 	}
 	.item-row.selected { background: var(--bg3); }
 	.item-row.drag-source { opacity: 0.4; }
-	.item-row.drag-target { background: var(--bg3); box-shadow: inset 0 2px 0 var(--accent); }
+	.item-row.drag-above { background: var(--bg3); box-shadow: inset 0 2px 0 var(--accent); }
+	.item-row.drag-below { background: var(--bg3); box-shadow: inset 0 -2px 0 var(--accent); }
 	.check-btn {
 		background: none;
 		border: none;

@@ -265,7 +265,8 @@
 				class="row folder-row"
 				class:done={folder.done}
 				class:drag-source={touchDragKind === 'folder' && touchDragFrom === i}
-				class:drag-target={touchDragKind === 'folder' && touchDragOver === i && touchDragFrom !== i}
+				class:drag-above={touchDragKind === 'folder' && touchDragOver === i && touchDragFrom !== null && touchDragFrom > i}
+				class:drag-below={touchDragKind === 'folder' && touchDragOver === i && touchDragFrom !== null && touchDragFrom < i}
 				data-drag-kind="folder"
 				data-drag-index={i}
 				style="--row-color:{folder.color}"
@@ -311,7 +312,8 @@
 				class="row list-row"
 				class:done={list.done}
 				class:drag-source={touchDragKind === 'list' && touchDragFrom === i}
-				class:drag-target={touchDragKind === 'list' && touchDragOver === i && touchDragFrom !== i}
+				class:drag-above={touchDragKind === 'list' && touchDragOver === i && touchDragFrom !== null && touchDragFrom > i}
+				class:drag-below={touchDragKind === 'list' && touchDragOver === i && touchDragFrom !== null && touchDragFrom < i}
 				data-drag-kind="list"
 				data-drag-index={i}
 				style="--row-color:{list.color}"
@@ -499,7 +501,8 @@
 		transition: background 0.15s, opacity 0.15s;
 	}
 	.row.drag-source { opacity: 0.4; }
-	.row.drag-target { background: var(--bg3); box-shadow: inset 0 2px 0 var(--accent); }
+	.row.drag-above { background: var(--bg3); box-shadow: inset 0 2px 0 var(--accent); }
+	.row.drag-below { background: var(--bg3); box-shadow: inset 0 -2px 0 var(--accent); }
 	.row.done { opacity: 0.55; }
 	.row.done .row-name { text-decoration: line-through; color: var(--text2); }
 	.check-circle {
