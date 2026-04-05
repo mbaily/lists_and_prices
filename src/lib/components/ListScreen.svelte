@@ -522,7 +522,7 @@
 						class="item-name heading-name"
 						class:editing={editingId === item.id}
 						onclick={() => startEditName(item)}
-					>{#each parseNameParts(item.name) as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else}{part.value}{/if}{/each}</button>
+					>{#each parseNameParts(item.name) as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else}{part.value}{/if}{/each}</button>
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, i)}>☰</button>
 					<RowMenu items={[
 						{ label: '📌 Unheading', action: () => updateItem(item.id, { heading: false }) },
@@ -543,7 +543,7 @@
 							onpointermove={cancelLongPress}
 							onpointerup={cancelLongPress}
 							onpointercancel={cancelLongPress}
-						>{#each parseNameParts(item.name) as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else}{part.value}{/if}{/each}</button>
+						>{#each parseNameParts(item.name) as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else}{part.value}{/if}{/each}</button>
 					</div>
 					<div class="priced-bottom">
 						<button
@@ -571,7 +571,7 @@
 						onpointermove={cancelLongPress}
 						onpointerup={cancelLongPress}
 						onpointercancel={cancelLongPress}
-					>{#each parseNameParts(item.name) as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else}{part.value}{/if}{/each}</button>
+					>{#each parseNameParts(item.name) as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else}{part.value}{/if}{/each}</button>
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, i)}>☰</button>
 					<RowMenu items={[
 						{ label: '📌 Make Heading', action: () => updateItem(item.id, { heading: true, checked: false }) },
