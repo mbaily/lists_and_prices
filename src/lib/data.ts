@@ -58,13 +58,18 @@ export function updateFolder(id: string, patch: Partial<Omit<Folder, 'id'>>) {
 }
 
 export function deleteFolder(id: string) {
+	const doc = getDoc();
+	doc.transact(() => _deleteFolderInner(id));
+}
+
+function _deleteFolderInner(id: string) {
 	// Cascade: delete child folders recursively, then lists/items
 	const doc = getDoc();
 	const allFolders = getFolders(doc).toArray() as Y.Map<unknown>[];
 	const childIds = allFolders
 		.filter((f) => f.get('parentId') === id)
 		.map((f) => f.get('id') as string);
-	for (const cid of childIds) deleteFolder(cid);
+	for (const cid of childIds) _deleteFolderInner(cid);
 
 	// Delete lists in this folder
 	const allLists = getLists(doc).toArray() as Y.Map<unknown>[];
@@ -76,14 +81,16 @@ export function deleteFolder(id: string) {
 	removeYMap(getFolders(doc), id);
 }
 
-export function isDescendant(folderId: string, targetId: string): boolean {
+export function isDescendant(folderId: string, targetId: string, _visited = new Set<string>()): boolean {
 	// Returns true if targetId is folderId or a descendant of folderId
 	if (folderId === targetId) return true;
+	if (_visited.has(folderId)) return false; // cycle guard
+	_visited.add(folderId);
 	const folders = getFolders(getDoc()).toArray() as Y.Map<unknown>[];
 	const children = folders
 		.filter((f) => f.get('parentId') === folderId)
 		.map((f) => f.get('id') as string);
-	return children.some((cid) => isDescendant(cid, targetId));
+	return children.some((cid) => isDescendant(cid, targetId, _visited));
 }
 
 // ─── Lists ────────────────────────────────────────────────────────────────────

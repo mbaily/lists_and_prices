@@ -331,7 +331,7 @@
 								deleteFolder(folder.id))}
 						aria-label="Delete"
 					>🗑</button>
-					<button onclick={() => (movingFolderId = movingFolderId === folder.id ? null : folder.id)} aria-label="Move">
+					<button onclick={() => { movingListId = null; movingFolderId = movingFolderId === folder.id ? null : folder.id; }} aria-label="Move">
 						{movingFolderId === folder.id ? '✕' : '↗'}
 					</button>
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'folder', i)}>⠣</button>
@@ -378,7 +378,7 @@
 							askDelete(`Delete list "${list.name}"?`, () => deleteList(list.id))}
 						aria-label="Delete"
 					>🗑</button>
-					<button onclick={() => (movingListId = movingListId === list.id ? null : list.id)} aria-label="Move">
+					<button onclick={() => { movingFolderId = null; movingListId = movingListId === list.id ? null : list.id; }} aria-label="Move">
 						{movingListId === list.id ? '✕' : '↗'}
 					</button>
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'list', i)}>⠣</button>
