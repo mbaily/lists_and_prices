@@ -324,15 +324,13 @@
 
 	$effect(() => {
 		if (!itemListEl || !favBarEl) return;
-		// Read scrollHeight inside the handler so it stays accurate if favourites change
 		const bar = favBarEl;
 		const list = itemListEl;
-		// Ensure there is always enough scroll room to fully collapse the bar
-		list.style.paddingBottom = `${bar.scrollHeight}px`;
+		// getBoundingClientRect().height captures the true rendered height including border,
+		// measured BEFORE any max-height manipulation alters the layout.
+		const fullHeight = bar.getBoundingClientRect().height;
+		list.style.paddingBottom = `${fullHeight}px`;
 		function onScroll() {
-			const fullHeight = bar.scrollHeight;
-			// Keep padding in sync if bar height ever changes
-			list.style.paddingBottom = `${fullHeight}px`;
 			const shrink = Math.min(list.scrollTop, fullHeight);
 			bar.style.maxHeight = `${fullHeight - shrink}px`;
 		}
@@ -340,6 +338,7 @@
 		return () => {
 			list.removeEventListener('scroll', onScroll);
 			list.style.paddingBottom = '';
+			bar.style.maxHeight = '';
 		};
 	});
 </script>
