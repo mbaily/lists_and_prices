@@ -144,6 +144,9 @@
 			]);
 			if (!allIds.has(renamingId)) renamingId = null;
 		}
+		// Clear stale tag if the tagged item was deleted by a peer
+		if (taggedFolderId !== null && !allFolders.some((f) => f.id === taggedFolderId)) taggedFolderId = null;
+		if (taggedListId !== null && !allLists.some((l) => l.id === taggedListId)) taggedListId = null;
 	});
 
 	// ── Breadcrumb label ────────────────────────────────────────────────────────
@@ -276,8 +279,13 @@
 		}
 		function onEnd() {
 			if (touchDragFrom !== null && touchDragOver !== null && touchDragFrom !== touchDragOver) {
-				if (kind === 'folder') reorderFolders(currentFolderId, touchDragFrom, touchDragOver);
-				else reorderLists(currentFolderId!, touchDragFrom, touchDragOver);
+				if (kind === 'folder') {
+					// Don't reorder inside the virtual archive root
+					if (currentFolderId !== ARCHIVE_ID) reorderFolders(currentFolderId, touchDragFrom, touchDragOver);
+				} else {
+					// Lists always have a real folderId (archive root shows no lists)
+					if (currentFolderId && currentFolderId !== ARCHIVE_ID) reorderLists(currentFolderId, touchDragFrom, touchDragOver);
+				}
 			}
 			touchDragKind = null;
 			touchDragFrom = null;
@@ -345,6 +353,17 @@
 						onclick={() => { openListId = fav.id; renamingId = null; }}
 					>{listPath(fav)}</button>
 				{/each}
+			</div>
+		{/if}
+
+		<!-- Tag indicator strip (outside .content so it stays visible while scrolling) -->
+		{#if hasTag}
+			<div class="tag-strip">
+				<span>🏷 {taggedFolderId ? '📁 ' + (allFolders.find(f => f.id === taggedFolderId)?.name ?? '…') : '📋 ' + (allLists.find(l => l.id === taggedListId)?.name ?? '…')} tagged — navigate to destination and tap ⋮ → Move Tagged Here</span>
+				{#if taggedFolderId}
+					<button class="tag-root-btn" onclick={() => moveTaggedTo(null)} title="Move to root">🏠</button>
+				{/if}
+				<button onclick={clearTag}>✕</button>
 			</div>
 		{/if}
 
@@ -467,16 +486,7 @@
 			</div>
 		{/each}
 
-		<!-- Tag indicator strip -->
-		{#if hasTag}
-			<div class="tag-strip">
-				<span>🏷 {taggedFolderId ? '📁 ' + (allFolders.find(f => f.id === taggedFolderId)?.name ?? '…') : '📋 ' + (allLists.find(l => l.id === taggedListId)?.name ?? '…')} tagged — navigate to destination and tap ⋮ → Move Tagged Here</span>
-				{#if taggedFolderId}
-					<button class="tag-root-btn" onclick={() => moveTaggedTo(null)} title="Move to root">🏠</button>
-				{/if}
-				<button onclick={clearTag}>✕</button>
-			</div>
-		{/if}
+		<!-- Tag indicator strip moved above .content -->
 
 		<!-- Action bar -->
 		<div class="action-bar">
