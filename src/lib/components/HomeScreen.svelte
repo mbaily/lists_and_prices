@@ -233,7 +233,7 @@
 </script>
 
 {#if openListId}
-	<ListScreen listId={openListId} onBack={() => (openListId = null)} onHome={() => { openListId = null; breadcrumb = [null]; }} />
+	<ListScreen listId={openListId} onBack={() => (openListId = null)} onHome={() => { openListId = null; breadcrumb = [null]; }} onOpenList={(id) => (openListId = id)} />
 {:else if showSettings}
 	<SettingsScreen onBack={() => (showSettings = false)} {onLogout} />
 {:else}
@@ -244,11 +244,11 @@
 				{#each breadcrumb as crumbId, i}
 					{#if i < breadcrumb.length - 1}
 						<button class="crumb" onclick={() => (breadcrumb = breadcrumb.slice(0, i + 1))}>
-							{folderName(crumbId)}
-						</button>
-						<span class="sep">/</span>
-					{:else}
-						<span class="crumb current">{folderName(crumbId)}</span>
+						{crumbId === null ? '🏠' : folderName(crumbId)}
+					</button>
+					<span class="sep">/</span>
+				{:else}
+					<span class="crumb current">{crumbId === null ? '🏠' : folderName(crumbId)}</span>
 					{/if}
 				{/each}
 			</div>

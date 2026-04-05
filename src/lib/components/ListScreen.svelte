@@ -4,6 +4,7 @@
 	import {
 		readItems,
 		readLists,
+		readFolders,
 		createItem,
 		updateItem,
 		deleteItem,
@@ -16,7 +17,7 @@
 	import NumericKeypad from './NumericKeypad.svelte';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 
-	let { listId, onBack, onHome }: { listId: string; onBack: () => void; onHome: () => void } = $props();
+	let { listId, onBack, onHome, onOpenList }: { listId: string; onBack: () => void; onHome: () => void; onOpenList: (id: string) => void } = $props();
 
 	let items = $derived.by(() => {
 		void docState.version;
@@ -26,6 +27,29 @@
 		void docState.version;
 		try { return readLists().find((l) => l.id === listId) ?? null; } catch { return null; }
 	});
+
+	let allLists = $derived.by(() => {
+		void docState.version;
+		try { return readLists(); } catch { return []; }
+	});
+	let allFolders = $derived.by(() => {
+		void docState.version;
+		try { return readFolders(); } catch { return []; }
+	});
+	let favouriteLists = $derived(allLists.filter((l) => l.favourite));
+
+	function listPath(list: ListMeta): string {
+		const parts: string[] = [];
+		let fid: string | null = list.folderId;
+		while (fid !== null) {
+			const f = allFolders.find((x) => x.id === fid);
+			if (!f) break;
+			parts.unshift(f.name);
+			fid = f.parentId;
+		}
+		parts.push(list.name);
+		return parts.join(' › ');
+	}
 
 	// Sum in integer cents to avoid float accumulation (e.g. 0.1+0.2 = 0.300...04)
 	const total = $derived(
@@ -268,6 +292,21 @@
 		</div>
 	</header>
 
+	<!-- Favourites bar -->
+	{#if favouriteLists.length > 0}
+		<div class="fav-bar">
+			<span class="fav-label">★</span>
+			{#each favouriteLists as fav}
+				<button
+					class="fav-chip"
+					class:fav-chip-active={fav.id === listId}
+					style="--chip-color:{fav.color}"
+					onclick={() => { if (fav.id !== listId) onOpenList(fav.id); }}
+				>{listPath(fav)}</button>
+			{/each}
+		</div>
+	{/if}
+
 	<!-- Universal input bar: always present so iOS keyboard opens at a fixed position -->
 	{#if !pricingItemId || !isPriced}
 		<div class="universal-bar">
@@ -445,6 +484,35 @@
 		cursor: pointer;
 		padding: 0;
 		line-height: 1;
+	}
+	/* ── Favourites bar ─────────────────────────────────────────────────────── */
+	.fav-bar {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.4rem 0.75rem;
+		background: var(--bg2);
+		border-bottom: 1px solid var(--border);
+		flex-shrink: 0;
+	}
+	.fav-label { color: #f59e0b; font-size: 1rem; flex-shrink: 0; }
+	.fav-chip {
+		background: none;
+		border: 1px solid var(--chip-color, var(--accent));
+		border-radius: 999px;
+		padding: 0.2rem 0.65rem;
+		font-size: 0.82rem;
+		color: var(--chip-color, var(--accent));
+		cursor: pointer;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 200px;
+	}
+	.fav-chip.fav-chip-active {
+		background: var(--chip-color, var(--accent));
+		color: #fff;
 	}
 	.list-title {
 		flex: 1;
