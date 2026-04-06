@@ -557,6 +557,11 @@
 			<!-- {#if !isInArchiveView && currentFolderId !== ARCHIVE_ID} -->
 
 			<div class="header-actions">
+				{#if currentFolderId === null && hasArchived}
+					<button class="icon-btn" onclick={() => (breadcrumb = [...breadcrumb, ARCHIVE_ID])} aria-label="Archived">
+						📦
+					</button>
+				{/if}
 				<SyncBadge status={syncState.status} />
 				<button class="icon-btn" onclick={() => (showSettings = true)} aria-label="Settings">
 					⚙
@@ -609,15 +614,6 @@
 			<div class="empty-prompt">
 				<p>Welcome! Create your first folder to get started.</p>
 				<button onclick={() => (showNewFolder = true)}>Create Folder</button>
-			</div>
-		{/if}
-
-		<!-- Archived virtual folder entry (shown at root when there's anything archived) -->
-		{#if currentFolderId === null && hasArchived}
-			<div class="row folder-row">
-				<span class="check-circle" style="color:#94a3b8">📦</span>
-				<button class="row-name" onclick={() => (breadcrumb = [...breadcrumb, ARCHIVE_ID])}
-				>Archived</button>
 			</div>
 		{/if}
 
