@@ -96,8 +96,6 @@
 	}
 
 	// Sum in integer cents to avoid float accumulation (e.g. 0.1+0.2 = 0.300...04)
-	// Only sum top-level items (parentId === null) — subtask prices are breakdowns,
-	// not additive, to avoid double-counting.
 	const total = $derived(
 		Math.round(items
 			.filter((i) => !i.heading && !i.note)
@@ -327,7 +325,12 @@
 			else if (e.key === 'Enter') key = 'enter';
 			else if (e.key === '.' || e.key === ',') key = '.';
 			else if (e.key === '-') key = 'minus';
-			else if (e.key === 'Escape') { pricingItemId ? commitPrice() : commitQty(); key = null; }
+			else if (e.key === 'Escape') {
+				// Escape = cancel (discard), Enter = commit (save)
+				e.preventDefault();
+				if (pricingItemId) { pricingItemId = null; priceBuffer = ''; }
+				else { qtyItemId = null; qtyBuffer = ''; }
+			}
 			if (key !== null) {
 				e.preventDefault();
 				handleKeypadInput(key);
@@ -451,6 +454,9 @@
 	// ── Type conversion ───────────────────────────────────────────────────────────
 	function toggleType() {
 		if (!listMeta) return;
+		// Dismiss any open keypad before switching type
+		pricingItemId = null; priceBuffer = '';
+		qtyItemId = null; qtyBuffer = '';
 		updateList(listId, { type: listMeta.type === 'plain' ? 'priced' : 'plain' });
 	}
 
