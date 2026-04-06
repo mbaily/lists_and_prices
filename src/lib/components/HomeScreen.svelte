@@ -128,7 +128,8 @@
 
 	let childFolders = $derived(
 		currentFolderId === ARCHIVE_ID
-			// Archive root: tops of archived subtrees + root-level path-through folders
+			// Archive root: tops of archived subtrees (archived folder whose parent is not archived),
+			// plus root-level path-through folders that lead to archived content.
 			? allFolders
 					.filter((f) =>
 						(f.archived && (f.parentId === null || !isFolderEffectivelyArchived(f.parentId, allFolders)))
@@ -195,6 +196,7 @@
 
 	// ── Favourites ───────────────────────────────────────────────────────────────────────
 	let favouriteLists = $derived(allLists.filter((l) => l.favourite && !isListEffectivelyArchived(l, allFolders)));
+	let favouriteFolders = $derived(allFolders.filter((f) => f.favourite && !isFolderEffectivelyArchived(f.id, allFolders)));
 
 	function listPath(list: ListMeta): string {
 		const parts: string[] = [];
@@ -212,6 +214,38 @@
 		return parts.join(' › ');
 	}
 
+	function folderPath(folder: Folder): string {
+		const parts: string[] = [];
+		const visited = new Set<string>();
+		let fid: string | null = folder.parentId;
+		while (fid !== null) {
+			if (visited.has(fid)) break;
+			visited.add(fid);
+			const f = allFolders.find((x) => x.id === fid);
+			if (!f) break;
+			parts.unshift(f.name);
+			fid = f.parentId;
+		}
+		parts.push(folder.name);
+		return parts.join(' › ');
+	}
+
+	/** Returns the ordered list of ancestor IDs (root-first) for a folder. */
+	function ancestorIds(folder: Folder): string[] {
+		const ids: string[] = [];
+		const visited = new Set<string>();
+		let fid: string | null = folder.parentId;
+		while (fid !== null) {
+			if (visited.has(fid)) break;
+			visited.add(fid);
+			ids.unshift(fid);
+			const f = allFolders.find((x) => x.id === fid);
+			if (!f) break;
+			fid = f.parentId;
+		}
+		return ids;
+	}
+
 	// ── Guard: trim breadcrumb if a folder in it was deleted (e.g. by a peer) ───
 	$effect(() => {
 		// allFolders is a reactive dependency; re-run whenever folders change.
@@ -221,7 +255,16 @@
 		// the IDs from the URL hash would be incorrectly treated as deleted.
 		if (docState.version > 0) {
 			// Find the deepest breadcrumb entry that still exists (null = root, ARCHIVE_ID = virtual — always valid)
-			const lastValid = breadcrumb.findLastIndex((id) => id === null || id === ARCHIVE_ID || ids.has(id));
+			// In archive view, also trim entries that are no longer archived or path-through.
+			const lastValid = breadcrumb.findLastIndex((id) => {
+				if (id === null || id === ARCHIVE_ID) return true;
+				if (!ids.has(id)) return false;
+				// If in archive view, a real folder must still be archived or a path-through
+				if (breadcrumb.includes(ARCHIVE_ID)) {
+					return isFolderEffectivelyArchived(id, allFolders) || pathThroughFolderIds.has(id);
+				}
+				return true;
+			});
 			if (lastValid < breadcrumb.length - 1) {
 				breadcrumb = breadcrumb.slice(0, lastValid + 1);
 			}
@@ -356,9 +399,17 @@
 				alert('Cannot move a folder into one of its own sub-folders.');
 				return;
 			}
+			if (targetFolderId !== null && isFolderEffectivelyArchived(targetFolderId, allFolders)) {
+				alert('Cannot move a folder into an archived folder.');
+				return;
+			}
 			updateFolder(taggedFolderId, { parentId: targetFolderId });
 		} else if (taggedListId) {
 			if (targetFolderId === null) return; // lists must live in a folder
+			if (isFolderEffectivelyArchived(targetFolderId, allFolders)) {
+				alert('Cannot move a list into an archived folder.');
+				return;
+			}
 			updateList(taggedListId, { folderId: targetFolderId });
 		}
 		clearTag();
@@ -514,9 +565,16 @@
 		</header>
 
 		<!-- Favourites bar -->
-		{#if favouriteLists.length > 0}
+		{#if favouriteLists.length > 0 || favouriteFolders.length > 0}
 			<div class="fav-bar">
 				<span class="fav-label">★</span>
+				{#each favouriteFolders as fav}
+					<button
+						class="fav-chip"
+						style="--chip-color:{fav.color}"
+						onclick={() => { breadcrumb = [null, ...ancestorIds(fav), fav.id]; renamingId = null; }}
+					>📁 {folderPath(fav)}</button>
+				{/each}
 				{#each favouriteLists as fav}
 					<button
 						class="fav-chip"
@@ -599,6 +657,12 @@
 					</button>
 				{/if}
 				{#if !isPathThrough}
+					<button
+						class="fav-btn"
+						class:active={folder.favourite}
+						onclick={() => updateFolder(folder.id, { favourite: !folder.favourite })}
+						aria-label={folder.favourite ? 'Unfavourite' : 'Favourite'}
+					>★</button>
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'folder', i)}>☰</button>
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoTarget = { kind: 'folder', data: folder } },

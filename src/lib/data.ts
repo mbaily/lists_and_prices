@@ -18,6 +18,7 @@ export interface Folder {
 	parentId: string | null;
 	order: number;
 	done: boolean;
+	favourite: boolean;
 	archived: boolean;
 	createdAt: string | null;
 	updatedAt: string | null;
@@ -35,6 +36,7 @@ function yMapToFolder(m: Y.Map<unknown>): Folder {
 		parentId: (m.get('parentId') as string | null) ?? null,
 		order: (m.get('order') as number) ?? 0,
 		done: (m.get('done') as boolean) ?? false,
+		favourite: (m.get('favourite') as boolean) ?? false,
 		archived: (m.get('archived') as boolean) ?? false,
 		createdAt: (m.get('createdAt') as string | null) ?? null,
 		updatedAt: (m.get('updatedAt') as string | null) ?? null
