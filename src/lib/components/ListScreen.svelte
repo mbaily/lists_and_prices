@@ -587,6 +587,7 @@
 		touchDragParentKey = null;
 		confirmAction = null;
 		infoItem = null;
+		showHeaderMenu = false;
 		// Reset scroll-shrink when switching lists — set scrollTop to 0;
 		// the scroll listener will fire and restore max-height to fullHeight automatically.
 		if (itemListEl) itemListEl.scrollTop = 0;
