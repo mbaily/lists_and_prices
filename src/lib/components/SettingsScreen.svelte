@@ -20,7 +20,7 @@
 		document.body.appendChild(a);
 		a.click();
 		document.body.removeChild(a);
-		URL.revokeObjectURL(url);
+		setTimeout(() => URL.revokeObjectURL(url), 10000);
 	}
 
 	// ── Restore ─────────────────────────────────────────────────────────────────
@@ -179,6 +179,7 @@
 	{@const modeLabel = restoreMode === 'replace' ? 'REPLACE ALL data with' : 'merge in'}
 	<ConfirmDialog
 		message={`Restore and ${modeLabel} ${pendingBackup.folders.length} folders, ${pendingBackup.lists.length} lists, ${pendingBackup.items.length} items${pendingBackup.sheets?.length ? `, ${pendingBackup.sheets.length} spreadsheets` : ''}? This cannot be undone.`}
+		confirmLabel="Restore"
 		onConfirm={confirmRestore}
 		onCancel={() => pendingBackup = null}
 	/>

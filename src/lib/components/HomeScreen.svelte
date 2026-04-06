@@ -139,20 +139,7 @@
 	);
 	let openSheetId = $state<string | null>(null);
 
-	// Breadcrumb ⋮ menu (reserved for future use)
-	let showBreadcrumbMenu = $state(false);
-
-	$effect(() => {
-		if (!showBreadcrumbMenu) return;
-		function dismiss(e: MouseEvent) {
-			const el = e.target as HTMLElement | null;
-			if (!el?.closest('.breadcrumb-menu-wrap')) showBreadcrumbMenu = false;
-		}
-		document.addEventListener('pointerdown', dismiss, { capture: true });
-		return () => document.removeEventListener('pointerdown', dismiss, { capture: true });
-	});
-
-	// ── Favourites ───────────────────────────────────────────────────────────────
+	// ── Favourites ───────────────────────────────────────────────────────────────────────
 	let favouriteLists = $derived(allLists.filter((l) => l.favourite && !isListEffectivelyArchived(l, allFolders)));
 
 	function listPath(list: ListMeta): string {
@@ -770,41 +757,6 @@
 	}
 	.home-crumb { font-size: 1.25rem; }
 	.sep { color: var(--text2); }
-
-	/* Breadcrumb ⋮ context menu */
-	.breadcrumb-menu-wrap {
-		position: relative;
-		flex-shrink: 0;
-	}
-	.context-menu-btn {
-		font-size: 1.2rem;
-		color: var(--text2);
-		padding: 0 0.3rem;
-	}
-	.breadcrumb-menu {
-		position: absolute;
-		top: calc(100% + 4px);
-		left: 0;
-		background: var(--bg2);
-		border: 1px solid var(--border);
-		border-radius: 8px;
-		box-shadow: 0 4px 16px rgba(0,0,0,0.18);
-		z-index: 200;
-		min-width: 12rem;
-		overflow: hidden;
-	}
-	.breadcrumb-menu button {
-		display: block;
-		width: 100%;
-		padding: 0.65rem 1rem;
-		background: none;
-		border: none;
-		text-align: left;
-		font-size: 0.9rem;
-		color: var(--text);
-		cursor: pointer;
-	}
-	.breadcrumb-menu button:hover { background: var(--bg3); }
 
 	/* Sheet row */
 	.sheet-row { gap: 0.5rem; }

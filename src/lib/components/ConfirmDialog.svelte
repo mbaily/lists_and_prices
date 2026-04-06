@@ -1,19 +1,20 @@
 <script lang="ts">
 	let {
 		message,
-		onConfirm,
-		onCancel
-	}: { message: string; onConfirm: () => void; onCancel: () => void } = $props();
+                confirmLabel = 'Delete',
+                onConfirm,
+                onCancel
+        }: { message: string; confirmLabel?: string; onConfirm: () => void; onCancel: () => void } = $props();
 </script>
 
 <div class="backdrop" onclick={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
-	<div class="dialog">
-		<p>{message}</p>
-		<div class="actions">
-			<button class="confirm" onclick={onConfirm}>Delete</button>
-			<button class="cancel" onclick={onCancel}>Cancel</button>
-		</div>
-	</div>
+        <div class="dialog">
+                <p>{message}</p>
+                <div class="actions">
+                        <button class="confirm" onclick={onConfirm}>{confirmLabel}</button>
+                        <button class="cancel" onclick={onCancel}>Cancel</button>
+                </div>
+        </div>
 </div>
 
 <style>
