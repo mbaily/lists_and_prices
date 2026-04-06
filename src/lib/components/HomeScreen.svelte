@@ -285,6 +285,15 @@
 			]);
 			if (!allIds.has(renamingId)) renamingId = null;
 		}
+		// Clear info dialog if the target was deleted by a peer
+		if (infoTarget !== null) {
+			const exists = infoTarget.kind === 'folder'
+				? allFolders.some((f) => f.id === infoTarget!.data.id)
+				: infoTarget.kind === 'list'
+				? allLists.some((l) => l.id === infoTarget!.data.id)
+				: allSheets.some((s) => s.id === infoTarget!.data.id);
+			if (!exists) infoTarget = null;
+		}
 		// Clear stale tag if the tagged item was deleted by a peer
 		if (taggedFolderId !== null && !allFolders.some((f) => f.id === taggedFolderId)) taggedFolderId = null;
 		if (taggedListId !== null && !allLists.some((l) => l.id === taggedListId)) taggedListId = null;
@@ -477,6 +486,7 @@
 	$effect(() => {
 		void currentFolderId; // track navigation
 		renamingId = null;
+		infoTarget = null;
 		// Close create forms so they don't linger in the wrong folder context
 		showNewFolder = false;
 		showNewList = false;
