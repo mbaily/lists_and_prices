@@ -423,6 +423,11 @@
 				rows.push(`${done}\t${name}`);
 			}
 		}
+		// Append a SUM row for priced lists (Price is column B, data starts at row 2)
+		if (isPriced) {
+			const lastDataRow = rows.length; // rows.length includes the header row
+			rows.push(`\t=SUM(B2:B${lastDataRow})\tTotal`);
+		}
 		const tsv = rows.join('\n');
 		try {
 			await navigator.clipboard.writeText(tsv);
