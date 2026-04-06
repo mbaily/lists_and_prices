@@ -835,7 +835,6 @@
 		flex-shrink: 0;
 	}
 	.breadcrumb {
-		flex: 1;
 		display: flex;
 		align-items: center;
 		gap: 0.25rem;
@@ -919,6 +918,12 @@
 
 	.header-menu-wrap {
 		position: relative;
+		margin-left: 0.4rem;
+		flex-shrink: 0;
+	}
+	.header-right {
+		margin-left: auto;
+		flex-shrink: 0;
 	}
 	.header-menu {
 		position: absolute;
