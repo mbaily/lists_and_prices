@@ -399,35 +399,61 @@
 	let copyStatus = $state<'idle' | 'copied' | 'error'>('idle');
 
 	async function copyAsTSV() {
+		const name = listMeta?.name ?? 'List';
+		const modified = fmtDate(listMeta?.updatedAt);
+		const created  = fmtDate(listMeta?.createdAt);
+
 		const rows: string[] = [];
-		// Header row — name last so it can overflow freely in Google Sheets
+
+		// Sentinel start
+		rows.push(`--- START: ${name} ---`);
+
+		// Metadata row: name | Modified | date | Created | date
+		rows.push(`${name}\tModified\t${modified}\tCreated\t${created}`);
+
+		// Blank separator
+		rows.push('');
+
+		// Column header
 		if (isPriced) {
 			rows.push('Done\tPrice\tItem');
 		} else {
 			rows.push('Done\tItem');
 		}
+
+		// Data rows
 		for (const { item, level } of treeItems) {
 			const indent = '\t'.repeat(level);
-			const name = indent + item.name;
+			const itemName = indent + item.name;
 			if (item.heading) {
-				// Heading: blank leading columns, name last
-				rows.push(isPriced ? `\t\t${name}` : `\t${name}`);
+				rows.push(isPriced ? `\t\t${itemName}` : `\t${itemName}`);
 			} else if (item.note) {
-				rows.push(isPriced ? `\t\t${name}` : `\t${name}`);
+				rows.push(isPriced ? `\t\t${itemName}` : `\t${itemName}`);
 			} else if (isPriced) {
 				const price = item.price !== null ? (item.price).toFixed(2) : '';
 				const done = item.checked ? '✓' : '';
-				rows.push(`${done}\t${price}\t${name}`);
+				rows.push(`${done}\t${price}\t${itemName}`);
 			} else {
 				const done = item.checked ? '✓' : '';
-				rows.push(`${done}\t${name}`);
+				rows.push(`${done}\t${itemName}`);
 			}
 		}
-		// Append a SUM row for priced lists (Price is column B, data starts at row 2)
+
+		// Blank rows (⌈items / 3⌉) for extra entries
+		const blankCount = Math.ceil(treeItems.length / 3);
+		for (let i = 0; i < blankCount; i++) rows.push(isPriced ? '\t\t' : '\t');
+
+		// SUM row for priced lists
+		// Header is at row 4 (1-indexed); data starts at row 5.
+		// Last row before SUM = 4 + treeItems.length + blankCount.
 		if (isPriced) {
-			const lastDataRow = rows.length; // rows.length includes the header row
-			rows.push(`\t=SUM(B2:B${lastDataRow})\tTotal`);
+			const lastRow = 4 + treeItems.length + blankCount;
+			rows.push(`\t=SUM(B5:B${lastRow})\tTotal`);
 		}
+
+		// Sentinel end
+		rows.push(`--- END: ${name} ---`);
+
 		const tsv = rows.join('\n');
 		try {
 			await navigator.clipboard.writeText(tsv);
