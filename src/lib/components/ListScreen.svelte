@@ -443,12 +443,12 @@
 		const blankCount = Math.ceil(treeItems.length / 3);
 		for (let i = 0; i < blankCount; i++) rows.push(isPriced ? '\t\t' : '\t');
 
-		// SUM row for priced lists
-		// Header is at row 4 (1-indexed); data starts at row 5.
-		// Last row before SUM = 4 + treeItems.length + blankCount.
+		// SUM row for priced lists — use INDIRECT+ROW() so the formula works regardless
+		// of where the user pastes in the sheet (not tied to absolute row numbers).
+		// ROW()-1 = last blank buffer row; ROW()-(blankCount+n) = first data row.
 		if (isPriced) {
-			const lastRow = 4 + treeItems.length + blankCount;
-			rows.push(`\t=SUM(B5:B${lastRow})\tTotal`);
+			const span = treeItems.length + blankCount;
+			rows.push(`\t=SUM(INDIRECT("B"&(ROW()-${span})&":B"&(ROW()-1)))\tTotal`);
 		}
 
 		// Sentinel end
