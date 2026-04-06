@@ -916,8 +916,10 @@
 	.row.drag-source { opacity: 0.4; }
 	.row.drag-above { background: var(--bg3); box-shadow: inset 0 2px 0 var(--accent); }
 	.row.drag-below { background: var(--bg3); box-shadow: inset 0 -2px 0 var(--accent); }
-	.row.done { opacity: 0.55; }
-	.row.done .row-name { text-decoration: line-through; color: var(--text2); }
+	.row.done .row-name { text-decoration: line-through; color: var(--text2); opacity: 0.55; }
+	.row.done .check-circle { opacity: 0.55; }
+	.row.done .fav-btn { opacity: 0.55; }
+	.row.done .drag-handle { opacity: 0.55; }
 	.row.archived { opacity: 0.6; }
 	.row.archived .row-name { font-style: italic; }
 	.path-through-hint { color: var(--accent); font-size: 0.85em; opacity: 0.7; }
