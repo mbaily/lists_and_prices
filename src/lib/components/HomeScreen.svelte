@@ -565,6 +565,7 @@
 
 		<!-- Folders -->
 		{#each childFolders as folder, i}
+			{@const isPathThrough = isInArchiveView && pathThroughFolderIds.has(folder.id) && !folder.archived}
 			<div
 				class="row folder-row"
 				class:done={folder.done}
@@ -576,9 +577,11 @@
 				data-drag-index={i}
 				style="--row-color:{folder.color}"
 			>
-				<button class="check-circle" onclick={() => updateFolder(folder.id, { done: !folder.done })} aria-label={folder.done ? 'Unmark complete' : 'Mark complete'}>
-					{folder.done ? '☑' : '☐'}
-				</button>
+				{#if !isPathThrough}
+					<button class="check-circle" onclick={() => updateFolder(folder.id, { done: !folder.done })} aria-label={folder.done ? 'Unmark complete' : 'Mark complete'}>
+						{folder.done ? '☑' : '☐'}
+					</button>
+				{/if}
 				{#if renamingId === folder.id}
 					<input
 						class="rename-input"
@@ -592,22 +595,24 @@
 						class="row-name"
 						onclick={() => (breadcrumb = [...breadcrumb, folder.id])}
 					>
-						📁 {folder.name}{#if isInArchiveView && pathThroughFolderIds.has(folder.id) && !folder.archived} <span class="path-through-hint">›</span>{/if}
+						📁 {folder.name}{#if isPathThrough} <span class="path-through-hint">›</span>{/if}
 					</button>
 				{/if}
-				<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'folder', i)}>☰</button>
-				<RowMenu items={[
-					{ label: 'ℹ️ Info', action: () => infoTarget = { kind: 'folder', data: folder } },
-					{ label: '✏ Rename', action: () => startRename(folder.id, folder.name, 'folder') },
-					{ label: folder.archived ? '📤 Unarchive' : '📥 Archive', action: () => folder.archived ? unarchiveFolder(folder.id) : archiveFolder(folder.id) },
-					...(hasTag && taggedFolderId !== folder.id
-						? [{ label: '📂 Move Tagged Here', action: () => moveTaggedTo(folder.id) }]
-						: []),
-					...(hasTag
-						? [{ label: '✕ Clear Tag', action: clearTag }]
-						: [{ label: '🏷 Tag (to move)', action: () => tagFolder(folder.id) }]),
-					{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete folder "${folder.name}" and all its contents?`, () => deleteFolder(folder.id)) }
-				]} />
+				{#if !isPathThrough}
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'folder', i)}>☰</button>
+					<RowMenu items={[
+						{ label: 'ℹ️ Info', action: () => infoTarget = { kind: 'folder', data: folder } },
+						{ label: '✏ Rename', action: () => startRename(folder.id, folder.name, 'folder') },
+						{ label: folder.archived ? '📤 Unarchive' : '📥 Archive', action: () => folder.archived ? unarchiveFolder(folder.id) : archiveFolder(folder.id) },
+						...(hasTag && taggedFolderId !== folder.id
+							? [{ label: '📂 Move Tagged Here', action: () => moveTaggedTo(folder.id) }]
+							: []),
+						...(hasTag
+							? [{ label: '✕ Clear Tag', action: clearTag }]
+							: [{ label: '🏷 Tag (to move)', action: () => tagFolder(folder.id) }]),
+						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete folder "${folder.name}" and all its contents?`, () => deleteFolder(folder.id)) }
+					]} />
+				{/if}
 			</div>
 		{/each}
 
