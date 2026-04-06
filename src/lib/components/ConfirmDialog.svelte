@@ -1,20 +1,30 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+
 	let {
 		message,
-                confirmLabel = 'Delete',
-                onConfirm,
-                onCancel
-        }: { message: string; confirmLabel?: string; onConfirm: () => void; onCancel: () => void } = $props();
+		confirmLabel = 'Delete',
+		onConfirm,
+		onCancel
+	}: { message: string; confirmLabel?: string; onConfirm: () => void; onCancel: () => void } = $props();
+
+	onMount(() => {
+		function handleKey(e: KeyboardEvent) {
+			if (e.key === 'Escape') onCancel();
+		}
+		document.addEventListener('keydown', handleKey);
+		return () => document.removeEventListener('keydown', handleKey);
+	});
 </script>
 
-<div class="backdrop" onclick={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
-        <div class="dialog">
-                <p>{message}</p>
-                <div class="actions">
-                        <button class="confirm" onclick={onConfirm}>{confirmLabel}</button>
-                        <button class="cancel" onclick={onCancel}>Cancel</button>
-                </div>
-        </div>
+<div class="backdrop" role="dialog" aria-modal="true" onclick={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
+	<div class="dialog">
+		<p>{message}</p>
+		<div class="actions">
+			<button class="confirm" onclick={onConfirm}>{confirmLabel}</button>
+			<button class="cancel" onclick={onCancel}>Cancel</button>
+		</div>
+	</div>
 </div>
 
 <style>
