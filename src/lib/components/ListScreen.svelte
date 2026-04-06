@@ -400,27 +400,27 @@
 
 	async function copyAsTSV() {
 		const rows: string[] = [];
-		// Header row
+		// Header row — name last so it can overflow freely in Google Sheets
 		if (isPriced) {
-			rows.push('Item\tPrice\tDone');
+			rows.push('Done\tPrice\tItem');
 		} else {
-			rows.push('Item\tDone');
+			rows.push('Done\tItem');
 		}
 		for (const { item, level } of treeItems) {
 			const indent = '\t'.repeat(level);
 			const name = indent + item.name;
 			if (item.heading) {
-				// Heading: just the name, blank other columns
-				rows.push(isPriced ? `${name}\t\t` : `${name}\t`);
+				// Heading: blank leading columns, name last
+				rows.push(isPriced ? `\t\t${name}` : `\t${name}`);
 			} else if (item.note) {
-				rows.push(isPriced ? `${name}\t\t` : `${name}\t`);
+				rows.push(isPriced ? `\t\t${name}` : `\t${name}`);
 			} else if (isPriced) {
 				const price = item.price !== null ? (item.price).toFixed(2) : '';
 				const done = item.checked ? '✓' : '';
-				rows.push(`${name}\t${price}\t${done}`);
+				rows.push(`${done}\t${price}\t${name}`);
 			} else {
 				const done = item.checked ? '✓' : '';
-				rows.push(`${name}\t${done}`);
+				rows.push(`${done}\t${name}`);
 			}
 		}
 		const tsv = rows.join('\n');
@@ -549,18 +549,18 @@
 				{/if}
 			{/each}
 		</div>
+		<div class="header-menu-wrap">
+			<button class="type-btn" onclick={() => showHeaderMenu = !showHeaderMenu} aria-label="More options">⋮</button>
+			{#if showHeaderMenu}
+				<div class="header-menu" role="menu">
+					<button role="menuitem" onclick={copyAsTSV}>📋 Copy as spreadsheet</button>
+				</div>
+			{/if}
+		</div>
 		<div class="header-right">
 			<button class="type-btn" onclick={toggleType} title="Convert list type">
 				{isPriced ? '📋' : '💰'}
 			</button>
-			<div class="header-menu-wrap">
-				<button class="type-btn" onclick={() => showHeaderMenu = !showHeaderMenu} aria-label="More options">⋮</button>
-				{#if showHeaderMenu}
-					<div class="header-menu" role="menu">
-						<button role="menuitem" onclick={copyAsTSV}>📋 Copy as spreadsheet</button>
-					</div>
-				{/if}
-			</div>
 		</div>
 	</header>
 
@@ -923,7 +923,7 @@
 	.header-menu {
 		position: absolute;
 		top: calc(100% + 4px);
-		right: 0;
+		left: 0;
 		background: var(--bg2);
 		border: 1px solid var(--border);
 		border-radius: 8px;
