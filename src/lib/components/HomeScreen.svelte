@@ -84,18 +84,69 @@
 	// True whenever ARCHIVE_ID is anywhere in the breadcrumb (including as currentFolderId)
 	let isInArchiveView = $derived(breadcrumb.includes(ARCHIVE_ID));
 
+	// Set of non-archived folder IDs that are ancestors of archived content.
+	// These are shown in the archive view as "path-through" folders so the user
+	// can navigate down to the archived lists/folders inside them.
+	let pathThroughFolderIds = $derived.by(() => {
+		const result = new Set<string>();
+		// Walk up from each archived list's folder chain
+		for (const list of allLists) {
+			if (!list.archived) continue;
+			let fid: string | null = list.folderId;
+			while (fid !== null) {
+				if (result.has(fid)) break;
+				const folder = allFolders.find((f) => f.id === fid);
+				if (!folder) break;
+				if (folder.archived) break; // stop at archived folders — they show as their own item
+				result.add(fid);
+				fid = folder.parentId;
+			}
+		}
+		// Walk up from each archived folder's parent chain
+		for (const folder of allFolders) {
+			if (!folder.archived) continue;
+			let fid: string | null = folder.parentId;
+			while (fid !== null) {
+				if (result.has(fid)) break;
+				const parent = allFolders.find((f) => f.id === fid);
+				if (!parent) break;
+				if (parent.archived) break;
+				result.add(fid);
+				fid = parent.parentId;
+			}
+		}
+		return result;
+	});
+
+	// True when the current folder is itself (or inherits) archived status.
+	// False when it's a path-through non-archived folder shown in the archive view.
+	let isCurrentFolderEffectivelyArchived = $derived(
+		currentFolderId !== null &&
+		currentFolderId !== ARCHIVE_ID &&
+		isFolderEffectivelyArchived(currentFolderId, allFolders)
+	);
+
 	let childFolders = $derived(
 		currentFolderId === ARCHIVE_ID
-			// Archive root: folders that are directly archived AND whose parent is NOT archived
-			// (these are the "tops" of archived subtrees — sub-folders are reached by navigating in)
+			// Archive root: tops of archived subtrees + root-level path-through folders
 			? allFolders
-					.filter((f) => f.archived && (f.parentId === null || !isFolderEffectivelyArchived(f.parentId, allFolders)))
+					.filter((f) =>
+						(f.archived && (f.parentId === null || !isFolderEffectivelyArchived(f.parentId, allFolders)))
+						|| (f.parentId === null && pathThroughFolderIds.has(f.id))
+					)
 					.sort((a, b) => a.order - b.order)
 			: isInArchiveView
-			// Inside an archived folder: show all children (they inherit archived status from parent)
-			? allFolders
-					.filter((f) => f.parentId === currentFolderId)
-					.sort((a, b) => a.order - b.order)
+			? (isCurrentFolderEffectivelyArchived
+				// Inside an explicitly archived folder: show all children
+				? allFolders
+						.filter((f) => f.parentId === currentFolderId)
+						.sort((a, b) => a.order - b.order)
+				// Inside a path-through folder: only archived children + path-through children
+				: allFolders
+						.filter((f) => f.parentId === currentFolderId &&
+							(isFolderEffectivelyArchived(f.id, allFolders) || pathThroughFolderIds.has(f.id)))
+						.sort((a, b) => a.order - b.order)
+			)
 			// Normal view: exclude effectively-archived
 			: allFolders
 					.filter((f) => f.parentId === currentFolderId && !isFolderEffectivelyArchived(f.id, allFolders))
@@ -103,25 +154,28 @@
 	);
 	let childLists = $derived(
 		currentFolderId === ARCHIVE_ID
-			// Archive root: lists that are directly archived AND whose folder is NOT archived
-			// (lists inside archived folders are reached by navigating into the archived folder)
+			// Archive root: only orphaned archived lists (whose folder has been deleted)
 			? allLists
-					.filter((l) => l.archived && !isFolderEffectivelyArchived(l.folderId, allFolders))
+					.filter((l) => l.archived && !allFolders.some((f) => f.id === l.folderId))
 					.sort((a, b) => a.order - b.order)
 			: isInArchiveView
-			// Inside an archived folder: show all lists (they inherit archived status from parent)
-			? allLists
-					.filter((l) => l.folderId === currentFolderId)
-					.sort((a, b) => a.order - b.order)
+			? (isCurrentFolderEffectivelyArchived
+				// Inside an explicitly archived folder: show all lists
+				? allLists
+						.filter((l) => l.folderId === currentFolderId)
+						.sort((a, b) => a.order - b.order)
+				// Inside a path-through folder: show only archived lists
+				: allLists
+						.filter((l) => l.folderId === currentFolderId && l.archived)
+						.sort((a, b) => a.order - b.order)
+			)
 			// Normal view: exclude effectively-archived
 			: allLists
 					.filter((l) => l.folderId === currentFolderId && !isListEffectivelyArchived(l, allFolders))
 					.sort((a, b) => a.order - b.order)
 	);
 	let hasArchived = $derived(
-		// True when the archive root would have any content
-		allFolders.some((f) => f.archived && (f.parentId === null || !isFolderEffectivelyArchived(f.parentId, allFolders))) ||
-		allLists.some((l) => l.archived && !isFolderEffectivelyArchived(l.folderId, allFolders))
+		allFolders.some((f) => f.archived) || allLists.some((l) => l.archived)
 	);
 	let currentFolderColor = $derived(
 		allFolders.find((f) => f.id === currentFolderId)?.color ?? '#6366f1'
@@ -538,7 +592,7 @@
 						class="row-name"
 						onclick={() => (breadcrumb = [...breadcrumb, folder.id])}
 					>
-						📁 {folder.name}
+						📁 {folder.name}{#if isInArchiveView && pathThroughFolderIds.has(folder.id) && !folder.archived} <span class="path-through-hint">›</span>{/if}
 					</button>
 				{/if}
 				<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'folder', i)}>☰</button>
@@ -801,6 +855,7 @@
 	.row.done .row-name { text-decoration: line-through; color: var(--text2); }
 	.row.archived { opacity: 0.6; }
 	.row.archived .row-name { font-style: italic; }
+	.path-through-hint { color: var(--accent); font-size: 0.85em; opacity: 0.7; }
 	/* ── Favourites bar ────────────────────────────────────────────────────────── */
 	.fav-bar {
 		display: flex;
