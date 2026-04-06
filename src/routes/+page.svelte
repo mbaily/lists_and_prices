@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { auth, checkSession, logout } from '$lib/auth.svelte';
 	import { initYjs, destroyYjs } from '$lib/yjsStore.svelte';
+	import { reloadSettings } from '$lib/settings.svelte';
 	import LoginScreen from '$lib/components/LoginScreen.svelte';
 	import HomeScreen from '$lib/components/HomeScreen.svelte';
 
@@ -10,6 +11,7 @@
 	onMount(async () => {
 		const ok = await checkSession();
 		if (ok && auth.username) {
+			reloadSettings(); // apply this user's theme/currency/handedness
 			const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
 			initYjs(auth.username, `${wsProto}//${location.host}/yjs`);
 		}
@@ -27,6 +29,7 @@
 {:else if !auth.username}
 	<LoginScreen
 		onLogin={(username: string) => {
+			reloadSettings(); // auth.username is set before this callback, load their settings
 			const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
 			initYjs(username, `${wsProto}//${location.host}/yjs`);
 		}}
