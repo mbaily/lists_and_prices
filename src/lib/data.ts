@@ -306,7 +306,7 @@ export function createItemsBatch(listId: string, names: string[]): void {
 export function listTotal(listId: string): number {
 	return Math.round(
 		readItems(listId)
-			.filter((i) => i.parentId === null)
+			.filter((i) => !i.heading && !i.note)
 			.reduce((s, i) => s + Math.round((i.price ?? 0) * 100), 0)
 	) / 100;
 }
@@ -374,6 +374,7 @@ export interface BackupFile {
 	folders: Folder[];
 	lists: ListMeta[];
 	items: ReturnType<typeof _readAllItems>;
+	sheets?: SheetMeta[];
 }
 
 function _readAllItems() {
@@ -387,7 +388,8 @@ export function exportBackup(): BackupFile {
 		exported: new Date().toISOString(),
 		folders: readFolders(),
 		lists: readLists(),
-		items: _readAllItems()
+		items: _readAllItems(),
+		sheets: readSheets()
 	};
 }
 
@@ -401,6 +403,7 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 	const fArr = getFolders(doc);
 	const lArr = getLists(doc);
 	const iArr = getItems(doc);
+	const sArr = getSpreadsheets(doc);
 
 	doc.transact(() => {
 		if (mode === 'replace') {
@@ -408,6 +411,7 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 			if (fArr.length) fArr.delete(0, fArr.length);
 			if (lArr.length) lArr.delete(0, lArr.length);
 			if (iArr.length) iArr.delete(0, iArr.length);
+			if (sArr.length) sArr.delete(0, sArr.length);
 
 			// Insert folders
 			for (const f of backup.folders) {
@@ -427,6 +431,12 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 				for (const [k, v] of Object.entries(i)) m.set(k, v);
 				iArr.push([m]);
 			}
+			// Insert sheets (metadata only — cell data is not backed up)
+			for (const s of (backup.sheets ?? [])) {
+				const m = new Y.Map<unknown>();
+				for (const [k, v] of Object.entries(s)) m.set(k, v);
+				sArr.push([m]);
+			}
 		} else {
 			// Merge: upsert each record by id
 			function upsert(arr: Y.Array<unknown>, record: Record<string, unknown>) {
@@ -442,6 +452,7 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 			for (const f of backup.folders) upsert(fArr, f as unknown as Record<string, unknown>);
 			for (const l of backup.lists) upsert(lArr, l as unknown as Record<string, unknown>);
 			for (const i of backup.items) upsert(iArr, i as unknown as Record<string, unknown>);
+			for (const s of (backup.sheets ?? [])) upsert(sArr, s as unknown as Record<string, unknown>);
 		}
 	});
 }

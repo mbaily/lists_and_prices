@@ -57,7 +57,7 @@
 		if (!pendingBackup) return;
 		try {
 			importBackup(pendingBackup, restoreMode);
-			restoreStatus = `Restored ${pendingBackup.folders.length} folders, ${pendingBackup.lists.length} lists, ${pendingBackup.items.length} items.`;
+			restoreStatus = `Restored ${pendingBackup.folders.length} folders, ${pendingBackup.lists.length} lists, ${pendingBackup.items.length} items${pendingBackup.sheets?.length ? `, ${pendingBackup.sheets.length} spreadsheets` : ''}.`;
 		} catch (err) {
 			restoreError = `Restore failed: ${err}`;
 		}
@@ -178,7 +178,7 @@
 {#if pendingBackup}
 	{@const modeLabel = restoreMode === 'replace' ? 'REPLACE ALL data with' : 'merge in'}
 	<ConfirmDialog
-		message={`Restore and ${modeLabel} ${pendingBackup.folders.length} folders, ${pendingBackup.lists.length} lists, ${pendingBackup.items.length} items? This cannot be undone.`}
+		message={`Restore and ${modeLabel} ${pendingBackup.folders.length} folders, ${pendingBackup.lists.length} lists, ${pendingBackup.items.length} items${pendingBackup.sheets?.length ? `, ${pendingBackup.sheets.length} spreadsheets` : ''}? This cannot be undone.`}
 		onConfirm={confirmRestore}
 		onCancel={() => pendingBackup = null}
 	/>

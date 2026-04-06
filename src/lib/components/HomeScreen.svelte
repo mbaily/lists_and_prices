@@ -14,7 +14,6 @@
 		isFolderEffectivelyArchived,
 		isListEffectivelyArchived,
 		readSheets,
-		createSheet,
 		deleteSheet,
 		updateSheet,
 		type Folder,
@@ -140,19 +139,7 @@
 	);
 	let openSheetId = $state<string | null>(null);
 
-	// New sheet form
-	let showNewSheet = $state(false);
-	let newSheetName = $state('');
-
-	function submitNewSheet() {
-		const name = newSheetName.trim() || new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
-		const id = createSheet(name, currentFolderId);
-		newSheetName = '';
-		showNewSheet = false;
-		openSheetId = id;
-	}
-
-	// Breadcrumb ⋮ menu
+	// Breadcrumb ⋮ menu (reserved for future use)
 	let showBreadcrumbMenu = $state(false);
 
 	$effect(() => {
@@ -401,13 +388,11 @@
 		// Close create forms so they don't linger in the wrong folder context
 		showNewFolder = false;
 		showNewList = false;
-		showNewSheet = false;
 		newFolderName = '';
 		newFolderColor = '#6366f1';
 		newListName = '';
 		newListType = 'plain';
 		newListColor = '#6366f1';
-		newSheetName = '';
 		// Do NOT clear the tag — the user navigates specifically to find the move target
 	});
 
@@ -476,21 +461,8 @@
 				{/each}
 			</div>
 
-			<!-- Breadcrumb ⋮ menu — hidden only in archive view -->
-			{#if !isInArchiveView && currentFolderId !== ARCHIVE_ID}
-				<div class="breadcrumb-menu-wrap">
-					<button
-						class="icon-btn context-menu-btn"
-						onclick={() => showBreadcrumbMenu = !showBreadcrumbMenu}
-						aria-label="More options"
-					>⋮</button>
-					{#if showBreadcrumbMenu}
-						<div class="breadcrumb-menu" role="menu">
-							<button role="menuitem" onclick={() => { showBreadcrumbMenu = false; showNewSheet = true; }}>📊 New Spreadsheet</button>
-						</div>
-					{/if}
-				</div>
-			{/if}
+			<!-- No breadcrumb menu items currently -->
+			<!-- {#if !isInArchiveView && currentFolderId !== ARCHIVE_ID} -->
 
 			<div class="header-actions">
 				<SyncBadge status={syncState.status} />
@@ -665,7 +637,6 @@
 				<button onclick={() => (showNewFolder = true)}>+ Folder</button>
 				{#if currentFolderId}
 					<button onclick={() => openNewList()}>+ List</button>
-					<button onclick={() => (showNewSheet = true)}>+ Sheet</button>
 				{/if}
 			{/if}
 		</div>
@@ -710,25 +681,6 @@
 					<div class="modal-actions">
 						<button onclick={submitNewList}>Create</button>
 						<button onclick={() => { showNewList = false; newListName = ''; newListType = 'plain'; newListColor = '#6366f1'; }}>Cancel</button>
-					</div>
-				</div>
-			</div>
-		{/if}
-
-		<!-- New spreadsheet form -->
-		{#if showNewSheet}
-			<div class="modal-backdrop">
-				<div class="modal">
-					<h2>New Spreadsheet</h2>
-					<input
-						placeholder="Name (optional)"
-						bind:value={newSheetName}
-						onkeydown={(e) => e.key === 'Enter' && submitNewSheet()}
-						autofocus
-					/>
-					<div class="modal-actions">
-						<button onclick={submitNewSheet}>Create</button>
-						<button onclick={() => { showNewSheet = false; newSheetName = ''; }}>Cancel</button>
 					</div>
 				</div>
 			</div>

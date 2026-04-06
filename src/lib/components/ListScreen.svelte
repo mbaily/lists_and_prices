@@ -100,7 +100,7 @@
 	// not additive, to avoid double-counting.
 	const total = $derived(
 		Math.round(items
-			.filter((i) => i.parentId === null)
+			.filter((i) => !i.heading && !i.note)
 			.reduce((s, i) => s + Math.round((i.price ?? 0) * 100), 0)) / 100
 	);
 
