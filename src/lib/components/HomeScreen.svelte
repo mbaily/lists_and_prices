@@ -572,7 +572,7 @@
 					<button
 						class="fav-chip"
 						style="--chip-color:{fav.color}"
-						onclick={() => { breadcrumb = [null, ...ancestorIds(fav), fav.id]; renamingId = null; }}
+						onclick={() => { breadcrumb = [null, ...ancestorIds(fav), fav.id]; openListId = null; renamingId = null; }}
 					>📁 {folderPath(fav)}</button>
 				{/each}
 				{#each favouriteLists as fav}
