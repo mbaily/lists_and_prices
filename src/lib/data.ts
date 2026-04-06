@@ -3,7 +3,7 @@
  * All mutations operate on the shared Y.Doc.
  */
 import * as Y from 'yjs';
-import { getFolders, getLists, getItems, getDoc } from './yjsStore.svelte';
+import { getFolders, getLists, getItems, getDoc, getSpreadsheets, getSheetCells } from './yjsStore.svelte';
 
 function uid(): string {
 	return crypto.randomUUID();
@@ -443,5 +443,91 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 			for (const l of backup.lists) upsert(lArr, l as unknown as Record<string, unknown>);
 			for (const i of backup.items) upsert(iArr, i as unknown as Record<string, unknown>);
 		}
+	});
+}
+// ─── Spreadsheets ─────────────────────────────────────────────────────────────
+
+export interface SheetMeta {
+	id: string;
+	name: string;
+	folderId: string;
+	order: number;
+	createdAt: string | null;
+	updatedAt: string | null;
+}
+
+export function readSheets(folderId?: string): SheetMeta[] {
+	const all = (getSpreadsheets(getDoc()).toArray() as Y.Map<unknown>[]).map(yMapToSheet);
+	return folderId !== undefined ? all.filter((s) => s.folderId === folderId) : all;
+}
+
+function yMapToSheet(m: Y.Map<unknown>): SheetMeta {
+	return {
+		id: m.get('id') as string,
+		name: m.get('name') as string,
+		folderId: m.get('folderId') as string,
+		order: (m.get('order') as number) ?? 0,
+		createdAt: (m.get('createdAt') as string | null) ?? null,
+		updatedAt: (m.get('updatedAt') as string | null) ?? null
+	};
+}
+
+export function createSheet(name: string, folderId: string): string {
+	const doc = getDoc();
+	const sheets = getSpreadsheets(doc);
+	const existing = (sheets.toArray() as Y.Map<unknown>[]).filter((s) => s.get('folderId') === folderId);
+	const m = new Y.Map<unknown>();
+	const id = uid();
+	const now = new Date().toISOString();
+	m.set('id', id);
+	m.set('name', name);
+	m.set('folderId', folderId);
+	m.set('order', existing.length);
+	m.set('createdAt', now);
+	m.set('updatedAt', now);
+	sheets.push([m]);
+	return id;
+}
+
+export function updateSheet(id: string, patch: Partial<Omit<SheetMeta, 'id' | 'createdAt' | 'updatedAt'>>) {
+	const m = findYMap(getSpreadsheets(getDoc()), id);
+	if (!m) return;
+	for (const [k, v] of Object.entries(patch)) m.set(k, v);
+	const keys = Object.keys(patch);
+	if (!(keys.length === 1 && keys[0] === 'order')) m.set('updatedAt', new Date().toISOString());
+}
+
+export function deleteSheet(id: string) {
+	const doc = getDoc();
+	doc.transact(() => {
+		// Delete cell data for this sheet
+		const cells = getSheetCells(doc, id);
+		cells.clear();
+		removeYMap(getSpreadsheets(doc), id);
+	});
+}
+
+/** Read all cell values for a sheet as a plain Record. */
+export function readCells(sheetId: string): Record<string, string> {
+	const cells = getSheetCells(getDoc(), sheetId);
+	const result: Record<string, string> = {};
+	cells.forEach((v, k) => { result[k] = v; });
+	return result;
+}
+
+/** Set a single cell value.  key = "R,C" (0-based). Empty string clears the cell. */
+export function setCell(sheetId: string, row: number, col: number, value: string) {
+	const doc = getDoc();
+	const cells = getSheetCells(doc, sheetId);
+	const key = `${row},${col}`;
+	doc.transact(() => {
+		if (value === '') {
+			cells.delete(key);
+		} else {
+			cells.set(key, value);
+		}
+		// Bump sheet updatedAt
+		const m = findYMap(getSpreadsheets(doc), sheetId);
+		if (m) m.set('updatedAt', new Date().toISOString());
 	});
 }

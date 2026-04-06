@@ -13,11 +13,17 @@
 		isDescendant,
 		isFolderEffectivelyArchived,
 		isListEffectivelyArchived,
+		readSheets,
+		createSheet,
+		deleteSheet,
+		updateSheet,
 		type Folder,
-		type ListMeta
+		type ListMeta,
+		type SheetMeta
 	} from '$lib/data';
 	import { syncState, docState } from '$lib/yjsStore.svelte';
 	import ListScreen from './ListScreen.svelte';
+	import SpreadsheetScreen from './SpreadsheetScreen.svelte';
 	import ColorPicker from './ColorPicker.svelte';
 	import SettingsScreen from './SettingsScreen.svelte';
 	import SyncBadge from './SyncBadge.svelte';
@@ -122,6 +128,44 @@
 		allFolders.find((f) => f.id === currentFolderId)?.color ?? '#6366f1'
 	);
 
+	// ── Spreadsheets ─────────────────────────────────────────────────────────────
+	let allSheets = $derived.by(() => {
+		void docState.version;
+		try { return readSheets(); } catch { return []; }
+	});
+	let childSheets = $derived(
+		currentFolderId && currentFolderId !== ARCHIVE_ID && !isInArchiveView
+			? allSheets.filter((s) => s.folderId === currentFolderId).sort((a, b) => a.order - b.order)
+			: []
+	);
+	let openSheetId = $state<string | null>(null);
+
+	// New sheet form
+	let showNewSheet = $state(false);
+	let newSheetName = $state('');
+
+	function submitNewSheet() {
+		if (!currentFolderId) return;
+		const name = newSheetName.trim() || new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+		const id = createSheet(name, currentFolderId);
+		newSheetName = '';
+		showNewSheet = false;
+		openSheetId = id;
+	}
+
+	// Breadcrumb ⋮ menu
+	let showBreadcrumbMenu = $state(false);
+
+	$effect(() => {
+		if (!showBreadcrumbMenu) return;
+		function dismiss(e: MouseEvent) {
+			const el = e.target as HTMLElement | null;
+			if (!el?.closest('.breadcrumb-menu-wrap')) showBreadcrumbMenu = false;
+		}
+		document.addEventListener('pointerdown', dismiss, { capture: true });
+		return () => document.removeEventListener('pointerdown', dismiss, { capture: true });
+	});
+
 	// ── Favourites ───────────────────────────────────────────────────────────────
 	let favouriteLists = $derived(allLists.filter((l) => l.favourite && !isListEffectivelyArchived(l, allFolders)));
 
@@ -157,6 +201,10 @@
 			// Close list screen if the open list has been deleted by a peer
 			if (openListId !== null && !allLists.some((l) => l.id === openListId)) {
 				openListId = null;
+			}
+			// Close spreadsheet if deleted by a peer
+			if (openSheetId !== null && !allSheets.some((s) => s.id === openSheetId)) {
+				openSheetId = null;
 			}
 		}
 		// Clear rename state if the target was deleted by a peer
@@ -233,7 +281,7 @@
 	}
 
 	// ── Info dialog ────────────────────────────────────────────────────────────
-	type InfoTarget = { kind: 'folder'; data: Folder } | { kind: 'list'; data: ListMeta };
+	type InfoTarget = { kind: 'folder'; data: Folder } | { kind: 'list'; data: ListMeta } | { kind: 'sheet'; data: SheetMeta };
 	let infoTarget = $state<InfoTarget | null>(null);
 
 	function fmtDate(iso: string | null | undefined): string {
@@ -247,9 +295,9 @@
 	// ── Rename ───────────────────────────────────────────────────────────────────
 	let renamingId = $state<string | null>(null);
 	let renameValue = $state('');
-	let renameTarget = $state<'folder' | 'list'>('folder');
+	let renameTarget = $state<'folder' | 'list' | 'sheet'>('folder');
 
-	function startRename(id: string, current: string, target: 'folder' | 'list') {
+	function startRename(id: string, current: string, target: 'folder' | 'list' | 'sheet') {
 		renamingId = id;
 		renameValue = current;
 		renameTarget = target;
@@ -258,7 +306,8 @@
 	function submitRename() {
 		if (renamingId && renameValue.trim()) {
 			if (renameTarget === 'folder') updateFolder(renamingId, { name: renameValue.trim() });
-			else updateList(renamingId, { name: renameValue.trim() });
+			else if (renameTarget === 'list') updateList(renamingId, { name: renameValue.trim() });
+			else if (renameTarget === 'sheet') updateSheet(renamingId, { name: renameValue.trim() });
 		}
 		// Always close the rename input, even if empty (discard)
 		renamingId = null;
@@ -353,11 +402,13 @@
 		// Close create forms so they don't linger in the wrong folder context
 		showNewFolder = false;
 		showNewList = false;
+		showNewSheet = false;
 		newFolderName = '';
 		newFolderColor = '#6366f1';
 		newListName = '';
 		newListType = 'plain';
 		newListColor = '#6366f1';
+		newSheetName = '';
 		// Do NOT clear the tag — the user navigates specifically to find the move target
 	});
 
@@ -387,7 +438,9 @@
 	});
 </script>
 
-{#if openListId}
+{#if openSheetId}
+	<SpreadsheetScreen sheetId={openSheetId} onBack={() => openSheetId = null} />
+{:else if openListId}
 	<ListScreen listId={openListId} onHome={() => { openListId = null; breadcrumb = [null]; }} onOpenList={(id) => (openListId = id)} onNavigateTo={(folderId) => {
 		openListId = null;
 		// Reconstruct the full ancestor path to folderId so the breadcrumb is correct
@@ -423,6 +476,23 @@
 					{/if}
 				{/each}
 			</div>
+
+			<!-- Breadcrumb ⋮ menu — available when inside a folder -->
+			{#if currentFolderId && currentFolderId !== ARCHIVE_ID && !isInArchiveView}
+				<div class="breadcrumb-menu-wrap">
+					<button
+						class="icon-btn context-menu-btn"
+						onclick={() => showBreadcrumbMenu = !showBreadcrumbMenu}
+						aria-label="More options"
+					>⋮</button>
+					{#if showBreadcrumbMenu}
+						<div class="breadcrumb-menu" role="menu">
+							<button role="menuitem" onclick={() => { showBreadcrumbMenu = false; showNewSheet = true; }}>📊 New Spreadsheet</button>
+						</div>
+					{/if}
+				</div>
+			{/if}
+
 			<div class="header-actions">
 				<SyncBadge status={syncState.status} />
 				<button class="icon-btn" onclick={() => (showSettings = true)} aria-label="Settings">
@@ -577,7 +647,18 @@
 			</div>
 		{/each}
 
-		<!-- Tag indicator strip moved above .content -->
+		<!-- Spreadsheets -->
+		{#each childSheets as sheet}
+			<div class="row sheet-row">
+				<span class="sheet-icon">📊</span>
+				<button class="row-name" onclick={() => openSheetId = sheet.id}>{sheet.name}</button>
+				<RowMenu items={[
+					{ label: 'ℹ️ Info', action: () => infoTarget = { kind: 'sheet', data: sheet } },
+					{ label: '✏ Rename', action: () => startRename(sheet.id, sheet.name, 'sheet') },
+					{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete spreadsheet "${sheet.name}"? All data will be lost.`, () => deleteSheet(sheet.id)) }
+				]} />
+			</div>
+		{/each}
 
 		<!-- Action bar -->
 		<div class="action-bar">
@@ -585,6 +666,7 @@
 				<button onclick={() => (showNewFolder = true)}>+ Folder</button>
 				{#if currentFolderId}
 					<button onclick={() => openNewList()}>+ List</button>
+					<button onclick={() => (showNewSheet = true)}>+ Sheet</button>
 				{/if}
 			{/if}
 		</div>
@@ -634,6 +716,25 @@
 			</div>
 		{/if}
 
+		<!-- New spreadsheet form -->
+		{#if showNewSheet}
+			<div class="modal-backdrop">
+				<div class="modal">
+					<h2>New Spreadsheet</h2>
+					<input
+						placeholder="Name (optional)"
+						bind:value={newSheetName}
+						onkeydown={(e) => e.key === 'Enter' && submitNewSheet()}
+						autofocus
+					/>
+					<div class="modal-actions">
+						<button onclick={submitNewSheet}>Create</button>
+						<button onclick={() => { showNewSheet = false; newSheetName = ''; }}>Cancel</button>
+					</div>
+				</div>
+			</div>
+		{/if}
+
 		<!-- Confirm dialog -->
 		{#if confirmAction}
 			<ConfirmDialog
@@ -651,6 +752,12 @@
 				rows={infoTarget.kind === 'folder'
 					? [
 						{ label: 'Type', value: 'Folder' },
+						{ label: 'Created', value: fmtDate(d.createdAt) },
+						{ label: 'Modified', value: fmtDate(d.updatedAt) }
+					]
+					: infoTarget.kind === 'sheet'
+					? [
+						{ label: 'Type', value: 'Spreadsheet' },
 						{ label: 'Created', value: fmtDate(d.createdAt) },
 						{ label: 'Modified', value: fmtDate(d.updatedAt) }
 					]
@@ -712,6 +819,45 @@
 	}
 	.home-crumb { font-size: 1.25rem; }
 	.sep { color: var(--text2); }
+
+	/* Breadcrumb ⋮ context menu */
+	.breadcrumb-menu-wrap {
+		position: relative;
+		flex-shrink: 0;
+	}
+	.context-menu-btn {
+		font-size: 1.2rem;
+		color: var(--text2);
+		padding: 0 0.3rem;
+	}
+	.breadcrumb-menu {
+		position: absolute;
+		top: calc(100% + 4px);
+		left: 0;
+		background: var(--bg2);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+		z-index: 200;
+		min-width: 12rem;
+		overflow: hidden;
+	}
+	.breadcrumb-menu button {
+		display: block;
+		width: 100%;
+		padding: 0.65rem 1rem;
+		background: none;
+		border: none;
+		text-align: left;
+		font-size: 0.9rem;
+		color: var(--text);
+		cursor: pointer;
+	}
+	.breadcrumb-menu button:hover { background: var(--bg3); }
+
+	/* Sheet row */
+	.sheet-row { gap: 0.5rem; }
+	.sheet-icon { font-size: 1.1rem; flex-shrink: 0; }
 	.header-actions {
 		display: flex;
 		align-items: center;
