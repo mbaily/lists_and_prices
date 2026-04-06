@@ -101,7 +101,7 @@
 	const total = $derived(
 		Math.round(items
 			.filter((i) => !i.heading && !i.note)
-			.reduce((s, i) => s + Math.round((i.price ?? 0) * 100), 0)) / 100
+			.reduce((s, i) => s + Math.round((i.price ?? 0) * (i.qty ?? 1) * 100), 0)) / 100
 	);
 
 	// ── URL detection ─────────────────────────────────────────────────────────────
@@ -799,7 +799,7 @@
 								{ label: '➕ Add Subtask', action: () => { newItemParentId = item.id; newItemIsNote = false; focusInput(); } },
 								{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
 							] : []),
-							...(level === 0 ? [{ label: '📌 Make Heading', action: () => updateItem(item.id, { heading: true, checked: false, price: null }) }] : []),
+							...(level === 0 ? [{ label: '📌 Make Heading', action: () => updateItem(item.id, { heading: true, checked: false, price: null, qty: null }) }] : []),
 							{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 						]} />
 					</div>
@@ -825,7 +825,7 @@
 							{ label: '➕ Add Subtask', action: () => { newItemParentId = item.id; newItemIsNote = false; focusInput(); } },
 							{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
 						] : []),
-						...(level === 0 ? [{ label: '📌 Make Heading', action: () => updateItem(item.id, { heading: true, checked: false }) }] : []),
+						...(level === 0 ? [{ label: '📌 Make Heading', action: () => updateItem(item.id, { heading: true, checked: false, price: null, qty: null }) }] : []),
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 					]} />
 				{/if}

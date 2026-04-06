@@ -309,7 +309,7 @@ export function listTotal(listId: string): number {
 	return Math.round(
 		readItems(listId)
 			.filter((i) => !i.heading && !i.note)
-			.reduce((s, i) => s + Math.round((i.price ?? 0) * 100), 0)
+			.reduce((s, i) => s + Math.round((i.price ?? 0) * (i.qty ?? 1) * 100), 0)
 	) / 100;
 }
 
