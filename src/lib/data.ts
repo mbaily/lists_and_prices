@@ -20,6 +20,8 @@ export interface Folder {
 	done: boolean;
 	favourite: boolean;
 	archived: boolean;
+	archivedPrevId: string | null;
+	archivedNextId: string | null;
 	createdAt: string | null;
 	updatedAt: string | null;
 }
@@ -38,6 +40,8 @@ function yMapToFolder(m: Y.Map<unknown>): Folder {
 		done: (m.get('done') as boolean) ?? false,
 		favourite: (m.get('favourite') as boolean) ?? false,
 		archived: (m.get('archived') as boolean) ?? false,
+		archivedPrevId: (m.get('archivedPrevId') as string | null) ?? null,
+		archivedNextId: (m.get('archivedNextId') as string | null) ?? null,
 		createdAt: (m.get('createdAt') as string | null) ?? null,
 		updatedAt: (m.get('updatedAt') as string | null) ?? null
 	};
@@ -133,6 +137,8 @@ export interface ListMeta {
 	done: boolean;
 	favourite: boolean;
 	archived: boolean;
+	archivedPrevId: string | null;
+	archivedNextId: string | null;
 	createdAt: string | null;
 	updatedAt: string | null;
 }
@@ -152,6 +158,8 @@ function yMapToList(m: Y.Map<unknown>): ListMeta {
 		done: (m.get('done') as boolean) ?? false,
 		favourite: (m.get('favourite') as boolean) ?? false,
 		archived: (m.get('archived') as boolean) ?? false,
+		archivedPrevId: (m.get('archivedPrevId') as string | null) ?? null,
+		archivedNextId: (m.get('archivedNextId') as string | null) ?? null,
 		createdAt: (m.get('createdAt') as string | null) ?? null,
 		updatedAt: (m.get('updatedAt') as string | null) ?? null
 	};
@@ -313,6 +321,88 @@ export function listTotal(listId: string): number {
 			.filter((i) => !i.heading && !i.note)
 			.reduce((s, i) => s + Math.round((i.price ?? 0) * (i.qty ?? 1) * 100), 0)
 	) / 100;
+}
+
+// ─── Archive helpers ──────────────────────────────────────────────────────────
+
+function computeInsertIndex(visible: { id: string }[], prevId: string | null, nextId: string | null): number {
+	if (prevId) {
+		const idx = visible.findIndex((v) => v.id === prevId);
+		if (idx !== -1) return idx + 1;
+	}
+	if (nextId) {
+		const idx = visible.findIndex((v) => v.id === nextId);
+		if (idx !== -1) return idx;
+	}
+	if (!prevId) return 0; // was the first sibling; if neighbours gone, restore to front
+	return visible.length; // was the last sibling; append
+}
+
+export function archiveList(id: string) {
+	const list = readLists().find((l) => l.id === id);
+	if (!list) return;
+	const allSiblings = readLists()
+		.filter((l) => l.folderId === list.folderId && !l.archived)
+		.sort((a, b) => a.order - b.order);
+	const idx = allSiblings.findIndex((l) => l.id === id);
+	const prevId = idx > 0 ? allSiblings[idx - 1].id : null;
+	const nextId = idx < allSiblings.length - 1 ? allSiblings[idx + 1].id : null;
+	updateList(id, { archived: true, archivedPrevId: prevId, archivedNextId: nextId });
+}
+
+export function unarchiveList(id: string) {
+	const doc = getDoc();
+	const list = readLists().find((l) => l.id === id);
+	if (!list) return;
+	const visible = readLists()
+		.filter((l) => l.folderId === list.folderId && !l.archived)
+		.sort((a, b) => a.order - b.order);
+	const insertIdx = computeInsertIndex(visible, list.archivedPrevId, list.archivedNextId);
+	const updated = [...visible];
+	updated.splice(insertIdx, 0, list);
+	doc.transact(() => {
+		updated.forEach((l, i) => {
+			if (l.id === id) {
+				updateList(id, { archived: false, order: i, archivedPrevId: null, archivedNextId: null });
+			} else if (l.order !== i) {
+				updateList(l.id, { order: i });
+			}
+		});
+	});
+}
+
+export function archiveFolder(id: string) {
+	const allFolders = readFolders();
+	const folder = allFolders.find((f) => f.id === id);
+	if (!folder) return;
+	const allSiblings = allFolders
+		.filter((f) => f.parentId === folder.parentId && !f.archived)
+		.sort((a, b) => a.order - b.order);
+	const idx = allSiblings.findIndex((f) => f.id === id);
+	const prevId = idx > 0 ? allSiblings[idx - 1].id : null;
+	const nextId = idx < allSiblings.length - 1 ? allSiblings[idx + 1].id : null;
+	updateFolder(id, { archived: true, archivedPrevId: prevId, archivedNextId: nextId });
+}
+
+export function unarchiveFolder(id: string) {
+	const doc = getDoc();
+	const folder = readFolders().find((f) => f.id === id);
+	if (!folder) return;
+	const visible = readFolders()
+		.filter((f) => f.parentId === folder.parentId && !f.archived)
+		.sort((a, b) => a.order - b.order);
+	const insertIdx = computeInsertIndex(visible, folder.archivedPrevId, folder.archivedNextId);
+	const updated = [...visible];
+	updated.splice(insertIdx, 0, folder);
+	doc.transact(() => {
+		updated.forEach((f, i) => {
+			if (f.id === id) {
+				updateFolder(id, { archived: false, order: i, archivedPrevId: null, archivedNextId: null });
+			} else if (f.order !== i) {
+				updateFolder(f.id, { order: i });
+			}
+		});
+	});
 }
 
 // ─── Reorder helpers ──────────────────────────────────────────────────────────

@@ -13,6 +13,10 @@
 		isDescendant,
 		isFolderEffectivelyArchived,
 		isListEffectivelyArchived,
+		archiveFolder,
+		unarchiveFolder,
+		archiveList,
+		unarchiveList,
 		readSheets,
 		deleteSheet,
 		updateSheet,
@@ -478,11 +482,7 @@
 
 	// ── First-launch guard ───────────────────────────────────────────────────────
 	let showFirstLaunch = $derived(allFolders.length === 0 && !showNewFolder);
-	// ── Archive helpers ───────────────────────────────────────────────────────
-	function archiveFolder(id: string) { updateFolder(id, { archived: true }); }
-	function unarchiveFolder(id: string) { updateFolder(id, { archived: false }); }
-	function archiveList(id: string) { updateList(id, { archived: true }); }
-	function unarchiveList(id: string) { updateList(id, { archived: false }); }
+
 	$effect(() => {
 		void currentFolderId; // track navigation
 		renamingId = null;
