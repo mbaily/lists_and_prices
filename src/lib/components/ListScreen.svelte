@@ -311,6 +311,32 @@
 		qtyBuffer = '';
 	}
 
+	// ── Physical keyboard input for the numeric keypad ────────────────────────────
+	// When the price/qty keypad is open, route physical keyboard events through
+	// handleKeypadInput so laptop/desktop/iPad-with-keyboard users can type normally.
+	// The SIP (software keyboard) is intentionally NOT triggered — no text input is
+	// focused while the custom keypad is open.
+	$effect(() => {
+		if (!pricingItemId && !qtyItemId) return;
+		function onKeyDown(e: KeyboardEvent) {
+			// Don't intercept if focus is inside a text input (e.g. the universal bar somehow active)
+			if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+			let key: string | null = null;
+			if (e.key >= '0' && e.key <= '9') key = e.key;
+			else if (e.key === 'Backspace') key = 'backspace';
+			else if (e.key === 'Enter') key = 'enter';
+			else if (e.key === '.' || e.key === ',') key = '.';
+			else if (e.key === '-') key = 'minus';
+			else if (e.key === 'Escape') { pricingItemId ? commitPrice() : commitQty(); key = null; }
+			if (key !== null) {
+				e.preventDefault();
+				handleKeypadInput(key);
+			}
+		}
+		document.addEventListener('keydown', onKeyDown);
+		return () => document.removeEventListener('keydown', onKeyDown);
+	});
+
 	// Cache Intl formatters — creating them on every call is expensive
 	const _numFmt = new Intl.NumberFormat(undefined, {
 		style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2
