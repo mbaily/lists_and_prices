@@ -210,11 +210,16 @@
 	let pricingItemId = $state<string | null>(null);
 	let priceBuffer = $state('');
 
+	// Which item's quantity is currently being edited via the keypad
+	let qtyItemId = $state<string | null>(null);
+	let qtyBuffer = $state('');
+
 	function startEditName(item: Item) {
 		editingId = item.id;
 		inputMode = 'edit';
 		universalValue = item.name;
 		pricingItemId = null;
+		qtyItemId = null;
 		newItemParentId = null;
 		newItemIsNote = false;
 		focusInput();
@@ -240,6 +245,7 @@
 	function startEditPrice(item: Item) {
 		cancelLongPress(); // prevent long-press selection firing after price editor opens
 		pricingItemId = item.id;
+		qtyItemId = null;
 		// Use toFixed to avoid float stringification artefacts (e.g. 1.1000000000000001)
 		priceBuffer = item.price !== null
 			? (item.price < 0 ? '-' : '') + Math.abs(item.price).toFixed(2).replace(/\.?0+$/, '')
@@ -247,7 +253,29 @@
 		cancelEdit();
 	}
 
+	function startEditQty(item: Item) {
+		cancelLongPress();
+		qtyItemId = item.id;
+		pricingItemId = null;
+		qtyBuffer = item.qty !== null ? String(item.qty) : '';
+		cancelEdit();
+	}
+
 	function handleKeypadInput(key: string) {
+		if (qtyItemId) {
+			// Quantity mode — integers only, no decimal, no negative
+			if (key === 'enter') {
+				commitQty();
+			} else if (key === 'backspace') {
+				qtyBuffer = qtyBuffer.slice(0, -1);
+			} else if (key === 'minus' || key === '.') {
+				// Not allowed for qty
+			} else {
+				if (qtyBuffer.length >= 4) return; // max 4 digits
+				qtyBuffer += key;
+			}
+			return;
+		}
 		if (!pricingItemId) return;
 		if (key === 'enter') {
 			commitPrice();
@@ -273,6 +301,14 @@
 		updateItem(pricingItemId, { price: isNaN(val) ? null : Math.round(val * 100) / 100 });
 		pricingItemId = null;
 		priceBuffer = '';
+	}
+
+	function commitQty() {
+		if (!qtyItemId) return;
+		const val = parseInt(qtyBuffer, 10);
+		updateItem(qtyItemId, { qty: isNaN(val) || val <= 0 ? null : val });
+		qtyItemId = null;
+		qtyBuffer = '';
 	}
 
 	// Cache Intl formatters — creating them on every call is expensive
@@ -416,7 +452,7 @@
 
 		// Column header
 		if (isPriced) {
-			rows.push('Done\tPrice\tItem');
+			rows.push('Done\tPrice\tQty\tItem');
 		} else {
 			rows.push('Done\tItem');
 		}
@@ -426,13 +462,14 @@
 			const indent = '\t'.repeat(level);
 			const itemName = indent + item.name;
 			if (item.heading) {
-				rows.push(isPriced ? `\t\t${itemName}` : `\t${itemName}`);
+				rows.push(isPriced ? `\t\t\t${itemName}` : `\t${itemName}`);
 			} else if (item.note) {
-				rows.push(isPriced ? `\t\t${itemName}` : `\t${itemName}`);
+				rows.push(isPriced ? `\t\t\t${itemName}` : `\t${itemName}`);
 			} else if (isPriced) {
 				const price = item.price !== null ? (item.price).toFixed(2) : '';
+				const qty = item.qty !== null ? String(item.qty) : '1';
 				const done = item.checked ? '✓' : '';
-				rows.push(`${done}\t${price}\t${itemName}`);
+				rows.push(`${done}\t${price}\t${qty}\t${itemName}`);
 			} else {
 				const done = item.checked ? '✓' : '';
 				rows.push(`${done}\t${itemName}`);
@@ -441,14 +478,14 @@
 
 		// Blank rows (⌈items / 3⌉) for extra entries
 		const blankCount = Math.ceil(treeItems.length / 3);
-		for (let i = 0; i < blankCount; i++) rows.push(isPriced ? '\t\t' : '\t');
+		for (let i = 0; i < blankCount; i++) rows.push(isPriced ? '\t\t\t' : '\t');
 
-		// SUM row for priced lists — use INDIRECT+ROW() so the formula works regardless
-		// of where the user pastes in the sheet (not tied to absolute row numbers).
-		// ROW()-1 = last blank buffer row; ROW()-(blankCount+n) = first data row.
+		// SUMPRODUCT(Price × Qty) row for priced lists — relative to current row so it
+		// works regardless of where the user pastes in the sheet.
+		// Price = col B, Qty = col C; data starts span rows above the Total row.
 		if (isPriced) {
 			const span = treeItems.length + blankCount;
-			rows.push(`\t=SUM(INDIRECT("B"&(ROW()-${span})&":B"&(ROW()-1)))\tTotal`);
+			rows.push(`\t=SUMPRODUCT(INDIRECT("B"&(ROW()-${span})&":B"&(ROW()-1)),INDIRECT("C"&(ROW()-${span})&":C"&(ROW()-1)))\t\tTotal`);
 		}
 
 		// Sentinel end
@@ -483,6 +520,10 @@
 			pricingItemId = null;
 			priceBuffer = '';
 		}
+		if (qtyItemId !== null && !ids.has(qtyItemId)) {
+			qtyItemId = null;
+			qtyBuffer = '';
+		}
 		if (editingId !== null && !ids.has(editingId)) {
 			cancelEdit();
 		}
@@ -506,6 +547,8 @@
 		newItemIsNote = false;
 		pricingItemId = null;
 		priceBuffer = '';
+		qtyItemId = null;
+		qtyBuffer = '';
 		selectedIds = new Set();
 		touchDragFrom = null;
 		touchDragOver = null;
@@ -566,7 +609,7 @@
 	});
 </script>
 
-<div class="screen" class:has-keypad={pricingItemId && isPriced}>
+<div class="screen" class:has-keypad={(pricingItemId || qtyItemId) && isPriced}>
 	<!-- Header -->
 	<header>
 		<button class="home-btn" onclick={onHome} aria-label="Home">🏠</button>
@@ -602,7 +645,7 @@
 	{/if}
 
 	<!-- Universal input bar: always present so iOS keyboard opens at a fixed position -->
-	{#if !pricingItemId || !isPriced}
+	{#if (!pricingItemId && !qtyItemId) || !isPriced}
 		<div class="universal-bar">
 			<!-- form fires submit on iOS keyboard return/tick, more reliable than keydown -->
 			<form
@@ -743,6 +786,12 @@
 							class:editing={pricingItemId === item.id}
 							onclick={() => pricingItemId === item.id ? commitPrice() : startEditPrice(item)}
 						>{pricingItemId === item.id ? (priceBuffer || '0') : formatPrice(item.price)}</button>
+						<button
+							class="qty-btn"
+							class:editing={qtyItemId === item.id}
+							onclick={() => qtyItemId === item.id ? commitQty() : startEditQty(item)}
+							title="Quantity"
+						>×{qtyItemId === item.id ? (qtyBuffer || '1') : (item.qty ?? 1)}</button>
 						<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 						<RowMenu items={[
 							{ label: 'ℹ️ Info', action: () => infoItem = item },
@@ -786,7 +835,7 @@
 
 	<!-- Floating blue + button: open keyboard / start adding -->
 	<!-- Position depends on handedness: left-handed = right side, right-handed = left side -->
-	{#if !pricingItemId || !isPriced}
+	{#if (!pricingItemId && !qtyItemId) || !isPriced}
 		<button
 			class="fab"
 			class:fab-right={settings.handedness !== 'right'}
@@ -811,11 +860,16 @@
 	{/if}
 
 	<!-- Numeric keypad -->
-	{#if isPriced && pricingItemId}
+	{#if isPriced && (pricingItemId || qtyItemId)}
 		<div class="keypad-area">
 			<div class="keypad-header">
-				<span>Entering price: <strong>{priceBuffer || '0'}</strong></span>
-				<button onclick={commitPrice}>Done</button>
+				{#if qtyItemId}
+					<span>Entering quantity: <strong>{qtyBuffer || '1'}</strong></span>
+					<button onclick={commitQty}>Done</button>
+				{:else}
+					<span>Entering price: <strong>{priceBuffer || '0'}</strong></span>
+					<button onclick={commitPrice}>Done</button>
+				{/if}
 			</div>
 			<NumericKeypad onKey={handleKeypadInput} />
 		</div>
@@ -1164,6 +1218,24 @@
 	.price-btn.editing {
 		border-color: var(--accent);
 		background: var(--bg);
+		font-weight: 700;
+	}
+	.qty-btn {
+		min-width: 42px;
+		padding: 0.25rem 0.4rem;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		background: var(--bg2);
+		color: var(--text2);
+		font-size: 0.85rem;
+		cursor: pointer;
+		text-align: center;
+		flex-shrink: 0;
+	}
+	.qty-btn.editing {
+		border-color: var(--accent);
+		background: var(--bg);
+		color: var(--text);
 		font-weight: 700;
 	}
 	.del-btn {
