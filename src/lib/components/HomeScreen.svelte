@@ -134,8 +134,8 @@
 		try { return readSheets(); } catch { return []; }
 	});
 	let childSheets = $derived(
-		currentFolderId && currentFolderId !== ARCHIVE_ID && !isInArchiveView
-			? allSheets.filter((s) => s.folderId === currentFolderId).sort((a, b) => a.order - b.order)
+		!isInArchiveView && currentFolderId !== ARCHIVE_ID
+			? allSheets.filter((s) => s.folderId === (currentFolderId ?? null)).sort((a, b) => a.order - b.order)
 			: []
 	);
 	let openSheetId = $state<string | null>(null);
@@ -145,7 +145,6 @@
 	let newSheetName = $state('');
 
 	function submitNewSheet() {
-		if (!currentFolderId) return;
 		const name = newSheetName.trim() || new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 		const id = createSheet(name, currentFolderId);
 		newSheetName = '';
@@ -477,8 +476,8 @@
 				{/each}
 			</div>
 
-			<!-- Breadcrumb ⋮ menu — available when inside a folder -->
-			{#if currentFolderId && currentFolderId !== ARCHIVE_ID && !isInArchiveView}
+			<!-- Breadcrumb ⋮ menu — hidden only in archive view -->
+			{#if !isInArchiveView && currentFolderId !== ARCHIVE_ID}
 				<div class="breadcrumb-menu-wrap">
 					<button
 						class="icon-btn context-menu-btn"

@@ -394,6 +394,57 @@
 
 	const isPriced = $derived(listMeta?.type === 'priced');
 
+	// ── Copy as TSV (for pasting into Google Sheets) ──────────────────────────────
+	let showHeaderMenu = $state(false);
+	let copyStatus = $state<'idle' | 'copied' | 'error'>('idle');
+
+	async function copyAsTSV() {
+		const rows: string[] = [];
+		// Header row
+		if (isPriced) {
+			rows.push('Item\tPrice\tDone');
+		} else {
+			rows.push('Item\tDone');
+		}
+		for (const { item, level } of treeItems) {
+			const indent = '\t'.repeat(level);
+			const name = indent + item.name;
+			if (item.heading) {
+				// Heading: just the name, blank other columns
+				rows.push(isPriced ? `${name}\t\t` : `${name}\t`);
+			} else if (item.note) {
+				rows.push(isPriced ? `${name}\t\t` : `${name}\t`);
+			} else if (isPriced) {
+				const price = item.price !== null ? (item.price).toFixed(2) : '';
+				const done = item.checked ? '✓' : '';
+				rows.push(`${name}\t${price}\t${done}`);
+			} else {
+				const done = item.checked ? '✓' : '';
+				rows.push(`${name}\t${done}`);
+			}
+		}
+		const tsv = rows.join('\n');
+		try {
+			await navigator.clipboard.writeText(tsv);
+			copyStatus = 'copied';
+			setTimeout(() => { copyStatus = 'idle'; }, 2000);
+		} catch {
+			copyStatus = 'error';
+			setTimeout(() => { copyStatus = 'idle'; }, 3000);
+		}
+		showHeaderMenu = false;
+	}
+
+	$effect(() => {
+		if (!showHeaderMenu) return;
+		function dismiss(e: PointerEvent) {
+			const el = e.target as HTMLElement | null;
+			if (!el?.closest('.header-menu-wrap')) showHeaderMenu = false;
+		}
+		document.addEventListener('pointerdown', dismiss, { capture: true });
+		return () => document.removeEventListener('pointerdown', dismiss, { capture: true });
+	});
+
 	// If a peer deletes the item currently being priced or named, clear stale state
 	$effect(() => {
 		const ids = new Set(items.map((i) => i.id));
@@ -502,8 +553,22 @@
 			<button class="type-btn" onclick={toggleType} title="Convert list type">
 				{isPriced ? '📋' : '💰'}
 			</button>
+			<div class="header-menu-wrap">
+				<button class="type-btn" onclick={() => showHeaderMenu = !showHeaderMenu} aria-label="More options">⋮</button>
+				{#if showHeaderMenu}
+					<div class="header-menu" role="menu">
+						<button role="menuitem" onclick={copyAsTSV}>📋 Copy as spreadsheet</button>
+					</div>
+				{/if}
+			</div>
 		</div>
 	</header>
+
+	{#if copyStatus !== 'idle'}
+		<div class="copy-toast" class:error={copyStatus === 'error'}>
+			{copyStatus === 'copied' ? '✓ Copied! Paste into Google Sheets.' : '✗ Clipboard access denied.'}
+		</div>
+	{/if}
 
 	<!-- Universal input bar: always present so iOS keyboard opens at a fixed position -->
 	{#if !pricingItemId || !isPriced}
@@ -851,6 +916,51 @@
 		cursor: pointer;
 		padding: 0.2rem;
 	}
+
+	.header-menu-wrap {
+		position: relative;
+	}
+	.header-menu {
+		position: absolute;
+		top: calc(100% + 4px);
+		right: 0;
+		background: var(--bg2);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+		z-index: 200;
+		min-width: 13rem;
+		overflow: hidden;
+	}
+	.header-menu button {
+		display: block;
+		width: 100%;
+		padding: 0.65rem 1rem;
+		background: none;
+		border: none;
+		text-align: left;
+		font-size: 0.9rem;
+		color: var(--text);
+		cursor: pointer;
+	}
+	.header-menu button:hover { background: var(--bg3); }
+
+	.copy-toast {
+		position: fixed;
+		bottom: 5rem;
+		left: 50%;
+		transform: translateX(-50%);
+		background: #22c55e;
+		color: #fff;
+		padding: 0.5rem 1.2rem;
+		border-radius: 999px;
+		font-size: 0.85rem;
+		font-weight: 600;
+		pointer-events: none;
+		z-index: 300;
+		white-space: nowrap;
+	}
+	.copy-toast.error { background: #ef4444; }
 	.summary-bar {
 		display: flex;
 		align-items: center;

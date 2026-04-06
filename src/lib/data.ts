@@ -450,7 +450,7 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 export interface SheetMeta {
 	id: string;
 	name: string;
-	folderId: string;
+	folderId: string | null;
 	order: number;
 	createdAt: string | null;
 	updatedAt: string | null;
@@ -465,14 +465,14 @@ function yMapToSheet(m: Y.Map<unknown>): SheetMeta {
 	return {
 		id: m.get('id') as string,
 		name: m.get('name') as string,
-		folderId: m.get('folderId') as string,
+		folderId: (m.get('folderId') as string | null) ?? null,
 		order: (m.get('order') as number) ?? 0,
 		createdAt: (m.get('createdAt') as string | null) ?? null,
 		updatedAt: (m.get('updatedAt') as string | null) ?? null
 	};
 }
 
-export function createSheet(name: string, folderId: string): string {
+export function createSheet(name: string, folderId: string | null): string {
 	const doc = getDoc();
 	const sheets = getSpreadsheets(doc);
 	const existing = (sheets.toArray() as Y.Map<unknown>[]).filter((s) => s.get('folderId') === folderId);
