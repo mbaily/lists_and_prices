@@ -920,8 +920,10 @@
 	.row.done .check-circle { opacity: 0.55; }
 	.row.done .fav-btn { opacity: 0.55; }
 	.row.done .drag-handle { opacity: 0.55; }
-	.row.archived { opacity: 0.6; }
-	.row.archived .row-name { font-style: italic; }
+	.row.archived .row-name { font-style: italic; opacity: 0.6; }
+	.row.archived .check-circle { opacity: 0.6; }
+	.row.archived .fav-btn { opacity: 0.6; }
+	.row.archived .drag-handle { opacity: 0.6; }
 	.path-through-hint { color: var(--accent); font-size: 0.85em; opacity: 0.7; }
 	/* ── Favourites bar ────────────────────────────────────────────────────────── */
 	.fav-bar {
