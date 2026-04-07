@@ -2,14 +2,18 @@
 	/**
 	 * A 3-dot (⋮) dropdown menu for folder/list rows.
 	 * Props: items — array of { label, action, danger? }
-	 * Closes on outside click or Escape.
+	 * Closes on outside tap (not scroll) or Escape.
 	 */
 	type MenuItem = { label: string; action: () => void; danger?: boolean };
 	let { items }: { items: MenuItem[] } = $props();
 
 	let open = $state(false);
-	let openUpward = $state(false);
+	let panelStyle = $state('');
 	let btnEl: HTMLButtonElement | null = null;
+
+	// Scroll-vs-tap detection
+	let _mayClose = false;
+	let _downX = 0, _downY = 0;
 
 	function close() { open = false; }
 
@@ -17,26 +21,57 @@
 		if (e.key === 'Escape') close();
 	}
 
-	function handleOutside(e: PointerEvent) {
-		if (e.target && btnEl && !btnEl.closest('.row-menu')?.contains(e.target as Node)) close();
+	function onOutsideDown(e: PointerEvent) {
+		if (btnEl?.closest('.row-menu')?.contains(e.target as Node)) return;
+		_mayClose = true;
+		_downX = e.clientX;
+		_downY = e.clientY;
+	}
+
+	function onOutsideMove(e: PointerEvent) {
+		if (!_mayClose) return;
+		const dx = e.clientX - _downX, dy = e.clientY - _downY;
+		if (dx * dx + dy * dy > 64) _mayClose = false; // >8px → scroll, not tap
+	}
+
+	function onOutsideUp() {
+		if (_mayClose) close();
+		_mayClose = false;
 	}
 
 	function toggle(e: MouseEvent) {
 		e.stopPropagation();
 		if (!open && btnEl) {
 			const rect = btnEl.getBoundingClientRect();
+			const ITEM_H = 52;
+			const panelH = items.length * ITEM_H + 8;
 			const spaceBelow = window.innerHeight - rect.bottom;
-			openUpward = spaceBelow < items.length * 48 + 16;
+			const spaceAbove = rect.top;
+
+			let top: number;
+			if (spaceBelow >= panelH || spaceBelow >= spaceAbove) {
+				// Open downward; clamp so it doesn't go off the bottom
+				top = Math.min(rect.bottom + 4, window.innerHeight - panelH - 4);
+			} else {
+				// Open upward; clamp so it doesn't go off the top
+				top = Math.max(rect.top - panelH - 4, 4);
+			}
+			const rightEdge = window.innerWidth - rect.right;
+			panelStyle = `top:${top}px;right:${rightEdge}px`;
 		}
 		open = !open;
 	}
 
 	$effect(() => {
 		if (!open) return;
-		document.addEventListener('pointerdown', handleOutside, { capture: true });
+		document.addEventListener('pointerdown', onOutsideDown, { capture: true });
+		document.addEventListener('pointermove', onOutsideMove, { capture: true, passive: true });
+		document.addEventListener('pointerup', onOutsideUp, { capture: true });
 		document.addEventListener('keydown', handleKey);
 		return () => {
-			document.removeEventListener('pointerdown', handleOutside, { capture: true });
+			document.removeEventListener('pointerdown', onOutsideDown, { capture: true });
+			document.removeEventListener('pointermove', onOutsideMove, { capture: true });
+			document.removeEventListener('pointerup', onOutsideUp, { capture: true });
 			document.removeEventListener('keydown', handleKey);
 		};
 	});
@@ -51,7 +86,7 @@
 		onclick={toggle}
 	>⋮</button>
 	{#if open}
-		<div class="menu-panel" class:upward={openUpward} role="menu">
+		<div class="menu-panel" style={panelStyle} role="menu">
 			{#each items as item}
 				<button
 					class="menu-item"
@@ -85,9 +120,7 @@
 		letter-spacing: 0;
 	}
 	.menu-panel {
-		position: absolute;
-		right: 0;
-		top: 100%;
+		position: fixed;
 		background: var(--bg);
 		border: 1px solid var(--border);
 		border-radius: 10px;
@@ -97,10 +130,6 @@
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
-	}
-	.menu-panel.upward {
-		top: auto;
-		bottom: 100%;
 	}
 	.menu-item {
 		background: none;

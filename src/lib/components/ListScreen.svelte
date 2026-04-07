@@ -673,7 +673,8 @@
 			<button class="type-btn" onclick={() => showHeaderMenu = !showHeaderMenu} aria-label="More options">⋮</button>
 			{#if showHeaderMenu}
 				<div class="header-menu" role="menu">
-					<button role="menuitem" onclick={copyAsTSV}>📋 Copy as spreadsheet</button>
+					<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsTSV(); }}>📋 Copy as spreadsheet</button>
+					<button role="menuitem" onclick={() => { showHeaderMenu = false; importFromClipboard(); }}>📥 Import from clipboard</button>
 				</div>
 			{/if}
 		</div>
@@ -717,14 +718,7 @@
 						<button type="button" class="input-clear" onclick={cancelEdit} aria-label="Cancel edit">✕</button>
 					{/if}
 				</div>
-				<div class="input-actions">
-					{#if inputMode === 'edit'}
-						<button type="submit" class="universal-btn done-btn">OK</button>
-					{:else}
-						<button type="submit" class="universal-btn add-btn" disabled={!universalValue.trim()}>OK</button>
-						<button type="button" class="universal-btn paste-btn" onclick={importFromClipboard} title="Import from clipboard">📋</button>
-					{/if}
-				</div>
+
 			</form>
 			{#if newItemParentId}
 				<div class="subtask-hint">
@@ -1335,11 +1329,6 @@
 		flex-direction: column;
 		gap: 0.4rem;
 	}
-	.input-actions {
-		display: flex;
-		gap: 0.5rem;
-		justify-content: flex-end;
-	}
 	.input-wrap {
 		position: relative;
 		flex: 1;
@@ -1374,24 +1363,6 @@
 		cursor: pointer;
 		padding: 0.2rem 0.3rem;
 		line-height: 1;
-	}
-	.universal-btn {
-		padding: 0.6rem 1rem;
-		border: none;
-		border-radius: 10px;
-		font-size: 0.95rem;
-		font-weight: 600;
-		cursor: pointer;
-		flex-shrink: 0;
-	}
-	.add-btn { background: var(--accent); color: #fff; }
-	.add-btn:disabled { opacity: 0.4; }
-	.done-btn { background: #22c55e; color: #fff; }
-	.paste-btn {
-		background: var(--bg3);
-		color: var(--text);
-		padding: 0.6rem 0.7rem;
-		font-size: 1.1rem;
 	}
 	/* ── Floating action buttons ────────────────────────────────────── */
 	.fab {
