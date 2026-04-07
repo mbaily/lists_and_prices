@@ -881,19 +881,34 @@
 		{/each}
 	</div>
 
-	<!-- Floating blue + button: open keyboard / start adding -->
+	<!-- Floating + / ✕ button: add item when idle; cancel when typing -->
 	<!-- Position depends on handedness: left-handed = right side, right-handed = left side -->
 	{#if (!pricingItemId && !qtyItemId) || !isPriced}
-		<button
-			class="fab"
-			class:fab-right={settings.handedness !== 'right'}
-			class:fab-left={settings.handedness === 'right'}
-			aria-label="Add item"
-			onclick={() => { newItemParentId = null; newItemIsNote = false; cancelEdit(); focusInput(); }}
-		>＋</button>
+		{#if universalValue.trim()}
+			<!-- Cancel: discard typed text / revert edit -->
+			<button
+				class="fab fab-cancel"
+				class:fab-right={settings.handedness !== 'right'}
+				class:fab-left={settings.handedness === 'right'}
+				aria-label="Cancel"
+				onpointerdown={(e) => {
+					e.preventDefault();
+					cancelEdit();
+				}}
+			>✕</button>
+		{:else}
+			<!-- Start adding -->
+			<button
+				class="fab"
+				class:fab-right={settings.handedness !== 'right'}
+				class:fab-left={settings.handedness === 'right'}
+				aria-label="Add item"
+				onclick={() => { newItemParentId = null; newItemIsNote = false; cancelEdit(); focusInput(); }}
+			>＋</button>
+		{/if}
 	{/if}
 
-	<!-- Floating green confirm button: opposite side to blue button -->
+	<!-- Floating green confirm button: opposite side to +/✕ button -->
 	{#if universalValue.trim()}
 		<button
 			class="fab fab-confirm"
@@ -1385,6 +1400,7 @@
 	.fab-right { right: 1.25rem; background: var(--accent); }
 	.fab-left  { left: 1.25rem; background: var(--accent); }
 	.fab-confirm { background: #22c55e; font-size: 1.8rem; }
+	.fab-cancel  { background: #ef4444; font-size: 1.8rem; }
 	.keypad-area {
 		flex-shrink: 0;
 		border-top: 2px solid var(--accent);

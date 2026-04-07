@@ -73,11 +73,14 @@
 		document.addEventListener('pointermove', onOutsideMove, { capture: true, passive: true });
 		document.addEventListener('pointerup', onOutsideUp, { capture: true });
 		document.addEventListener('keydown', handleKey);
+		// Close when the page (or any scroll container) scrolls — menu is fixed so it would be left behind
+		document.addEventListener('scroll', close, { capture: true, passive: true });
 		return () => {
 			document.removeEventListener('pointerdown', onOutsideDown, { capture: true });
 			document.removeEventListener('pointermove', onOutsideMove, { capture: true });
 			document.removeEventListener('pointerup', onOutsideUp, { capture: true });
 			document.removeEventListener('keydown', handleKey);
+			document.removeEventListener('scroll', close, { capture: true });
 		};
 	});
 </script>
