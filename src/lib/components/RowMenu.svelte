@@ -8,6 +8,7 @@
 	let { items }: { items: MenuItem[] } = $props();
 
 	let open = $state(false);
+	let openUpward = $state(false);
 	let btnEl: HTMLButtonElement | null = null;
 
 	function close() { open = false; }
@@ -18,6 +19,16 @@
 
 	function handleOutside(e: PointerEvent) {
 		if (e.target && btnEl && !btnEl.closest('.row-menu')?.contains(e.target as Node)) close();
+	}
+
+	function toggle(e: MouseEvent) {
+		e.stopPropagation();
+		if (!open && btnEl) {
+			const rect = btnEl.getBoundingClientRect();
+			const spaceBelow = window.innerHeight - rect.bottom;
+			openUpward = spaceBelow < items.length * 48 + 16;
+		}
+		open = !open;
 	}
 
 	$effect(() => {
@@ -37,10 +48,10 @@
 		class="menu-trigger"
 		aria-label="More options"
 		aria-expanded={open}
-		onclick={(e) => { e.stopPropagation(); open = !open; }}
+		onclick={toggle}
 	>⋮</button>
 	{#if open}
-		<div class="menu-panel" role="menu">
+		<div class="menu-panel" class:upward={openUpward} role="menu">
 			{#each items as item}
 				<button
 					class="menu-item"
@@ -86,6 +97,10 @@
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
+	}
+	.menu-panel.upward {
+		top: auto;
+		bottom: 100%;
 	}
 	.menu-item {
 		background: none;

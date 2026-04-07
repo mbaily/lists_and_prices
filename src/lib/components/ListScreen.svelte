@@ -161,7 +161,18 @@
 	let inputMode = $state<InputMode>('add');
 	let universalValue = $state('');
 	// bind:this requires a plain let (not $state) to receive the real DOM node
-	let universalInputEl: HTMLInputElement | null = null;
+	let universalInputEl: HTMLTextAreaElement | null = null;
+
+	function resizeUniversal() {
+		if (!universalInputEl) return;
+		universalInputEl.style.height = 'auto';
+		universalInputEl.style.height = universalInputEl.scrollHeight + 'px';
+	}
+
+	$effect(() => {
+		void universalValue;
+		tick().then(resizeUniversal);
+	});
 	// Subtask / subnote context when adding a child item
 	let newItemParentId = $state<string | null>(null);
 	let newItemIsNote = $state(false);
@@ -688,24 +699,32 @@
 				onsubmit={(e) => { e.preventDefault(); inputMode === 'edit' ? submitEditName() : addItem(); }}
 			>
 				<div class="input-wrap">
-					<input
+					<textarea
 						bind:this={universalInputEl}
 						class="universal-input"
 						class:editing={inputMode === 'edit'}
 						placeholder={inputMode === 'edit' ? 'Edit name…' : newItemParentId ? (newItemIsNote ? 'Add subnote…' : 'Add subtask…') : 'Add item…'}
 						bind:value={universalValue}
-						onkeydown={(e) => { if (e.key === 'Escape') cancelEdit(); }}
-					/>
+						rows="1"
+						enterkeyhint="done"
+						oninput={resizeUniversal}
+						onkeydown={(e) => {
+							if (e.key === 'Escape') cancelEdit();
+							if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); inputMode === 'edit' ? submitEditName() : addItem(); }
+						}}
+					></textarea>
 					{#if inputMode === 'edit'}
 						<button type="button" class="input-clear" onclick={cancelEdit} aria-label="Cancel edit">✕</button>
 					{/if}
 				</div>
-				{#if inputMode === 'edit'}
-					<button type="submit" class="universal-btn done-btn">OK</button>
-				{:else}
-					<button type="submit" class="universal-btn add-btn" disabled={!universalValue.trim()}>OK</button>
-					<button type="button" class="universal-btn paste-btn" onclick={importFromClipboard} title="Import from clipboard">📋</button>
-				{/if}
+				<div class="input-actions">
+					{#if inputMode === 'edit'}
+						<button type="submit" class="universal-btn done-btn">OK</button>
+					{:else}
+						<button type="submit" class="universal-btn add-btn" disabled={!universalValue.trim()}>OK</button>
+						<button type="button" class="universal-btn paste-btn" onclick={importFromClipboard} title="Import from clipboard">📋</button>
+					{/if}
+				</div>
 			</form>
 			{#if newItemParentId}
 				<div class="subtask-hint">
@@ -1313,7 +1332,13 @@
 	}
 	.universal-row {
 		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+	.input-actions {
+		display: flex;
 		gap: 0.5rem;
+		justify-content: flex-end;
 	}
 	.input-wrap {
 		position: relative;
@@ -1330,14 +1355,18 @@
 		color: var(--text);
 		outline: none;
 		box-sizing: border-box;
+		resize: none;
+		overflow: hidden;
+		min-height: 2.5rem;
+		line-height: 1.4;
+		font-family: inherit;
 	}
 	.universal-input:focus { border-color: var(--accent); }
 	.universal-input.editing { border-color: var(--accent); }
 	.input-clear {
 		position: absolute;
 		right: 0.4rem;
-		top: 50%;
-		transform: translateY(-50%);
+		top: 0.4rem;
 		background: none;
 		border: none;
 		color: var(--text2);
