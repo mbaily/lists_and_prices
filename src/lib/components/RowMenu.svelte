@@ -47,17 +47,22 @@
 			const panelH = items.length * ITEM_H + 8;
 			const spaceBelow = window.innerHeight - rect.bottom;
 			const spaceAbove = rect.top;
+			const MARGIN = 8;
 
 			let top: number;
-			if (spaceBelow >= panelH || spaceBelow >= spaceAbove) {
-				// Open downward; clamp so it doesn't go off the bottom
-				top = Math.min(rect.bottom + 4, window.innerHeight - panelH - 4);
+			let maxHeight: number;
+			if (spaceBelow >= spaceAbove) {
+				// Open downward
+				top = rect.bottom + 4;
+				maxHeight = window.innerHeight - top - MARGIN;
 			} else {
-				// Open upward; clamp so it doesn't go off the top
-				top = Math.max(rect.top - panelH - 4, 4);
+				// Open upward
+				maxHeight = rect.top - MARGIN - 4;
+				top = rect.top - 4 - Math.min(panelH, maxHeight);
 			}
+			maxHeight = Math.max(maxHeight, 80);
 			const rightEdge = window.innerWidth - rect.right;
-			panelStyle = `top:${top}px;right:${rightEdge}px`;
+			panelStyle = `top:${top}px;right:${rightEdge}px;max-height:${maxHeight}px`;
 		}
 		open = !open;
 	}
@@ -129,7 +134,8 @@
 		z-index: 100;
 		display: flex;
 		flex-direction: column;
-		overflow: hidden;
+		overflow-y: auto;
+		-webkit-overflow-scrolling: touch;
 	}
 	.menu-item {
 		background: none;
