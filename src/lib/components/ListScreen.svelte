@@ -903,7 +903,7 @@
 				class:fab-right={settings.handedness !== 'right'}
 				class:fab-left={settings.handedness === 'right'}
 				aria-label="Add item"
-				onclick={() => { newItemParentId = null; newItemIsNote = false; cancelEdit(); focusInput(); }}
+				onpointerdown={(e) => { e.preventDefault(); newItemParentId = null; newItemIsNote = false; cancelEdit(); focusInput(); }}
 			>＋</button>
 		{/if}
 	{/if}
