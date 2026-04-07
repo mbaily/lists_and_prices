@@ -45,24 +45,15 @@
 			const rect = btnEl.getBoundingClientRect();
 			const ITEM_H = 52;
 			const panelH = items.length * ITEM_H + 8;
-			const spaceBelow = window.innerHeight - rect.bottom;
-			const spaceAbove = rect.top;
 			const MARGIN = 8;
-
-			let top: number;
-			let maxHeight: number;
-			if (spaceBelow >= spaceAbove) {
-				// Open downward
-				top = rect.bottom + 4;
-				maxHeight = window.innerHeight - top - MARGIN;
-			} else {
-				// Open upward
-				maxHeight = rect.top - MARGIN - 4;
-				top = rect.top - 4 - Math.min(panelH, maxHeight);
-			}
-			maxHeight = Math.max(maxHeight, 80);
 			const rightEdge = window.innerWidth - rect.right;
-			panelStyle = `top:${top}px;right:${rightEdge}px;max-height:${maxHeight}px`;
+
+			// Start below the button, then slide up as needed so the panel stays on screen
+			let top = rect.bottom + 4;
+			top = Math.min(top, window.innerHeight - panelH - MARGIN);
+			top = Math.max(top, MARGIN);
+
+			panelStyle = `top:${top}px;right:${rightEdge}px;max-height:${window.innerHeight - 2 * MARGIN}px`;
 		}
 		open = !open;
 	}
