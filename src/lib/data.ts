@@ -127,6 +127,8 @@ export function isListEffectivelyArchived(list: ListMeta, folders: Folder[]): bo
 
 // ─── Lists ────────────────────────────────────────────────────────────────────
 
+export type FilterView = 'all' | 'unchecked' | 'checked';
+
 export interface ListMeta {
 	id: string;
 	name: string;
@@ -141,6 +143,7 @@ export interface ListMeta {
 	archivedNextId: string | null;
 	createdAt: string | null;
 	updatedAt: string | null;
+	filterView: FilterView;
 }
 
 export function readLists(): ListMeta[] {
@@ -161,7 +164,8 @@ function yMapToList(m: Y.Map<unknown>): ListMeta {
 		archivedPrevId: (m.get('archivedPrevId') as string | null) ?? null,
 		archivedNextId: (m.get('archivedNextId') as string | null) ?? null,
 		createdAt: (m.get('createdAt') as string | null) ?? null,
-		updatedAt: (m.get('updatedAt') as string | null) ?? null
+		updatedAt: (m.get('updatedAt') as string | null) ?? null,
+		filterView: (m.get('filterView') as FilterView) ?? 'all'
 	};
 }
 

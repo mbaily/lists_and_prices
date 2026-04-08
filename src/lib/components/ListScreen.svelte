@@ -15,7 +15,8 @@
 		reorderSiblings,
 		isListEffectivelyArchived,
 		type Item,
-		type ListMeta
+		type ListMeta,
+		type FilterView
 	} from '$lib/data';
 	import { settings } from '$lib/settings.svelte';
 	import NumericKeypad from './NumericKeypad.svelte';
@@ -145,6 +146,15 @@
 		return result;
 	}
 	const treeItems = $derived(buildTreeOrder(items));
+	const filterView = $derived<FilterView>(listMeta?.filterView ?? 'all');
+	const filteredTreeItems = $derived(
+		filterView === 'all'
+			? treeItems
+			: treeItems.filter(({ item }) =>
+				item.heading || item.note ||
+				(filterView === 'checked' ? item.checked : !item.checked)
+			)
+	);
 	const checkedCount = $derived(items.filter((i) => !i.heading && !i.note && i.checked).length);
 	const uncheckedCount = $derived(items.filter((i) => !i.heading && !i.note && !i.checked).length);
 	// Count of items that "Del checked" would actually delete
@@ -377,6 +387,11 @@
 
 	// ── Bulk actions ─────────────────────────────────────────────────────────────
 	let selectedIds = $state<Set<string>>(new Set());
+
+	function cycleFilter() {
+		const next: FilterView = filterView === 'all' ? 'unchecked' : filterView === 'unchecked' ? 'checked' : 'all';
+		updateList(listId, { filterView: next });
+	}
 
 	function toggleSelect(id: string) {
 		const next = new Set(selectedIds);
@@ -787,6 +802,14 @@
 				bulkDeleteChecked
 			)}>Del checked</button>
 		{/if}
+		{#if items.some((i) => i.checked)}
+			<button
+				class="bulk-btn filter-btn"
+				class:filter-active={filterView !== 'all'}
+				onclick={cycleFilter}
+				title="Filter: show all, unchecked only, or checked only"
+			>{filterView === 'all' ? 'All' : filterView === 'unchecked' ? '✗ only' : '✓ only'}</button>
+		{/if}
 	</div>
 
 	<!-- Item list (fav-bar is first child — it scrolls away naturally) -->
@@ -804,7 +827,7 @@
 				{/each}
 			</div>
 		{/if}
-		{#each treeItems as {item, level, tlIdx, rootTlIdx, sibIdx}}
+		{#each filteredTreeItems as {item, level, tlIdx, rootTlIdx, sibIdx}}
 			{@const canAddChildren = !item.note && !item.heading && level < 2}
 			{@const linkParts = parseNameParts(item.name)}
 			{@const parentKey = item.parentId ?? '__top__'}
@@ -1176,6 +1199,8 @@
 		cursor: pointer;
 	}
 	.bulk-btn.danger { color: #ef4444; border-color: #ef4444; }
+	.bulk-btn.filter-btn { margin-left: auto; }
+	.bulk-btn.filter-active { color: var(--accent); border-color: var(--accent); }
 	.item-list {
 		flex: 1;
 		overflow-x: hidden;
