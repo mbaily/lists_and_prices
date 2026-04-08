@@ -792,15 +792,15 @@
 		{/if}
 		<span class="check-counts">✓ {checkedCount} / ✗ {uncheckedCount}</span>
 		{#if items.some((i) => i.checked)}
-			<button class="bulk-btn" onclick={bulkUncheck}>Uncheck{selectedIds.size > 0 ? ' sel.' : ' all'}</button>
+			<button class="bulk-btn icon-btn" onclick={bulkUncheck} title={selectedIds.size > 0 ? 'Uncheck selected' : 'Uncheck all'} aria-label={selectedIds.size > 0 ? 'Uncheck selected' : 'Uncheck all'}>☐</button>
 		{/if}
 		{#if delCheckedCount > 0}
-			<button class="bulk-btn danger" onclick={() => askDelete(
+			<button class="bulk-btn icon-btn danger" onclick={() => askDelete(
 				selectedIds.size > 0
 					? `Delete ${delCheckedCount} checked item(s)?`
 					: `Delete all ${checkedCount} checked item(s)?`,
 				bulkDeleteChecked
-			)}>Del checked</button>
+			)} title={selectedIds.size > 0 ? 'Delete selected checked' : 'Delete all checked'} aria-label={selectedIds.size > 0 ? 'Delete selected checked' : 'Delete all checked'}>🗑</button>
 		{/if}
 		{#if items.some((i) => i.checked)}
 			<button
@@ -1181,14 +1181,14 @@
 	.summary-bar {
 		display: flex;
 		align-items: center;
-		gap: 0.75rem;
-		padding: 0.5rem 1rem;
+		gap: 0.5rem;
+		padding: 0.35rem 0.75rem;
 		background: var(--bg3);
 		font-size: 0.85rem;
 		flex-shrink: 0;
-		flex-wrap: wrap;
+		overflow: hidden;
 	}
-	.check-counts { color: var(--text2); }
+	.check-counts { color: var(--text2); white-space: nowrap; }
 	.bulk-btn {
 		padding: 0.25rem 0.6rem;
 		border: 1px solid var(--border);
@@ -1197,6 +1197,13 @@
 		color: var(--text);
 		font-size: 0.8rem;
 		cursor: pointer;
+		white-space: nowrap;
+		flex-shrink: 0;
+	}
+	.bulk-btn.icon-btn {
+		padding: 0.2rem 0.5rem;
+		font-size: 1rem;
+		line-height: 1;
 	}
 	.bulk-btn.danger { color: #ef4444; border-color: #ef4444; }
 	.bulk-btn.filter-btn { margin-left: auto; }
