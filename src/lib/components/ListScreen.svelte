@@ -476,6 +476,7 @@
 	// ── Copy as TSV (for pasting into Google Sheets) ──────────────────────────────
 	let showHeaderMenu = $state(false);
 	let copyStatus = $state<'idle' | 'copied' | 'error'>('idle');
+	let copyMessage = $state('');
 
 	async function copyAsTSV() {
 		const name = listMeta?.name ?? 'List';
@@ -537,9 +538,48 @@
 		const tsv = rows.join('\n');
 		try {
 			await navigator.clipboard.writeText(tsv);
+			copyMessage = '✓ Copied! Paste into Google Sheets.';
 			copyStatus = 'copied';
 			setTimeout(() => { copyStatus = 'idle'; }, 2000);
 		} catch {
+			copyMessage = '✗ Clipboard access denied.';
+			copyStatus = 'error';
+			setTimeout(() => { copyStatus = 'idle'; }, 3000);
+		}
+		showHeaderMenu = false;
+	}
+
+	// ── Copy as journal ───────────────────────────────────────────────────────────
+	function fmtJournalDate(iso: string | null | undefined): string {
+		if (!iso) return '';
+		const d = new Date(iso);
+		const day = d.getDate();
+		const month = d.getMonth() + 1;
+		const year = d.getFullYear();
+		const hours = d.getHours();
+		const minutes = d.getMinutes();
+		const ampm = hours >= 12 ? 'PM' : 'AM';
+		const h12 = hours % 12 || 12;
+		const mm = String(minutes).padStart(2, '0');
+		return `${day}/${month}/${year} ${h12}:${mm}${ampm}`;
+	}
+
+	async function copyAsJournal() {
+		const lines: string[] = [];
+		for (const { item } of treeItems) {
+			if (item.heading) continue;
+			const dateStr = fmtJournalDate(item.createdAt);
+			const prefix = dateStr ? `${dateStr} ` : '';
+			lines.push(`  * ${prefix}${item.name}`);
+		}
+		const text = lines.join('\n');
+		try {
+			await navigator.clipboard.writeText(text);
+			copyMessage = '✓ Copied as journal!';
+			copyStatus = 'copied';
+			setTimeout(() => { copyStatus = 'idle'; }, 2000);
+		} catch {
+			copyMessage = '✗ Clipboard access denied.';
 			copyStatus = 'error';
 			setTimeout(() => { copyStatus = 'idle'; }, 3000);
 		}
@@ -674,6 +714,7 @@
 			{#if showHeaderMenu}
 				<div class="header-menu" role="menu">
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsTSV(); }}>📋 Copy as spreadsheet</button>
+					<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsJournal(); }}>📓 Copy as journal</button>
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; importFromClipboard(); }}>📥 Import from clipboard</button>
 				</div>
 			{/if}
@@ -687,7 +728,7 @@
 
 	{#if copyStatus !== 'idle'}
 		<div class="copy-toast" class:error={copyStatus === 'error'}>
-			{copyStatus === 'copied' ? '✓ Copied! Paste into Google Sheets.' : '✗ Clipboard access denied.'}
+			{copyMessage}
 		</div>
 	{/if}
 
