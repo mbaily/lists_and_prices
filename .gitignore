@@ -1,3 +1,8 @@
+# Python
+.venv/
+
+dist
+
 node_modules
 
 # Output
@@ -18,6 +23,7 @@ Thumbs.db
 !.env.example
 !.env.test
 
+
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
@@ -34,3 +40,4 @@ server/server.db
 *.ntvs*
 *.njsproj
 *.sln
+
