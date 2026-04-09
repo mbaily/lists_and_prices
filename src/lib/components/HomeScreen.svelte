@@ -243,6 +243,18 @@
 	let currentFolderColor = $derived(
 		allFolders.find((f) => f.id === currentFolderId)?.color ?? '#6366f1'
 	);
+	// Whether the current folder renders sub-folders above lists (default true)
+	const currentFolderFoldersFirst = $derived(
+		currentFolderId === null
+			? true
+			: (allFolders.find((f) => f.id === currentFolderId)?.foldersFirst ?? true)
+	);
+	// Returns true if a folder has at least one visible child folder AND one visible child list
+	function folderHasBothKinds(folderId: string): boolean {
+		const hasKids = allFolders.some((f) => f.parentId === folderId && !isFolderEffectivelyArchived(f.id, allFolders));
+		const hasLists = allLists.some((l) => l.folderId === folderId && !isListEffectivelyArchived(l, allFolders));
+		return hasKids && hasLists;
+	}
 
 	// ── Spreadsheets ─────────────────────────────────────────────────────────────
 	let allSheets = $derived.by(() => {
@@ -1014,6 +1026,8 @@ ${bodyHtml}
 			</div>
 		{/if}
 
+		<!-- Folders and Lists — order controlled by parent folder's foldersFirst setting -->
+		{#snippet folderRows()}
 		<!-- Folders -->
 		{#each childFolders as folder, i}
 			{@const isPathThrough = isInArchiveView && pathThroughFolderIds.has(folder.id) && !folder.archived}
@@ -1067,6 +1081,9 @@ ${bodyHtml}
 						{ label: 'ℹ️ Info', action: () => infoTarget = { kind: 'folder', data: folder } },
 						{ label: '✏ Rename', action: () => startRename(folder.id, folder.name, 'folder', folder.color) },
 						{ label: '📋 Smart Folder', action: () => { sfDialogFolder = folder; sfNewName = ''; } },
+						...(folderHasBothKinds(folder.id)
+							? [{ label: folder.foldersFirst ? '📋 Lists first' : '📁 Folders first', action: () => updateFolder(folder.id, { foldersFirst: !folder.foldersFirst }) }]
+							: []),
 						{ label: folder.archived ? '📤 Unarchive' : '📥 Archive', action: () => folder.archived ? unarchiveFolder(folder.id) : archiveFolder(folder.id) },
 						...(hasTag && taggedFolderId !== folder.id
 							? [{ label: '📂 Move Tagged Here', action: () => moveTaggedTo(folder.id) }]
@@ -1079,7 +1096,9 @@ ${bodyHtml}
 				{/if}
 			</div>
 		{/each}
+		{/snippet}
 
+		{#snippet listRows()}
 		<!-- Lists -->
 		{#each childLists as list, i}
 			<div
@@ -1133,6 +1152,15 @@ ${bodyHtml}
 				]} />
 			</div>
 		{/each}
+		{/snippet}
+
+		{#if currentFolderFoldersFirst}
+			{@render folderRows()}
+			{@render listRows()}
+		{:else}
+			{@render listRows()}
+			{@render folderRows()}
+		{/if}
 
 		<!-- Spreadsheets -->
 		{#each childSheets as sheet}

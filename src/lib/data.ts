@@ -25,6 +25,7 @@ export interface Folder {
 	archivedNextId: string | null;
 	createdAt: string | null;
 	updatedAt: string | null;
+	foldersFirst: boolean;
 }
 
 export function readFolders(): Folder[] {
@@ -44,7 +45,8 @@ function yMapToFolder(m: Y.Map<unknown>): Folder {
 		archivedPrevId: (m.get('archivedPrevId') as string | null) ?? null,
 		archivedNextId: (m.get('archivedNextId') as string | null) ?? null,
 		createdAt: (m.get('createdAt') as string | null) ?? null,
-		updatedAt: (m.get('updatedAt') as string | null) ?? null
+		updatedAt: (m.get('updatedAt') as string | null) ?? null,
+		foldersFirst: (m.get('foldersFirst') as boolean) ?? true
 	};
 }
 
@@ -69,6 +71,7 @@ export function createFolder(name: string, parentId: string | null, color = '#63
 		m.set('done', false);
 		m.set('favourite', false);
 		m.set('archived', false);
+		m.set('foldersFirst', true);
 		m.set('createdAt', now);
 		m.set('updatedAt', now);
 		folders.push([m]);

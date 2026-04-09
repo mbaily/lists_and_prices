@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { auth, checkSession } from '$lib/auth.svelte';
 	import { initYjs, destroyYjs } from '$lib/yjsStore.svelte';
 	import { reloadSettings } from '$lib/settings.svelte';
 	import SmartFolderReportScreen from '$lib/components/SmartFolderReportScreen.svelte';
 
-	const reportName = $derived(decodeURIComponent($page.params.name));
+	const reportName = $derived(decodeURIComponent(page.params.name));
 
 	let ready = $state(false);
 	let authed = $state(false);
