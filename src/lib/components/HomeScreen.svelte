@@ -436,18 +436,20 @@
 	// ── Rename ───────────────────────────────────────────────────────────────────
 	let renamingId = $state<string | null>(null);
 	let renameValue = $state('');
+	let renameColor = $state('#6366f1');
 	let renameTarget = $state<'folder' | 'list' | 'sheet'>('folder');
 
-	function startRename(id: string, current: string, target: 'folder' | 'list' | 'sheet') {
+	function startRename(id: string, current: string, target: 'folder' | 'list' | 'sheet', color = '#6366f1') {
 		renamingId = id;
 		renameValue = current;
+		renameColor = color;
 		renameTarget = target;
 	}
 
 	function submitRename() {
 		if (renamingId && renameValue.trim()) {
-			if (renameTarget === 'folder') updateFolder(renamingId, { name: renameValue.trim() });
-			else if (renameTarget === 'list') updateList(renamingId, { name: renameValue.trim() });
+			if (renameTarget === 'folder') updateFolder(renamingId, { name: renameValue.trim(), color: renameColor });
+			else if (renameTarget === 'list') updateList(renamingId, { name: renameValue.trim(), color: renameColor });
 			else if (renameTarget === 'sheet') updateSheet(renamingId, { name: renameValue.trim() });
 		}
 		// Always close the rename input, even if empty (discard)
@@ -1019,13 +1021,19 @@ ${bodyHtml}
 					</button>
 				{/if}
 				{#if renamingId === folder.id}
-					<input
-						class="rename-input"
-						bind:value={renameValue}
-						onblur={submitRename}
-						onkeydown={(e) => e.key === 'Enter' && submitRename()}
-						autofocus
-					/>
+					<div class="rename-wrap">
+						<input
+							class="rename-input"
+							bind:value={renameValue}
+							onkeydown={(e) => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') renamingId = null; }}
+							autofocus
+						/>
+						<ColorPicker bind:value={renameColor} />
+						<div class="rename-actions">
+							<button class="rename-ok" onclick={submitRename}>✓</button>
+							<button class="rename-cancel" onclick={() => renamingId = null}>✕</button>
+						</div>
+					</div>
 				{:else}
 					<button
 						class="row-name"
@@ -1044,7 +1052,7 @@ ${bodyHtml}
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'folder', i)}>☰</button>
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoTarget = { kind: 'folder', data: folder } },
-						{ label: '✏ Rename', action: () => startRename(folder.id, folder.name, 'folder') },
+						{ label: '✏ Rename', action: () => startRename(folder.id, folder.name, 'folder', folder.color) },
 						{ label: '📋 Smart Folder', action: () => { sfDialogFolder = folder; sfNewName = ''; } },
 						{ label: folder.archived ? '📤 Unarchive' : '📥 Archive', action: () => folder.archived ? unarchiveFolder(folder.id) : archiveFolder(folder.id) },
 						...(hasTag && taggedFolderId !== folder.id
@@ -1076,13 +1084,19 @@ ${bodyHtml}
 					{list.done ? '☑' : '☐'}
 				</button>
 				{#if renamingId === list.id}
-					<input
-						class="rename-input"
-						bind:value={renameValue}
-						onblur={submitRename}
-						onkeydown={(e) => e.key === 'Enter' && submitRename()}
-						autofocus
-					/>
+					<div class="rename-wrap">
+						<input
+							class="rename-input"
+							bind:value={renameValue}
+							onkeydown={(e) => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') renamingId = null; }}
+							autofocus
+						/>
+						<ColorPicker bind:value={renameColor} />
+						<div class="rename-actions">
+							<button class="rename-ok" onclick={submitRename}>✓</button>
+							<button class="rename-cancel" onclick={() => renamingId = null}>✕</button>
+						</div>
+					</div>
 				{:else}
 					<button class="row-name" onclick={() => { openListId = list.id; renamingId = null; }}>
 						{list.type === 'priced' ? '💰' : '📋'} {list.name}
@@ -1097,7 +1111,7 @@ ${bodyHtml}
 				<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'list', i)}>☰</button>
 				<RowMenu items={[
 					{ label: 'ℹ️ Info', action: () => infoTarget = { kind: 'list', data: list } },
-					{ label: '✏ Rename', action: () => startRename(list.id, list.name, 'list') },
+					{ label: '✏ Rename', action: () => startRename(list.id, list.name, 'list', list.color) },
 					{ label: list.archived ? '📤 Unarchive' : '📥 Archive', action: () => list.archived ? unarchiveList(list.id) : archiveList(list.id) },
 					...(hasTag
 						? [{ label: '✕ Clear Tag', action: clearTag }]
@@ -1494,15 +1508,40 @@ ${bodyHtml}
 		padding: 0;
 	}
 	.drag-handle:active { color: var(--accent); }
-	.rename-input {
+	.rename-wrap {
 		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+		padding: 0.4rem;
+		background: var(--bg2);
+		border: 1px solid var(--accent);
+		border-radius: 8px;
+	}
+	.rename-input {
+		width: 100%;
 		border: 1px solid var(--accent);
 		border-radius: 6px;
 		padding: 0.3rem 0.5rem;
 		font-size: 1rem;
-		background: var(--bg2);
+		background: var(--bg);
 		color: var(--text);
+		box-sizing: border-box;
 	}
+	.rename-actions {
+		display: flex;
+		gap: 0.4rem;
+	}
+	.rename-ok, .rename-cancel {
+		flex: 1;
+		padding: 0.3rem;
+		border-radius: 6px;
+		border: none;
+		font-size: 1rem;
+		cursor: pointer;
+	}
+	.rename-ok { background: var(--accent); color: #fff; }
+	.rename-cancel { background: var(--bg); color: var(--text); border: 1px solid var(--border, #ccc); }
 	.action-bar {
 		display: flex;
 		gap: 0.75rem;
