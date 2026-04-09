@@ -29,6 +29,7 @@
 	} from '$lib/data';
 	import { syncState, docState } from '$lib/yjsStore.svelte';
 	import { settings } from '$lib/settings.svelte';
+	import { smartFolders, assignToReport, removeFromReport } from '$lib/smartFolders.svelte';
 	import ListScreen from './ListScreen.svelte';
 	import SpreadsheetScreen from './SpreadsheetScreen.svelte';
 	import ColorPicker from './ColorPicker.svelte';
@@ -600,8 +601,91 @@
 		// Do NOT clear the tag — the user navigates specifically to find the move target
 	});
 
+	// ── Smart folders (reports) ──────────────────────────────────────────────────
+	let sfDialogFolder = $state<Folder | null>(null);
+	let sfNewName = $state('');
+	let showReportsMenu = $state(false);
+
+	function sfReportNames(): string[] {
+		return Object.keys(smartFolders).sort();
+	}
+
+	function generateReport(reportName: string) {
+		showReportsMenu = false;
+		const folderIds: string[] = smartFolders[reportName] ?? [];
+		const now = new Date();
+		const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+		const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+		const lines: string[] = [
+			`SMART FOLDER: ${reportName}`,
+			`Generated: ${dateStr} ${timeStr}`,
+			''
+		];
+
+		const reportFolders = allFolders
+			.filter((f) => folderIds.includes(f.id) && !isFolderEffectivelyArchived(f.id, allFolders));
+		const allItemsNow = readAllItems();
+		let hasAny = false;
+
+		for (const folder of reportFolders) {
+			const folderLists = allLists
+				.filter((l) => l.folderId === folder.id && !isListEffectivelyArchived(l, allFolders))
+				.sort((a, b) => a.order - b.order);
+
+			type TodoEntry = { name: string; listName: string; createdAt: string | null };
+			const todos: TodoEntry[] = [];
+
+			for (const list of folderLists) {
+				const items = allItemsNow.filter((i) =>
+					i.listId === list.id && !i.checked && !i.heading && !i.note
+				);
+				for (const item of items) {
+					todos.push({ name: item.name, listName: list.name, createdAt: item.createdAt });
+				}
+			}
+
+			// Sort by creation date descending within the folder
+			todos.sort((a, b) => {
+				const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+				const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+				return db - da;
+			});
+
+			if (todos.length === 0) continue;
+			hasAny = true;
+			lines.push(`=== ${folder.name} ===`);
+			for (const todo of todos) {
+				const d = todo.createdAt
+					? new Date(todo.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })
+					: '';
+				lines.push(`  [${todo.listName}] ${todo.name}${d ? `  (${d})` : ''}`);
+			}
+			lines.push('');
+		}
+
+		if (!hasAny) lines.push('(No uncompleted todos found)');
+
+		const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `${reportName.replace(/[^a-z0-9]+/gi, '_')}_${now.toISOString().slice(0, 10)}.txt`;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		setTimeout(() => URL.revokeObjectURL(url), 10000);
+	}
+
+	$effect(() => {
+		if (!showReportsMenu) return;
+		function dismiss(e: PointerEvent) {
+			if (!(e.target as HTMLElement)?.closest('.reports-wrap')) showReportsMenu = false;
+		}
+		document.addEventListener('pointerdown', dismiss, { capture: true });
+		return () => document.removeEventListener('pointerdown', dismiss, { capture: true });
+	});
+
 	// ── URL hash sync ────────────────────────────────────────────────────────────
-	// Keep the address bar in sync so the page can be refreshed without losing state.
 	// Use pushState so the browser back button works between navigations.
 	let _lastHash = typeof window !== 'undefined' ? window.location.hash : '';
 	$effect(() => {
@@ -691,6 +775,19 @@
 					<button class="icon-btn" onclick={() => (breadcrumb = [...breadcrumb, ARCHIVE_ID])} aria-label="Archived">
 						📦
 					</button>
+				{/if}
+				{#if sfReportNames().length > 0}
+					<div class="reports-wrap">
+						<button class="icon-btn" onclick={() => showReportsMenu = !showReportsMenu} aria-label="Smart Folder Reports">📋</button>
+						{#if showReportsMenu}
+							<div class="reports-menu">
+								<div class="reports-header">Smart Folders</div>
+								{#each sfReportNames() as rname}
+									<button class="reports-item" onclick={() => generateReport(rname)}>{rname}</button>
+								{/each}
+							</div>
+						{/if}
+					</div>
 				{/if}
 				<SyncBadge status={syncState.status} />
 				<button class="icon-btn" onclick={() => (showSettings = true)} aria-label="Settings">
@@ -860,6 +957,7 @@
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoTarget = { kind: 'folder', data: folder } },
 						{ label: '✏ Rename', action: () => startRename(folder.id, folder.name, 'folder') },
+						{ label: '📋 Smart Folder', action: () => { sfDialogFolder = folder; sfNewName = ''; } },
 						{ label: folder.archived ? '📤 Unarchive' : '📥 Archive', action: () => folder.archived ? unarchiveFolder(folder.id) : archiveFolder(folder.id) },
 						...(hasTag && taggedFolderId !== folder.id
 							? [{ label: '📂 Move Tagged Here', action: () => moveTaggedTo(folder.id) }]
@@ -996,6 +1094,46 @@
 				onConfirm={() => { confirmAction?.(); confirmAction = null; }}
 				onCancel={() => (confirmAction = null)}
 			/>
+		{/if}
+
+		<!-- Smart folder assign dialog -->
+		{#if sfDialogFolder !== null}
+			{@const fid = sfDialogFolder.id}
+			<div class="sf-backdrop" role="dialog" aria-modal="true"
+				onclick={(e) => { if (e.target === e.currentTarget) sfDialogFolder = null; }}>
+				<div class="sf-dialog">
+					<div class="sf-title">📋 Smart Folders</div>
+					<div class="sf-folder-name">📁 {sfDialogFolder.name}</div>
+					{#if sfReportNames().length > 0}
+						<div class="sf-section">Assign to report:</div>
+						<div class="sf-list">
+							{#each sfReportNames() as rname}
+								{@const assigned = (smartFolders[rname] ?? []).includes(fid)}
+								<button
+									class="sf-opt"
+									class:sf-opt-active={assigned}
+									onclick={() => assigned ? removeFromReport(fid, rname) : assignToReport(fid, rname)}
+								>{assigned ? '☑' : '☐'} {rname}</button>
+							{/each}
+						</div>
+					{/if}
+					<div class="sf-section">New report name:</div>
+					<div class="sf-new-row">
+						<input
+							class="sf-input"
+							bind:value={sfNewName}
+							placeholder="Report name…"
+							onkeydown={(e) => { if (e.key === 'Enter' && sfNewName.trim()) { assignToReport(fid, sfNewName.trim()); sfNewName = ''; } }}
+						/>
+						<button
+							class="sf-add-btn"
+							onclick={() => { if (sfNewName.trim()) { assignToReport(fid, sfNewName.trim()); sfNewName = ''; } }}
+							disabled={!sfNewName.trim()}
+						>Add</button>
+					</div>
+					<button class="sf-close" onclick={() => sfDialogFolder = null}>Done</button>
+				</div>
+			</div>
 		{/if}
 
 		<!-- Info dialog -->
@@ -1498,5 +1636,138 @@
 		padding: 0.1rem 0.4rem;
 		flex-shrink: 0;
 		white-space: nowrap;
+	}
+	/* ── Reports dropdown ────────────────────────────────────────────────────── */
+	.reports-wrap {
+		position: relative;
+	}
+	.reports-menu {
+		position: fixed;
+		top: 52px;
+		right: 52px;
+		background: var(--bg);
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+		min-width: 180px;
+		z-index: 90;
+		overflow: hidden;
+	}
+	.reports-header {
+		padding: 0.55rem 1rem 0.35rem;
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: var(--text2);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		border-bottom: 1px solid var(--border);
+	}
+	.reports-item {
+		display: block;
+		width: 100%;
+		background: none;
+		border: none;
+		text-align: left;
+		padding: 0.8rem 1rem;
+		font-size: 0.95rem;
+		color: var(--text);
+		cursor: pointer;
+		border-bottom: 1px solid var(--border);
+	}
+	.reports-item:last-child { border-bottom: none; }
+	.reports-item:hover { background: var(--bg2); }
+	/* ── Smart folder assign dialog ──────────────────────────────────────────── */
+	.sf-backdrop {
+		position: fixed;
+		inset: 0;
+		background: rgba(0,0,0,0.5);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 100;
+		padding: 1rem;
+	}
+	.sf-dialog {
+		background: var(--bg);
+		border-radius: 16px;
+		padding: 1.25rem;
+		max-width: 320px;
+		width: 100%;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+	.sf-title {
+		font-size: 1rem;
+		font-weight: 700;
+		margin-bottom: 0.1rem;
+	}
+	.sf-folder-name {
+		font-size: 0.9rem;
+		color: var(--text2);
+		margin-bottom: 0.25rem;
+	}
+	.sf-section {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: var(--text2);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		margin-top: 0.25rem;
+	}
+	.sf-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+	}
+	.sf-opt {
+		background: none;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 0.55rem 0.75rem;
+		text-align: left;
+		font-size: 0.9rem;
+		color: var(--text);
+		cursor: pointer;
+	}
+	.sf-opt.sf-opt-active {
+		border-color: var(--accent);
+		color: var(--accent);
+		background: color-mix(in srgb, var(--accent) 8%, transparent);
+	}
+	.sf-new-row {
+		display: flex;
+		gap: 0.4rem;
+	}
+	.sf-input {
+		flex: 1;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 0.5rem 0.65rem;
+		font-size: 0.9rem;
+		background: var(--bg2);
+		color: var(--text);
+	}
+	.sf-add-btn {
+		background: var(--accent);
+		color: #fff;
+		border: none;
+		border-radius: 8px;
+		padding: 0.5rem 0.85rem;
+		font-size: 0.9rem;
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.sf-add-btn:disabled { opacity: 0.4; cursor: default; }
+	.sf-close {
+		background: var(--bg3);
+		border: none;
+		border-radius: 10px;
+		padding: 0.7rem;
+		font-size: 0.95rem;
+		font-weight: 600;
+		cursor: pointer;
+		color: var(--text);
+		margin-top: 0.25rem;
 	}
 </style>
