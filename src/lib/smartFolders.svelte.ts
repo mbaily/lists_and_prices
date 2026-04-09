@@ -32,10 +32,11 @@ function readAll(): Record<string, string[]> {
 export type SmartFolderMap = Record<string, string[]>;
 
 // Re-derive on every Yjs update tick so the UI stays reactive.
-export const smartFolders: SmartFolderMap = $derived.by(() => {
+const _smartFolders: SmartFolderMap = $derived.by(() => {
 	void docState.version; // subscribe to Yjs updates
 	return readAll();
 });
+export function getSmartFolders(): SmartFolderMap { return _smartFolders; }
 
 export function assignToReport(folderId: string, reportName: string) {
 	const m = getYMap();

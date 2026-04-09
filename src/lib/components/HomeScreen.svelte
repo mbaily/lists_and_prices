@@ -29,7 +29,7 @@
 	} from '$lib/data';
 	import { syncState, docState } from '$lib/yjsStore.svelte';
 	import { settings } from '$lib/settings.svelte';
-	import { smartFolders, assignToReport, removeFromReport, deleteReport } from '$lib/smartFolders.svelte';
+	import { getSmartFolders, assignToReport, removeFromReport, deleteReport } from '$lib/smartFolders.svelte';
 	import ListScreen from './ListScreen.svelte';
 	import SpreadsheetScreen from './SpreadsheetScreen.svelte';
 	import ColorPicker from './ColorPicker.svelte';
@@ -607,12 +607,12 @@
 	let showReportsMenu = $state(false);
 
 	function sfReportNames(): string[] {
-		return Object.keys(smartFolders).sort();
+		return Object.keys(getSmartFolders()).sort();
 	}
 
 	function generateReport(reportName: string) {
 		showReportsMenu = false;
-		const folderIds: string[] = smartFolders[reportName] ?? [];
+		const folderIds: string[] = getSmartFolders()[reportName] ?? [];
 		const now = new Date();
 		const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 		const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
@@ -1196,7 +1196,7 @@ ${bodyHtml}
 						<div class="sf-section">Assign to report:</div>
 						<div class="sf-list">
 							{#each sfReportNames() as rname}
-								{@const assigned = (smartFolders[rname] ?? []).includes(fid)}
+								{@const assigned = (getSmartFolders()[rname] ?? []).includes(fid)}
 								<div class="sf-opt-row">
 									<button
 										class="sf-opt"
