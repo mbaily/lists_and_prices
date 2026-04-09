@@ -240,6 +240,10 @@ export function readItems(listId: string): Item[] {
 		.sort((a, b) => a.order - b.order);
 }
 
+export function readAllItems(): Item[] {
+	return (getItems(getDoc()).toArray() as Y.Map<unknown>[]).map(yMapToItem);
+}
+
 function yMapToItem(m: Y.Map<unknown>): Item {
 	return {
 		id: m.get('id') as string,

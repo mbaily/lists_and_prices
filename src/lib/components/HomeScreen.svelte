@@ -1,7 +1,9 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import {
 		readFolders,
 		readLists,
+		readAllItems,
 		createFolder,
 		createList,
 		deleteFolder,
@@ -22,7 +24,8 @@
 		updateSheet,
 		type Folder,
 		type ListMeta,
-		type SheetMeta
+		type SheetMeta,
+		type Item
 	} from '$lib/data';
 	import { syncState, docState } from '$lib/yjsStore.svelte';
 	import ListScreen from './ListScreen.svelte';
@@ -71,6 +74,11 @@
 	let openListId = $state<string | null>(_init.openListId);
 	let showSettings = $state(false);
 
+	// ── Search ────────────────────────────────────────────────────────────────────
+	let showSearch = $state(false);
+	let searchQuery = $state('');
+	let searchInputEl: HTMLInputElement | null = null;
+
 	// ── Live data (re-read on every Yjs change) ─────────────────────────────────
 	// docState.version increments on every Yjs update, making these $derived re-run.
 	let allFolders = $derived.by(() => {
@@ -80,6 +88,37 @@
 	let allLists = $derived.by(() => {
 		void docState.version;
 		try { return readLists(); } catch { return []; }
+	});
+	let allItems = $derived.by(() => {
+		if (!showSearch) return [] as Item[];
+		void docState.version;
+		try { return readAllItems(); } catch { return [] as Item[]; }
+	});
+
+	// ── Search results ────────────────────────────────────────────────────────────
+	type SearchResult =
+		| { kind: 'folder'; data: Folder; path: string }
+		| { kind: 'list'; data: ListMeta; path: string }
+		| { kind: 'item'; data: Item; listData: ListMeta };
+	let searchResults = $derived.by((): SearchResult[] => {
+		const q = searchQuery.trim().toLowerCase();
+		if (!q) return [];
+		const results: SearchResult[] = [];
+		for (const folder of allFolders) {
+			if (folder.name.toLowerCase().includes(q))
+				results.push({ kind: 'folder', data: folder, path: folderPath(folder) });
+		}
+		for (const list of allLists) {
+			if (list.name.toLowerCase().includes(q))
+				results.push({ kind: 'list', data: list, path: listPath(list) });
+		}
+		for (const item of allItems) {
+			if (item.name.toLowerCase().includes(q)) {
+				const list = allLists.find(l => l.id === item.listId);
+				if (list) results.push({ kind: 'item', data: item, listData: list });
+			}
+		}
+		return results;
 	});
 
 	// Special virtual folder id for the Archived view
@@ -483,6 +522,35 @@
 	// ── First-launch guard ───────────────────────────────────────────────────────
 	let showFirstLaunch = $derived(allFolders.length === 0 && !showNewFolder);
 
+	// ── Search actions ────────────────────────────────────────────────────────────
+	function toggleSearch() {
+		showSearch = !showSearch;
+		if (!showSearch) searchQuery = '';
+		else tick().then(() => searchInputEl?.focus());
+	}
+
+	function openSearchResult(result: SearchResult) {
+		showSearch = false;
+		searchQuery = '';
+		if (result.kind === 'folder') {
+			const visited = new Set<string>();
+			const ids: string[] = [];
+			let cur: string | null = result.data.id;
+			while (cur !== null) {
+				if (visited.has(cur)) break;
+				visited.add(cur);
+				ids.unshift(cur);
+				const f = allFolders.find(x => x.id === cur);
+				cur = f?.parentId ?? null;
+			}
+			breadcrumb = [null, ...ids];
+		} else if (result.kind === 'list') {
+			openListId = result.data.id;
+		} else {
+			openListId = result.listData.id;
+		}
+	}
+
 	$effect(() => {
 		void currentFolderId; // track navigation
 		renamingId = null;
@@ -576,8 +644,29 @@
 				<button class="icon-btn" onclick={() => (showSettings = true)} aria-label="Settings">
 					⚙
 				</button>
+				<button class="icon-btn" class:search-active={showSearch} onclick={toggleSearch} aria-label={showSearch ? 'Close search' : 'Search'}>
+					🔍
+				</button>
 			</div>
 		</header>
+
+		{#if showSearch}
+			<div class="search-bar">
+				<input
+					bind:this={searchInputEl}
+					bind:value={searchQuery}
+					type="search"
+					class="search-input"
+					placeholder="Search folders, lists, items…"
+					autocomplete="off"
+					autocorrect="off"
+					spellcheck={false}
+				/>
+				{#if searchQuery}
+					<button class="search-clear" onclick={() => searchQuery = ''} aria-label="Clear search">✕</button>
+				{/if}
+			</div>
+		{/if}
 
 		<!-- Favourites bar -->
 		{#if favouriteLists.length > 0 || favouriteFolders.length > 0}
@@ -613,6 +702,39 @@
 
 		<!-- Up button -->
 		<div class="content">
+		{#if showSearch && searchQuery.trim()}
+			<!-- Search results -->
+			{#if searchResults.length === 0}
+				<div class="search-empty">No results for "{searchQuery.trim()}"</div>
+			{:else}
+				{#each searchResults as result}
+					<button class="search-result-row" onclick={() => openSearchResult(result)}>
+						{#if result.kind === 'folder'}
+							<span class="result-icon">📁</span>
+							<span class="result-info">
+								<span class="result-name">{result.data.name}</span>
+								<span class="result-path">{result.path}</span>
+							</span>
+							<span class="result-kind-badge">Folder</span>
+						{:else if result.kind === 'list'}
+							<span class="result-icon">{result.data.type === 'priced' ? '💰' : '📋'}</span>
+							<span class="result-info">
+								<span class="result-name">{result.data.name}</span>
+								<span class="result-path">{result.path}</span>
+							</span>
+							<span class="result-kind-badge">List</span>
+						{:else}
+							<span class="result-icon">📄</span>
+							<span class="result-info">
+								<span class="result-name">{result.data.name}</span>
+								<span class="result-path">{result.listData.name}</span>
+							</span>
+							<span class="result-kind-badge">Item</span>
+						{/if}
+					</button>
+				{/each}
+			{/if}
+		{:else}
 		{#if breadcrumb.length > 1}
 			<button class="up-btn" onclick={() => (breadcrumb = breadcrumb.slice(0, -1))}>
 				↑ Up
@@ -836,6 +958,7 @@
 				onClose={() => infoTarget = null}
 			/>
 		{/if}
+		{/if}<!-- end search else -->
 		</div><!-- end .content -->
 	</div>
 {/if}
@@ -1176,5 +1299,89 @@
 		padding: 0.25rem;
 		min-width: 32px;
 		min-height: 32px;
+	}
+	/* ── Search ───────────────────────────────────────────────────────────────── */
+	.icon-btn.search-active { color: var(--accent); }
+	.search-bar {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem 1rem;
+		background: var(--bg2);
+		border-bottom: 1px solid var(--border);
+	}
+	.search-input {
+		flex: 1;
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		padding: 0.5rem 0.75rem;
+		font-size: 1rem;
+		background: var(--bg);
+		color: var(--text);
+		outline: none;
+	}
+	.search-input:focus { border-color: var(--accent); }
+	.search-clear {
+		background: none;
+		border: none;
+		font-size: 1.1rem;
+		cursor: pointer;
+		color: var(--text2);
+		padding: 0.25rem;
+		min-width: 32px;
+		min-height: 44px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.search-empty {
+		text-align: center;
+		padding: 2rem 1rem;
+		color: var(--text2);
+		font-size: 0.95rem;
+	}
+	.search-result-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		width: 100%;
+		padding: 0.65rem 1rem;
+		border: none;
+		border-bottom: 1px solid var(--border);
+		background: none;
+		text-align: left;
+		cursor: pointer;
+		min-height: 52px;
+	}
+	.search-result-row:active { background: var(--bg2); }
+	.result-icon { font-size: 1.1rem; flex-shrink: 0; }
+	.result-info {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+	.result-name {
+		font-size: 1rem;
+		color: var(--text);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.result-path {
+		font-size: 0.78rem;
+		color: var(--text2);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.result-kind-badge {
+		font-size: 0.7rem;
+		color: var(--accent);
+		border: 1px solid var(--accent);
+		border-radius: 99px;
+		padding: 0.1rem 0.4rem;
+		flex-shrink: 0;
+		white-space: nowrap;
 	}
 </style>
