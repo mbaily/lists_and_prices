@@ -1,55 +1,61 @@
 /**
- * Smart folder (report) configuration — persisted to localStorage per user.
- * Maps report name → array of folder IDs included in that report.
+ * Smart folder (report) configuration — stored in the shared Y.Doc so it
+ * syncs across devices just like folders, lists and items.
+ *
+ * Yjs structure: Y.Map<string> keyed 'smart-folders', where each entry is
+ *   reportName → JSON-encoded string[] of folder IDs
+ *
+ * The exported `smartFolders` is a plain reactive $state mirror that
+ * HomeScreen components read directly; it is re-derived on every docState
+ * tick so it stays live.
  */
-import { auth } from './auth.svelte';
+import * as Y from 'yjs';
+import { getDoc, docState } from './yjsStore.svelte';
 
-const SF_KEY = 'pnl_smart_folders';
-
-function sfKey(): string {
-	const user = typeof localStorage !== 'undefined' && auth.username ? auth.username : '_guest';
-	return `${SF_KEY}:${user}`;
+function getYMap(): Y.Map<string> {
+	return getDoc().getMap('smart-folders');
 }
 
-type SmartFolderMap = Record<string, string[]>;
-
-function load(): SmartFolderMap {
-	if (typeof localStorage === 'undefined') return {};
-	try { return JSON.parse(localStorage.getItem(sfKey()) ?? '{}'); } catch { return {}; }
+function readAll(): Record<string, string[]> {
+	try {
+		const m = getYMap();
+		const out: Record<string, string[]> = {};
+		m.forEach((val, key) => {
+			try { out[key] = JSON.parse(val); } catch { /* skip corrupt entry */ }
+		});
+		return out;
+	} catch {
+		return {};
+	}
 }
 
-function save(map: SmartFolderMap) {
-	if (typeof localStorage !== 'undefined')
-		localStorage.setItem(sfKey(), JSON.stringify(map));
-}
+export type SmartFolderMap = Record<string, string[]>;
 
-export const smartFolders = $state<SmartFolderMap>(load());
+// Re-derive on every Yjs update tick so the UI stays reactive.
+export const smartFolders: SmartFolderMap = $derived.by(() => {
+	void docState.version; // subscribe to Yjs updates
+	return readAll();
+});
 
 export function assignToReport(folderId: string, reportName: string) {
-	if (!smartFolders[reportName]) smartFolders[reportName] = [];
-	if (!smartFolders[reportName].includes(folderId)) {
-		smartFolders[reportName] = [...smartFolders[reportName], folderId];
+	const m = getYMap();
+	const current: string[] = (() => { try { return JSON.parse(m.get(reportName) ?? '[]'); } catch { return []; } })();
+	if (!current.includes(folderId)) {
+		m.set(reportName, JSON.stringify([...current, folderId]));
 	}
-	save({ ...smartFolders });
 }
 
 export function removeFromReport(folderId: string, reportName: string) {
-	if (!smartFolders[reportName]) return;
-	smartFolders[reportName] = smartFolders[reportName].filter((id) => id !== folderId);
-	if (smartFolders[reportName].length === 0) {
-		delete smartFolders[reportName];
+	const m = getYMap();
+	const current: string[] = (() => { try { return JSON.parse(m.get(reportName) ?? '[]'); } catch { return []; } })();
+	const next = current.filter((id) => id !== folderId);
+	if (next.length === 0) {
+		m.delete(reportName);
+	} else {
+		m.set(reportName, JSON.stringify(next));
 	}
-	save({ ...smartFolders });
 }
 
 export function deleteReport(reportName: string) {
-	delete smartFolders[reportName];
-	save({ ...smartFolders });
-}
-
-/** Reload after login/user switch so the correct user's config is loaded. */
-export function reloadSmartFolders() {
-	const fresh = load();
-	for (const key of Object.keys(smartFolders)) delete smartFolders[key];
-	Object.assign(smartFolders, fresh);
+	getYMap().delete(reportName);
 }

@@ -160,10 +160,18 @@
 	const filteredTreeItems = $derived(
 		filterView === 'all'
 			? treeItems
-			: treeItems.filter(({ item }) =>
-				item.heading || item.note ||
-				(filterView === 'checked' ? item.checked : !item.checked)
-			)
+			: (() => {
+				const visibleIds = new Set<string>(
+					treeItems
+						.filter(({ item }) => item.heading || (!item.note && (filterView === 'checked' ? item.checked : !item.checked)))
+						.map(({ item }) => item.id)
+				);
+				return treeItems.filter(({ item }) =>
+					item.heading ||
+					(!item.note && (filterView === 'checked' ? item.checked : !item.checked)) ||
+					(item.note && item.parentId !== null && visibleIds.has(item.parentId))
+				);
+			})()
 	);
 	const checkedCount = $derived(items.filter((i) => !i.heading && !i.note && i.checked).length);
 	const uncheckedCount = $derived(items.filter((i) => !i.heading && !i.note && !i.checked).length);
