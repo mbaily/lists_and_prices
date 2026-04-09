@@ -487,6 +487,37 @@ export function reorderLists(folderId: string, fromIndex: number, toIndex: numbe
 	doc.transact(() => all.forEach((l, idx) => updateList(l.id, { order: idx })));
 }
 
+/**
+ * Returns all non-archived lists in the order the user would encounter them
+ * by navigating the folder tree depth-first (respecting each folder's foldersFirst setting).
+ */
+export function readListsInTreeOrder(folders?: Folder[], lists?: ListMeta[]): ListMeta[] {
+	const allFolders = folders ?? readFolders();
+	const allLists = lists ?? readLists();
+	const result: ListMeta[] = [];
+
+	function visit(parentId: string | null) {
+		const childFolders = allFolders
+			.filter((f) => f.parentId === parentId && !isFolderEffectivelyArchived(f.id, allFolders))
+			.sort((a, b) => a.order - b.order);
+		const childLists = allLists
+			.filter((l) => l.folderId === parentId && !isListEffectivelyArchived(l, allFolders))
+			.sort((a, b) => a.order - b.order);
+		const folder = allFolders.find((f) => f.id === parentId);
+		const foldersFirst = folder?.foldersFirst ?? true;
+		if (foldersFirst) {
+			for (const f of childFolders) visit(f.id);
+			result.push(...childLists);
+		} else {
+			result.push(...childLists);
+			for (const f of childFolders) visit(f.id);
+		}
+	}
+
+	visit(null);
+	return result;
+}
+
 // ─── Internal utilities ───────────────────────────────────────────────────────
 
 function findYMap(arr: Y.Array<unknown>, id: string): Y.Map<unknown> | null {

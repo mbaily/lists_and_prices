@@ -25,13 +25,14 @@
 	import RowMenu from './RowMenu.svelte';
 	import InfoDialog from './InfoDialog.svelte';
 
-	let { listId, onHome, onOpenList, onNavigateTo, savedSearch = null, onRestoreSearch = undefined }: {
+	let { listId, onHome, onOpenList, onNavigateTo, savedSearch = null, onRestoreSearch = undefined, orderedLists = [] }: {
 		listId: string;
 		onHome: () => void;
 		onOpenList: (id: string) => void;
 		onNavigateTo: (folderId: string | null) => void;
 		savedSearch?: string | null;
 		onRestoreSearch?: () => void;
+		orderedLists?: import('$lib/data').ListMeta[];
 	} = $props();
 
 	let items = $derived.by(() => {
@@ -510,6 +511,15 @@
 
 	// ── Copy as TSV (for pasting into Google Sheets) ──────────────────────────────
 	let showHeaderMenu = $state(false);
+
+	// ── Tree-order navigation ────────────────────────────────────────────────────
+	const navIndex = $derived(orderedLists.findIndex((l) => l.id === listId));
+	const navTotal = $derived(orderedLists.length);
+	function navTo(delta: number) {
+		if (navTotal < 2) return;
+		const next = (navIndex + delta + navTotal) % navTotal;
+		onOpenList(orderedLists[next].id);
+	}
 	let copyStatus = $state<'idle' | 'copied' | 'error'>('idle');
 	let copyMessage = $state('');
 
@@ -761,6 +771,13 @@
 			{/if}
 		</div>
 		<div class="header-right">
+			{#if navTotal > 1}
+				<div class="nav-strip">
+					<button class="nav-btn" onclick={() => navTo(-1)} aria-label="Previous list">‹</button>
+					<span class="nav-count">{navIndex + 1} / {navTotal}</span>
+					<button class="nav-btn" onclick={() => navTo(1)} aria-label="Next list">›</button>
+				</div>
+			{/if}
 			<button class="type-btn" onclick={toggleType} title="Convert list type">
 				{isPriced ? '📋' : '💰'}
 			</button>
@@ -1263,6 +1280,31 @@
 	.header-right {
 		margin-left: auto;
 		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		gap: 0.3rem;
+	}
+	.nav-strip {
+		display: flex;
+		align-items: center;
+		gap: 0.1rem;
+	}
+	.nav-btn {
+		background: none;
+		border: none;
+		font-size: 1.3rem;
+		line-height: 1;
+		padding: 0.1rem 0.3rem;
+		cursor: pointer;
+		color: var(--text2);
+	}
+	.nav-btn:hover { color: var(--text); }
+	.nav-count {
+		font-size: 0.75rem;
+		color: var(--text2);
+		white-space: nowrap;
+		min-width: 2.8rem;
+		text-align: center;
 	}
 	.header-menu {
 		position: absolute;
