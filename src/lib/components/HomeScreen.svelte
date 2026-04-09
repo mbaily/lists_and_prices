@@ -622,43 +622,54 @@
 			''
 		];
 
+		// Sort assigned folders by creation date ascending
 		const reportFolders = allFolders
-			.filter((f) => folderIds.includes(f.id) && !isFolderEffectivelyArchived(f.id, allFolders));
-		const allItemsNow = readAllItems();
-		let hasAny = false;
-
-		for (const folder of reportFolders) {
-			const folderLists = allLists
-				.filter((l) => l.folderId === folder.id && !isListEffectivelyArchived(l, allFolders))
-				.sort((a, b) => a.order - b.order);
-
-			type TodoEntry = { name: string; listName: string; createdAt: string | null };
-			const todos: TodoEntry[] = [];
-
-			for (const list of folderLists) {
-				const items = allItemsNow.filter((i) =>
-					i.listId === list.id && !i.checked && !i.heading && !i.note
-				);
-				for (const item of items) {
-					todos.push({ name: item.name, listName: list.name, createdAt: item.createdAt });
-				}
-			}
-
-			// Sort by creation date descending within the folder
-			todos.sort((a, b) => {
+			.filter((f) => folderIds.includes(f.id) && !isFolderEffectivelyArchived(f.id, allFolders))
+			.sort((a, b) => {
 				const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
 				const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
 				return db - da;
 			});
+		const allItemsNow = readAllItems();
+		let hasAny = false;
 
-			if (todos.length === 0) continue;
+		for (const folder of reportFolders) {
+			// Sort lists within the folder by creation date ascending
+			const folderLists = allLists
+				.filter((l) => l.folderId === folder.id && !isListEffectivelyArchived(l, allFolders))
+				.sort((a, b) => {
+					const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+					const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+					return db - da;
+				});
+
+			// Collect items per list first to know if the folder has anything
+			type ListBlock = { listName: string; items: { name: string; createdAt: string | null }[] };
+			const blocks: ListBlock[] = [];
+			for (const list of folderLists) {
+				const items = allItemsNow
+					.filter((i) => i.listId === list.id && !i.checked && !i.heading && !i.note)
+					.sort((a, b) => {
+						const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+						const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+						return db - da;
+					});
+				if (items.length > 0)
+					blocks.push({ listName: list.name, items: items.map((i) => ({ name: i.name, createdAt: i.createdAt })) });
+			}
+
+			if (blocks.length === 0) continue;
 			hasAny = true;
-			lines.push(`=== ${folder.name} ===`);
-			for (const todo of todos) {
-				const d = todo.createdAt
-					? new Date(todo.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })
-					: '';
-				lines.push(`  [${todo.listName}] ${todo.name}${d ? `  (${d})` : ''}`);
+
+			lines.push(`${folder.name}`);
+			for (const block of blocks) {
+				lines.push(`  ${block.listName}`);
+				for (const item of block.items) {
+					const d = item.createdAt
+						? new Date(item.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })
+						: '';
+					lines.push(`    ${item.name}${d ? `  (${d})` : ''}`);
+				}
 			}
 			lines.push('');
 		}
