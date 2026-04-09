@@ -95,6 +95,10 @@
 		void docState.version;
 		try { return readAllItems(); } catch { return [] as Item[]; }
 	});
+	let allPinnedItems = $derived.by(() => {
+		void docState.version;
+		try { return readAllItems().filter((i) => i.pinned); } catch { return [] as Item[]; }
+	});
 
 	// ── Search results ────────────────────────────────────────────────────────────
 	type SearchResult =
@@ -709,6 +713,22 @@
 			</div>
 		{/if}
 
+		<!-- Pinned items bar -->
+		{#if allPinnedItems.length > 0}
+			<div class="pin-bar">
+				<span class="pin-label">📍</span>
+				{#each allPinnedItems as pItem}
+					{@const pItemList = allLists.find((l) => l.id === pItem.listId)}
+					<button
+						class="pin-chip"
+						class:pin-chip-checked={!pItem.heading && !pItem.note && pItem.checked}
+						onclick={() => { openListId = pItem.listId; renamingId = null; }}
+						title={`${pItem.name} — ${pItemList?.name ?? '…'}`}
+					>{pItem.name}<span class="pin-chip-list"> ({pItemList?.name ?? '…'})</span></button>
+				{/each}
+			</div>
+		{/if}
+
 		<!-- Favourites bar -->
 		{#if favouriteLists.length > 0 || favouriteFolders.length > 0}
 			<div class="fav-bar">
@@ -1099,6 +1119,39 @@
 	.row.archived .fav-btn { opacity: 0.6; }
 	.row.archived .drag-handle { opacity: 0.6; }
 	.path-through-hint { color: var(--accent); font-size: 0.85em; opacity: 0.7; }
+	/* ── Pinned items bar ────────────────────────────────────────────────────── */
+	.pin-bar {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.4rem 1rem;
+		background: var(--bg2);
+		border-bottom: 1px solid var(--border);
+	}
+	.pin-label { font-size: 1rem; flex-shrink: 0; }
+	.pin-chip {
+		background: none;
+		border: 1px solid var(--accent);
+		border-radius: 999px;
+		padding: 0.2rem 0.65rem;
+		font-size: 0.82rem;
+		color: var(--accent);
+		cursor: pointer;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 220px;
+	}
+	.pin-chip:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+	.pin-chip.pin-chip-checked {
+		text-decoration: line-through;
+		opacity: 0.6;
+	}
+	.pin-chip-list {
+		font-size: 0.75em;
+		opacity: 0.75;
+	}
 	/* ── Favourites bar ────────────────────────────────────────────────────────── */
 	.fav-bar {
 		display: flex;

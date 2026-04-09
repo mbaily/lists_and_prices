@@ -3,6 +3,7 @@
 	import { onDestroy, tick } from 'svelte';
 	import {
 		readItems,
+		readAllItems,
 		readLists,
 		readFolders,
 		createItem,
@@ -51,7 +52,10 @@
 		try { return readFolders(); } catch { return []; }
 	});
 	let favouriteLists = $derived(allLists.filter((l) => l.favourite && !isListEffectivelyArchived(l, allFolders)));
-	let pinnedItems = $derived(items.filter((i) => i.pinned));
+	let allPinnedItems = $derived.by(() => {
+		void docState.version;
+		try { return readAllItems().filter((i) => i.pinned); } catch { return []; }
+	});
 
 	// ── Breadcrumb ────────────────────────────────────────────────────────────────
 	// Build an ordered array of { id, name } entries from root down to current list.
@@ -821,15 +825,22 @@
 
 	<!-- Item list (pin-bar and fav-bar are first children — they scroll away naturally) -->
 	<div class="item-list" bind:this={itemListEl}>
-		{#if pinnedItems.length > 0}
+		{#if allPinnedItems.length > 0}
 			<div class="pin-bar">
 				<span class="pin-label">📍</span>
-				{#each pinnedItems as pItem}
+				{#each allPinnedItems as pItem}
+					{@const inThisList = pItem.listId === listId}
+					{@const pItemList = allLists.find((l) => l.id === pItem.listId)}
 					<button
 						class="pin-chip"
 						class:pin-chip-checked={!pItem.heading && !pItem.note && pItem.checked}
-						onclick={() => { if (!pItem.heading && !pItem.note) toggleCheck(pItem); }}
-					>{pItem.name}</button>
+						class:pin-chip-foreign={!inThisList}
+						onclick={() => {
+							if (inThisList && !pItem.heading && !pItem.note) toggleCheck(pItem);
+							else if (!inThisList) onOpenList(pItem.listId);
+						}}
+						title={inThisList ? pItem.name : `${pItem.name} — ${pItemList?.name ?? '…'}`}
+					>{pItem.name}{#if !inThisList}<span class="pin-chip-list"> ({pItemList?.name ?? '…'})</span>{/if}</button>
 				{/each}
 			</div>
 		{/if}
@@ -1125,6 +1136,14 @@
 	.pin-chip.pin-chip-checked {
 		text-decoration: line-through;
 		opacity: 0.6;
+	}
+	.pin-chip.pin-chip-foreign {
+		border-style: dashed;
+		opacity: 0.85;
+	}
+	.pin-chip-list {
+		font-size: 0.75em;
+		opacity: 0.75;
 	}
 	/* ── Favourites bar ─────────────────────────────────────────────────────── */
 	/* Lives inside .item-list — scrolls away naturally, no JS needed */
