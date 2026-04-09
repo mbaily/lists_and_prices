@@ -1353,6 +1353,20 @@ ${bodyHtml}
 		border-bottom: 1px solid var(--border);
 		min-height: 52px;
 		transition: background 0.15s, opacity 0.15s;
+		position: relative;
+	}
+	.folder-row, .list-row {
+		padding-left: 1.35rem;
+	}
+	.folder-row::before, .list-row::before {
+		content: '';
+		position: absolute;
+		left: 0;
+		top: 0;
+		bottom: 0;
+		width: 5px;
+		background: var(--row-color, transparent);
+		border-radius: 0 3px 3px 0;
 	}
 	.row.drag-source { opacity: 0.4; }
 	.row.drag-above { background: var(--bg3); box-shadow: inset 0 2px 0 var(--accent); }
