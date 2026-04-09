@@ -764,6 +764,7 @@
 			<button class="type-btn" onclick={() => showHeaderMenu = !showHeaderMenu} aria-label="More options">⋮</button>
 			{#if showHeaderMenu}
 				<div class="header-menu" role="menu">
+					<button role="menuitem" onclick={() => { showHeaderMenu = false; toggleType(); }}>{isPriced ? '📋 Switch to plain list' : '💰 Switch to priced list'}</button>
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsTSV(); }}>📋 Copy as spreadsheet</button>
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsJournal(); }}>📓 Copy as journal</button>
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; importFromClipboard(); }}>📥 Import from clipboard</button>
@@ -778,9 +779,6 @@
 					<button class="nav-btn" onclick={() => navTo(1)} aria-label="Next list">›</button>
 				</div>
 			{/if}
-			<button class="type-btn" onclick={toggleType} title="Convert list type">
-				{isPriced ? '📋' : '💰'}
-			</button>
 		</div>
 	</header>
 
