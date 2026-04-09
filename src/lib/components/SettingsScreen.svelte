@@ -120,13 +120,29 @@
 			<div class="toggle-row">
 				<button
 					class="theme-btn"
-					class:active={settings.addPosition === 'bottom'}
-					onclick={() => updateSettings({ addPosition: 'bottom' })}
+					class:active={settings.addItemPosition === 'bottom'}
+					onclick={() => updateSettings({ addItemPosition: 'bottom' })}
 				>⬇ Bottom</button>
 				<button
 					class="theme-btn"
-					class:active={settings.addPosition === 'top'}
-					onclick={() => updateSettings({ addPosition: 'top' })}
+					class:active={settings.addItemPosition === 'top'}
+					onclick={() => updateSettings({ addItemPosition: 'top' })}
+				>⬆ Top</button>
+			</div>
+		</section>
+
+		<section>
+			<h2>Add lists &amp; folders to</h2>
+			<div class="toggle-row">
+				<button
+					class="theme-btn"
+					class:active={settings.addListPosition === 'bottom'}
+					onclick={() => updateSettings({ addListPosition: 'bottom' })}
+				>⬇ Bottom</button>
+				<button
+					class="theme-btn"
+					class:active={settings.addListPosition === 'top'}
+					onclick={() => updateSettings({ addListPosition: 'top' })}
 				>⬆ Top</button>
 			</div>
 		</section>

@@ -15,19 +15,20 @@ interface Settings {
 	currency: string;
 	theme: 'light' | 'dark';
 	handedness: 'left' | 'right';
-	addPosition: 'bottom' | 'top';
+	addItemPosition: 'bottom' | 'top';
+	addListPosition: 'bottom' | 'top';
 }
 
 function loadSettings(): Settings {
-	if (typeof localStorage === 'undefined') return { currency: '$', theme: 'light', handedness: 'right', addPosition: 'bottom' };
+	if (typeof localStorage === 'undefined') return { currency: '$', theme: 'light', handedness: 'right', addItemPosition: 'bottom', addListPosition: 'bottom' };
 	try {
 		const saved = JSON.parse(localStorage.getItem(settingsKey()) ?? 'null');
-			if (saved) return { currency: '$', theme: 'light' as const, handedness: 'right' as const, addPosition: 'bottom' as const, ...saved };
+			if (saved) return { currency: '$', theme: 'light' as const, handedness: 'right' as const, addItemPosition: 'bottom' as const, addListPosition: 'bottom' as const, ...saved };
 	} catch { /* fall through */ }
 	// No saved settings — detect OS preference rather than hardcoding light
 	const prefersDark =
 		typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches;
-	return { currency: '$', theme: prefersDark ? 'dark' : 'light', handedness: 'right', addPosition: 'bottom' };
+	return { currency: '$', theme: prefersDark ? 'dark' : 'light', handedness: 'right', addItemPosition: 'bottom', addListPosition: 'bottom' };
 }
 
 function saveSettings(s: Settings) {

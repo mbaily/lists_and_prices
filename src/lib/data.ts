@@ -47,11 +47,15 @@ function yMapToFolder(m: Y.Map<unknown>): Folder {
 	};
 }
 
-export function createFolder(name: string, parentId: string | null, color = '#6366f1'): string {
+export function createFolder(name: string, parentId: string | null, color = '#6366f1', addPosition: 'top' | 'bottom' = 'bottom'): string {
 	const doc = getDoc();
 	const folders = getFolders(doc);
 	const existing = folders.toArray() as Y.Map<unknown>[];
-	const maxOrder = existing.filter((f) => f.get('parentId') === parentId).length;
+	const siblings = existing.filter((f) => f.get('parentId') === parentId);
+	const newOrder = addPosition === 'top' ? -1 : siblings.length;
+	if (addPosition === 'top') {
+		doc.transact(() => { for (const sib of siblings) sib.set('order', (sib.get('order') as number ?? 0) + 1); });
+	}
 	const m = new Y.Map<unknown>();
 	const id = uid();
 	const now = new Date().toISOString();
@@ -59,7 +63,7 @@ export function createFolder(name: string, parentId: string | null, color = '#63
 	m.set('name', name);
 	m.set('color', color);
 	m.set('parentId', parentId);
-	m.set('order', maxOrder);
+	m.set('order', newOrder);
 	m.set('createdAt', now);
 	m.set('updatedAt', now);
 	folders.push([m]);
@@ -173,13 +177,18 @@ export function createList(
 	name: string,
 	folderId: string,
 	type: 'plain' | 'priced',
-	color = '#6366f1'
+	color = '#6366f1',
+	addPosition: 'top' | 'bottom' = 'bottom'
 ): string {
 	const doc = getDoc();
 	const lists = getLists(doc);
 	const existing = (lists.toArray() as Y.Map<unknown>[]).filter(
 		(l) => l.get('folderId') === folderId
 	);
+	const newOrder = addPosition === 'top' ? -1 : existing.length;
+	if (addPosition === 'top') {
+		doc.transact(() => { for (const sib of existing) sib.set('order', (sib.get('order') as number ?? 0) + 1); });
+	}
 	const m = new Y.Map<unknown>();
 	const id = uid();
 	const now = new Date().toISOString();
@@ -188,7 +197,7 @@ export function createList(
 	m.set('color', color);
 	m.set('folderId', folderId);
 	m.set('type', type);
-	m.set('order', existing.length);
+	m.set('order', newOrder);
 	m.set('createdAt', now);
 	m.set('updatedAt', now);
 	lists.push([m]);

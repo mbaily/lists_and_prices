@@ -204,7 +204,7 @@
 	function addItem() {
 		if (!universalValue.trim()) return;
 		// Only apply addPosition for top-level items; subtasks/subnotes always append
-		const pos = newItemParentId ? 'bottom' : settings.addPosition;
+		const pos = newItemParentId ? 'bottom' : settings.addItemPosition;
 		createItem(listId, universalValue.trim(), null, newItemParentId, newItemIsNote, pos);
 		universalValue = '';
 		newItemParentId = null;
@@ -231,7 +231,7 @@
 			alert('No valid items found in clipboard.');
 			return;
 		}
-		createItemsBatch(listId, lines, settings.addPosition);
+		createItemsBatch(listId, lines, settings.addItemPosition);
 	}
 
 	// ── Edit item name via universal input ────────────────────────────────────────

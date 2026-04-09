@@ -28,6 +28,7 @@
 		type Item
 	} from '$lib/data';
 	import { syncState, docState } from '$lib/yjsStore.svelte';
+	import { settings } from '$lib/settings.svelte';
 	import ListScreen from './ListScreen.svelte';
 	import SpreadsheetScreen from './SpreadsheetScreen.svelte';
 	import ColorPicker from './ColorPicker.svelte';
@@ -371,7 +372,7 @@
 
 	function submitNewFolder() {
 		if (!newFolderName.trim()) return;
-		createFolder(newFolderName.trim(), currentFolderId, newFolderColor);
+		createFolder(newFolderName.trim(), currentFolderId, newFolderColor, settings.addListPosition);
 		newFolderName = '';
 		newFolderColor = '#6366f1';
 		showNewFolder = false;
@@ -403,7 +404,7 @@
 			alert('Please create a folder first.');
 			return;
 		}
-		createList(name, currentFolderId!, newListType, newListColor);
+		createList(name, currentFolderId!, newListType, newListColor, settings.addListPosition);
 		newListName = '';
 		newListType = 'plain';
 		newListColor = '#6366f1';
