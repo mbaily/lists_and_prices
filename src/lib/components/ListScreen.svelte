@@ -51,6 +51,7 @@
 		try { return readFolders(); } catch { return []; }
 	});
 	let favouriteLists = $derived(allLists.filter((l) => l.favourite && !isListEffectivelyArchived(l, allFolders)));
+	let pinnedItems = $derived(items.filter((i) => i.pinned));
 
 	// ── Breadcrumb ────────────────────────────────────────────────────────────────
 	// Build an ordered array of { id, name } entries from root down to current list.
@@ -818,8 +819,20 @@
 		{/if}
 	</div>
 
-	<!-- Item list (fav-bar is first child — it scrolls away naturally) -->
+	<!-- Item list (pin-bar and fav-bar are first children — they scroll away naturally) -->
 	<div class="item-list" bind:this={itemListEl}>
+		{#if pinnedItems.length > 0}
+			<div class="pin-bar">
+				<span class="pin-label">📍</span>
+				{#each pinnedItems as pItem}
+					<button
+						class="pin-chip"
+						class:pin-chip-checked={!pItem.heading && !pItem.note && pItem.checked}
+						onclick={() => { if (!pItem.heading && !pItem.note) toggleCheck(pItem); }}
+					>{pItem.name}</button>
+				{/each}
+			</div>
+		{/if}
 		{#if favouriteLists.length > 0}
 			<div class="fav-bar">
 				<span class="fav-label">★</span>
@@ -861,6 +874,7 @@
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoItem = item },
+						{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => updateItem(item.id, { pinned: !item.pinned }) },
 					{ label: '📌 Unheading', action: () => updateItem(item.id, { heading: false }) },
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 					]} />
@@ -879,6 +893,7 @@
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoItem = item },
+						{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => updateItem(item.id, { pinned: !item.pinned }) },
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 					]} />
 				{:else if isPriced}
@@ -913,6 +928,7 @@
 						<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 						<RowMenu items={[
 							{ label: 'ℹ️ Info', action: () => infoItem = item },
+							{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => updateItem(item.id, { pinned: !item.pinned }) },
 							...(canAddChildren ? [
 								{ label: '➕ Add Subtask', action: () => { newItemParentId = item.id; newItemIsNote = false; focusInput(); } },
 								{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
@@ -939,6 +955,7 @@
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoItem = item },
+						{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => updateItem(item.id, { pinned: !item.pinned }) },
 						...(canAddChildren ? [
 							{ label: '➕ Add Subtask', action: () => { newItemParentId = item.id; newItemIsNote = false; focusInput(); } },
 							{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
@@ -1080,6 +1097,35 @@
 		display: inline-block;
 	}
 	.sep { color: var(--text2); }
+	/* ── Pinned items bar ───────────────────────────────────────────────────── */
+	/* Lives inside .item-list before fav-bar — scrolls away naturally */
+	.pin-bar {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.4rem 0.75rem;
+		background: var(--bg2);
+		border-bottom: 1px solid var(--border);
+	}
+	.pin-label { font-size: 1rem; flex-shrink: 0; }
+	.pin-chip {
+		background: none;
+		border: 1px solid var(--accent);
+		border-radius: 999px;
+		padding: 0.2rem 0.65rem;
+		font-size: 0.82rem;
+		color: var(--accent);
+		cursor: pointer;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 200px;
+	}
+	.pin-chip.pin-chip-checked {
+		text-decoration: line-through;
+		opacity: 0.6;
+	}
 	/* ── Favourites bar ─────────────────────────────────────────────────────── */
 	/* Lives inside .item-list — scrolls away naturally, no JS needed */
 	.fav-bar {
