@@ -720,15 +720,15 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: ui-monospace, 'Cascadia Code', 'Fira Mono', monospace; font-size: 14px; line-height: 1.6; background: #000; color: #fff; padding: 1.5rem 2rem 4rem; max-width: 860px; }
   h1 { font-size: 1rem; font-weight: 700; color: #cba6f7; margin-bottom: 0.2rem; }
-  .meta { color: #6c7086; margin-bottom: 2rem; font-size: 0.85rem; }
+  .meta { color: #888; margin-bottom: 2rem; font-size: 0.85rem; }
   .folder-block { margin-bottom: 1.5rem; }
-  .folder-name { font-weight: 700; color: #89b4fa; padding-bottom: 0.15rem; border-bottom: 1px solid #313244; margin-bottom: 0.4rem; }
+  .folder-name { font-weight: 700; color: #89b4fa; padding-bottom: 0.15rem; border-bottom: 1px solid #333; margin-bottom: 0.4rem; }
   .list-block { margin-left: 2ch; margin-top: 0.6rem; }
   .list-name { color: #a6e3a1; font-style: italic; margin-bottom: 0.15rem; }
-  .item { margin-left: 2ch; color: #cdd6f4; word-break: break-word; }
-  .date { color: #6c7086; font-size: 0.85em; }
-  .empty { color: #6c7086; }
-  .copy-btn { position: fixed; bottom: 1.2rem; right: 1.2rem; padding: 0.55rem 1.1rem; background: #cba6f7; color: #1e1e2e; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: 700; font-family: inherit; opacity: 0.9; }
+  .item { margin-left: 2ch; color: #fff; word-break: break-word; }
+  .date { color: #888; font-size: 0.85em; }
+  .empty { color: #888; }
+  .copy-btn { position: fixed; bottom: 1.2rem; right: 1.2rem; padding: 0.55rem 1.1rem; background: #cba6f7; color: #000; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: 700; font-family: inherit; opacity: 0.9; }
   .copy-btn:hover { opacity: 1; }
   .copy-btn.copied { background: #a6e3a1; }
 </style>
