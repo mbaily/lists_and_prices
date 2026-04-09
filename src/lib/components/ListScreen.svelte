@@ -54,7 +54,10 @@
 	let favouriteLists = $derived(allLists.filter((l) => l.favourite && !isListEffectivelyArchived(l, allFolders)));
 	let allPinnedItems = $derived.by(() => {
 		void docState.version;
-		try { return readAllItems().filter((i) => i.pinned); } catch { return []; }
+		try {
+			const activeLists = new Set(allLists.filter((l) => !isListEffectivelyArchived(l, allFolders)).map((l) => l.id));
+			return readAllItems().filter((i) => i.pinned && activeLists.has(i.listId));
+		} catch { return []; }
 	});
 
 	// ── Breadcrumb ────────────────────────────────────────────────────────────────
@@ -200,7 +203,9 @@
 
 	function addItem() {
 		if (!universalValue.trim()) return;
-		createItem(listId, universalValue.trim(), null, newItemParentId, newItemIsNote);
+		// Only apply addPosition for top-level items; subtasks/subnotes always append
+		const pos = newItemParentId ? 'bottom' : settings.addPosition;
+		createItem(listId, universalValue.trim(), null, newItemParentId, newItemIsNote, pos);
 		universalValue = '';
 		newItemParentId = null;
 		newItemIsNote = false;
@@ -226,7 +231,7 @@
 			alert('No valid items found in clipboard.');
 			return;
 		}
-		createItemsBatch(listId, lines);
+		createItemsBatch(listId, lines, settings.addPosition);
 	}
 
 	// ── Edit item name via universal input ────────────────────────────────────────
@@ -837,7 +842,7 @@
 						class:pin-chip-foreign={!inThisList}
 						onclick={() => {
 							if (inThisList && !pItem.heading && !pItem.note) toggleCheck(pItem);
-							else if (!inThisList) onOpenList(pItem.listId);
+							else onOpenList(pItem.listId);
 						}}
 						title={inThisList ? pItem.name : `${pItem.name} — ${pItemList?.name ?? '…'}`}
 					>{pItem.name}{#if !inThisList}<span class="pin-chip-list"> ({pItemList?.name ?? '…'})</span>{/if}</button>
@@ -886,7 +891,7 @@
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoItem = item },
 						{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => updateItem(item.id, { pinned: !item.pinned }) },
-					{ label: '📌 Unheading', action: () => updateItem(item.id, { heading: false }) },
+						{ label: '📌 Unheading', action: () => updateItem(item.id, { heading: false }) },
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 					]} />
 				{:else if item.note}

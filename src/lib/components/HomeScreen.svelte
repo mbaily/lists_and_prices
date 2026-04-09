@@ -97,7 +97,10 @@
 	});
 	let allPinnedItems = $derived.by(() => {
 		void docState.version;
-		try { return readAllItems().filter((i) => i.pinned); } catch { return [] as Item[]; }
+		try {
+			const activeLists = new Set(allLists.filter((l) => !isListEffectivelyArchived(l, allFolders)).map((l) => l.id));
+			return readAllItems().filter((i) => i.pinned && activeLists.has(i.listId));
+		} catch { return [] as Item[]; }
 	});
 
 	// ── Search results ────────────────────────────────────────────────────────────

@@ -15,18 +15,19 @@ interface Settings {
 	currency: string;
 	theme: 'light' | 'dark';
 	handedness: 'left' | 'right';
+	addPosition: 'bottom' | 'top';
 }
 
 function loadSettings(): Settings {
-	if (typeof localStorage === 'undefined') return { currency: '$', theme: 'light', handedness: 'right' };
+	if (typeof localStorage === 'undefined') return { currency: '$', theme: 'light', handedness: 'right', addPosition: 'bottom' };
 	try {
 		const saved = JSON.parse(localStorage.getItem(settingsKey()) ?? 'null');
-			if (saved) return { currency: '$', theme: 'light' as const, handedness: 'right' as const, ...saved };
+			if (saved) return { currency: '$', theme: 'light' as const, handedness: 'right' as const, addPosition: 'bottom' as const, ...saved };
 	} catch { /* fall through */ }
 	// No saved settings — detect OS preference rather than hardcoding light
 	const prefersDark =
 		typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches;
-	return { currency: '$', theme: prefersDark ? 'dark' : 'light', handedness: 'right' };
+	return { currency: '$', theme: prefersDark ? 'dark' : 'light', handedness: 'right', addPosition: 'bottom' };
 }
 
 function saveSettings(s: Settings) {

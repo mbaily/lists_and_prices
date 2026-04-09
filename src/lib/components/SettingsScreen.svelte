@@ -116,6 +116,22 @@
 		</section>
 
 		<section>
+			<h2>Add items to</h2>
+			<div class="toggle-row">
+				<button
+					class="theme-btn"
+					class:active={settings.addPosition === 'bottom'}
+					onclick={() => updateSettings({ addPosition: 'bottom' })}
+				>⬇ Bottom</button>
+				<button
+					class="theme-btn"
+					class:active={settings.addPosition === 'top'}
+					onclick={() => updateSettings({ addPosition: 'top' })}
+				>⬆ Top</button>
+			</div>
+		</section>
+
+		<section>
 			<h2>Handedness</h2>
 			<div class="toggle-row">
 				<button

@@ -263,7 +263,7 @@ function yMapToItem(m: Y.Map<unknown>): Item {
 	};
 }
 
-export function createItem(listId: string, name: string, price: number | null = null, parentId: string | null = null, note = false): string {
+export function createItem(listId: string, name: string, price: number | null = null, parentId: string | null = null, note = false, addPosition: 'top' | 'bottom' = 'bottom'): string {
 	const doc = getDoc();
 	const items = getItems(doc);
 	const existing = (items.toArray() as Y.Map<unknown>[]).filter(
@@ -271,6 +271,13 @@ export function createItem(listId: string, name: string, price: number | null = 
 	);
 	// Order within siblings (same parentId)
 	const siblings = existing.filter((i) => (i.get('parentId') ?? null) === parentId);
+	const newOrder = addPosition === 'top' ? -1 : siblings.length;
+	// When inserting at top, shift all existing siblings up by 1
+	if (addPosition === 'top') {
+		doc.transact(() => {
+			for (const sib of siblings) sib.set('order', (sib.get('order') as number ?? 0) + 1);
+		});
+	}
 	const m = new Y.Map<unknown>();
 	const id = uid();
 	const now = new Date().toISOString();
@@ -279,7 +286,7 @@ export function createItem(listId: string, name: string, price: number | null = 
 	m.set('name', name);
 	m.set('price', price);
 	m.set('checked', false);
-	m.set('order', siblings.length);
+	m.set('order', newOrder);
 	m.set('createdAt', now);
 	m.set('updatedAt', now);
 	if (parentId !== null) m.set('parentId', parentId);
@@ -321,8 +328,10 @@ export function setItemsChecked(ids: string[], checked: boolean): void {
 	getDoc().transact(() => { for (const id of ids) updateItem(id, { checked }); });
 }
 
-export function createItemsBatch(listId: string, names: string[]): void {
-	getDoc().transact(() => { for (const name of names) createItem(listId, name); });
+export function createItemsBatch(listId: string, names: string[], addPosition: 'top' | 'bottom' = 'bottom'): void {
+	// When adding at top, insert in reverse so final order matches input order
+	const ordered = addPosition === 'top' ? [...names].reverse() : names;
+	getDoc().transact(() => { for (const name of ordered) createItem(listId, name, null, null, false, addPosition); });
 }
 
 export function listTotal(listId: string): number {
