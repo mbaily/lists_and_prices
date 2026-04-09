@@ -164,6 +164,24 @@
 		</section>
 
 		<section>
+			<h2>Report font size</h2>
+			<div class="toggle-row">
+				<input
+					type="number"
+					class="font-size-input"
+					min="8"
+					max="72"
+					value={settings.reportFontSize}
+					oninput={(e) => {
+						const v = parseInt((e.target as HTMLInputElement).value, 10);
+						if (!isNaN(v) && v >= 8 && v <= 72) updateSettings({ reportFontSize: v });
+					}}
+				/>
+				<span class="font-size-unit">pt</span>
+			</div>
+		</section>
+
+		<section>
 			<h2>Account</h2>
 			<button class="logout-btn" onclick={onLogout}>Sign out</button>
 		</section>
@@ -271,7 +289,17 @@
 		color: #fff;
 		border-color: var(--accent);
 	}
-	.toggle-row { display: flex; gap: 0.5rem; }
+	.toggle-row { display: flex; gap: 0.5rem; align-items: center; }
+	.font-size-input {
+		width: 5rem;
+		padding: 0.4rem 0.6rem;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		background: var(--bg2);
+		color: var(--text);
+		font-size: 1rem;
+	}
+	.font-size-unit { color: var(--text2); font-size: 0.95rem; }
 	.theme-btn {
 		flex: 1;
 		padding: 0.65rem;

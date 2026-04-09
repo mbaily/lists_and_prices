@@ -720,7 +720,7 @@
 <title>Smart Folder: ${esc(reportName)}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: ui-monospace, 'Cascadia Code', 'Fira Mono', monospace; font-size: 14px; line-height: 1.6; background: #000; color: #fff; padding: 1.5rem 2rem 4rem; max-width: 860px; }
+  body { font-family: ui-monospace, 'Cascadia Code', 'Fira Mono', monospace; font-size: ${settings.reportFontSize}px; line-height: 1.6; background: #000; color: #fff; padding: 1.5rem 2rem 4rem; max-width: 860px; }
   h1 { font-size: 1rem; font-weight: 700; color: #cba6f7; margin-bottom: 0.2rem; }
   .meta { color: #888; margin-bottom: 2rem; font-size: 0.85rem; }
   .folder-block { margin-bottom: 1.5rem; }
