@@ -4,6 +4,7 @@
  */
 import * as Y from 'yjs';
 import { getFolders, getLists, getItems, getDoc, getSpreadsheets, getSheetCells } from './yjsStore.svelte';
+import { removeFromAllReports } from './smartFolders.svelte';
 
 function uid(): string {
 	return crypto.randomUUID();
@@ -65,6 +66,9 @@ export function createFolder(name: string, parentId: string | null, color = '#63
 		m.set('color', color);
 		m.set('parentId', parentId);
 		m.set('order', newOrder);
+		m.set('done', false);
+		m.set('favourite', false);
+		m.set('archived', false);
 		m.set('createdAt', now);
 		m.set('updatedAt', now);
 		folders.push([m]);
@@ -102,6 +106,8 @@ function _deleteFolderInner(id: string) {
 	for (const lid of listIds) deleteList(lid);
 
 	removeYMap(getFolders(doc), id);
+	// Clean up any smart folder report assignments for this folder
+	removeFromAllReports(id);
 }
 
 export function isDescendant(folderId: string, targetId: string, _visited = new Set<string>()): boolean {
@@ -500,10 +506,20 @@ export interface BackupFile {
 	lists: ListMeta[];
 	items: ReturnType<typeof _readAllItems>;
 	sheets?: SheetMeta[];
+	smartFolders?: Record<string, string[]>;
 }
 
 function _readAllItems() {
 	return (getItems(getDoc()).toArray() as Y.Map<unknown>[]).map(yMapToItem);
+}
+
+function _readSmartFolders(): Record<string, string[]> {
+	try {
+		const m = getDoc().getMap<string>('smart-folders');
+		const out: Record<string, string[]> = {};
+		m.forEach((val, key) => { try { out[key] = JSON.parse(val); } catch { /* skip */ } });
+		return out;
+	} catch { return {}; }
 }
 
 /** Serialise the entire doc to a plain JS object ready to JSON.stringify. */
@@ -514,7 +530,8 @@ export function exportBackup(): BackupFile {
 		folders: readFolders(),
 		lists: readLists(),
 		items: _readAllItems(),
-		sheets: readSheets()
+		sheets: readSheets(),
+		smartFolders: _readSmartFolders()
 	};
 }
 
@@ -529,14 +546,16 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 	const lArr = getLists(doc);
 	const iArr = getItems(doc);
 	const sArr = getSpreadsheets(doc);
+	const sfMap = doc.getMap<string>('smart-folders');
 
 	doc.transact(() => {
 		if (mode === 'replace') {
-			// Clear all arrays
+			// Clear all arrays and the smart-folders map
 			if (fArr.length) fArr.delete(0, fArr.length);
 			if (lArr.length) lArr.delete(0, lArr.length);
 			if (iArr.length) iArr.delete(0, iArr.length);
 			if (sArr.length) sArr.delete(0, sArr.length);
+			sfMap.forEach((_, key) => sfMap.delete(key));
 
 			// Insert folders
 			for (const f of backup.folders) {
@@ -562,6 +581,10 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 				for (const [k, v] of Object.entries(s)) m.set(k, v);
 				sArr.push([m]);
 			}
+			// Restore smart folder report assignments
+			for (const [name, ids] of Object.entries(backup.smartFolders ?? {})) {
+				sfMap.set(name, JSON.stringify(ids));
+			}
 		} else {
 			// Merge: upsert each record by id
 			function upsert(arr: Y.Array<unknown>, record: Record<string, unknown>) {
@@ -578,6 +601,12 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 			for (const l of backup.lists) upsert(lArr, l as unknown as Record<string, unknown>);
 			for (const i of backup.items) upsert(iArr, i as unknown as Record<string, unknown>);
 			for (const s of (backup.sheets ?? [])) upsert(sArr, s as unknown as Record<string, unknown>);
+			// Merge smart folder report assignments (union of existing + backup)
+			for (const [name, ids] of Object.entries(backup.smartFolders ?? {})) {
+				const existing: string[] = (() => { try { return JSON.parse(sfMap.get(name) ?? '[]'); } catch { return []; } })();
+				const merged = [...new Set([...existing, ...ids])];
+				sfMap.set(name, JSON.stringify(merged));
+			}
 		}
 	});
 }

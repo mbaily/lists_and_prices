@@ -60,3 +60,18 @@ export function removeFromReport(folderId: string, reportName: string) {
 export function deleteReport(reportName: string) {
 	getYMap().delete(reportName);
 }
+
+/** Called by deleteFolder to purge a folder ID from all reports. */
+export function removeFromAllReports(folderId: string) {
+	const m = getYMap();
+	m.forEach((val, reportName) => {
+		try {
+			const ids: string[] = JSON.parse(val);
+			if (ids.includes(folderId)) {
+				const next = ids.filter((id) => id !== folderId);
+				if (next.length === 0) m.delete(reportName);
+				else m.set(reportName, JSON.stringify(next));
+			}
+		} catch { /* skip corrupt entry */ }
+	});
+}

@@ -32,6 +32,7 @@
 	import { getSmartFolders, assignToReport, removeFromReport, deleteReport } from '$lib/smartFolders.svelte';
 	import ListScreen from './ListScreen.svelte';
 	import SpreadsheetScreen from './SpreadsheetScreen.svelte';
+	import SmartFolderReportScreen from './SmartFolderReportScreen.svelte';
 	import ColorPicker from './ColorPicker.svelte';
 	import SettingsScreen from './SettingsScreen.svelte';
 	import SyncBadge from './SyncBadge.svelte';
@@ -607,6 +608,7 @@
 	let sfDialogFolder = $state<Folder | null>(null);
 	let sfNewName = $state('');
 	let showReportsMenu = $state(false);
+	let reactiveReportName = $state<string | null>(null);
 
 	function sfReportNames(): string[] {
 		return Object.keys(getSmartFolders()).sort();
@@ -823,6 +825,8 @@ ${bodyHtml}
 	}} />
 {:else if showSettings}
 	<SettingsScreen onBack={() => (showSettings = false)} {onLogout} />
+{:else if reactiveReportName}
+	<SmartFolderReportScreen reportName={reactiveReportName} onBack={() => (reactiveReportName = null)} />
 {:else}
 	<div class="screen">
 		<!-- Header -->
@@ -874,7 +878,16 @@ ${bodyHtml}
 							<div class="reports-menu">
 								<div class="reports-header">Smart Folders</div>
 								{#each sfReportNames() as rname}
-									<button class="reports-item" onclick={() => generateReport(rname)}>{rname}</button>
+					<button class="reports-item reports-item-split" onclick={(e) => {
+							const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+							showReportsMenu = false;
+							if (e.clientX < rect.left + rect.width / 2) { reactiveReportName = rname; }
+							else { generateReport(rname); }
+						}}>
+							<span class="split-left-zone" aria-hidden="true">⟳</span>
+							<span class="split-name">{rname}</span>
+							<span class="split-right-zone" aria-hidden="true">📤</span>
+						</button>
 								{/each}
 							</div>
 						{/if}
@@ -1821,6 +1834,37 @@ ${bodyHtml}
 	}
 	.reports-item:last-child { border-bottom: none; }
 	.reports-item:hover { background: var(--bg2); }
+	.reports-item-split {
+		display: flex;
+		align-items: center;
+		gap: 0;
+		position: relative;
+		padding: 0.8rem 0.6rem;
+	}
+	.reports-item-split::after {
+		content: '';
+		position: absolute;
+		left: 50%;
+		top: 20%;
+		bottom: 20%;
+		width: 1px;
+		background: var(--border);
+		pointer-events: none;
+	}
+	.split-left-zone, .split-right-zone {
+		flex-shrink: 0;
+		font-size: 0.8em;
+		opacity: 0.5;
+		width: 1.4em;
+		text-align: center;
+	}
+	.split-name {
+		flex: 1;
+		text-align: center;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
 	/* ── Smart folder assign dialog ──────────────────────────────────────────── */
 	.sf-backdrop {
 		position: fixed;
