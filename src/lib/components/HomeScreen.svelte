@@ -646,18 +646,27 @@
 		<header>
 			<div class="header-left">
 				<div class="breadcrumb">
+					<!-- Home icon always first -->
+					{#if breadcrumb.length > 1 || (savedSearch && !showSearch)}
+						<button class="crumb home-crumb" onclick={() => (breadcrumb = [null])}>🏠</button>
+						<span class="sep">/</span>
+					{:else}
+						<span class="crumb current home-crumb">🏠</span>
+					{/if}
+					<!-- Search crumb immediately after home -->
 					{#if savedSearch && !showSearch}
 						<button class="crumb search-crumb" onclick={restoreSearch} title="Back to search results">🔍 "{savedSearch}"</button>
-						<span class="sep">/</span>
+						{#if breadcrumb.length > 1}<span class="sep">/</span>{/if}
 					{/if}
-					{#each breadcrumb as crumbId, i}
-						{#if i < breadcrumb.length - 1}
-							<button class="crumb" class:home-crumb={crumbId === null} onclick={() => (breadcrumb = breadcrumb.slice(0, i + 1))}>
-							{crumbId === null ? '🏠' : folderName(crumbId)}
-						</button>
-						<span class="sep">/</span>
+					<!-- Remaining folder crumbs (skip the null home entry) -->
+					{#each breadcrumb.slice(1) as crumbId, i}
+						{#if i < breadcrumb.length - 2}
+							<button class="crumb" onclick={() => (breadcrumb = breadcrumb.slice(0, i + 2))}>
+								{folderName(crumbId)}
+							</button>
+							<span class="sep">/</span>
 						{:else}
-							<span class="crumb current" class:home-crumb={crumbId === null}>{crumbId === null ? '🏠' : folderName(crumbId)}</span>
+							<span class="crumb current">{folderName(crumbId)}</span>
 						{/if}
 					{/each}
 				</div>
