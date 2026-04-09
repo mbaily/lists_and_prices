@@ -616,13 +616,8 @@
 		const now = new Date();
 		const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 		const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-		const lines: string[] = [
-			`SMART FOLDER: ${reportName}`,
-			`Generated: ${dateStr} ${timeStr}`,
-			''
-		];
 
-		// Sort assigned folders by creation date ascending
+		// Sort assigned folders by creation date descending
 		const reportFolders = allFolders
 			.filter((f) => folderIds.includes(f.id) && !isFolderEffectivelyArchived(f.id, allFolders))
 			.sort((a, b) => {
@@ -631,10 +626,13 @@
 				return db - da;
 			});
 		const allItemsNow = readAllItems();
-		let hasAny = false;
+
+		// Build structured data for both HTML and plain-text
+		type ListBlock = { listName: string; items: { name: string; date: string }[] };
+		type FolderBlock = { folderName: string; lists: ListBlock[] };
+		const folderBlocks: FolderBlock[] = [];
 
 		for (const folder of reportFolders) {
-			// Sort lists within the folder by creation date ascending
 			const folderLists = allLists
 				.filter((l) => l.folderId === folder.id && !isListEffectivelyArchived(l, allFolders))
 				.sort((a, b) => {
@@ -643,8 +641,6 @@
 					return db - da;
 				});
 
-			// Collect items per list first to know if the folder has anything
-			type ListBlock = { listName: string; items: { name: string; createdAt: string | null }[] };
 			const blocks: ListBlock[] = [];
 			for (const list of folderLists) {
 				const items = allItemsNow
@@ -654,32 +650,108 @@
 						const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
 						return db - da;
 					});
-				if (items.length > 0)
-					blocks.push({ listName: list.name, items: items.map((i) => ({ name: i.name, createdAt: i.createdAt })) });
-			}
-
-			if (blocks.length === 0) continue;
-			hasAny = true;
-
-			lines.push(`${folder.name}`);
-			for (const block of blocks) {
-				lines.push(`  ${block.listName}`);
-				for (const item of block.items) {
-					const d = item.createdAt
-						? new Date(item.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })
-						: '';
-					lines.push(`    ${item.name}${d ? `  (${d})` : ''}`);
+				if (items.length > 0) {
+					blocks.push({
+						listName: list.name,
+						items: items.map((i) => ({
+							name: i.name,
+							date: i.createdAt
+								? new Date(i.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })
+								: ''
+						}))
+					});
 				}
 			}
-			lines.push('');
+			if (blocks.length > 0) folderBlocks.push({ folderName: folder.name, lists: blocks });
 		}
 
-		if (!hasAny) lines.push('(No uncompleted todos found)');
+		// Build plain-text version (for "Copy as text" button)
+		const plainLines: string[] = [
+			`SMART FOLDER: ${reportName}`,
+			`Generated: ${dateStr} ${timeStr}`,
+			''
+		];
+		if (folderBlocks.length === 0) {
+			plainLines.push('(No uncompleted todos found)');
+		} else {
+			for (const fb of folderBlocks) {
+				plainLines.push(fb.folderName);
+				for (const lb of fb.lists) {
+					plainLines.push(`  ${lb.listName}`);
+					for (const item of lb.items) {
+						plainLines.push(`    ${item.name}${item.date ? `  (${item.date})` : ''}`);
+					}
+				}
+				plainLines.push('');
+			}
+		}
+		const plainText = plainLines.join('\n');
 
-		const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+		// Build HTML — block-level items so CSS margin-left keeps all wrapped
+		// lines aligned without needing leading spaces.
+		function esc(s: string) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+		let bodyHtml = '';
+		if (folderBlocks.length === 0) {
+			bodyHtml = '<p class="empty">(No uncompleted todos found)</p>';
+		} else {
+			for (const fb of folderBlocks) {
+				bodyHtml += `<div class="folder-block">`;
+				bodyHtml += `<div class="folder-name">${esc(fb.folderName)}</div>`;
+				for (const lb of fb.lists) {
+					bodyHtml += `<div class="list-block">`;
+					bodyHtml += `<div class="list-name">${esc(lb.listName)}</div>`;
+					for (const item of lb.items) {
+						const date = item.date ? `<span class="date">(${esc(item.date)})</span>` : '';
+						bodyHtml += `<div class="item">${esc(item.name)} ${date}</div>`;
+					}
+					bodyHtml += `</div>`;
+				}
+				bodyHtml += `</div>`;
+			}
+		}
+
+		const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Smart Folder: ${esc(reportName)}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: ui-monospace, 'Cascadia Code', 'Fira Mono', monospace; font-size: 14px; line-height: 1.6; background: #1e1e2e; color: #cdd6f4; padding: 1.5rem 2rem 4rem; max-width: 860px; }
+  h1 { font-size: 1rem; font-weight: 700; color: #cba6f7; margin-bottom: 0.2rem; }
+  .meta { color: #6c7086; margin-bottom: 2rem; font-size: 0.85rem; }
+  .folder-block { margin-bottom: 1.5rem; }
+  .folder-name { font-weight: 700; color: #89b4fa; padding-bottom: 0.15rem; border-bottom: 1px solid #313244; margin-bottom: 0.4rem; }
+  .list-block { margin-left: 2ch; margin-top: 0.6rem; }
+  .list-name { color: #a6e3a1; font-style: italic; margin-bottom: 0.15rem; }
+  .item { margin-left: 2ch; color: #cdd6f4; word-break: break-word; }
+  .date { color: #6c7086; font-size: 0.85em; }
+  .empty { color: #6c7086; }
+  .copy-btn { position: fixed; bottom: 1.2rem; right: 1.2rem; padding: 0.55rem 1.1rem; background: #cba6f7; color: #1e1e2e; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: 700; font-family: inherit; opacity: 0.9; }
+  .copy-btn:hover { opacity: 1; }
+  .copy-btn.copied { background: #a6e3a1; }
+</style>
+</head>
+<body>
+<h1>📋 ${esc(reportName)}</h1>
+<div class="meta">Generated: ${esc(dateStr)} ${esc(timeStr)}</div>
+${bodyHtml}
+<button class="copy-btn" id="copyBtn" onclick="
+  navigator.clipboard.writeText(document.getElementById('pt').textContent).then(() => {
+    const b = document.getElementById('copyBtn');
+    b.textContent = '✓ Copied!';
+    b.classList.add('copied');
+    setTimeout(() => { b.textContent = 'Copy as text'; b.classList.remove('copied'); }, 2000);
+  });
+">Copy as text</button>
+<pre id="pt" style="display:none">${esc(plainText)}</pre>
+</body>
+</html>`;
+
+		const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
 		const url = URL.createObjectURL(blob);
 		const tab = window.open(url, '_blank');
-		// Some browsers block window.open without a user gesture — fall back to an anchor click
 		if (!tab) {
 			const a = document.createElement('a');
 			a.href = url;
