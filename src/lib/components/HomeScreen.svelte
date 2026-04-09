@@ -118,6 +118,15 @@
 				if (list) results.push({ kind: 'item', data: item, listData: list });
 			}
 		}
+		// Sort by createdAt descending (newest first); nulls go last
+		results.sort((a, b) => {
+			const aDate = a.kind === 'item' ? a.data.createdAt : a.data.createdAt;
+			const bDate = b.kind === 'item' ? b.data.createdAt : b.data.createdAt;
+			if (!aDate && !bDate) return 0;
+			if (!aDate) return 1;
+			if (!bDate) return -1;
+			return bDate.localeCompare(aDate);
+		});
 		return results;
 	});
 
@@ -630,6 +639,9 @@
 					{/if}
 				{/each}
 			</div>
+			<button class="icon-btn search-btn" class:search-active={showSearch} onclick={toggleSearch} aria-label={showSearch ? 'Close search' : 'Search'}>
+				🔍
+			</button>
 
 			<!-- No breadcrumb menu items currently -->
 			<!-- {#if !isInArchiveView && currentFolderId !== ARCHIVE_ID} -->
@@ -643,9 +655,6 @@
 				<SyncBadge status={syncState.status} />
 				<button class="icon-btn" onclick={() => (showSettings = true)} aria-label="Settings">
 					⚙
-				</button>
-				<button class="icon-btn" class:search-active={showSearch} onclick={toggleSearch} aria-label={showSearch ? 'Close search' : 'Search'}>
-					🔍
 				</button>
 			</div>
 		</header>
@@ -1302,6 +1311,7 @@
 	}
 	/* ── Search ───────────────────────────────────────────────────────────────── */
 	.icon-btn.search-active { color: var(--accent); }
+	.search-btn { margin-left: 0.35rem; flex-shrink: 0; }
 	.search-bar {
 		display: flex;
 		align-items: center;
