@@ -2,7 +2,7 @@
 
 # --- Configuration ---
 APP_NAME="lists-and-prices"
-SOURCE_DIR="$HOME/other_git/list-prices-svelte5"
+SOURCE_DIR="$HOME/other_git/list_svelt5"
 DEST_DIR="/opt/lists_and_prices"
 SERVICE_NAME="lists-and-prices.service"
 
