@@ -844,16 +844,26 @@
 				{#each allPinnedItems as pItem}
 					{@const inThisList = pItem.listId === listId}
 					{@const pItemList = allLists.find((l) => l.id === pItem.listId)}
-					<button
+					<span
 						class="pin-chip"
 						class:pin-chip-checked={!pItem.heading && !pItem.note && pItem.checked}
 						class:pin-chip-foreign={!inThisList}
-						onclick={() => {
-							if (inThisList && !pItem.heading && !pItem.note) toggleCheck(pItem);
-							else onOpenList(pItem.listId);
-						}}
-						title={inThisList ? pItem.name : `${pItem.name} — ${pItemList?.name ?? '…'}`}
-					>{pItem.name}{#if !inThisList}<span class="pin-chip-list"> ({pItemList?.name ?? '…'})</span>{/if}</button>
+					>
+						<button
+							class="pin-chip-unpin"
+							onclick={() => askDelete(`Unpin "${pItem.name}"?`, () => updateItem(pItem.id, { pinned: false }))}
+							title="Unpin"
+							aria-label="Unpin"
+						>📍</button
+						><button
+							class="pin-chip-label"
+							onclick={() => {
+								if (inThisList && !pItem.heading && !pItem.note) toggleCheck(pItem);
+								else onOpenList(pItem.listId);
+							}}
+							title={inThisList ? pItem.name : `${pItem.name} — ${pItemList?.name ?? '…'}`}
+						>{pItem.name}{#if !inThisList}<span class="pin-chip-list"> ({pItemList?.name ?? '…'})</span>{/if}</button>
+					</span>
 				{/each}
 			</div>
 		{/if}
@@ -1134,22 +1144,43 @@
 	}
 	.pin-label { font-size: 1rem; flex-shrink: 0; }
 	.pin-chip {
-		background: none;
+		display: inline-flex;
+		align-items: center;
 		border: 1px solid var(--accent);
 		border-radius: 999px;
-		padding: 0.2rem 0.65rem;
+		overflow: hidden;
+		max-width: 220px;
+		white-space: nowrap;
+	}
+	.pin-chip-unpin {
+		background: none;
+		border: none;
+		border-right: 1px solid var(--accent);
+		border-radius: 0;
+		padding: 0.2rem 0.4rem;
+		font-size: 0.75rem;
+		cursor: pointer;
+		line-height: 1;
+		opacity: 0.6;
+		flex-shrink: 0;
+	}
+	.pin-chip-unpin:hover { opacity: 1; background: color-mix(in srgb, var(--accent) 15%, transparent); }
+	.pin-chip-label {
+		background: none;
+		border: none;
+		padding: 0.2rem 0.55rem 0.2rem 0.4rem;
 		font-size: 0.82rem;
 		color: var(--accent);
 		cursor: pointer;
-		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		max-width: 200px;
+		white-space: nowrap;
 	}
-	.pin-chip.pin-chip-checked {
+	.pin-chip.pin-chip-checked .pin-chip-label {
 		text-decoration: line-through;
 		opacity: 0.6;
 	}
+	.pin-chip.pin-chip-checked .pin-chip-unpin { opacity: 0.4; }
 	.pin-chip.pin-chip-foreign {
 		border-style: dashed;
 		opacity: 0.85;
