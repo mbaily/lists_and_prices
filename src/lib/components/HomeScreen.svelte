@@ -29,7 +29,7 @@
 	} from '$lib/data';
 	import { syncState, docState } from '$lib/yjsStore.svelte';
 	import { settings } from '$lib/settings.svelte';
-	import { smartFolders, assignToReport, removeFromReport } from '$lib/smartFolders.svelte';
+	import { smartFolders, assignToReport, removeFromReport, deleteReport } from '$lib/smartFolders.svelte';
 	import ListScreen from './ListScreen.svelte';
 	import SpreadsheetScreen from './SpreadsheetScreen.svelte';
 	import ColorPicker from './ColorPicker.svelte';
@@ -1197,11 +1197,14 @@ ${bodyHtml}
 						<div class="sf-list">
 							{#each sfReportNames() as rname}
 								{@const assigned = (smartFolders[rname] ?? []).includes(fid)}
-								<button
-									class="sf-opt"
-									class:sf-opt-active={assigned}
-									onclick={() => assigned ? removeFromReport(fid, rname) : assignToReport(fid, rname)}
-								>{assigned ? '☑' : '☐'} {rname}</button>
+								<div class="sf-opt-row">
+									<button
+										class="sf-opt"
+										class:sf-opt-active={assigned}
+										onclick={() => assigned ? removeFromReport(fid, rname) : assignToReport(fid, rname)}
+									>{assigned ? '☑' : '☐'} {rname}</button>
+									<button class="sf-del-btn" onclick={() => deleteReport(rname)} aria-label="Delete report">🗑</button>
+								</div>
 							{/each}
 						</div>
 					{/if}
@@ -1808,7 +1811,13 @@ ${bodyHtml}
 		flex-direction: column;
 		gap: 0.2rem;
 	}
+	.sf-opt-row {
+		display: flex;
+		align-items: center;
+		gap: 0.3rem;
+	}
 	.sf-opt {
+		flex: 1;
 		background: none;
 		border: 1px solid var(--border);
 		border-radius: 8px;
@@ -1818,6 +1827,21 @@ ${bodyHtml}
 		color: var(--text);
 		cursor: pointer;
 	}
+	.sf-del-btn {
+		background: none;
+		border: none;
+		cursor: pointer;
+		font-size: 1rem;
+		color: #ef4444;
+		padding: 0.3rem;
+		min-width: 32px;
+		min-height: 36px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 6px;
+	}
+	.sf-del-btn:hover { background: color-mix(in srgb, #ef4444 12%, transparent); }
 	.sf-opt.sf-opt-active {
 		border-color: var(--accent);
 		color: var(--accent);

@@ -42,6 +42,11 @@ export function removeFromReport(folderId: string, reportName: string) {
 	save({ ...smartFolders });
 }
 
+export function deleteReport(reportName: string) {
+	delete smartFolders[reportName];
+	save({ ...smartFolders });
+}
+
 /** Reload after login/user switch so the correct user's config is loaded. */
 export function reloadSmartFolders() {
 	const fresh = load();
