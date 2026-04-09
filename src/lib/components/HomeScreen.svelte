@@ -78,6 +78,7 @@
 	let showSearch = $state(false);
 	let searchQuery = $state('');
 	let searchInputEl: HTMLInputElement | null = null;
+	let savedSearch = $state<string | null>(null); // persists after navigating to a result
 
 	// ── Live data (re-read on every Yjs change) ─────────────────────────────────
 	// docState.version increments on every Yjs update, making these $derived re-run.
@@ -533,14 +534,30 @@
 
 	// ── Search actions ────────────────────────────────────────────────────────────
 	function toggleSearch() {
-		showSearch = !showSearch;
-		if (!showSearch) searchQuery = '';
-		else tick().then(() => searchInputEl?.focus());
+		if (!showSearch) {
+			// Opening fresh search — clear saved crumb so user starts clean
+			savedSearch = null;
+			showSearch = true;
+			tick().then(() => searchInputEl?.focus());
+		} else {
+			showSearch = false;
+			searchQuery = '';
+		}
+	}
+
+	function restoreSearch() {
+		if (!savedSearch) return;
+		searchQuery = savedSearch;
+		savedSearch = null;
+		showSearch = true;
+		tick().then(() => searchInputEl?.focus());
 	}
 
 	function openSearchResult(result: SearchResult) {
+		const query = searchQuery.trim();
 		showSearch = false;
 		searchQuery = '';
+		savedSearch = query || null;
 		if (result.kind === 'folder') {
 			const visited = new Set<string>();
 			const ids: string[] = [];
@@ -629,6 +646,10 @@
 		<header>
 			<div class="header-left">
 				<div class="breadcrumb">
+					{#if savedSearch && !showSearch}
+						<button class="crumb search-crumb" onclick={restoreSearch} title="Back to search results">🔍 "{savedSearch}"</button>
+						<span class="sep">/</span>
+					{/if}
 					{#each breadcrumb as crumbId, i}
 						{#if i < breadcrumb.length - 1}
 							<button class="crumb" class:home-crumb={crumbId === null} onclick={() => (breadcrumb = breadcrumb.slice(0, i + 1))}>
@@ -1314,6 +1335,15 @@
 	/* ── Search ───────────────────────────────────────────────────────────────── */
 	.icon-btn.search-active { color: var(--accent); }
 	.search-btn { flex-shrink: 0; }
+	.search-crumb {
+		color: var(--accent);
+		opacity: 0.75;
+		font-size: 0.88rem;
+		white-space: nowrap;
+		max-width: 140px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
 	.header-left {
 		display: flex;
 		align-items: center;
