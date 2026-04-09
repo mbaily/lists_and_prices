@@ -32,7 +32,6 @@
 	import { getSmartFolders, assignToReport, removeFromReport, deleteReport } from '$lib/smartFolders.svelte';
 	import ListScreen from './ListScreen.svelte';
 	import SpreadsheetScreen from './SpreadsheetScreen.svelte';
-	import SmartFolderReportScreen from './SmartFolderReportScreen.svelte';
 	import ColorPicker from './ColorPicker.svelte';
 	import SettingsScreen from './SettingsScreen.svelte';
 	import SyncBadge from './SyncBadge.svelte';
@@ -608,7 +607,6 @@
 	let sfDialogFolder = $state<Folder | null>(null);
 	let sfNewName = $state('');
 	let showReportsMenu = $state(false);
-	let reactiveReportName = $state<string | null>(null);
 
 	function sfReportNames(): string[] {
 		return Object.keys(getSmartFolders()).sort();
@@ -825,8 +823,6 @@ ${bodyHtml}
 	}} />
 {:else if showSettings}
 	<SettingsScreen onBack={() => (showSettings = false)} {onLogout} />
-{:else if reactiveReportName}
-	<SmartFolderReportScreen reportName={reactiveReportName} onBack={() => (reactiveReportName = null)} />
 {:else}
 	<div class="screen">
 		<!-- Header -->
@@ -881,8 +877,11 @@ ${bodyHtml}
 					<button class="reports-item reports-item-split" onclick={(e) => {
 							const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
 							showReportsMenu = false;
-							if (e.clientX < rect.left + rect.width / 2) { reactiveReportName = rname; }
-							else { generateReport(rname); }
+							if (e.clientX < rect.left + rect.width / 2) {
+								window.open('/report/' + encodeURIComponent(rname), '_blank', 'noopener');
+							} else {
+								generateReport(rname);
+							}
 						}}>
 							<span class="split-left-zone" aria-hidden="true">⟳</span>
 							<span class="split-name">{rname}</span>
