@@ -627,21 +627,23 @@
 	<div class="screen">
 		<!-- Header -->
 		<header>
-			<div class="breadcrumb">
-				{#each breadcrumb as crumbId, i}
-					{#if i < breadcrumb.length - 1}
-						<button class="crumb" class:home-crumb={crumbId === null} onclick={() => (breadcrumb = breadcrumb.slice(0, i + 1))}>
-						{crumbId === null ? '🏠' : folderName(crumbId)}
-					</button>
-					<span class="sep">/</span>
-					{:else}
-						<span class="crumb current" class:home-crumb={crumbId === null}>{crumbId === null ? '🏠' : folderName(crumbId)}</span>
-					{/if}
-				{/each}
+			<div class="header-left">
+				<div class="breadcrumb">
+					{#each breadcrumb as crumbId, i}
+						{#if i < breadcrumb.length - 1}
+							<button class="crumb" class:home-crumb={crumbId === null} onclick={() => (breadcrumb = breadcrumb.slice(0, i + 1))}>
+							{crumbId === null ? '🏠' : folderName(crumbId)}
+						</button>
+						<span class="sep">/</span>
+						{:else}
+							<span class="crumb current" class:home-crumb={crumbId === null}>{crumbId === null ? '🏠' : folderName(crumbId)}</span>
+						{/if}
+					{/each}
+				</div>
+				<button class="icon-btn search-btn" class:search-active={showSearch} onclick={toggleSearch} aria-label={showSearch ? 'Close search' : 'Search'}>
+					🔍
+				</button>
 			</div>
-			<button class="icon-btn search-btn" class:search-active={showSearch} onclick={toggleSearch} aria-label={showSearch ? 'Close search' : 'Search'}>
-				🔍
-			</button>
 
 			<!-- No breadcrumb menu items currently -->
 			<!-- {#if !isInArchiveView && currentFolderId !== ARCHIVE_ID} -->
@@ -1311,7 +1313,14 @@
 	}
 	/* ── Search ───────────────────────────────────────────────────────────────── */
 	.icon-btn.search-active { color: var(--accent); }
-	.search-btn { margin-left: 0.35rem; flex-shrink: 0; }
+	.search-btn { flex-shrink: 0; }
+	.header-left {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		min-width: 0;
+		flex: 1;
+	}
 	.search-bar {
 		display: flex;
 		align-items: center;
