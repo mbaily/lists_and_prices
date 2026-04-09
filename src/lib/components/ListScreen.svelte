@@ -686,10 +686,12 @@
 
 	// ── Delete confirmation ───────────────────────────────────────────────────────
 	let confirmMsg = $state('');
+	let confirmLabel = $state('Delete');
 	let confirmAction = $state<(() => void) | null>(null);
 
-	function askDelete(msg: string, action: () => void) {
+	function askDelete(msg: string, action: () => void, label = 'Delete') {
 		confirmMsg = msg;
+		confirmLabel = label;
 		confirmAction = () => action();
 	}
 
@@ -851,7 +853,7 @@
 					>
 						<button
 							class="pin-chip-unpin"
-							onclick={() => askDelete(`Unpin "${pItem.name}"?`, () => updateItem(pItem.id, { pinned: false }))}
+							onclick={() => askDelete(`Unpin "${pItem.name}"?`, () => updateItem(pItem.id, { pinned: false }), 'Unpin')}
 							title="Unpin"
 							aria-label="Unpin"
 						>📍</button
@@ -1063,6 +1065,7 @@
 	{#if confirmAction}
 		<ConfirmDialog
 			message={confirmMsg}
+			confirmLabel={confirmLabel}
 			onConfirm={() => { confirmAction?.(); confirmAction = null; }}
 			onCancel={() => (confirmAction = null)}
 		/>
