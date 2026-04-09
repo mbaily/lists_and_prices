@@ -31,6 +31,10 @@ sudo chown -R www-data:www-data "$DEST_DIR"
 echo "📥 Checking dependencies..."
 sudo -u www-data npm install --prefix "$DEST_DIR" --omit=dev
 
+# 4a. Rebuild native addons against the current Node version
+echo "🔧 Rebuilding native addons..."
+sudo -u www-data npm rebuild --prefix "$DEST_DIR"
+
 # 5. Restart the service
 echo "♻️  Restarting $SERVICE_NAME..."
 sudo systemctl restart "$SERVICE_NAME"
