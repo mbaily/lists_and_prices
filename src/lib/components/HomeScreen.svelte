@@ -621,7 +621,7 @@
 {#if openSheetId}
 	<SpreadsheetScreen sheetId={openSheetId} onBack={() => openSheetId = null} />
 {:else if openListId}
-	<ListScreen listId={openListId} onHome={() => { openListId = null; breadcrumb = [null]; }} onOpenList={(id) => (openListId = id)} onNavigateTo={(folderId) => {
+	<ListScreen listId={openListId} onHome={() => { openListId = null; breadcrumb = [null]; }} onOpenList={(id) => (openListId = id)} savedSearch={savedSearch} onRestoreSearch={() => { openListId = null; breadcrumb = [null]; restoreSearch(); }} onNavigateTo={(folderId) => {
 		openListId = null;
 		// Reconstruct the full ancestor path to folderId so the breadcrumb is correct
 		// regardless of which folder the user was in when they opened the list.

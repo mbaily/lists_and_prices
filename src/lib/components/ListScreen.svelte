@@ -24,11 +24,13 @@
 	import RowMenu from './RowMenu.svelte';
 	import InfoDialog from './InfoDialog.svelte';
 
-	let { listId, onHome, onOpenList, onNavigateTo }: {
+	let { listId, onHome, onOpenList, onNavigateTo, savedSearch = null, onRestoreSearch = undefined }: {
 		listId: string;
 		onHome: () => void;
 		onOpenList: (id: string) => void;
 		onNavigateTo: (folderId: string | null) => void;
+		savedSearch?: string | null;
+		onRestoreSearch?: () => void;
 	} = $props();
 
 	let items = $derived.by(() => {
@@ -715,6 +717,10 @@
 	<header>
 		<button class="home-btn" onclick={onHome} aria-label="Home">🏠</button>
 		<div class="breadcrumb">
+			{#if savedSearch && onRestoreSearch}
+				<button class="crumb search-crumb" onclick={onRestoreSearch} title="Back to search results">🔍 "{savedSearch}"</button>
+				<span class="sep">/</span>
+			{/if}
 			{#each breadcrumbItems as crumb, i}
 				{#if i > 0}<span class="sep">/</span>{/if}
 				{#if crumb.id === 'LIST'}
@@ -1119,6 +1125,15 @@
 		padding: 0;
 		line-height: 1;
 		flex-shrink: 0;
+	}
+	.search-crumb {
+		color: var(--accent);
+		opacity: 0.75;
+		font-size: 0.88rem;
+		white-space: nowrap;
+		max-width: 140px;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 	.type-btn {
 		background: none;
