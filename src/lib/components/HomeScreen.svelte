@@ -718,7 +718,7 @@
 <title>Smart Folder: ${esc(reportName)}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: ui-monospace, 'Cascadia Code', 'Fira Mono', monospace; font-size: 14px; line-height: 1.6; background: #1e1e2e; color: #cdd6f4; padding: 1.5rem 2rem 4rem; max-width: 860px; }
+  body { font-family: ui-monospace, 'Cascadia Code', 'Fira Mono', monospace; font-size: 14px; line-height: 1.6; background: #000; color: #fff; padding: 1.5rem 2rem 4rem; max-width: 860px; }
   h1 { font-size: 1rem; font-weight: 700; color: #cba6f7; margin-bottom: 0.2rem; }
   .meta { color: #6c7086; margin-bottom: 2rem; font-size: 0.85rem; }
   .folder-block { margin-bottom: 1.5rem; }
@@ -737,14 +737,14 @@
 <h1>📋 ${esc(reportName)}</h1>
 <div class="meta">Generated: ${esc(dateStr)} ${esc(timeStr)}</div>
 ${bodyHtml}
-<button class="copy-btn" id="copyBtn" onclick="
+<button class="copy-btn" id="copyBtn" title="Copy as text" onclick="
   navigator.clipboard.writeText(document.getElementById('pt').textContent).then(() => {
     const b = document.getElementById('copyBtn');
-    b.textContent = '✓ Copied!';
+    b.textContent = '✓';
     b.classList.add('copied');
-    setTimeout(() => { b.textContent = 'Copy as text'; b.classList.remove('copied'); }, 2000);
+    setTimeout(() => { b.textContent = '⎘'; b.classList.remove('copied'); }, 2000);
   });
-">Copy as text</button>
+">⎘</button>
 <pre id="pt" style="display:none">${esc(plainText)}</pre>
 </body>
 </html>`;
