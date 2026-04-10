@@ -812,25 +812,9 @@ ${bodyHtml}
 		}
 		window.addEventListener('popstate', onPopState);
 		window.addEventListener('hashchange', onPopState);
-
-		// Navigate when a smart-folder report tab clicks a list/folder link.
-		const ch = new BroadcastChannel('sf-nav');
-		console.log('[sf-nav] HomeScreen: BroadcastChannel listener registered');
-		ch.onmessage = (e: MessageEvent<{ url: string }>) => {
-			console.log('[sf-nav] HomeScreen: received message', e.data);
-			const { url } = e.data;
-			history.pushState(null, '', url);
-			const { breadcrumb: crumbs, openListId: listId } = parseHash();
-			breadcrumb = crumbs;
-			openListId = listId;
-			_lastHash = window.location.hash;
-			window.focus();
-		};
-
 		return () => {
 			window.removeEventListener('popstate', onPopState);
 			window.removeEventListener('hashchange', onPopState);
-			ch.close();
 		};
 	});
 </script>
