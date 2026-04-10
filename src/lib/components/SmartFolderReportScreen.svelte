@@ -6,15 +6,43 @@
 		readLists,
 		readAllItems,
 		isFolderEffectivelyArchived,
-		isListEffectivelyArchived
+		isListEffectivelyArchived,
+		type Item
 	} from '$lib/data';
 	import { getSmartFolders } from '$lib/smartFolders.svelte';
 
 	let { reportName, onBack }: { reportName: string; onBack: () => void } = $props();
 
-	type ItemEntry = { name: string; date: string };
+	type ItemEntry = { name: string; date: string; isNote: boolean; children: ItemEntry[] };
 	type ListBlock = { listName: string; items: ItemEntry[] };
 	type FolderBlock = { folderName: string; lists: ListBlock[] };
+
+	function formatDate(createdAt: string | null): string {
+		return createdAt
+			? new Date(createdAt).toLocaleDateString('en-GB', {
+					day: '2-digit',
+					month: '2-digit',
+					year: '2-digit'
+				})
+			: '';
+	}
+
+	function buildItemTree(allListItems: Item[], parentId: string | null): ItemEntry[] {
+		return allListItems
+			.filter(
+				(i) =>
+					(i.parentId ?? null) === parentId &&
+					!i.heading &&
+					(!i.checked || i.note)
+			)
+			.sort((a, b) => a.order - b.order)
+			.map((i) => ({
+				name: i.name,
+				date: formatDate(i.createdAt),
+				isNote: i.note,
+				children: buildItemTree(allListItems, i.id)
+			}));
+	}
 
 	const folderBlocks = $derived.by((): FolderBlock[] => {
 		void docState.version;
@@ -43,27 +71,24 @@
 
 			const blocks: ListBlock[] = [];
 			for (const list of folderLists) {
-				const items = allItems
-					.filter((i) => i.listId === list.id && !i.checked && !i.heading && !i.note)
+				const listItems = allItems.filter((i) => i.listId === list.id);
+				const topItems = listItems
+					.filter(
+						(i) => !i.checked && !i.heading && !i.note && (i.parentId ?? null) === null
+					)
 					.sort((a, b) => {
 						const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
 						const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
 						return db - da;
-					});
-				if (items.length > 0) {
-					blocks.push({
-						listName: list.name,
-						items: items.map((i) => ({
-							name: i.name,
-							date: i.createdAt
-								? new Date(i.createdAt).toLocaleDateString('en-GB', {
-										day: '2-digit',
-										month: '2-digit',
-										year: '2-digit'
-									})
-								: ''
-						}))
-					});
+					})
+					.map((i) => ({
+						name: i.name,
+						date: formatDate(i.createdAt),
+						isNote: false,
+						children: buildItemTree(listItems, i.id)
+					}));
+				if (topItems.length > 0) {
+					blocks.push({ listName: list.name, items: topItems });
 				}
 			}
 			if (blocks.length > 0) result.push({ folderName: folder.name, lists: blocks });
@@ -72,6 +97,13 @@
 	});
 
 	let copyStatus = $state<'idle' | 'copied'>('idle');
+
+	function addItemLines(lines: string[], items: ItemEntry[], indent: string) {
+		for (const item of items) {
+			lines.push(`${indent}${item.name}${item.date ? `  (${item.date})` : ''}`);
+			if (item.children.length > 0) addItemLines(lines, item.children, indent + '  ');
+		}
+	}
 
 	async function copyAsText() {
 		const lines: string[] = [`SMART FOLDER: ${reportName}`, ''];
@@ -82,9 +114,7 @@
 				lines.push(fb.folderName);
 				for (const lb of fb.lists) {
 					lines.push(`  ${lb.listName}`);
-					for (const item of lb.items) {
-						lines.push(`    ${item.name}${item.date ? `  (${item.date})` : ''}`);
-					}
+					addItemLines(lines, lb.items, '    ');
 				}
 				lines.push('');
 			}
@@ -123,11 +153,16 @@
 					{#each fb.lists as lb}
 						<div class="rf-list-block">
 							<div class="rf-list-name">{lb.listName}</div>
-							{#each lb.items as item}
-								<div class="rf-item">
-									{item.name}
-									{#if item.date}<span class="rf-date">({item.date})</span>{/if}
+							{#snippet renderItem(item: ItemEntry, depth: number)}
+								<div class="rf-item" style="margin-left: {depth * 2}ch">
+									{#if item.isNote}<span class="rf-note-mark">↳ </span>{/if}{item.name}{#if item.date}<span class="rf-date"> ({item.date})</span>{/if}
 								</div>
+								{#each item.children as child}
+									{@render renderItem(child, depth + 1)}
+								{/each}
+							{/snippet}
+							{#each lb.items as item}
+								{@render renderItem(item, 0)}
 							{/each}
 						</div>
 					{/each}
@@ -214,9 +249,12 @@
 		margin-bottom: 0.15rem;
 	}
 	.rf-item {
-		margin-left: 2ch;
+		margin-left: 0;
 		color: #fff;
 		word-break: break-word;
+	}
+	.rf-note-mark {
+		color: #888;
 	}
 	.rf-date {
 		color: #888;
