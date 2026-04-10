@@ -811,7 +811,11 @@ ${bodyHtml}
 			_lastHash = window.location.hash;
 		}
 		window.addEventListener('popstate', onPopState);
-		return () => window.removeEventListener('popstate', onPopState);
+		window.addEventListener('hashchange', onPopState);
+		return () => {
+			window.removeEventListener('popstate', onPopState);
+			window.removeEventListener('hashchange', onPopState);
+		};
 	});
 </script>
 
