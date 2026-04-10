@@ -892,7 +892,7 @@ ${bodyHtml}
 							const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
 							showReportsMenu = false;
 							if (e.clientX < rect.left + rect.width / 2) {
-								window.open('/report/' + encodeURIComponent(rname), '_blank', 'noopener');
+								window.open('/report/' + encodeURIComponent(rname), '_blank');
 							} else {
 								generateReport(rname);
 							}

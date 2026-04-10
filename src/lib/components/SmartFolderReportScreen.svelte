@@ -15,7 +15,7 @@
 
 	type ItemEntry = { name: string; date: string; isNote: boolean; children: ItemEntry[] };
 	type ListBlock = { listName: string; listId: string; items: ItemEntry[] };
-	type FolderBlock = { folderName: string; lists: ListBlock[] };
+	type FolderBlock = { folderName: string; folderId: string; lists: ListBlock[] };
 
 	function formatDate(createdAt: string | null): string {
 		return createdAt
@@ -91,21 +91,37 @@
 					blocks.push({ listName: list.name, listId: list.id, items: topItems });
 				}
 			}
-			if (blocks.length > 0) result.push({ folderName: folder.name, lists: blocks });
+			if (blocks.length > 0) result.push({ folderName: folder.name, folderId: folder.id, lists: blocks });
 		}
 		return result;
 	});
 
 	let copyStatus = $state<'idle' | 'copied'>('idle');
 
-	function navigateToList(listId: string) {
-		const url = `/#l/${listId}`;
+	function navigate(url: string) {
 		if (window.opener && !window.opener.closed) {
 			window.opener.location.href = url;
 			window.opener.focus();
 		} else {
 			window.open(url, '_blank');
 		}
+	}
+
+	function navigateToList(listId: string) { navigate(`/#l/${listId}`); }
+	function navigateToFolder(folderId: string) {
+		// Build the full ancestor path so the breadcrumb is correct for nested folders
+		const allFolders = readFolders();
+		const ancestors: string[] = [];
+		let fid: string | null = folderId;
+		const visited = new Set<string>();
+		while (fid !== null) {
+			if (visited.has(fid)) break;
+			visited.add(fid);
+			ancestors.unshift(fid);
+			const f = allFolders.find((x) => x.id === fid);
+			fid = f?.parentId ?? null;
+		}
+		navigate(`/#f/${ancestors.join('/')}`);
 	}
 
 	function addItemLines(lines: string[], items: ItemEntry[], indent: string) {
@@ -159,7 +175,8 @@
 		{:else}
 			{#each folderBlocks as fb}
 				<div class="rf-folder-block">
-					<div class="rf-folder-name">{fb.folderName}</div>
+					<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+					<div class="rf-folder-name rf-clickable" onclick={() => navigateToFolder(fb.folderId)}>{fb.folderName}</div>
 					{#each fb.lists as lb}
 						<div class="rf-list-block">
 						<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
