@@ -815,7 +815,9 @@ ${bodyHtml}
 
 		// Navigate when a smart-folder report tab clicks a list/folder link.
 		const ch = new BroadcastChannel('sf-nav');
+		console.log('[sf-nav] HomeScreen: BroadcastChannel listener registered');
 		ch.onmessage = (e: MessageEvent<{ url: string }>) => {
+			console.log('[sf-nav] HomeScreen: received message', e.data);
 			const { url } = e.data;
 			history.pushState(null, '', url);
 			const { breadcrumb: crumbs, openListId: listId } = parseHash();

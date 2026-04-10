@@ -99,9 +99,16 @@
 	let copyStatus = $state<'idle' | 'copied'>('idle');
 
 	function navigate(url: string) {
-		const ch = new BroadcastChannel('sf-nav');
-		ch.postMessage({ url });
-		ch.close();
+		console.log('[sf-nav] navigate called with url:', url);
+		try {
+			const ch = new BroadcastChannel('sf-nav');
+			console.log('[sf-nav] BroadcastChannel created, posting message');
+			ch.postMessage({ url });
+			ch.close();
+			console.log('[sf-nav] message posted and channel closed');
+		} catch (err) {
+			console.error('[sf-nav] BroadcastChannel error:', err);
+		}
 		try { if (window.opener && !window.opener.closed) window.opener.focus(); } catch { /* cross-origin */ }
 	}
 
