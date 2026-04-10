@@ -100,7 +100,10 @@
 
 	function navigate(url: string) {
 		if (window.opener && !window.opener.closed) {
-			window.opener.location.href = url;
+			// pushState updates the URL; then dispatch popstate so HomeScreen's handler fires.
+			// (location.href assignment triggers hashchange, not popstate, which HomeScreen doesn't listen for.)
+			window.opener.history.pushState(null, '', url);
+			window.opener.dispatchEvent(new Event('popstate'));
 			window.opener.focus();
 		} else {
 			window.open(url, '_blank');
