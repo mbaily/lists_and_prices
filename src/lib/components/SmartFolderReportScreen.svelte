@@ -99,12 +99,10 @@
 	let copyStatus = $state<'idle' | 'copied'>('idle');
 
 	function navigate(url: string) {
-		if (window.opener && !window.opener.closed) {
-			window.opener.location.href = url;
-			window.opener.focus();
-		} else {
-			window.open(url, '_blank');
-		}
+		const ch = new BroadcastChannel('sf-nav');
+		ch.postMessage({ url });
+		ch.close();
+		try { if (window.opener && !window.opener.closed) window.opener.focus(); } catch { /* cross-origin */ }
 	}
 
 	function navigateToList(listId: string) { navigate(`/#l/${listId}`); }
