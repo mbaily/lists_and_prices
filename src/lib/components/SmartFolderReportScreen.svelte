@@ -14,7 +14,7 @@
 	let { reportName, onBack }: { reportName: string; onBack: () => void } = $props();
 
 	type ItemEntry = { name: string; date: string; isNote: boolean; children: ItemEntry[] };
-	type ListBlock = { listName: string; items: ItemEntry[] };
+	type ListBlock = { listName: string; listId: string; items: ItemEntry[] };
 	type FolderBlock = { folderName: string; lists: ListBlock[] };
 
 	function formatDate(createdAt: string | null): string {
@@ -88,7 +88,7 @@
 						children: buildItemTree(listItems, i.id)
 					}));
 				if (topItems.length > 0) {
-					blocks.push({ listName: list.name, items: topItems });
+					blocks.push({ listName: list.name, listId: list.id, items: topItems });
 				}
 			}
 			if (blocks.length > 0) result.push({ folderName: folder.name, lists: blocks });
@@ -97,6 +97,16 @@
 	});
 
 	let copyStatus = $state<'idle' | 'copied'>('idle');
+
+	function navigateToList(listId: string) {
+		const url = `/#l/${listId}`;
+		if (window.opener && !window.opener.closed) {
+			window.opener.location.href = url;
+			window.opener.focus();
+		} else {
+			window.open(url, '_blank');
+		}
+	}
 
 	function addItemLines(lines: string[], items: ItemEntry[], indent: string) {
 		for (const item of items) {
@@ -152,9 +162,11 @@
 					<div class="rf-folder-name">{fb.folderName}</div>
 					{#each fb.lists as lb}
 						<div class="rf-list-block">
-							<div class="rf-list-name">{lb.listName}</div>
-							{#snippet renderItem(item: ItemEntry, depth: number)}
-								<div class="rf-item" style="margin-left: {depth * 2}ch">
+						<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+						<div class="rf-list-name rf-clickable" onclick={() => navigateToList(lb.listId)}>{lb.listName}</div>
+						{#snippet renderItem(item: ItemEntry, depth: number)}
+							<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+							<div class="rf-item rf-clickable" style="margin-left: {depth * 2}ch" onclick={() => navigateToList(lb.listId)}>
 									{#if item.isNote}<span class="rf-note-mark">↳ </span>{/if}{item.name}{#if item.date}<span class="rf-date"> ({item.date})</span>{/if}
 								</div>
 								{#each item.children as child}
@@ -252,6 +264,9 @@
 		margin-left: 0;
 		color: #fff;
 		word-break: break-word;
+	}
+	.rf-clickable {
+		cursor: pointer;
 	}
 	.rf-note-mark {
 		color: #888;
