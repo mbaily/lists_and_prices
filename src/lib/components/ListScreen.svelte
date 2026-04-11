@@ -1387,10 +1387,10 @@
 		display: flex;
 		align-items: center;
 		gap: 0.4rem;
-		padding: var(--item-spacing, 0.5rem) 0.75rem;
+		padding: var(--item-spacing, 8px) 0.75rem;
 		border-bottom: 1px solid var(--border);
 		transition: background 0.15s, opacity 0.15s;
-		min-height: var(--row-min-height, 52px);
+		line-height: var(--row-line-height, normal);
 	}
 	/* Priced rows: two-line layout on touch devices only */
 	@media (pointer: coarse) {
@@ -1425,7 +1425,7 @@
 	.item-row.heading {
 		background: var(--bg2);
 		border-top: 1px solid var(--border);
-		padding: calc(var(--item-spacing, 0.25rem) / 2) 0.75rem;
+		padding: var(--item-spacing, 4px) 0.75rem;
 	}
 	.heading-name {
 		font-weight: 700;
@@ -1437,19 +1437,18 @@
 	.check-btn {
 		background: none;
 		border: none;
-		font-size: 1.82rem;
+		font-size: var(--row-icon-size, 1.82rem);
 		cursor: pointer;
 		padding: 0;
 		flex-shrink: 0;
 		min-width: 50px;
-		min-height: var(--row-min-height, 50px);
 		display: flex;
 		align-items: center;
 		justify-content: center;
 	}
 	@media (pointer: fine) {
 		/* Mouse/trackpad users: revert to original size */
-		.check-btn { font-size: 1.4rem; min-width: 44px; min-height: var(--row-min-height, 44px); }
+		.check-btn { font-size: var(--row-icon-size, 1.4rem); min-width: 44px; }
 	}
 	.item-name {
 		flex: 1;
@@ -1475,10 +1474,9 @@
 	}
 	/* ── Subnotes ────────────────────────────────────────────────────────── */
 	.note-icon {
-		font-size: 1.1rem;
+		font-size: var(--row-icon-size, 1.1rem);
 		flex-shrink: 0;
 		min-width: 50px;
-		min-height: var(--row-min-height, 50px);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -1564,7 +1562,6 @@
 		user-select: none;
 		flex-shrink: 0;
 		min-width: 44px;
-		min-height: 44px;
 		display: flex;
 		align-items: center;
 		justify-content: center;

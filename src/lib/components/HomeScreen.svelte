@@ -1396,11 +1396,11 @@ ${bodyHtml}
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		padding: var(--item-spacing, 0.65rem) 1rem;
+		padding: var(--item-spacing, 8px) 1rem;
 		border-bottom: 1px solid var(--border);
-		min-height: var(--row-min-height, 52px);
 		transition: background 0.15s, opacity 0.15s;
 		position: relative;
+		line-height: var(--row-line-height, normal);
 	}
 	.folder-row, .list-row {
 		padding-left: 1.35rem;
@@ -1497,7 +1497,6 @@ ${bodyHtml}
 		padding: 0;
 		color: var(--text2);
 		min-width: 28px;
-		min-height: var(--row-min-height, 44px);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -1506,12 +1505,11 @@ ${bodyHtml}
 	.check-circle {
 		background: none;
 		border: none;
-		font-size: 1.3rem;
+		font-size: var(--row-icon-size, 1.3rem);
 		cursor: pointer;
 		padding: 0;
 		flex-shrink: 0;
 		min-width: 36px;
-		min-height: var(--row-min-height, 44px);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -1546,7 +1544,6 @@ ${bodyHtml}
 		cursor: pointer;
 		color: var(--text2);
 		min-width: 40px;
-		min-height: var(--row-min-height, 44px);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -1560,7 +1557,6 @@ ${bodyHtml}
 		-webkit-user-select: none;
 		touch-action: none;
 		min-width: 44px;
-		min-height: var(--row-min-height, 44px);
 		display: flex;
 		align-items: center;
 		justify-content: center;

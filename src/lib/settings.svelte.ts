@@ -64,11 +64,15 @@ export function applyTheme() {
 }
 
 export function applyItemSpacing() {
-	const spacing = settings.itemSpacing;
-	document.documentElement.style.setProperty('--item-spacing', `${spacing}px`);
-	if (spacing === 0) {
-		document.documentElement.style.setProperty('--row-min-height', '0px');
+	const s = settings.itemSpacing;
+	const root = document.documentElement;
+	root.style.setProperty('--item-spacing', `${s}px`);
+	root.style.removeProperty('--row-min-height');
+	if (s === 0) {
+		root.style.setProperty('--row-icon-size', '1rem');
+		root.style.setProperty('--row-line-height', '1');
 	} else {
-		document.documentElement.style.removeProperty('--row-min-height');
+		root.style.removeProperty('--row-icon-size');
+		root.style.removeProperty('--row-line-height');
 	}
 }

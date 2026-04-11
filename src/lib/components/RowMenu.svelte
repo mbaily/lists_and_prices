@@ -106,11 +106,10 @@
 	.menu-trigger {
 		background: none;
 		border: none;
-		font-size: 1.3rem;
+		font-size: var(--row-icon-size, 1.3rem);
 		color: var(--text2);
 		cursor: pointer;
 		min-width: 36px;
-		min-height: 44px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
