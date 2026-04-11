@@ -64,5 +64,11 @@ export function applyTheme() {
 }
 
 export function applyItemSpacing() {
-	document.documentElement.style.setProperty('--item-spacing', `${settings.itemSpacing}px`);
+	const spacing = settings.itemSpacing;
+	document.documentElement.style.setProperty('--item-spacing', `${spacing}px`);
+	if (spacing === 0) {
+		document.documentElement.style.setProperty('--row-min-height', '0px');
+	} else {
+		document.documentElement.style.removeProperty('--row-min-height');
+	}
 }
