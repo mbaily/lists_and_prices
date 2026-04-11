@@ -182,6 +182,22 @@
 		</section>
 
 		<section>
+			<h2>Item spacing</h2>
+			<div class="toggle-row spacing-row">
+				<input
+					type="range"
+					class="spacing-slider"
+					min="0"
+					max="16"
+					step="1"
+					value={settings.itemSpacing}
+					oninput={(e) => updateSettings({ itemSpacing: parseInt((e.target as HTMLInputElement).value, 10) })}
+				/>
+				<span class="spacing-value">{settings.itemSpacing}px</span>
+			</div>
+		</section>
+
+		<section>
 			<h2>Account</h2>
 			<button class="logout-btn" onclick={onLogout}>Sign out</button>
 		</section>
@@ -355,4 +371,11 @@
 	.restore-err { margin: 0; font-size: 0.85rem; color: #ef4444; }
 	footer { margin-top: auto; text-align: center; }
 	.version { font-size: 0.8rem; color: var(--text2); }
+	.spacing-row { align-items: center; gap: 0.75rem; }
+	.spacing-slider {
+		flex: 1;
+		accent-color: var(--accent);
+		cursor: pointer;
+	}
+	.spacing-value { color: var(--text2); font-size: 0.95rem; min-width: 2.5rem; text-align: right; }
 </style>

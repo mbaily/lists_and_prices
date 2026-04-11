@@ -1387,7 +1387,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.4rem;
-		padding: 0.5rem 0.75rem;
+		padding: var(--item-spacing, 0.5rem) 0.75rem;
 		border-bottom: 1px solid var(--border);
 		transition: background 0.15s, opacity 0.15s;
 		min-height: 52px;
@@ -1398,7 +1398,7 @@
 			flex-direction: column;
 			align-items: stretch;
 			gap: 0;
-			padding: 0.4rem 0.75rem 0.3rem;
+			padding: var(--item-spacing, 0.4rem) 0.75rem;
 		}
 		.priced-top {
 			display: flex;
@@ -1425,7 +1425,7 @@
 	.item-row.heading {
 		background: var(--bg2);
 		border-top: 1px solid var(--border);
-		padding: 0.25rem 0.75rem;
+		padding: calc(var(--item-spacing, 0.25rem) / 2) 0.75rem;
 	}
 	.heading-name {
 		font-weight: 700;

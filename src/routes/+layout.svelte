@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { applyTheme } from '$lib/settings.svelte';
+	import { applyTheme, applyItemSpacing } from '$lib/settings.svelte';
 	import '../app.css';
 
 	let { children } = $props();
 
 	onMount(() => {
 		applyTheme();
+		applyItemSpacing();
 	});
 </script>
 

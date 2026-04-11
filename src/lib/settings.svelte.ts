@@ -18,18 +18,19 @@ interface Settings {
 	addItemPosition: 'bottom' | 'top';
 	addListPosition: 'bottom' | 'top';
 	reportFontSize: number;
+	itemSpacing: number;
 }
 
 function loadSettings(): Settings {
-	if (typeof localStorage === 'undefined') return { currency: '$', theme: 'light', handedness: 'right', addItemPosition: 'bottom', addListPosition: 'bottom' };
+	if (typeof localStorage === 'undefined') return { currency: '$', theme: 'light', handedness: 'right', addItemPosition: 'bottom', addListPosition: 'bottom', reportFontSize: 14, itemSpacing: 8 };
 	try {
 		const saved = JSON.parse(localStorage.getItem(settingsKey()) ?? 'null');
-			if (saved) return { currency: '$', theme: 'light' as const, handedness: 'right' as const, addItemPosition: 'bottom' as const, addListPosition: 'bottom' as const, reportFontSize: 14, ...saved };
+			if (saved) return { currency: '$', theme: 'light' as const, handedness: 'right' as const, addItemPosition: 'bottom' as const, addListPosition: 'bottom' as const, reportFontSize: 14, itemSpacing: 8, ...saved };
 	} catch { /* fall through */ }
 	// No saved settings — detect OS preference rather than hardcoding light
 	const prefersDark =
 		typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches;
-	return { currency: '$', theme: prefersDark ? 'dark' : 'light', handedness: 'right', addItemPosition: 'bottom', addListPosition: 'bottom', reportFontSize: 14 };
+	return { currency: '$', theme: prefersDark ? 'dark' : 'light', handedness: 'right', addItemPosition: 'bottom', addListPosition: 'bottom', reportFontSize: 14, itemSpacing: 8 };
 }
 
 function saveSettings(s: Settings) {
@@ -46,14 +47,22 @@ export function updateSettings(patch: Partial<Settings>) {
 	if (patch.theme) {
 		document.documentElement.setAttribute('data-theme', settings.theme);
 	}
+	if (patch.itemSpacing !== undefined) {
+		applyItemSpacing();
+	}
 }
 
 /** Call after login so the correct user's settings are loaded and applied. */
 export function reloadSettings() {
 	Object.assign(settings, loadSettings());
 	applyTheme();
+	applyItemSpacing();
 }
 
 export function applyTheme() {
 	document.documentElement.setAttribute('data-theme', settings.theme);
+}
+
+export function applyItemSpacing() {
+	document.documentElement.style.setProperty('--item-spacing', `${settings.itemSpacing}px`);
 }

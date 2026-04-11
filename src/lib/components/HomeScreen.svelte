@@ -1396,7 +1396,7 @@ ${bodyHtml}
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		padding: 0.65rem 1rem;
+		padding: var(--item-spacing, 0.65rem) 1rem;
 		border-bottom: 1px solid var(--border);
 		min-height: 52px;
 		transition: background 0.15s, opacity 0.15s;
