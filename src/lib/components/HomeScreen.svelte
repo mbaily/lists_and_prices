@@ -398,23 +398,45 @@
 	let newListType = $state<'plain' | 'priced'>('plain');
 	let newListColor = $state('#6366f1');
 	let showNewList = $state(false);
+	let newListDateMode = $state<'default' | 'offset' | 'custom'>('default');
+	let newListDateOffset = $state(0);
+	let newListCustomDate = $state('');
+	let showCustomDatePicker = $state(false);
+
+	function resetNewListDate() {
+		newListDateMode = 'default';
+		newListDateOffset = 0;
+		newListCustomDate = '';
+		showCustomDatePicker = false;
+	}
 
 	function openNewList() {
 		newListColor = currentFolderColor;
 		newListType = 'plain';
+		resetNewListDate();
 		showNewList = true;
 	}
 
 	function submitNewList() {
-		const name =
-			newListName.trim() ||
-			new Date().toLocaleString('en-GB', {
-				day: '2-digit',
-				month: '2-digit',
-				year: '2-digit',
-				hour: '2-digit',
-				minute: '2-digit'
-			});
+		let name = newListName.trim();
+		if (!name) {
+			if (newListDateMode === 'offset') {
+				const d = new Date();
+				d.setDate(d.getDate() + newListDateOffset);
+				name = d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
+			} else if (newListDateMode === 'custom' && newListCustomDate) {
+				const [y, m, day] = newListCustomDate.split('-');
+				name = `${day}/${m}/${y.slice(2)}`;
+			} else {
+				name = new Date().toLocaleString('en-GB', {
+					day: '2-digit',
+					month: '2-digit',
+					year: '2-digit',
+					hour: '2-digit',
+					minute: '2-digit'
+				});
+			}
+		}
 		if (!currentFolderId) {
 			alert('Please create a folder first.');
 			return;
@@ -423,6 +445,7 @@
 		newListName = '';
 		newListType = 'plain';
 		newListColor = '#6366f1';
+		resetNewListDate();
 		showNewList = false;
 	}
 
@@ -1217,6 +1240,41 @@ ${bodyHtml}
 				<div class="modal">
 					<h2>New List</h2>
 					<input placeholder="Name (optional)" bind:value={newListName} />
+					<div class="date-shortcuts">
+						<span class="date-shortcuts-label">Date:</span>
+						{#each [0, 1, 2, 3, 7] as offset}
+							<button
+								class:active={newListDateMode === 'offset' && newListDateOffset === offset}
+								onclick={() => {
+									newListDateMode = 'offset';
+									newListDateOffset = offset;
+									showCustomDatePicker = false;
+									newListCustomDate = '';
+								}}
+							>{offset === 0 ? 'Today' : `+${offset}`}</button>
+						{/each}
+						<button
+							class:active={showCustomDatePicker}
+							onclick={() => {
+								showCustomDatePicker = !showCustomDatePicker;
+								if (showCustomDatePicker) {
+									newListDateMode = 'custom';
+									newListDateOffset = 0;
+								} else {
+									newListCustomDate = '';
+									newListDateMode = 'default';
+								}
+							}}
+							title="Pick a date"
+						>📅</button>
+					</div>
+					{#if showCustomDatePicker}
+						<input
+							type="date"
+							bind:value={newListCustomDate}
+							onchange={() => (newListDateMode = 'custom')}
+						/>
+					{/if}
 					<div class="type-toggle">
 						<button
 							class:active={newListType === 'plain'}
@@ -1230,7 +1288,7 @@ ${bodyHtml}
 					<ColorPicker bind:value={newListColor} />
 					<div class="modal-actions">
 						<button onclick={submitNewList}>Create</button>
-						<button onclick={() => { showNewList = false; newListName = ''; newListType = 'plain'; newListColor = '#6366f1'; }}>Cancel</button>
+						<button onclick={() => { showNewList = false; newListName = ''; newListType = 'plain'; newListColor = '#6366f1'; resetNewListDate(); }}>Cancel</button>
 					</div>
 				</div>
 			</div>
@@ -1667,6 +1725,32 @@ ${bodyHtml}
 	.modal-actions button:last-child {
 		background: var(--bg3);
 		color: var(--text);
+	}
+	.date-shortcuts {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		flex-wrap: wrap;
+	}
+	.date-shortcuts-label {
+		font-size: 0.8rem;
+		color: var(--text2);
+		margin-right: 0.1rem;
+	}
+	.date-shortcuts button {
+		padding: 0.3rem 0.6rem;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--bg2);
+		color: var(--text);
+		font-size: 0.82rem;
+		cursor: pointer;
+		line-height: 1.3;
+	}
+	.date-shortcuts button.active {
+		background: var(--accent);
+		color: #fff;
+		border-color: var(--accent);
 	}
 	.type-toggle {
 		display: flex;
