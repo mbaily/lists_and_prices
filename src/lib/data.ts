@@ -588,6 +588,12 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 			if (fArr.length) fArr.delete(0, fArr.length);
 			if (lArr.length) lArr.delete(0, lArr.length);
 			if (iArr.length) iArr.delete(0, iArr.length);
+			// Clear cell data for every existing sheet before wiping the metadata array
+			for (let i = 0; i < sArr.length; i++) {
+				const m = sArr.get(i) as Y.Map<unknown>;
+				const id = m?.get('id') as string | undefined;
+				if (id) getSheetCells(doc, id).clear();
+			}
 			if (sArr.length) sArr.delete(0, sArr.length);
 			sfMap.forEach((_, key) => sfMap.delete(key));
 

@@ -57,7 +57,7 @@
 		if (!pendingBackup) return;
 		try {
 			importBackup(pendingBackup, restoreMode);
-			restoreStatus = `Restored ${pendingBackup.folders.length} folders, ${pendingBackup.lists.length} lists, ${pendingBackup.items.length} items${pendingBackup.sheets?.length ? `, ${pendingBackup.sheets.length} spreadsheets` : ''}.`;
+			restoreStatus = `Restored ${pendingBackup.folders.length} folders, ${pendingBackup.lists.length} lists, ${pendingBackup.items.length} items${pendingBackup.sheets?.length ? `, ${pendingBackup.sheets.length} spreadsheets (names only — cell content is not included in backups)` : ''}.`;
 		} catch (err) {
 			restoreError = `Restore failed: ${err}`;
 		}
@@ -244,7 +244,7 @@
 {#if pendingBackup}
 	{@const modeLabel = restoreMode === 'replace' ? 'REPLACE ALL data with' : 'merge in'}
 	<ConfirmDialog
-		message={`Restore and ${modeLabel} ${pendingBackup.folders.length} folders, ${pendingBackup.lists.length} lists, ${pendingBackup.items.length} items${pendingBackup.sheets?.length ? `, ${pendingBackup.sheets.length} spreadsheets` : ''}? This cannot be undone.`}
+		message={`Restore and ${modeLabel} ${pendingBackup.folders.length} folders, ${pendingBackup.lists.length} lists, ${pendingBackup.items.length} items${pendingBackup.sheets?.length ? `, ${pendingBackup.sheets.length} spreadsheets (cell content not included)` : ''}? This cannot be undone.`}
 		confirmLabel="Restore"
 		onConfirm={confirmRestore}
 		onCancel={() => pendingBackup = null}
