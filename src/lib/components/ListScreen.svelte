@@ -742,7 +742,7 @@
 	});
 </script>
 
-<div class="screen" class:has-keypad={(pricingItemId || qtyItemId) && isPriced}>
+<div class="screen" class:has-keypad={(pricingItemId || qtyItemId) && isPriced} style="--list-color:{listMeta?.color ?? 'var(--text)'}">
 	<!-- Header -->
 	<header>
 		<button class="home-btn" onclick={onHome} aria-label="Home">🏠</button>
@@ -1445,6 +1445,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		color: var(--list-color, var(--text));
 	}
 	@media (pointer: fine) {
 		/* Mouse/trackpad users: revert to original size */
