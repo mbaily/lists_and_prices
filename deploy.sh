@@ -2,7 +2,10 @@
 
 # --- Configuration ---
 APP_NAME="lists-and-prices"
-SOURCE_DIR="$HOME/other_git/list-prices-svelte5"
+# When run as `sudo ./deploy.sh`, $HOME becomes /root. Use SUDO_USER to resolve
+# the real user's home directory, falling back to $HOME if run without sudo.
+REAL_HOME=$(getent passwd "${SUDO_USER:-$USER}" | cut -d: -f6)
+SOURCE_DIR="$REAL_HOME/other_git/list-prices-svelte5"
 DEST_DIR="/opt/lists_and_prices"
 SERVICE_NAME="lists-and-prices.service"
 
