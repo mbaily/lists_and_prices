@@ -26,7 +26,7 @@
 	import RowMenu from './RowMenu.svelte';
 	import InfoDialog from './InfoDialog.svelte';
 
-	let { listId, onHome, onOpenList, onNavigateTo, savedSearch = null, onRestoreSearch = undefined, orderedLists = [] }: {
+	let { listId, onHome, onOpenList, onNavigateTo, savedSearch = null, onRestoreSearch = undefined, orderedLists = [], onTagClick = undefined }: {
 		listId: string;
 		onHome: () => void;
 		onOpenList: (id: string) => void;
@@ -34,6 +34,7 @@
 		savedSearch?: string | null;
 		onRestoreSearch?: () => void;
 		orderedLists?: import('$lib/data').ListMeta[];
+		onTagClick?: (tag: string) => void;
 	} = $props();
 
 	let items = $derived.by(() => {
@@ -961,7 +962,7 @@
 						class="item-name heading-name"
 						class:editing={editingId === item.id}
 						onclick={() => startEditName(item)}
-					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill">{part.value}</span>{:else}{part.value}{/if}{/each}</button>
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else}{part.value}{/if}{/each}</button>
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoItem = item },
@@ -980,7 +981,7 @@
 						onpointermove={cancelLongPress}
 						onpointerup={cancelLongPress}
 						onpointercancel={cancelLongPress}
-					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill">{part.value}</span>{:else}{part.value}{/if}{/each}</button>
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else}{part.value}{/if}{/each}</button>
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoItem = item },
@@ -1002,7 +1003,7 @@
 							onpointermove={cancelLongPress}
 							onpointerup={cancelLongPress}
 							onpointercancel={cancelLongPress}
-						>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill">{part.value}</span>{:else}{part.value}{/if}{/each}</button>
+						>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else}{part.value}{/if}{/each}</button>
 					</div>
 					<div class="priced-bottom">
 						<button
@@ -1042,7 +1043,7 @@
 						onpointermove={cancelLongPress}
 						onpointerup={cancelLongPress}
 						onpointercancel={cancelLongPress}
-					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill">{part.value}</span>{:else}{part.value}{/if}{/each}</button>
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else}{part.value}{/if}{/each}</button>
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoItem = item },
@@ -1523,6 +1524,7 @@
 		font-weight: 600;
 		white-space: nowrap;
 		letter-spacing: 0.01em;
+		cursor: pointer;
 	}
 	/* ── Tag autocomplete dropdown ──────────────────────────────────────────── */
 	.tag-autocomplete {

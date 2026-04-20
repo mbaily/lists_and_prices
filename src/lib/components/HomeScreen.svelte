@@ -869,7 +869,7 @@ ${bodyHtml}
 {#if openSheetId}
 	<SpreadsheetScreen sheetId={openSheetId} onBack={() => openSheetId = null} />
 {:else if openListId}
-	<ListScreen listId={openListId} orderedLists={allListsInTreeOrder} onHome={() => { openListId = null; breadcrumb = [null]; }} onOpenList={(id) => (openListId = id)} savedSearch={savedSearch} onRestoreSearch={() => { openListId = null; breadcrumb = [null]; restoreSearch(); }} onNavigateTo={(folderId) => {
+	<ListScreen listId={openListId} orderedLists={allListsInTreeOrder} onHome={() => { openListId = null; breadcrumb = [null]; }} onOpenList={(id) => (openListId = id)} savedSearch={savedSearch} onRestoreSearch={() => { openListId = null; breadcrumb = [null]; restoreSearch(); }} onTagClick={(tag) => { openListId = null; breadcrumb = [null]; activeTagFilter = null; showSearch = true; searchQuery = '#' + tag; savedSearch = '#' + tag; tick().then(() => searchInputEl?.focus()); }} onNavigateTo={(folderId) => {
 		openListId = null;
 		// Reconstruct the full ancestor path to folderId so the breadcrumb is correct
 		// regardless of which folder the user was in when they opened the list.
@@ -1138,7 +1138,7 @@ ${bodyHtml}
 						class="row-name"
 						onclick={() => (breadcrumb = [...breadcrumb, folder.id])}
 					>
-						📁 {#each splitWithTags(folder.name) as part}{#if part.type === 'tag'}<span class="tag-pill" style="--pill-color:{folder.color}">{part.value}</span>{:else}{part.value}{/if}{/each}{#if isPathThrough} <span class="path-through-hint">›</span>{/if}
+						📁 {#each splitWithTags(folder.name) as part}{#if part.type === 'tag'}<span class="tag-pill" role="button" style="--pill-color:{folder.color}" onclick={(e) => { e.stopPropagation(); const t = part.value.slice(1).toLowerCase(); activeTagFilter = activeTagFilter === t ? null : t; }}>{part.value}</span>{:else}{part.value}{/if}{/each}{#if isPathThrough} <span class="path-through-hint">›</span>{/if}
 					</button>
 				{/if}
 				{#if !isPathThrough}
@@ -1203,7 +1203,7 @@ ${bodyHtml}
 					</div>
 				{:else}
 					<button class="row-name" onclick={() => { openListId = list.id; renamingId = null; }}>
-						{list.type === 'priced' ? '💰' : '📋'} {#each splitWithTags(list.name) as part}{#if part.type === 'tag'}<span class="tag-pill" style="--pill-color:{list.color}">{part.value}</span>{:else}{part.value}{/if}{/each}
+						{list.type === 'priced' ? '💰' : '📋'} {#each splitWithTags(list.name) as part}{#if part.type === 'tag'}<span class="tag-pill" role="button" style="--pill-color:{list.color}" onclick={(e) => { e.stopPropagation(); const t = part.value.slice(1).toLowerCase(); activeTagFilter = activeTagFilter === t ? null : t; }}>{part.value}</span>{:else}{part.value}{/if}{/each}
 					</button>
 				{/if}
 				<button
@@ -1638,6 +1638,7 @@ ${bodyHtml}
 		font-weight: 600;
 		white-space: nowrap;
 		letter-spacing: 0.01em;
+		cursor: pointer;
 	}
 	.fav-btn {
 		background: none;
