@@ -20,6 +20,7 @@
 		type FilterView
 	} from '$lib/data';
 	import { settings } from '$lib/settings.svelte';
+	import { extractTags, splitWithTags, type NameSegment } from '$lib/tags';
 	import NumericKeypad from './NumericKeypad.svelte';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import RowMenu from './RowMenu.svelte';
@@ -114,19 +115,50 @@
 			.reduce((s, i) => s + Math.round((i.price ?? 0) * (i.qty ?? 1) * 100), 0)) / 100
 	);
 
-	// ── URL detection ─────────────────────────────────────────────────────────────
-	type NamePart = { type: 'text' | 'url'; value: string };
-	function parseNameParts(name: string): NamePart[] {
-		const urlRe = /https?:\/\/[^\s]+/g;
-		const result: NamePart[] = [];
-		let last = 0, m: RegExpExecArray | null;
-		while ((m = urlRe.exec(name)) !== null) {
-			if (m.index > last) result.push({ type: 'text', value: name.slice(last, m.index) });
-			result.push({ type: 'url', value: m[0] });
-			last = m.index + m[0].length;
+	// ── URL + tag detection ──────────────────────────────────────────────────────
+	function parseNameParts(name: string): NameSegment[] {
+		return splitWithTags(name);
+	}
+
+	// ── All tags (for autocomplete) ───────────────────────────────────────────────
+	const allTags = $derived.by(() => {
+		const set = new Set<string>();
+		for (const item of items) extractTags(item.name).forEach((t) => set.add(t));
+		for (const list of allLists) extractTags(list.name).forEach((t) => set.add(t));
+		for (const folder of allFolders) extractTags(folder.name).forEach((t) => set.add(t));
+		return [...set].sort();
+	});
+
+	// ── Tag autocomplete ──────────────────────────────────────────────────────────
+	let tagSuggestions = $state<string[]>([]);
+
+	function updateTagSuggestions() {
+		if (!universalInputEl) { tagSuggestions = []; return; }
+		const pos = universalInputEl.selectionStart ?? 0;
+		const before = universalValue.slice(0, pos);
+		const m = before.match(/#(\w*)$/);
+		if (m) {
+			const prefix = m[1].toLowerCase();
+			tagSuggestions = allTags.filter((t) => t.startsWith(prefix) && t !== prefix).slice(0, 6);
+		} else {
+			tagSuggestions = [];
 		}
-		if (last < name.length) result.push({ type: 'text', value: name.slice(last) });
-		return result.length ? result : [{ type: 'text', value: name }];
+	}
+
+	function applyTagSuggestion(tag: string) {
+		if (!universalInputEl) return;
+		const pos = universalInputEl.selectionStart ?? universalValue.length;
+		const before = universalValue.slice(0, pos);
+		const after = universalValue.slice(pos);
+		const newBefore = before.replace(/#\w*$/, '#' + tag);
+		universalValue = newBefore + after;
+		tagSuggestions = [];
+		tick().then(() => {
+			if (universalInputEl) {
+				universalInputEl.selectionStart = universalInputEl.selectionEnd = newBefore.length;
+				universalInputEl.focus();
+			}
+		});
 	}
 
 	// ── Tree order (subtasks / subnotes) ──────────────────────────────────────────
@@ -805,11 +837,12 @@
 						bind:value={universalValue}
 						rows="1"
 						enterkeyhint="done"
-						oninput={resizeUniversal}
+						oninput={() => { resizeUniversal(); updateTagSuggestions(); }}
 						onkeydown={(e) => {
-							if (e.key === 'Escape') cancelEdit();
-							if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); inputMode === 'edit' ? submitEditName() : addItem(); }
+							if (e.key === 'Escape') { if (tagSuggestions.length) { tagSuggestions = []; e.preventDefault(); return; } cancelEdit(); }
+							if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); inputMode === 'edit' ? submitEditName() : addItem(); tagSuggestions = []; }
 						}}
+						onblur={() => setTimeout(() => { tagSuggestions = []; }, 150)}
 					></textarea>
 					{#if inputMode === 'edit'}
 						<button type="button" class="input-clear" onclick={cancelEdit} aria-label="Cancel edit">✕</button>
@@ -817,7 +850,14 @@
 				</div>
 
 			</form>
-			{#if newItemParentId}
+			{#if tagSuggestions.length > 0}
+			<div class="tag-autocomplete">
+				{#each tagSuggestions as tag}
+					<button class="tag-ac-item" onpointerdown={(e) => { e.preventDefault(); applyTagSuggestion(tag); }}>#{tag}</button>
+				{/each}
+			</div>
+		{/if}
+		{#if newItemParentId}
 				<div class="subtask-hint">
 					{newItemIsNote ? '📝 Subnote' : '➕ Subtask'} → <em>{items.find((i) => i.id === newItemParentId)?.name ?? '…'}</em>
 					<button type="button" onclick={() => { newItemParentId = null; newItemIsNote = false; universalValue = ''; }} aria-label="Cancel">✕</button>
@@ -921,7 +961,7 @@
 						class="item-name heading-name"
 						class:editing={editingId === item.id}
 						onclick={() => startEditName(item)}
-					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else}{part.value}{/if}{/each}</button>
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill">{part.value}</span>{:else}{part.value}{/if}{/each}</button>
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoItem = item },
@@ -940,7 +980,7 @@
 						onpointermove={cancelLongPress}
 						onpointerup={cancelLongPress}
 						onpointercancel={cancelLongPress}
-					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else}{part.value}{/if}{/each}</button>
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill">{part.value}</span>{:else}{part.value}{/if}{/each}</button>
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoItem = item },
@@ -962,7 +1002,7 @@
 							onpointermove={cancelLongPress}
 							onpointerup={cancelLongPress}
 							onpointercancel={cancelLongPress}
-						>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else}{part.value}{/if}{/each}</button>
+						>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill">{part.value}</span>{:else}{part.value}{/if}{/each}</button>
 					</div>
 					<div class="priced-bottom">
 						<button
@@ -1002,7 +1042,7 @@
 						onpointermove={cancelLongPress}
 						onpointerup={cancelLongPress}
 						onpointercancel={cancelLongPress}
-					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else}{part.value}{/if}{/each}</button>
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill">{part.value}</span>{:else}{part.value}{/if}{/each}</button>
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoItem = item },
@@ -1473,6 +1513,38 @@
 		text-decoration: underline;
 		word-break: break-all;
 	}
+	.tag-pill {
+		display: inline-block;
+		background: color-mix(in srgb, var(--list-color, var(--accent)) 18%, transparent);
+		color: var(--list-color, var(--accent));
+		border-radius: 999px;
+		padding: 0 0.45em;
+		font-size: 0.82em;
+		font-weight: 600;
+		white-space: nowrap;
+		letter-spacing: 0.01em;
+	}
+	/* ── Tag autocomplete dropdown ──────────────────────────────────────────── */
+	.tag-autocomplete {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.3rem;
+		padding: 0.3rem 0.75rem;
+		background: var(--bg2);
+		border-bottom: 1px solid var(--border);
+	}
+	.tag-ac-item {
+		background: color-mix(in srgb, var(--list-color, var(--accent)) 15%, transparent);
+		color: var(--list-color, var(--accent));
+		border: 1px solid var(--list-color, var(--accent));
+		border-radius: 999px;
+		padding: 0.15rem 0.65rem;
+		font-size: 0.82rem;
+		font-weight: 600;
+		cursor: pointer;
+		white-space: nowrap;
+	}
+	.tag-ac-item:hover { background: color-mix(in srgb, var(--list-color, var(--accent)) 28%, transparent); }
 	/* ── Subnotes ────────────────────────────────────────────────────────── */
 	.note-icon {
 		font-size: var(--row-icon-size, 1.1rem);

@@ -31,6 +31,7 @@
 	import { syncState, docState } from '$lib/yjsStore.svelte';
 	import { settings } from '$lib/settings.svelte';
 	import { getSmartFolders, assignToReport, removeFromReport, deleteReport } from '$lib/smartFolders.svelte';
+	import { extractTags, splitWithTags } from '$lib/tags';
 	import ListScreen from './ListScreen.svelte';
 	import SpreadsheetScreen from './SpreadsheetScreen.svelte';
 	import ColorPicker from './ColorPicker.svelte';
@@ -211,9 +212,9 @@
 							(isFolderEffectivelyArchived(f.id, allFolders) || pathThroughFolderIds.has(f.id)))
 						.sort((a, b) => a.order - b.order)
 			)
-			// Normal view: exclude effectively-archived
+			// Normal view: exclude effectively-archived, then apply tag filter
 			: allFolders
-					.filter((f) => f.parentId === currentFolderId && !isFolderEffectivelyArchived(f.id, allFolders))
+					.filter((f) => f.parentId === currentFolderId && !isFolderEffectivelyArchived(f.id, allFolders) && (!activeTagFilter || extractTags(f.name).includes(activeTagFilter)))
 					.sort((a, b) => a.order - b.order)
 	);
 	let childLists = $derived(
@@ -233,9 +234,9 @@
 						.filter((l) => l.folderId === currentFolderId && l.archived)
 						.sort((a, b) => a.order - b.order)
 			)
-			// Normal view: exclude effectively-archived
+			// Normal view: exclude effectively-archived, then apply tag filter
 			: allLists
-					.filter((l) => l.folderId === currentFolderId && !isListEffectivelyArchived(l, allFolders))
+					.filter((l) => l.folderId === currentFolderId && !isListEffectivelyArchived(l, allFolders) && (!activeTagFilter || extractTags(l.name).includes(activeTagFilter)))
 					.sort((a, b) => a.order - b.order)
 	);
 	let hasArchived = $derived(
@@ -273,6 +274,27 @@
 	// ── Favourites ───────────────────────────────────────────────────────────────────────
 	let favouriteLists = $derived(allLists.filter((l) => l.favourite && !isListEffectivelyArchived(l, allFolders)));
 	let favouriteFolders = $derived(allFolders.filter((f) => f.favourite && !isFolderEffectivelyArchived(f.id, allFolders)));
+
+	// ── Tags ──────────────────────────────────────────────────────────────────────
+	// Scoped to the current folder's direct visible children (pre-filter) so that
+	// the chips bar always reflects what's actually in view — and tags don't
+	// disappear from the bar when the active filter reduces results to zero.
+	let allTags = $derived.by(() => {
+		void docState.version;
+		const set = new Set<string>();
+		try {
+			const folderScope = allFolders.filter(
+				(f) => f.parentId === currentFolderId && !isFolderEffectivelyArchived(f.id, allFolders)
+			);
+			const listScope = allLists.filter(
+				(l) => l.folderId === currentFolderId && !isListEffectivelyArchived(l, allFolders)
+			);
+			for (const f of folderScope) extractTags(f.name).forEach((t) => set.add(t));
+			for (const l of listScope) extractTags(l.name).forEach((t) => set.add(t));
+		} catch { /* ignore */ }
+		return [...set].sort();
+	});
+	let activeTagFilter = $state<string | null>(null);
 
 	function listPath(list: ListMeta): string {
 		const parts: string[] = [];
@@ -583,8 +605,9 @@
 	// ── Search actions ────────────────────────────────────────────────────────────
 	function toggleSearch() {
 		if (!showSearch) {
-			// Opening fresh search — clear saved crumb so user starts clean
+			// Opening fresh search — clear saved crumb and any active tag filter
 			savedSearch = null;
+			activeTagFilter = null;
 			showSearch = true;
 			tick().then(() => searchInputEl?.focus());
 		} else {
@@ -629,6 +652,7 @@
 		void currentFolderId; // track navigation
 		renamingId = null;
 		infoTarget = null;
+		activeTagFilter = null;
 		// Close create forms so they don't linger in the wrong folder context
 		showNewFolder = false;
 		showNewList = false;
@@ -995,6 +1019,20 @@ ${bodyHtml}
 			</div>
 		{/if}
 
+		<!-- Hashtags bar — shown when there are tags in the current folder's content -->
+		{#if !isInArchiveView && !showSearch && allTags.length > 0}
+			<div class="tags-bar">
+				<span class="tags-label">#</span>
+				{#each allTags as tag}
+					<button
+						class="tags-chip"
+						class:tags-chip-active={activeTagFilter === tag}
+						onclick={() => { activeTagFilter = activeTagFilter === tag ? null : tag; }}
+					>#{tag}</button>
+				{/each}
+			</div>
+		{/if}
+
 		<!-- Tag indicator strip (outside .content so it stays visible while scrolling) -->
 		{#if hasTag}
 			<div class="tag-strip">
@@ -1047,6 +1085,11 @@ ${bodyHtml}
 			</button>
 		{/if}
 
+		<!-- Active tag filter empty state -->
+		{#if activeTagFilter !== null && childFolders.length === 0 && childLists.length === 0}
+			<div class="tag-filter-empty">No folders or lists tagged <strong>#{activeTagFilter}</strong> here.</div>
+		{/if}
+
 		<!-- First-launch prompt -->
 		{#if showFirstLaunch}
 			<div class="empty-prompt">
@@ -1095,7 +1138,7 @@ ${bodyHtml}
 						class="row-name"
 						onclick={() => (breadcrumb = [...breadcrumb, folder.id])}
 					>
-						📁 {folder.name}{#if isPathThrough} <span class="path-through-hint">›</span>{/if}
+						📁 {#each splitWithTags(folder.name) as part}{#if part.type === 'tag'}<span class="tag-pill" style="--pill-color:{folder.color}">{part.value}</span>{:else}{part.value}{/if}{/each}{#if isPathThrough} <span class="path-through-hint">›</span>{/if}
 					</button>
 				{/if}
 				{#if !isPathThrough}
@@ -1160,7 +1203,7 @@ ${bodyHtml}
 					</div>
 				{:else}
 					<button class="row-name" onclick={() => { openListId = list.id; renamingId = null; }}>
-						{list.type === 'priced' ? '💰' : '📋'} {list.name}
+						{list.type === 'priced' ? '💰' : '📋'} {#each splitWithTags(list.name) as part}{#if part.type === 'tag'}<span class="tag-pill" style="--pill-color:{list.color}">{part.value}</span>{:else}{part.value}{/if}{/each}
 					</button>
 				{/if}
 				<button
@@ -1547,6 +1590,55 @@ ${bodyHtml}
 		max-width: 200px;
 	}
 	.fav-chip:hover { background: color-mix(in srgb, var(--chip-color) 12%, transparent); }
+	/* ── Tags bar ───────────────────────────────────────────────────────────────── */
+	.tags-bar {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 0.35rem 1rem;
+		background: var(--bg2);
+		border-bottom: 1px solid var(--border);
+	}
+	.tags-label {
+		color: var(--text2);
+		font-size: 0.85rem;
+		font-weight: 700;
+		flex-shrink: 0;
+	}
+	.tags-chip {
+		background: none;
+		border: 1px solid var(--accent);
+		border-radius: 999px;
+		padding: 0.15rem 0.6rem;
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: var(--accent);
+		cursor: pointer;
+		white-space: nowrap;
+	}
+	.tags-chip:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+	.tags-chip.tags-chip-active {
+		background: var(--accent);
+		color: #fff;
+	}
+	.tag-filter-empty {
+		padding: 1.25rem 1.5rem;
+		color: var(--text2);
+		font-size: 0.9rem;
+	}
+	/* ── Tag pill (inline in folder/list names) ─────────────────────────────── */
+	.tag-pill {
+		display: inline-block;
+		background: color-mix(in srgb, var(--pill-color, var(--accent)) 18%, transparent);
+		color: var(--pill-color, var(--accent));
+		border-radius: 999px;
+		padding: 0 0.45em;
+		font-size: 0.82em;
+		font-weight: 600;
+		white-space: nowrap;
+		letter-spacing: 0.01em;
+	}
 	.fav-btn {
 		background: none;
 		border: none;
