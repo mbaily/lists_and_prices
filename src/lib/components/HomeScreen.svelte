@@ -1056,21 +1056,21 @@ ${bodyHtml}
 						{#if result.kind === 'folder'}
 							<span class="result-icon">📁</span>
 							<span class="result-info">
-								<span class="result-name">{result.data.name}</span>
+								<span class="result-name">{#each splitWithTags(result.data.name) as part}{#if part.type === 'tag'}<span class="tag-pill" style="--pill-color:{result.data.color}">{part.value}</span>{:else}{part.value}{/if}{/each}</span>
 								<span class="result-path">{result.path}</span>
 							</span>
 							<span class="result-kind-badge">Folder</span>
 						{:else if result.kind === 'list'}
 							<span class="result-icon">{result.data.type === 'priced' ? '💰' : '📋'}</span>
 							<span class="result-info">
-								<span class="result-name">{result.data.name}</span>
+								<span class="result-name">{#each splitWithTags(result.data.name) as part}{#if part.type === 'tag'}<span class="tag-pill" style="--pill-color:{result.data.color}">{part.value}</span>{:else}{part.value}{/if}{/each}</span>
 								<span class="result-path">{result.path}</span>
 							</span>
 							<span class="result-kind-badge">List</span>
 						{:else}
 							<span class="result-icon">📄</span>
 							<span class="result-info">
-								<span class="result-name">{result.data.name}</span>
+								<span class="result-name">{#each splitWithTags(result.data.name) as part}{#if part.type === 'tag'}<span class="tag-pill" style="--pill-color:{result.listData.color}">{part.value}</span>{:else}{part.value}{/if}{/each}</span>
 								<span class="result-path">{result.listData.name}</span>
 							</span>
 							<span class="result-kind-badge">Item</span>
