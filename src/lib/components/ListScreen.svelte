@@ -780,10 +780,6 @@
 	<header>
 		<button class="home-btn" onclick={onHome} aria-label="Home">🏠</button>
 		<div class="breadcrumb">
-			{#if savedSearch && onRestoreSearch}
-				<button class="crumb search-crumb" onclick={onRestoreSearch} title="Back to search results">🔍 "{savedSearch}"</button>
-				<span class="sep">·</span>
-			{/if}
 			{#each breadcrumbItems as crumb, i}
 				{#if i > 0}<span class="sep">/</span>{/if}
 				{#if crumb.id === 'LIST'}
@@ -793,6 +789,9 @@
 				{/if}
 			{/each}
 		</div>
+		{#if savedSearch && onRestoreSearch}
+			<button class="crumb search-crumb" onclick={onRestoreSearch} title="Back to search results">🔍 "{savedSearch}"</button>
+		{/if}
 		<div class="header-menu-wrap">
 			<button class="type-btn" onclick={() => showHeaderMenu = !showHeaderMenu} aria-label="More options">⋮</button>
 			{#if showHeaderMenu}
