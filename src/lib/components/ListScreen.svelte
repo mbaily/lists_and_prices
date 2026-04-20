@@ -781,7 +781,7 @@
 		<button class="home-btn" onclick={onHome} aria-label="Home">🏠</button>
 		<div class="breadcrumb">
 			{#each breadcrumbItems as crumb, i}
-				{#if i > 0}<span class="sep">/</span>{/if}
+				<span class="sep">/</span>
 				{#if crumb.id === 'LIST'}
 					<span class="crumb current">{crumb.name}</span>
 				{:else}
