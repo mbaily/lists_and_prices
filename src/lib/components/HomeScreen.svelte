@@ -895,8 +895,8 @@ ${bodyHtml}
 			<div class="header-left">
 				<div class="breadcrumb">
 					<!-- Home icon always first -->
-					{#if breadcrumb.length > 1 || (savedSearch && !showSearch)}
-						<button class="crumb home-crumb" onclick={() => (breadcrumb = [null])}>🏠</button>
+					{#if breadcrumb.length > 1 || (savedSearch && !showSearch) || showSearch}
+						<button class="crumb home-crumb" onclick={() => { if (showSearch) { savedSearch = searchQuery.trim() || null; showSearch = false; searchQuery = ''; } breadcrumb = [null]; }}>🏠</button>
 						<span class="sep">/</span>
 					{:else}
 						<span class="crumb current home-crumb">🏠</span>
