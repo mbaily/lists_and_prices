@@ -895,16 +895,11 @@ ${bodyHtml}
 			<div class="header-left">
 				<div class="breadcrumb">
 					<!-- Home icon always first -->
-					{#if breadcrumb.length > 1 || (savedSearch && !showSearch) || showSearch}
+					{#if breadcrumb.length > 1 || showSearch}
 						<button class="crumb home-crumb" onclick={() => { if (showSearch) { savedSearch = searchQuery.trim() || null; showSearch = false; searchQuery = ''; } breadcrumb = [null]; }}>🏠</button>
 						<span class="sep">/</span>
 					{:else}
 						<span class="crumb current home-crumb">🏠</span>
-					{/if}
-					<!-- Search crumb immediately after home -->
-					{#if savedSearch && !showSearch}
-						<button class="crumb search-crumb" onclick={restoreSearch} title="Back to search results">🔍 "{savedSearch}"</button>
-						{#if breadcrumb.length > 1}<span class="sep">·</span>{/if}
 					{/if}
 					<!-- Remaining folder crumbs (skip the null home entry) -->
 					{#each breadcrumb.slice(1) as crumbId, i}
@@ -921,6 +916,9 @@ ${bodyHtml}
 				<button class="icon-btn search-btn" class:search-active={showSearch} onclick={toggleSearch} aria-label={showSearch ? 'Close search' : 'Search'}>
 					🔍
 				</button>
+				{#if savedSearch && !showSearch}
+					<button class="crumb search-crumb" onclick={restoreSearch} title="Back to search results">"{savedSearch}"</button>
+				{/if}
 			</div>
 
 			<!-- No breadcrumb menu items currently -->
