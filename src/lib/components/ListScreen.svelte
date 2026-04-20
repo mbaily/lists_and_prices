@@ -782,7 +782,7 @@
 		<div class="breadcrumb">
 			{#if savedSearch && onRestoreSearch}
 				<button class="crumb search-crumb" onclick={onRestoreSearch} title="Back to search results">🔍 "{savedSearch}"</button>
-				<span class="sep">/</span>
+				<span class="sep">·</span>
 			{/if}
 			{#each breadcrumbItems as crumb, i}
 				{#if i > 0}<span class="sep">/</span>{/if}
