@@ -81,6 +81,7 @@
 	// ── Search ────────────────────────────────────────────────────────────────────
 	let showSearch = $state(false);
 	let searchQuery = $state('');
+	let searchUncheckedOnly = $state(false);
 	let searchInputEl: HTMLInputElement | null = null;
 	let savedSearch = $state<string | null>(null); // persists after navigating to a result
 
@@ -121,10 +122,12 @@
 				results.push({ kind: 'folder', data: folder, path: folderPath(folder) });
 		}
 		for (const list of allLists) {
+			if (searchUncheckedOnly && list.done) continue;
 			if (list.name.toLowerCase().includes(q))
 				results.push({ kind: 'list', data: list, path: listPath(list) });
 		}
 		for (const item of allItems) {
+			if (searchUncheckedOnly && item.checked) continue;
 			if (item.name.toLowerCase().includes(q)) {
 				const list = allLists.find(l => l.id === item.listId);
 				if (list) results.push({ kind: 'item', data: item, listData: list });
@@ -613,6 +616,7 @@
 		} else {
 			showSearch = false;
 			searchQuery = '';
+			searchUncheckedOnly = false;
 		}
 	}
 
@@ -964,6 +968,13 @@ ${bodyHtml}
 
 		{#if showSearch}
 			<div class="search-bar">
+				<button
+					class="search-unchecked-btn"
+					class:search-unchecked-active={searchUncheckedOnly}
+					onclick={() => searchUncheckedOnly = !searchUncheckedOnly}
+					title={searchUncheckedOnly ? 'Showing unchecked only' : 'Showing all'}
+					aria-label={searchUncheckedOnly ? 'Show all' : 'Show unchecked only'}
+				>{searchUncheckedOnly ? '☐' : '☑'}</button>
 				<input
 					bind:this={searchInputEl}
 					bind:value={searchQuery}
@@ -1924,6 +1935,24 @@ ${bodyHtml}
 		padding: 0.5rem 1rem;
 		background: var(--bg2);
 		border-bottom: 1px solid var(--border);
+	}
+	.search-unchecked-btn {
+		background: none;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		font-size: 1.1rem;
+		cursor: pointer;
+		color: var(--text2);
+		padding: 0.25rem 0.4rem;
+		min-height: 44px;
+		display: flex;
+		align-items: center;
+		flex-shrink: 0;
+	}
+	.search-unchecked-active {
+		color: var(--accent);
+		border-color: var(--accent);
+		background: color-mix(in srgb, var(--accent) 10%, transparent);
 	}
 	.search-input {
 		flex: 1;
