@@ -904,7 +904,7 @@ ${bodyHtml}
 					<!-- Search crumb immediately after home -->
 					{#if savedSearch && !showSearch}
 						<button class="crumb search-crumb" onclick={restoreSearch} title="Back to search results">🔍 "{savedSearch}"</button>
-						{#if breadcrumb.length > 1}<span class="sep">/</span>{/if}
+						{#if breadcrumb.length > 1}<span class="sep">·</span>{/if}
 					{/if}
 					<!-- Remaining folder crumbs (skip the null home entry) -->
 					{#each breadcrumb.slice(1) as crumbId, i}
