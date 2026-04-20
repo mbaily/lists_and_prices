@@ -1072,14 +1072,14 @@ ${bodyHtml}
 						{:else if result.kind === 'list'}
 							<span class="result-icon">{result.data.type === 'priced' ? '💰' : '📋'}</span>
 							<span class="result-info">
-								<span class="result-name">{#each splitWithTags(result.data.name) as part}{#if part.type === 'tag'}<span class="tag-pill" style="--pill-color:{result.data.color}">{part.value}</span>{:else}{part.value}{/if}{/each}</span>
+								<span class="result-name" class:result-done={result.data.done}>{#each splitWithTags(result.data.name) as part}{#if part.type === 'tag'}<span class="tag-pill" style="--pill-color:{result.data.color}">{part.value}</span>{:else}{part.value}{/if}{/each}</span>
 								<span class="result-path">{result.path}</span>
 							</span>
 							<span class="result-kind-badge">List</span>
 						{:else}
-							<span class="result-icon">📄</span>
+							<span class="result-icon">{result.data.checked ? '☑' : '📄'}</span>
 							<span class="result-info">
-								<span class="result-name">{#each splitWithTags(result.data.name) as part}{#if part.type === 'tag'}<span class="tag-pill" style="--pill-color:{result.listData.color}">{part.value}</span>{:else}{part.value}{/if}{/each}</span>
+								<span class="result-name" class:result-done={result.data.checked}>{#each splitWithTags(result.data.name) as part}{#if part.type === 'tag'}<span class="tag-pill" style="--pill-color:{result.listData.color}">{part.value}</span>{:else}{part.value}{/if}{/each}</span>
 								<span class="result-path">{result.listData.name}</span>
 							</span>
 							<span class="result-kind-badge">Item</span>
@@ -2011,6 +2011,16 @@ ${bodyHtml}
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+	}
+	.result-done {
+		text-decoration: line-through;
+		color: var(--text2);
+		opacity: 0.55;
+	}
+	.result-done {
+		text-decoration: line-through;
+		color: var(--text2);
+		opacity: 0.55;
 	}
 	.result-path {
 		font-size: 0.78rem;
