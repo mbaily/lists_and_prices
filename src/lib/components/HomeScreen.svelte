@@ -128,9 +128,11 @@
 		}
 		for (const item of allItems) {
 			if (searchUncheckedOnly && item.checked) continue;
+			const list = allLists.find(l => l.id === item.listId);
+			if (!list) continue;
+			if (searchUncheckedOnly && list.done) continue;
 			if (item.name.toLowerCase().includes(q)) {
-				const list = allLists.find(l => l.id === item.listId);
-				if (list) results.push({ kind: 'item', data: item, listData: list });
+				results.push({ kind: 'item', data: item, listData: list });
 			}
 		}
 		// Sort by createdAt descending (newest first); nulls go last
