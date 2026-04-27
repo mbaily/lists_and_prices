@@ -821,16 +821,13 @@ ${bodyHtml}
 
 		const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
 		const url = URL.createObjectURL(blob);
-		const tab = window.open(url, '_blank');
-		if (!tab) {
-			const a = document.createElement('a');
-			a.href = url;
-			a.target = '_blank';
-			a.rel = 'noopener noreferrer';
-			document.body.appendChild(a);
-			a.click();
-			document.body.removeChild(a);
-		}
+		const a = document.createElement('a');
+		a.href = url;
+		a.target = '_blank';
+		a.rel = 'noopener noreferrer';
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
 		setTimeout(() => URL.revokeObjectURL(url), 60000);
 	}
 
