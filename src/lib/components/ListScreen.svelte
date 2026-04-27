@@ -25,6 +25,7 @@
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import RowMenu from './RowMenu.svelte';
 	import InfoDialog from './InfoDialog.svelte';
+	import CopyLinkDialog from './CopyLinkDialog.svelte';
 
 	let { listId, onHome, onOpenList, onNavigateTo, savedSearch = null, onRestoreSearch = undefined, orderedLists = [], onTagClick = undefined }: {
 		listId: string;
@@ -741,6 +742,9 @@
 	// ── Info dialog ───────────────────────────────────────────────────────────
 	let infoItem = $state<Item | null>(null);
 
+	// ── Copy-link dialog ─────────────────────────────────────────────────────
+	let copyLinksItem = $state<Item | null>(null);
+
 	function fmtDate(iso: string | null | undefined): string {
 		if (!iso) return 'Unknown';
 		return new Date(iso).toLocaleString(undefined, {
@@ -940,6 +944,7 @@
 		{#each filteredTreeItems as {item, level, tlIdx, rootTlIdx, sibIdx}}
 			{@const canAddChildren = !item.note && !item.heading && level < 2}
 			{@const linkParts = parseNameParts(item.name)}
+			{@const itemLinks = linkParts.filter(p => p.type === 'url').map(p => p.value)}
 			{@const parentKey = item.parentId ?? '__top__'}
 			<div
 				class="item-row"
@@ -967,6 +972,7 @@
 						{ label: 'ℹ️ Info', action: () => infoItem = item },
 						{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => updateItem(item.id, { pinned: !item.pinned }) },
 						{ label: '📌 Unheading', action: () => updateItem(item.id, { heading: false }) },
+						...(itemLinks.length > 0 ? [{ label: '🔗 Copy Link', action: () => copyLinksItem = item }] : []),
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 					]} />
 				{:else if item.note}
@@ -985,6 +991,7 @@
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoItem = item },
 						{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => updateItem(item.id, { pinned: !item.pinned }) },
+						...(itemLinks.length > 0 ? [{ label: '🔗 Copy Link', action: () => copyLinksItem = item }] : []),
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 					]} />
 				{:else if isPriced}
@@ -1025,6 +1032,7 @@
 								{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
 							] : []),
 							...(level === 0 ? [{ label: '📌 Make Heading', action: () => updateItem(item.id, { heading: true, checked: false, price: null, qty: null }) }] : []),
+							...(itemLinks.length > 0 ? [{ label: '🔗 Copy Link', action: () => copyLinksItem = item }] : []),
 							{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 						]} />
 					</div>
@@ -1052,6 +1060,7 @@
 							{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
 						] : []),
 						...(level === 0 ? [{ label: '📌 Make Heading', action: () => updateItem(item.id, { heading: true, checked: false, price: null, qty: null }) }] : []),
+						...(itemLinks.length > 0 ? [{ label: '🔗 Copy Link', action: () => copyLinksItem = item }] : []),
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 					]} />
 				{/if}
@@ -1137,6 +1146,15 @@
 				{ label: 'Modified', value: fmtDate(it.updatedAt) }
 			]}
 			onClose={() => infoItem = null}
+		/>
+	{/if}
+
+	<!-- Copy-link dialog -->
+	{#if copyLinksItem}
+		{@const cl = copyLinksItem}
+		<CopyLinkDialog
+			links={parseNameParts(cl.name).filter(p => p.type === 'url').map(p => p.value)}
+			onClose={() => copyLinksItem = null}
 		/>
 	{/if}
 </div>
