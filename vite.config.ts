@@ -21,6 +21,8 @@ export default defineConfig({
 				background_color: '#ffffff',
 				display: 'standalone',
 				orientation: 'portrait',
+				scope: 'https://git23069.hopto.org:8082/',
+				start_url: 'https://git23069.hopto.org:8082/',
 				icons: [
 					{ src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }
 				]
