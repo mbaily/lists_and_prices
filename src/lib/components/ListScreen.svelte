@@ -1502,7 +1502,7 @@
 		padding: 0;
 		min-width: 0;
 		/* Allow wrapping in priced rows; plain rows also benefit from wrap */
-		white-space: normal;
+		white-space: pre-wrap;
 		word-break: break-word;
 		overflow-wrap: break-word;
 	}
