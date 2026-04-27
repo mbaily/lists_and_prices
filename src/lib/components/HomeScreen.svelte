@@ -530,6 +530,18 @@
 	function tagList(id: string) { taggedListId = id; taggedFolderId = null; }
 	function clearTag() { taggedFolderId = null; taggedListId = null; }
 
+	function writeClipboard(text: string) {
+		navigator.clipboard.writeText(text).catch(() => {
+			const ta = document.createElement('textarea');
+			ta.value = text;
+			ta.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+			document.body.appendChild(ta);
+			ta.select();
+			try { document.execCommand('copy'); } catch { /* ignore */ }
+			document.body.removeChild(ta);
+		});
+	}
+
 	function moveTaggedTo(targetFolderId: string | null) {
 		if (taggedFolderId) {
 			if (targetFolderId !== null && isDescendant(taggedFolderId, targetFolderId)) {
@@ -1165,6 +1177,7 @@ ${bodyHtml}
 							? [{ label: folder.foldersFirst ? '📋 Lists first' : '📁 Folders first', action: () => updateFolder(folder.id, { foldersFirst: !folder.foldersFirst }) }]
 							: []),
 						{ label: folder.archived ? '📤 Unarchive' : '📥 Archive', action: () => folder.archived ? unarchiveFolder(folder.id) : archiveFolder(folder.id) },
+						{ label: '🔗 Tag as Link', action: () => writeClipboard(`[[folder:${folder.id}]]`) },
 						...(hasTag && taggedFolderId !== folder.id
 							? [{ label: '📂 Move Tagged Here', action: () => moveTaggedTo(folder.id) }]
 							: []),
@@ -1225,6 +1238,7 @@ ${bodyHtml}
 					{ label: 'ℹ️ Info', action: () => infoTarget = { kind: 'list', data: list } },
 					{ label: '✏ Rename', action: () => startRename(list.id, list.name, 'list', list.color) },
 					{ label: list.archived ? '📤 Unarchive' : '📥 Archive', action: () => list.archived ? unarchiveList(list.id) : archiveList(list.id) },
+					{ label: '🔗 Tag as Link', action: () => writeClipboard(`[[list:${list.id}]]`) },
 					...(hasTag
 						? [{ label: '✕ Clear Tag', action: clearTag }]
 						: [{ label: '🏷 Tag (to move)', action: () => tagList(list.id) }]),

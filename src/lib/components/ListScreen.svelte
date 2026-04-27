@@ -759,6 +759,42 @@
 		}
 	}
 
+	// ── Internal item/list/folder refs ────────────────────────────────────────────
+	let allItemsById = $derived.by(() => {
+		void docState.version;
+		try {
+			const map = new Map<string, Item>();
+			for (const i of readAllItems()) map.set(i.id, i);
+			return map;
+		} catch { return new Map<string, Item>(); }
+	});
+
+	function resolveRefName(type: string, id: string): string {
+		if (type === 'list-ref') return allLists.find(l => l.id === id)?.name ?? '…';
+		if (type === 'folder-ref') return allFolders.find(f => f.id === id)?.name ?? '…';
+		return allItemsById.get(id)?.name ?? '…';
+	}
+
+	function navigateToRef(type: string, id: string) {
+		if (type === 'list-ref') { onOpenList(id); return; }
+		if (type === 'folder-ref') { onNavigateTo(id); return; }
+		const target = allItemsById.get(id);
+		if (target) onOpenList(target.listId);
+	}
+
+	function copyRefToClipboard(id: string) {
+		const text = `[[item:${id}]]`;
+		navigator.clipboard.writeText(text).catch(() => {
+			const ta = document.createElement('textarea');
+			ta.value = text;
+			ta.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+			document.body.appendChild(ta);
+			ta.select();
+			try { document.execCommand('copy'); } catch { /* ignore */ }
+			document.body.removeChild(ta);
+		});
+	}
+
 	function fmtDate(iso: string | null | undefined): string {
 		if (!iso) return 'Unknown';
 		return new Date(iso).toLocaleString(undefined, {
@@ -980,12 +1016,13 @@
 						class="item-name heading-name"
 						class:editing={editingId === item.id}
 						onclick={() => startEditName(item)}
-					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else}{part.value}{/if}{/each}</button>
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<button class="ref-pill" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</button>{:else}{part.value}{/if}{/each}</button>
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoItem = item },
 						{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => updateItem(item.id, { pinned: !item.pinned }) },
 						{ label: '📌 Unheading', action: () => updateItem(item.id, { heading: false }) },
+						{ label: '🔗 Tag as Link', action: () => copyRefToClipboard(item.id) },
 						...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItem = item) }] : []),
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 					]} />
@@ -1000,11 +1037,12 @@
 						onpointermove={cancelLongPress}
 						onpointerup={cancelLongPress}
 						onpointercancel={cancelLongPress}
-					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else}{part.value}{/if}{/each}</button>
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<button class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</button>{:else}{part.value}{/if}{/each}</button>
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoItem = item },
 						{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => updateItem(item.id, { pinned: !item.pinned }) },
+						{ label: '🔗 Tag as Link', action: () => copyRefToClipboard(item.id) },
 						...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItem = item) }] : []),
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 					]} />
@@ -1023,7 +1061,7 @@
 							onpointermove={cancelLongPress}
 							onpointerup={cancelLongPress}
 							onpointercancel={cancelLongPress}
-						>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else}{part.value}{/if}{/each}</button>
+						>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<button class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</button>{:else}{part.value}{/if}{/each}</button>
 					</div>
 					<div class="priced-bottom">
 						<button
@@ -1046,6 +1084,7 @@
 								{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
 							] : []),
 							...(level === 0 ? [{ label: '📌 Make Heading', action: () => updateItem(item.id, { heading: true, checked: false, price: null, qty: null }) }] : []),
+							{ label: '🔗 Tag as Link', action: () => copyRefToClipboard(item.id) },
 							...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItem = item) }] : []),
 							{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 						]} />
@@ -1064,7 +1103,7 @@
 						onpointermove={cancelLongPress}
 						onpointerup={cancelLongPress}
 						onpointercancel={cancelLongPress}
-					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else}{part.value}{/if}{/each}</button>
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<button class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</button>{:else}{part.value}{/if}{/each}</button>
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoItem = item },
@@ -1074,6 +1113,7 @@
 							{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
 						] : []),
 						...(level === 0 ? [{ label: '📌 Make Heading', action: () => updateItem(item.id, { heading: true, checked: false, price: null, qty: null }) }] : []),
+						{ label: '🔗 Tag as Link', action: () => copyRefToClipboard(item.id) },
 						...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItem = item) }] : []),
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 					]} />
@@ -1557,6 +1597,22 @@
 		letter-spacing: 0.01em;
 		cursor: pointer;
 	}
+	.ref-pill {
+		display: inline-block;
+		background: color-mix(in srgb, var(--list-color, var(--accent)) 10%, transparent);
+		color: var(--list-color, var(--accent));
+		border: 1px solid color-mix(in srgb, var(--list-color, var(--accent)) 40%, transparent);
+		border-radius: 4px;
+		padding: 0 0.45em;
+		font-size: 0.82em;
+		font-weight: 500;
+		white-space: nowrap;
+		cursor: pointer;
+		font-family: inherit;
+		line-height: 1.4;
+		vertical-align: middle;
+	}
+	.ref-pill::before { content: '→\00a0'; opacity: 0.7; }
 	/* ── Tag autocomplete dropdown ──────────────────────────────────────────── */
 	.tag-autocomplete {
 		display: flex;
