@@ -1606,7 +1606,8 @@
 		padding: 0 0.45em;
 		font-size: 0.82em;
 		font-weight: 500;
-		white-space: nowrap;
+		white-space: normal;
+		overflow-wrap: break-word;
 		cursor: pointer;
 		font-family: inherit;
 		line-height: 1.4;
