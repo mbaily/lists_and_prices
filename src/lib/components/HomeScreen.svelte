@@ -1279,85 +1279,7 @@ ${bodyHtml}
 			{/if}
 		</div>
 
-		<!-- New folder form -->
-		{#if showNewFolder}
-			<div class="modal-backdrop">
-				<div class="modal">
-					<h2>New Folder</h2>
-					<input
-						placeholder="Folder name"
-						bind:value={newFolderName}
-						onkeydown={(e) => e.key === 'Enter' && submitNewFolder()}
-						autofocus
-					/>
-					<ColorPicker bind:value={newFolderColor} />
-					<div class="modal-actions">
-						<button onclick={submitNewFolder} disabled={!newFolderName.trim()}>Create</button>
-						<button onclick={() => { showNewFolder = false; newFolderName = ''; newFolderColor = '#6366f1'; }}>Cancel</button>
-					</div>
-				</div>
-			</div>
-		{/if}
 
-		<!-- New list form -->
-		{#if showNewList}
-			<div class="modal-backdrop">
-				<div class="modal">
-					<h2>New List</h2>
-					<input placeholder="Name (optional)" bind:value={newListName} />
-					<div class="date-shortcuts">
-						<span class="date-shortcuts-label">Date:</span>
-						{#each [0, 1, 2, 3, 7] as offset}
-							<button
-								class:active={newListDateMode === 'offset' && newListDateOffset === offset}
-								onclick={() => {
-									newListDateMode = 'offset';
-									newListDateOffset = offset;
-									showCustomDatePicker = false;
-									newListCustomDate = '';
-								}}
-							>{offset === 0 ? 'Today' : `+${offset}`}</button>
-						{/each}
-						<button
-							class:active={showCustomDatePicker}
-							onclick={() => {
-								showCustomDatePicker = !showCustomDatePicker;
-								if (showCustomDatePicker) {
-									newListDateMode = 'custom';
-									newListDateOffset = 0;
-								} else {
-									newListCustomDate = '';
-									newListDateMode = 'default';
-								}
-							}}
-							title="Pick a date"
-						>📅</button>
-					</div>
-					{#if showCustomDatePicker}
-						<input
-							type="date"
-							bind:value={newListCustomDate}
-							onchange={() => (newListDateMode = 'custom')}
-						/>
-					{/if}
-					<div class="type-toggle">
-						<button
-							class:active={newListType === 'plain'}
-							onclick={() => (newListType = 'plain')}
-						>Plain</button>
-						<button
-							class:active={newListType === 'priced'}
-							onclick={() => (newListType = 'priced')}
-						>Priced</button>
-					</div>
-					<ColorPicker bind:value={newListColor} />
-					<div class="modal-actions">
-						<button onclick={submitNewList}>Create</button>
-						<button onclick={() => { showNewList = false; newListName = ''; newListType = 'plain'; newListColor = '#6366f1'; resetNewListDate(); }}>Cancel</button>
-					</div>
-				</div>
-			</div>
-		{/if}
 
 		<!-- Confirm dialog -->
 		{#if confirmAction}
@@ -1438,6 +1360,86 @@ ${bodyHtml}
 		{/if}
 		{/if}<!-- end search else -->
 		</div><!-- end .content -->
+
+		<!-- New folder form (outside .content to avoid iOS fixed-position clipping) -->
+		{#if showNewFolder}
+			<div class="modal-backdrop">
+				<div class="modal">
+					<h2>New Folder</h2>
+					<input
+						placeholder="Folder name"
+						bind:value={newFolderName}
+						onkeydown={(e) => e.key === 'Enter' && submitNewFolder()}
+						autofocus
+					/>
+					<ColorPicker bind:value={newFolderColor} />
+					<div class="modal-actions">
+						<button onclick={submitNewFolder} disabled={!newFolderName.trim()}>Create</button>
+						<button onclick={() => { showNewFolder = false; newFolderName = ''; newFolderColor = '#6366f1'; }}>Cancel</button>
+					</div>
+				</div>
+			</div>
+		{/if}
+
+		<!-- New list form (outside .content to avoid iOS fixed-position clipping) -->
+		{#if showNewList}
+			<div class="modal-backdrop">
+				<div class="modal">
+					<h2>New List</h2>
+					<input placeholder="Name (optional)" bind:value={newListName} />
+					<div class="date-shortcuts">
+						<span class="date-shortcuts-label">Date:</span>
+						{#each [0, 1, 2, 3, 7] as offset}
+							<button
+								class:active={newListDateMode === 'offset' && newListDateOffset === offset}
+								onclick={() => {
+									newListDateMode = 'offset';
+									newListDateOffset = offset;
+									showCustomDatePicker = false;
+									newListCustomDate = '';
+								}}
+							>{offset === 0 ? 'Today' : `+${offset}`}</button>
+						{/each}
+						<button
+							class:active={showCustomDatePicker}
+							onclick={() => {
+								showCustomDatePicker = !showCustomDatePicker;
+								if (showCustomDatePicker) {
+									newListDateMode = 'custom';
+									newListDateOffset = 0;
+								} else {
+									newListCustomDate = '';
+									newListDateMode = 'default';
+								}
+							}}
+							title="Pick a date"
+						>📅</button>
+					</div>
+					{#if showCustomDatePicker}
+						<input
+							type="date"
+							bind:value={newListCustomDate}
+							onchange={() => (newListDateMode = 'custom')}
+						/>
+					{/if}
+					<div class="type-toggle">
+						<button
+							class:active={newListType === 'plain'}
+							onclick={() => (newListType = 'plain')}
+						>Plain</button>
+						<button
+							class:active={newListType === 'priced'}
+							onclick={() => (newListType = 'priced')}
+						>Priced</button>
+					</div>
+					<ColorPicker bind:value={newListColor} />
+					<div class="modal-actions">
+						<button onclick={submitNewList}>Create</button>
+						<button onclick={() => { showNewList = false; newListName = ''; newListType = 'plain'; newListColor = '#6366f1'; resetNewListDate(); }}>Cancel</button>
+					</div>
+				</div>
+			</div>
+		{/if}
 	</div>
 {/if}
 
