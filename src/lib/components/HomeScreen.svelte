@@ -1099,10 +1099,18 @@ ${bodyHtml}
 				{/each}
 			{/if}
 		{:else}
-		{#if breadcrumb.length > 1}
-			<button class="up-btn" onclick={() => (breadcrumb = breadcrumb.slice(0, -1))}>
-				↑ Up
-			</button>
+		{#if breadcrumb.length > 1 || !isInArchiveView}
+			<div class="nav-bar">
+				{#if breadcrumb.length > 1}
+					<button class="nav-up" onclick={() => (breadcrumb = breadcrumb.slice(0, -1))}>↑ Up</button>
+				{/if}
+				{#if !isInArchiveView}
+					<button class="nav-action" onclick={() => (showNewFolder = true)}>+ Folder</button>
+					{#if currentFolderId}
+						<button class="nav-action" onclick={() => openNewList()}>+ List</button>
+					{/if}
+				{/if}
+			</div>
 		{/if}
 
 		<!-- Active tag filter empty state -->
@@ -1269,15 +1277,7 @@ ${bodyHtml}
 			</div>
 		{/each}
 
-		<!-- Action bar -->
-		<div class="action-bar">
-			{#if !isInArchiveView}
-				<button onclick={() => (showNewFolder = true)}>+ Folder</button>
-				{#if currentFolderId}
-					<button onclick={() => openNewList()}>+ List</button>
-				{/if}
-			{/if}
-		</div>
+
 
 
 
@@ -1506,16 +1506,32 @@ ${bodyHtml}
 		padding: 0.25rem;
 		color: var(--text);
 	}
-	.up-btn {
-		margin: 0.5rem 1rem 0;
-		background: var(--bg3);
+	.nav-bar {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem 1rem;
+		border-bottom: 1px solid var(--border);
+		background: var(--bg2);
+	}
+	.nav-up {
+		background: var(--bg);
 		border: 1px solid var(--border);
 		border-radius: 8px;
-		padding: 0.5rem 1rem;
+		padding: 0.35rem 0.85rem;
 		font-size: 0.9rem;
 		color: var(--text);
 		cursor: pointer;
-		align-self: flex-start;
+	}
+	.nav-action {
+		background: var(--accent);
+		border: none;
+		border-radius: 8px;
+		padding: 0.35rem 0.85rem;
+		font-size: 0.9rem;
+		font-weight: 600;
+		color: #fff;
+		cursor: pointer;
 	}
 	.row {
 		display: flex;
@@ -1774,25 +1790,7 @@ ${bodyHtml}
 	}
 	.rename-ok { background: var(--accent); color: #fff; }
 	.rename-cancel { background: var(--bg); color: var(--text); border: 1px solid var(--border, #ccc); }
-	.action-bar {
-		display: flex;
-		gap: 0.75rem;
-		padding: 0.75rem 1rem;
-		margin-top: auto;
-		border-top: 1px solid var(--border);
-		background: var(--bg2);
-	}
-	.action-bar button {
-		flex: 1;
-		padding: 0.7rem;
-		background: var(--accent);
-		color: #fff;
-		border: none;
-		border-radius: 10px;
-		font-size: 0.95rem;
-		font-weight: 600;
-		cursor: pointer;
-	}
+
 	.modal-backdrop {
 		position: fixed;
 		inset: 0;
