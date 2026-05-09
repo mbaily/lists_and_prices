@@ -248,6 +248,16 @@
 		allFolders.some((f) => f.archived) || allLists.some((l) => l.archived)
 	);
 	const allListsInTreeOrder = $derived(readListsInTreeOrder(allFolders, allLists));
+	// When the opened list is "done" (e.g. a journal entry), navigate within its folder instead
+	const navOrderedLists = $derived(() => {
+		if (!openListId) return allListsInTreeOrder;
+		const openList = allLists.find((l) => l.id === openListId);
+		if (!openList?.done) return allListsInTreeOrder;
+		// Return all non-archived lists in the same folder, sorted by order
+		return allLists
+			.filter((l) => l.folderId === openList.folderId && !isListEffectivelyArchived(l, allFolders))
+			.sort((a, b) => a.order - b.order);
+	})();
 	let currentFolderColor = $derived(
 		allFolders.find((f) => f.id === currentFolderId)?.color ?? '#6366f1'
 	);
@@ -884,7 +894,7 @@ ${bodyHtml}
 {#if openSheetId}
 	<SpreadsheetScreen sheetId={openSheetId} onBack={() => openSheetId = null} />
 {:else if openListId}
-	<ListScreen listId={openListId} orderedLists={allListsInTreeOrder} onHome={() => { openListId = null; breadcrumb = [null]; }} onOpenList={(id) => (openListId = id)} savedSearch={savedSearch} onRestoreSearch={() => { openListId = null; breadcrumb = [null]; restoreSearch(); }} onTagClick={(tag) => { openListId = null; breadcrumb = [null]; activeTagFilter = null; showSearch = true; searchQuery = '#' + tag; savedSearch = '#' + tag; tick().then(() => searchInputEl?.focus()); }} onNavigateTo={(folderId) => {
+	<ListScreen listId={openListId} orderedLists={navOrderedLists} onHome={() => { openListId = null; breadcrumb = [null]; }} onOpenList={(id) => (openListId = id)} savedSearch={savedSearch} onRestoreSearch={() => { openListId = null; breadcrumb = [null]; restoreSearch(); }} onTagClick={(tag) => { openListId = null; breadcrumb = [null]; activeTagFilter = null; showSearch = true; searchQuery = '#' + tag; savedSearch = '#' + tag; tick().then(() => searchInputEl?.focus()); }} onNavigateTo={(folderId) => {
 		openListId = null;
 		// Reconstruct the full ancestor path to folderId so the breadcrumb is correct
 		// regardless of which folder the user was in when they opened the list.
