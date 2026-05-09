@@ -1,11 +1,11 @@
 <script lang="ts">
 	/**
 	 * A 3-dot (⋮) dropdown menu for folder/list rows.
-	 * Props: items — array of { label, action?, danger?, children? }
-	 * Items with `children` drill into a sub-panel; a ← Back button returns to the top.
+	 * Props: items — array of { label, action?, danger?, submenu? }
+	 * Items with `submenu` drill into a sub-panel; a ← Back button returns to the top.
 	 * Closes on outside tap (not scroll) or Escape.
 	 */
-	type MenuItem = { label: string; action?: () => void; danger?: boolean; children?: MenuItem[] };
+	type MenuItem = { label: string; action?: () => void; danger?: boolean; submenu?: MenuItem[] };
 	let { items }: { items: MenuItem[] } = $props();
 
 	let open = $state(false);
@@ -101,11 +101,11 @@
 				{/each}
 			{:else}
 				{#each items as item}
-					{#if item.children}
+					{#if item.submenu}
 						<button
 							class="menu-item menu-group"
 							role="menuitem"
-							onclick={(e) => { e.stopPropagation(); subItems = item.children!; }}
+							onclick={(e) => { e.stopPropagation(); subItems = item.submenu!; }}
 						>{item.label} ›</button>
 					{:else}
 						<button

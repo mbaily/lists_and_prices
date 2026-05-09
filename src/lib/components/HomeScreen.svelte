@@ -1190,7 +1190,7 @@ ${bodyHtml}
 					>★</button>
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'folder', i)}>☰</button>
 					<RowMenu items={[
-						{ label: '⚙ Folder settings', children: [
+						{ label: '⚙ Folder settings', submenu: [
 							{ label: 'ℹ️ Info', action: () => infoTarget = { kind: 'folder', data: folder } },
 							{ label: '✏ Rename', action: () => startRename(folder.id, folder.name, 'folder', folder.color) },
 							{ label: folder.localNav ? '🌐 Global navigation' : '📂 Local navigation', action: () => updateFolder(folder.id, { localNav: !folder.localNav }) },
