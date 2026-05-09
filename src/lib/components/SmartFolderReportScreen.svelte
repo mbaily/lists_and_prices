@@ -10,6 +10,7 @@
 		type Item
 	} from '$lib/data';
 	import { getSmartFolders } from '$lib/smartFolders.svelte';
+	import { splitWithTags } from '$lib/tags';
 
 	let { reportName, onBack }: { reportName: string; onBack: () => void } = $props();
 
@@ -95,6 +96,26 @@
 		}
 		return result;
 	});
+
+	// Lookup maps for resolving [[ref]] display names
+	const allItemsById = $derived.by((): Map<string, Item> => {
+		void docState.version;
+		return new Map(readAllItems().map((i) => [i.id, i]));
+	});
+	const allListsById = $derived.by(() => {
+		void docState.version;
+		return new Map(readLists().map((l) => [l.id, l]));
+	});
+	const allFoldersById = $derived.by(() => {
+		void docState.version;
+		return new Map(readFolders().map((f) => [f.id, f]));
+	});
+
+	function resolveRefName(type: string, id: string): string {
+		if (type === 'list-ref') return allListsById.get(id)?.name ?? '…';
+		if (type === 'folder-ref') return allFoldersById.get(id)?.name ?? '…';
+		return allItemsById.get(id)?.name ?? '…';
+	}
 
 	let copyStatus = $state<'idle' | 'copied'>('idle');
 
@@ -185,7 +206,7 @@
 						{#snippet renderItem(item: ItemEntry, depth: number)}
 							<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 							<div class="rf-item rf-clickable" style="margin-left: {depth * 2}ch" onclick={() => navigateToList(lb.listId)}>
-									{#if item.isNote}<span class="rf-note-mark">↳ </span>{/if}{item.name}{#if item.date}<span class="rf-date"> ({item.date})</span>{/if}
+									{#if item.isNote}<span class="rf-note-mark">↳ </span>{/if}{#each splitWithTags(item.name) as part}{#if part.type === 'url'}<a class="rf-url" href={part.value} target="_blank" rel="noopener noreferrer" onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="rf-tag-pill" onclick={(e) => e.stopPropagation()}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="rf-ref-pill" onclick={(e) => { e.stopPropagation(); navigateToList(lb.listId); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}{#if item.date}<span class="rf-date"> ({item.date})</span>{/if}
 								</div>
 								{#each item.children as child}
 									{@render renderItem(child, depth + 1)}
@@ -295,5 +316,24 @@
 	}
 	.rf-empty {
 		color: #888;
+	}
+	.rf-ref-pill {
+		background: #313244;
+		color: #cba6f7;
+		border-radius: 4px;
+		padding: 0 0.3em;
+		font-size: 0.9em;
+		cursor: pointer;
+		text-decoration: underline dotted;
+	}
+	.rf-ref-pill:hover {
+		background: #45475a;
+	}
+	.rf-url {
+		color: #89b4fa;
+		word-break: break-all;
+	}
+	.rf-tag-pill {
+		color: #f38ba8;
 	}
 </style>
