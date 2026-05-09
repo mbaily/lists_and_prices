@@ -502,13 +502,13 @@ export function readListsInTreeOrder(folders?: Folder[], lists?: ListMeta[]): Li
 	const result: ListMeta[] = [];
 
 	function visit(parentId: string | null) {
+		const folder = allFolders.find((f) => f.id === parentId);
 		const childFolders = allFolders
 			.filter((f) => f.parentId === parentId && !isFolderEffectivelyArchived(f.id, allFolders))
 			.sort((a, b) => a.order - b.order);
 		const childLists = allLists
 			.filter((l) => l.folderId === parentId && !isListEffectivelyArchived(l, allFolders) && !l.done && !folder?.localNav)
 			.sort((a, b) => a.order - b.order);
-		const folder = allFolders.find((f) => f.id === parentId);
 		const foldersFirst = folder?.foldersFirst ?? true;
 		if (foldersFirst) {
 			for (const f of childFolders) visit(f.id);
