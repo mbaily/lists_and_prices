@@ -63,7 +63,7 @@
 		const result: FolderBlock[] = [];
 		for (const folder of reportFolders) {
 			const folderLists = allLists
-				.filter((l) => l.folderId === folder.id && !isListEffectivelyArchived(l, allFolders))
+				.filter((l) => l.folderId === folder.id && !isListEffectivelyArchived(l, allFolders) && !l.done)
 				.sort((a, b) => {
 					const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
 					const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;

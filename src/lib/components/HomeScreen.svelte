@@ -720,6 +720,16 @@
 			});
 		const allItemsNow = readAllItems();
 
+		// Lookup maps for resolving [[ref]] display names
+		const itemById = new Map(allItemsNow.map((i) => [i.id, i]));
+		const listById = new Map(allLists.map((l) => [l.id, l]));
+		const folderById = new Map(allFolders.map((f) => [f.id, f]));
+		function resolveRef(type: string, id: string): string {
+			if (type === 'list-ref') return listById.get(id)?.name ?? '…';
+			if (type === 'folder-ref') return folderById.get(id)?.name ?? '…';
+			return itemById.get(id)?.name ?? '…';
+		}
+
 		// Build structured data for both HTML and plain-text
 		type ListBlock = { listName: string; items: { name: string; date: string }[] };
 		type FolderBlock = { folderName: string; lists: ListBlock[] };
@@ -727,7 +737,7 @@
 
 		for (const folder of reportFolders) {
 			const folderLists = allLists
-				.filter((l) => l.folderId === folder.id && !isListEffectivelyArchived(l, allFolders))
+				.filter((l) => l.folderId === folder.id && !isListEffectivelyArchived(l, allFolders) && !l.done)
 				.sort((a, b) => {
 					const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
 					const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
@@ -772,7 +782,11 @@
 				for (const lb of fb.lists) {
 					plainLines.push(`  ${lb.listName}`);
 					for (const item of lb.items) {
-						plainLines.push(`    ${item.name}${item.date ? `  (${item.date})` : ''}`);
+						const resolved = splitWithTags(item.name)
+							.map((p) => (p.type === 'item-ref' || p.type === 'list-ref' || p.type === 'folder-ref')
+								? resolveRef(p.type, p.value) : p.value)
+							.join('');
+						plainLines.push(`    ${resolved}${item.date ? `  (${item.date})` : ''}`);
 					}
 				}
 				plainLines.push('');
@@ -796,7 +810,15 @@
 					bodyHtml += `<div class="list-name">${esc(lb.listName)}</div>`;
 					for (const item of lb.items) {
 						const date = item.date ? `<span class="date">(${esc(item.date)})</span>` : '';
-						bodyHtml += `<div class="item">${esc(item.name)} ${date}</div>`;
+						const nameHtml = splitWithTags(item.name)
+							.map((p) => {
+								if (p.type === 'url') return `<a class="ref-url" href="${esc(p.value)}" target="_blank" rel="noopener noreferrer">${esc(p.value)}</a>`;
+								if (p.type === 'tag') return `<span class="ref-tag">${esc(p.value)}</span>`;
+								if (p.type === 'item-ref' || p.type === 'list-ref' || p.type === 'folder-ref') return `<span class="ref-pill">${esc(resolveRef(p.type, p.value))}</span>`;
+								return esc(p.value);
+							})
+							.join('');
+						bodyHtml += `<div class="item">${nameHtml} ${date}</div>`;
 					}
 					bodyHtml += `</div>`;
 				}
@@ -822,6 +844,9 @@
   .item { margin-left: 2ch; color: #fff; word-break: break-word; }
   .date { color: #888; font-size: 0.85em; }
   .empty { color: #888; }
+  .ref-pill { background: #313244; color: #cba6f7; border-radius: 4px; padding: 0 0.3em; font-size: 0.9em; }
+  .ref-url { color: #89b4fa; word-break: break-all; }
+  .ref-tag { color: #f38ba8; }
   .copy-btn { position: fixed; bottom: 1.2rem; right: 1.2rem; padding: 0.55rem 1.1rem; background: #cba6f7; color: #000; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: 700; font-family: inherit; opacity: 0.9; }
   .copy-btn:hover { opacity: 1; }
   .copy-btn.copied { background: #a6e3a1; }
