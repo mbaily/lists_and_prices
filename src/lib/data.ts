@@ -501,7 +501,7 @@ export function readListsInTreeOrder(folders?: Folder[], lists?: ListMeta[]): Li
 			.filter((f) => f.parentId === parentId && !isFolderEffectivelyArchived(f.id, allFolders))
 			.sort((a, b) => a.order - b.order);
 		const childLists = allLists
-			.filter((l) => l.folderId === parentId && !isListEffectivelyArchived(l, allFolders))
+			.filter((l) => l.folderId === parentId && !isListEffectivelyArchived(l, allFolders) && !l.done)
 			.sort((a, b) => a.order - b.order);
 		const folder = allFolders.find((f) => f.id === parentId);
 		const foldersFirst = folder?.foldersFirst ?? true;
