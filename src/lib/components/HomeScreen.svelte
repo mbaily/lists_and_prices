@@ -248,11 +248,13 @@
 		allFolders.some((f) => f.archived) || allLists.some((l) => l.archived)
 	);
 	const allListsInTreeOrder = $derived(readListsInTreeOrder(allFolders, allLists));
-	// When the opened list is "done" (e.g. a journal entry), navigate within its folder instead
+	// When the opened list is in a "localNav" folder, navigate within that folder instead of globally
 	const navOrderedLists = $derived.by(() => {
 		if (!openListId) return allListsInTreeOrder;
 		const openList = allLists.find((l) => l.id === openListId);
-		if (!openList?.done) return allListsInTreeOrder;
+		if (!openList) return allListsInTreeOrder;
+		const folder = allFolders.find((f) => f.id === openList.folderId);
+		if (!folder?.localNav) return allListsInTreeOrder;
 		// Return all non-archived lists in the same folder, sorted by order
 		return allLists
 			.filter((l) => l.folderId === openList.folderId && !isListEffectivelyArchived(l, allFolders))
@@ -1188,8 +1190,11 @@ ${bodyHtml}
 					>★</button>
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'folder', i)}>☰</button>
 					<RowMenu items={[
-						{ label: 'ℹ️ Info', action: () => infoTarget = { kind: 'folder', data: folder } },
-						{ label: '✏ Rename', action: () => startRename(folder.id, folder.name, 'folder', folder.color) },
+						{ label: '⚙ Folder settings', children: [
+							{ label: 'ℹ️ Info', action: () => infoTarget = { kind: 'folder', data: folder } },
+							{ label: '✏ Rename', action: () => startRename(folder.id, folder.name, 'folder', folder.color) },
+							{ label: folder.localNav ? '🌐 Global navigation' : '📂 Local navigation', action: () => updateFolder(folder.id, { localNav: !folder.localNav }) },
+						]},
 						{ label: '📋 Smart Folder', action: () => { sfDialogFolder = folder; sfNewName = ''; } },
 						...(folderHasBothKinds(folder.id)
 							? [{ label: folder.foldersFirst ? '📋 Lists first' : '📁 Folders first', action: () => updateFolder(folder.id, { foldersFirst: !folder.foldersFirst }) }]

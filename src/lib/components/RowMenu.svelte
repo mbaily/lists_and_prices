@@ -1,21 +1,23 @@
 <script lang="ts">
 	/**
 	 * A 3-dot (⋮) dropdown menu for folder/list rows.
-	 * Props: items — array of { label, action, danger? }
+	 * Props: items — array of { label, action?, danger?, children? }
+	 * Items with `children` drill into a sub-panel; a ← Back button returns to the top.
 	 * Closes on outside tap (not scroll) or Escape.
 	 */
-	type MenuItem = { label: string; action: () => void; danger?: boolean };
+	type MenuItem = { label: string; action?: () => void; danger?: boolean; children?: MenuItem[] };
 	let { items }: { items: MenuItem[] } = $props();
 
 	let open = $state(false);
 	let panelStyle = $state('');
+	let subItems = $state<MenuItem[] | null>(null);
 	let btnEl: HTMLButtonElement | null = null;
 
 	// Scroll-vs-tap detection
 	let _mayClose = false;
 	let _downX = 0, _downY = 0;
 
-	function close() { open = false; }
+	function close() { open = false; subItems = null; }
 
 	function handleKey(e: KeyboardEvent) {
 		if (e.key === 'Escape') close();
@@ -54,6 +56,7 @@
 			top = Math.max(top, MARGIN);
 
 			panelStyle = `top:${top}px;right:${rightEdge}px;max-height:${window.innerHeight - 2 * MARGIN}px`;
+			subItems = null;
 		}
 		open = !open;
 	}
@@ -86,14 +89,34 @@
 	>⋮</button>
 	{#if open}
 		<div class="menu-panel" style={panelStyle} role="menu">
-			{#each items as item}
-				<button
-					class="menu-item"
-					class:danger={item.danger}
-					role="menuitem"
-					onclick={() => { close(); item.action(); }}
-				>{item.label}</button>
-			{/each}
+			{#if subItems}
+				<button class="menu-item menu-back" role="menuitem" onclick={(e) => { e.stopPropagation(); subItems = null; }}>← Back</button>
+				{#each subItems as item}
+					<button
+						class="menu-item"
+						class:danger={item.danger}
+						role="menuitem"
+						onclick={(e) => { e.stopPropagation(); close(); item.action?.(); }}
+					>{item.label}</button>
+				{/each}
+			{:else}
+				{#each items as item}
+					{#if item.children}
+						<button
+							class="menu-item menu-group"
+							role="menuitem"
+							onclick={(e) => { e.stopPropagation(); subItems = item.children!; }}
+						>{item.label} ›</button>
+					{:else}
+						<button
+							class="menu-item"
+							class:danger={item.danger}
+							role="menuitem"
+							onclick={(e) => { e.stopPropagation(); close(); item.action?.(); }}
+						>{item.label}</button>
+					{/if}
+				{/each}
+			{/if}
 		</div>
 	{/if}
 </div>
@@ -143,4 +166,6 @@
 	.menu-item:last-child { border-bottom: none; }
 	.menu-item:hover, .menu-item:active { background: var(--bg2); }
 	.menu-item.danger { color: #ef4444; }
+	.menu-item.menu-back { color: var(--text2); font-size: 0.9rem; }
+	.menu-item.menu-group { display: flex; justify-content: space-between; }
 </style>

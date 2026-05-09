@@ -26,6 +26,9 @@ export interface Folder {
 	createdAt: string | null;
 	updatedAt: string | null;
 	foldersFirst: boolean;
+	/** If true, lists in this folder are excluded from global left/right navigation
+	 *  and instead navigate only within the folder. */
+	localNav: boolean;
 }
 
 export function readFolders(): Folder[] {
@@ -46,7 +49,8 @@ function yMapToFolder(m: Y.Map<unknown>): Folder {
 		archivedNextId: (m.get('archivedNextId') as string | null) ?? null,
 		createdAt: (m.get('createdAt') as string | null) ?? null,
 		updatedAt: (m.get('updatedAt') as string | null) ?? null,
-		foldersFirst: (m.get('foldersFirst') as boolean) ?? true
+		foldersFirst: (m.get('foldersFirst') as boolean) ?? true,
+		localNav: (m.get('localNav') as boolean) ?? false
 	};
 }
 
@@ -72,6 +76,7 @@ export function createFolder(name: string, parentId: string | null, color = '#63
 		m.set('favourite', false);
 		m.set('archived', false);
 		m.set('foldersFirst', true);
+		m.set('localNav', false);
 		m.set('createdAt', now);
 		m.set('updatedAt', now);
 		folders.push([m]);
@@ -501,7 +506,7 @@ export function readListsInTreeOrder(folders?: Folder[], lists?: ListMeta[]): Li
 			.filter((f) => f.parentId === parentId && !isFolderEffectivelyArchived(f.id, allFolders))
 			.sort((a, b) => a.order - b.order);
 		const childLists = allLists
-			.filter((l) => l.folderId === parentId && !isListEffectivelyArchived(l, allFolders) && !l.done)
+			.filter((l) => l.folderId === parentId && !isListEffectivelyArchived(l, allFolders) && !l.done && !folder?.localNav)
 			.sort((a, b) => a.order - b.order);
 		const folder = allFolders.find((f) => f.id === parentId);
 		const foldersFirst = folder?.foldersFirst ?? true;
