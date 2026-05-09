@@ -249,7 +249,7 @@
 	);
 	const allListsInTreeOrder = $derived(readListsInTreeOrder(allFolders, allLists));
 	// When the opened list is "done" (e.g. a journal entry), navigate within its folder instead
-	const navOrderedLists = $derived(() => {
+	const navOrderedLists = $derived.by(() => {
 		if (!openListId) return allListsInTreeOrder;
 		const openList = allLists.find((l) => l.id === openListId);
 		if (!openList?.done) return allListsInTreeOrder;
@@ -257,7 +257,7 @@
 		return allLists
 			.filter((l) => l.folderId === openList.folderId && !isListEffectivelyArchived(l, allFolders))
 			.sort((a, b) => a.order - b.order);
-	})();
+	});
 	let currentFolderColor = $derived(
 		allFolders.find((f) => f.id === currentFolderId)?.color ?? '#6366f1'
 	);
