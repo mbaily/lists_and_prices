@@ -499,6 +499,10 @@
 		selectionMode = true;
 		showSelectionPanel = false;
 		showHeaderMenu = false;
+		// Cancel any in-progress editing states
+		cancelEdit();
+		pricingItemId = null; priceBuffer = '';
+		qtyItemId = null; qtyBuffer = '';
 	}
 
 	function exitSelectionMode() {
@@ -520,19 +524,12 @@
 	function deleteSelected() {
 		const ids = [...selectedIds];
 		deleteItemsBatch(ids);
-		selectedIds = new Set();
-		showSelectionPanel = false;
+		exitSelectionMode();
 	}
 
 	function cycleFilter() {
 		const next: FilterView = filterView === 'all' ? 'unchecked' : filterView === 'unchecked' ? 'checked' : 'all';
 		updateList(listId, { filterView: next });
-	}
-
-	function toggleSelect(id: string) {
-		const next = new Set(selectedIds);
-		if (next.has(id)) next.delete(id); else next.add(id);
-		selectedIds = next;
 	}
 
 	function bulkUncheck() {
@@ -560,7 +557,8 @@
 		// Only fire on primary button / single touch
 		if (e.button !== 0 && e.pointerType !== 'touch') return;
 		longPressTimer = setTimeout(() => {
-			toggleSelect(id);
+			if (!selectionMode) enterSelectionMode();
+			toggleSelectionItem(id);
 			longPressTimer = null;
 		}, 500);
 	}
@@ -1177,8 +1175,8 @@
 							class="item-name"
 							class:strikethrough={item.checked}
 							class:editing={editingId === item.id}
-							onclick={() => startEditName(item)}
-							onpointerdown={(e) => onPointerDown(e, item.id)}
+							onclick={() => selectionMode ? toggleSelectionItem(item.id) : startEditName(item)}
+							onpointerdown={(e) => { if (!selectionMode) onPointerDown(e, item.id); }}
 							onpointermove={cancelLongPress}
 							onpointerup={cancelLongPress}
 							onpointercancel={cancelLongPress}
@@ -1188,12 +1186,12 @@
 						<button
 							class="price-btn"
 							class:editing={pricingItemId === item.id}
-							onclick={() => pricingItemId === item.id ? commitPrice() : startEditPrice(item)}
+							onclick={() => { if (!selectionMode) { pricingItemId === item.id ? commitPrice() : startEditPrice(item); } }}
 						>{pricingItemId === item.id ? (priceBuffer || '0') : formatPrice(item.price)}</button>
 						<button
 							class="qty-btn"
 							class:editing={qtyItemId === item.id}
-							onclick={() => qtyItemId === item.id ? commitQty() : startEditQty(item)}
+							onclick={() => { if (!selectionMode) { qtyItemId === item.id ? commitQty() : startEditQty(item); } }}
 							title="Quantity"
 						>×{qtyItemId === item.id ? (qtyBuffer || '1') : (item.qty ?? 1)}</button>
 						<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
@@ -1223,8 +1221,8 @@
 						class="item-name"
 						class:strikethrough={item.checked}
 						class:editing={editingId === item.id}
-						onclick={() => startEditName(item)}
-						onpointerdown={(e) => onPointerDown(e, item.id)}
+						onclick={() => selectionMode ? toggleSelectionItem(item.id) : startEditName(item)}
+						onpointerdown={(e) => { if (!selectionMode) onPointerDown(e, item.id); }}
 						onpointermove={cancelLongPress}
 						onpointerup={cancelLongPress}
 						onpointercancel={cancelLongPress}
