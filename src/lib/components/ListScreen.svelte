@@ -490,6 +490,40 @@
 	// ── Bulk actions ─────────────────────────────────────────────────────────────
 	let selectedIds = $state<Set<string>>(new Set());
 
+	// ── Selection mode ────────────────────────────────────────────────────────────
+	let selectionMode = $state(false);
+	let showSelectionPanel = $state(false);
+
+	function enterSelectionMode() {
+		selectedIds = new Set();
+		selectionMode = true;
+		showSelectionPanel = false;
+		showHeaderMenu = false;
+	}
+
+	function exitSelectionMode() {
+		selectionMode = false;
+		showSelectionPanel = false;
+		selectedIds = new Set();
+	}
+
+	function toggleSelectionItem(id: string) {
+		const next = new Set(selectedIds);
+		if (next.has(id)) next.delete(id); else next.add(id);
+		selectedIds = next;
+	}
+
+	const selectedItems = $derived(
+		treeItems.filter(({ item }) => selectedIds.has(item.id)).map(({ item }) => item)
+	);
+
+	function deleteSelected() {
+		const ids = [...selectedIds];
+		deleteItemsBatch(ids);
+		selectedIds = new Set();
+		showSelectionPanel = false;
+	}
+
 	function cycleFilter() {
 		const next: FilterView = filterView === 'all' ? 'unchecked' : filterView === 'unchecked' ? 'checked' : 'all';
 		updateList(listId, { filterView: next });
@@ -759,6 +793,8 @@
 		qtyItemId = null;
 		qtyBuffer = '';
 		selectedIds = new Set();
+		selectionMode = false;
+		showSelectionPanel = false;
 		touchDragFrom = null;
 		touchDragOver = null;
 		touchDragParentKey = null;
@@ -898,6 +934,7 @@
 			{#if showHeaderMenu}
 				<div class="header-menu" role="menu">
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; toggleType(); }}>{isPriced ? '📋 Switch to plain list' : '💰 Switch to priced list'}</button>
+					<button role="menuitem" onclick={enterSelectionMode}>☑ Select items</button>
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsTSV(); }}>📋 Copy as spreadsheet</button>
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsJournal(); }}>📓 Copy as journal</button>
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; exportToClipboard(); }}>📤 Export to clipboard (JSON)</button>
@@ -968,7 +1005,16 @@
 		</div>
 	{/if}
 
-	<!-- Summary bar -->
+	<!-- Summary bar / Selection bar -->
+	{#if selectionMode}
+		<div class="summary-bar selection-bar">
+			<span class="sel-count">{selectedIds.size} selected</span>
+			<button class="bulk-btn sel-view-btn" onclick={() => showSelectionPanel = !showSelectionPanel}>
+				{showSelectionPanel ? '▾ Hide list' : '▸ View list'}
+			</button>
+			<button class="bulk-btn sel-done-btn" onclick={exitSelectionMode}>✕ Done</button>
+		</div>
+	{:else}
 	<div class="summary-bar">
 		{#if isPriced}
 			<span>Total: <strong>{formatPrice(total)}</strong></span>
@@ -994,6 +1040,29 @@
 			>{filterView === 'all' ? 'All' : filterView === 'unchecked' ? '✗ only' : '✓ only'}</button>
 		{/if}
 	</div>
+	{/if}
+
+	<!-- Selection panel (shown when selectionMode && showSelectionPanel) -->
+	{#if selectionMode && showSelectionPanel}
+		<div class="selection-panel">
+			{#if selectedItems.length === 0}
+				<p class="sel-empty">No items selected yet. Tap the ◇ next to each item to select it.</p>
+			{:else}
+				<ul class="sel-item-list">
+					{#each selectedItems as item}
+						<li class="sel-item-row">
+							<button class="sel-item-deselect" onclick={() => toggleSelectionItem(item.id)} aria-label="Deselect">✕</button>
+							<span class="sel-item-name">{item.name}</span>
+						</li>
+					{/each}
+				</ul>
+				<button class="sel-delete-btn" onclick={() => askDelete(
+					`Delete ${selectedItems.length} selected item(s)?`,
+					deleteSelected
+				)}>🗑 Delete {selectedItems.length} item(s)</button>
+			{/if}
+		</div>
+	{/if}
 
 	<!-- Item list (pin-bar and fav-bar are first children — they scroll away naturally) -->
 	<div class="item-list" bind:this={itemListEl}>
@@ -1097,9 +1166,13 @@
 				{:else if isPriced}
 					<!-- Priced: name wraps top line, controls on bottom line -->
 					<div class="priced-top">
-						<button class="check-btn" onclick={() => toggleCheck(item)} aria-label={item.checked ? 'Uncheck' : 'Check'}>
-							{item.checked ? '☑' : '☐'}
-						</button>
+						<button
+							class="check-btn"
+							class:sel-check={selectionMode}
+							class:sel-checked={selectionMode && selectedIds.has(item.id)}
+							onclick={() => selectionMode ? toggleSelectionItem(item.id) : toggleCheck(item)}
+							aria-label={selectionMode ? (selectedIds.has(item.id) ? 'Deselect' : 'Select') : (item.checked ? 'Uncheck' : 'Check')}
+						>{selectionMode ? (selectedIds.has(item.id) ? '◆' : '◇') : (item.checked ? '☑' : '☐')}</button>
 						<button
 							class="item-name"
 							class:strikethrough={item.checked}
@@ -1139,9 +1212,13 @@
 					</div>
 				{:else}
 					<!-- Plain: single row -->
-					<button class="check-btn" onclick={() => toggleCheck(item)} aria-label={item.checked ? 'Uncheck' : 'Check'}>
-						{item.checked ? '☑' : '☐'}
-					</button>
+					<button
+						class="check-btn"
+						class:sel-check={selectionMode}
+						class:sel-checked={selectionMode && selectedIds.has(item.id)}
+						onclick={() => selectionMode ? toggleSelectionItem(item.id) : toggleCheck(item)}
+						aria-label={selectionMode ? (selectedIds.has(item.id) ? 'Deselect' : 'Select') : (item.checked ? 'Uncheck' : 'Check')}
+					>{selectionMode ? (selectedIds.has(item.id) ? '◆' : '◇') : (item.checked ? '☑' : '☐')}</button>
 					<button
 						class="item-name"
 						class:strikethrough={item.checked}
@@ -1582,6 +1659,78 @@
 	.item-row.drag-source { opacity: 0.4; }
 	.item-row.drag-above { background: var(--bg3); box-shadow: inset 0 2px 0 var(--accent); }
 	.item-row.drag-below { background: var(--bg3); box-shadow: inset 0 -2px 0 var(--accent); }
+	/* Selection-mode check button */
+	.check-btn.sel-check { color: var(--text2); }
+	.check-btn.sel-checked { color: var(--list-color, var(--accent)); }
+	/* Selected item row highlight */
+	.item-row:has(.sel-checked) { background: color-mix(in srgb, var(--list-color, var(--accent)) 12%, var(--bg)); }
+	/* Selection bar */
+	.summary-bar.selection-bar {
+		background: color-mix(in srgb, var(--list-color, var(--accent)) 15%, var(--bg2));
+		border-bottom: 2px solid var(--list-color, var(--accent));
+	}
+	.sel-count { font-weight: 600; flex: 1; }
+	.sel-view-btn {
+		background: var(--bg3);
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		padding: 0.2rem 0.6rem;
+		font-size: 0.85rem;
+		cursor: pointer;
+	}
+	.sel-done-btn {
+		background: none;
+		border: 1px solid var(--text2);
+		border-radius: 6px;
+		padding: 0.2rem 0.6rem;
+		font-size: 0.85rem;
+		cursor: pointer;
+		color: var(--text2);
+	}
+	/* Selection panel */
+	.selection-panel {
+		background: var(--bg2);
+		border-bottom: 1px solid var(--border);
+		padding: 0.5rem 0.75rem;
+		flex-shrink: 0;
+		max-height: 40vh;
+		overflow-y: auto;
+	}
+	.sel-empty { color: var(--text2); font-size: 0.88rem; margin: 0; padding: 0.25rem 0; }
+	.sel-item-list { list-style: none; margin: 0; padding: 0; }
+	.sel-item-row {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.3rem 0;
+		border-bottom: 1px solid var(--border);
+		font-size: 0.9rem;
+	}
+	.sel-item-row:last-child { border-bottom: none; }
+	.sel-item-deselect {
+		background: none;
+		border: none;
+		cursor: pointer;
+		color: var(--text2);
+		font-size: 0.8rem;
+		flex-shrink: 0;
+		padding: 0.1rem 0.3rem;
+	}
+	.sel-item-name { flex: 1; word-break: break-word; }
+	.sel-delete-btn {
+		display: block;
+		margin-top: 0.5rem;
+		width: 100%;
+		padding: 0.45rem;
+		background: #dc262620;
+		border: 1px solid #dc2626;
+		border-radius: 6px;
+		color: #dc2626;
+		font-size: 0.9rem;
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.sel-delete-btn:hover { background: #dc262630; }
 	.item-row.heading {
 		background: var(--bg2);
 		border-top: 1px solid var(--border);
