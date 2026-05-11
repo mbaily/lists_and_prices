@@ -8,6 +8,7 @@
 		readFolders,
 		createItem,
 		createItemsBatch,
+		createItemsFromExport,
 		updateItem,
 		deleteItemCascade,
 		deleteItemsBatch,
@@ -16,6 +17,7 @@
 		reorderSiblings,
 		isListEffectivelyArchived,
 		type Item,
+		type ExportedItem,
 		type ListMeta,
 		type FilterView
 	} from '$lib/data';
@@ -257,6 +259,35 @@
 	}
 
 	// ── Clipboard import ───────────────────────────────────────────────────
+	async function exportToClipboard() {
+		const exportData = {
+			__list_app__: true,
+			items: treeItems.map(({ item }) => {
+				const ex: ExportedItem = { id: item.id, name: item.name };
+				if (item.price !== null) ex.price = item.price;
+				if (item.qty !== null) ex.qty = item.qty;
+				if (item.checked) ex.checked = true;
+				if (item.heading) ex.heading = true;
+				if (item.note) ex.note = true;
+				if (item.pinned) ex.pinned = true;
+				if (item.parentId !== null) ex.parentId = item.parentId;
+				return ex;
+			})
+		};
+		const json = JSON.stringify(exportData, null, 2);
+		try {
+			await navigator.clipboard.writeText(json);
+			copyMessage = '✓ Copied as JSON!';
+			copyStatus = 'copied';
+			setTimeout(() => { copyStatus = 'idle'; }, 2000);
+		} catch {
+			copyMessage = '✗ Clipboard access denied.';
+			copyStatus = 'error';
+			setTimeout(() => { copyStatus = 'idle'; }, 3000);
+		}
+		showHeaderMenu = false;
+	}
+
 	async function importFromClipboard() {
 		let text: string;
 		try {
@@ -265,6 +296,22 @@
 			alert('Could not read clipboard. Make sure you have granted clipboard permission.');
 			return;
 		}
+
+		// Try JSON export format first
+		const trimmed = text.trim();
+		if (trimmed.startsWith('{')) {
+			try {
+				const data = JSON.parse(trimmed);
+				if (data.__list_app__ === true && Array.isArray(data.items) && data.items.length > 0) {
+					createItemsFromExport(listId, data.items as ExportedItem[]);
+					return;
+				}
+			} catch {
+				// Not valid JSON — fall through to plain-text import
+			}
+		}
+
+		// Plain text: one item per line
 		const lines = text
 			.split(/\r?\n/)
 			.map((l) => l.trim())
@@ -853,6 +900,7 @@
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; toggleType(); }}>{isPriced ? '📋 Switch to plain list' : '💰 Switch to priced list'}</button>
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsTSV(); }}>📋 Copy as spreadsheet</button>
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsJournal(); }}>📓 Copy as journal</button>
+					<button role="menuitem" onclick={() => { showHeaderMenu = false; exportToClipboard(); }}>📤 Export to clipboard (JSON)</button>
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; importFromClipboard(); }}>📥 Import from clipboard</button>
 				</div>
 			{/if}

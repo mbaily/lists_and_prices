@@ -360,6 +360,38 @@ export function createItemsBatch(listId: string, names: string[], addPosition: '
 	getDoc().transact(() => { for (const name of ordered) createItem(listId, name, null, null, false, addPosition); });
 }
 
+export interface ExportedItem {
+	id: string;
+	name: string;
+	price?: number | null;
+	qty?: number | null;
+	checked?: boolean;
+	heading?: boolean;
+	note?: boolean;
+	pinned?: boolean;
+	parentId?: string | null;
+}
+
+/** Import items from a JSON export, preserving all attributes and hierarchy.
+ *  Items must be in tree order (parents before their children). */
+export function createItemsFromExport(listId: string, exportedItems: ExportedItem[]): void {
+	const doc = getDoc();
+	const idMap = new Map<string, string>(); // old id → new id
+	doc.transact(() => {
+		for (const ex of exportedItems) {
+			const resolvedParentId = ex.parentId ? (idMap.get(ex.parentId) ?? null) : null;
+			const newId = createItem(listId, ex.name, ex.price ?? null, resolvedParentId, ex.note ?? false, 'bottom');
+			idMap.set(ex.id, newId);
+			const patch: Partial<Omit<Item, 'id' | 'listId' | 'createdAt' | 'updatedAt'>> = {};
+			if (ex.qty != null) patch.qty = ex.qty;
+			if (ex.checked) patch.checked = true;
+			if (ex.heading) patch.heading = true;
+			if (ex.pinned) patch.pinned = true;
+			if (Object.keys(patch).length > 0) updateItem(newId, patch);
+		}
+	});
+}
+
 export function listTotal(listId: string): number {
 	return Math.round(
 		readItems(listId)
