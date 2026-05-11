@@ -1130,7 +1130,7 @@
 					<button
 						class="item-name heading-name"
 						class:editing={editingId === item.id}
-						onclick={() => startEditName(item)}
+						onclick={() => { if (!selectionMode) startEditName(item); }}
 					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}</button>
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
@@ -1147,8 +1147,8 @@
 					<button
 						class="item-name note-name"
 						class:editing={editingId === item.id}
-						onclick={() => startEditName(item)}
-						onpointerdown={(e) => onPointerDown(e, item.id)}
+						onclick={() => selectionMode ? toggleSelectionItem(item.id) : startEditName(item)}
+						onpointerdown={(e) => { if (!selectionMode) onPointerDown(e, item.id); }}
 						onpointermove={cancelLongPress}
 						onpointerup={cancelLongPress}
 						onpointercancel={cancelLongPress}
