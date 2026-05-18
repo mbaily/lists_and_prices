@@ -927,6 +927,12 @@
 		{#if savedSearch && onRestoreSearch}
 			<button class="crumb search-crumb" onclick={onRestoreSearch} title="Back to search results">🔍 "{savedSearch}"</button>
 		{/if}
+		<button
+			class="list-done-btn"
+			onclick={() => listMeta && updateList(listId, { done: !listMeta.done })}
+			aria-label={listMeta?.done ? 'Mark list incomplete' : 'Mark list complete'}
+			title={listMeta?.done ? 'Mark list incomplete' : 'Mark list complete'}
+		>{listMeta?.done ? '☑' : '☐'}</button>
 		<div class="header-menu-wrap">
 			<button class="type-btn" onclick={() => showHeaderMenu = !showHeaderMenu} aria-label="More options">⋮</button>
 			{#if showHeaderMenu}
@@ -1505,6 +1511,15 @@
 		padding: 0.2rem;
 	}
 
+	.list-done-btn {
+		background: none;
+		border: none;
+		font-size: 1.2rem;
+		cursor: pointer;
+		padding: 0.2rem;
+		flex-shrink: 0;
+		color: var(--list-color, var(--text));
+	}
 	.header-menu-wrap {
 		position: relative;
 		margin-left: 0.4rem;
