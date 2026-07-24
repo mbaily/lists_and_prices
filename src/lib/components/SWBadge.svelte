@@ -16,6 +16,10 @@
 			swStatus = 'installing';
 		}
 
+		navigator.serviceWorker.ready.then(() => {
+			swStatus = 'active';
+		});
+
 		navigator.serviceWorker.addEventListener('controllerchange', () => {
 			swStatus = 'active';
 		});
