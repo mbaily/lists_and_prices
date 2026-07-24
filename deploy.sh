@@ -21,6 +21,10 @@ sudo rsync -av --delete \
     --exclude="node_modules/" \
     --exclude="src/" \
     --exclude="deploy.sh" \
+    --exclude="server/cert.pem" \
+    --exclude="server/key.pem" \
+    --exclude="server/.htpasswd" \
+    --exclude="server/server.db" \
     "$SOURCE_DIR/" "$DEST_DIR/"
 
 # 3. Permissions
