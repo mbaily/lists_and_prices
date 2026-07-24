@@ -1,0 +1,6 @@
+{
+  "hostname": "git23069.hopto.org",
+  "port": 8082,
+  "tls": true,
+  "insecure": true
+}

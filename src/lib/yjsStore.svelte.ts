@@ -10,6 +10,9 @@ import { WebsocketProvider } from 'y-websocket';
 export type ItemType = 'plain' | 'priced';
 export type SyncStatus = 'offline' | 'connecting' | 'synced';
 
+/** True once y-indexeddb has finished loading persisted data into the Y.Doc. */
+export const idbSynced = $state<{ done: boolean }>({ done: false });
+
 // ─── Reactive state (Svelte 5 runes – used in components via import) ──────────
 // We export plain objects that components can $state-wrap or read directly.
 
@@ -29,8 +32,16 @@ export function initYjs(username: string, wsUrl: string) {
 	const doc = new Y.Doc();
 	_doc = doc;
 
-	// Local persistence (survives offline)
+	// Local persistence (survives offline).
+	// The 'synced' event fires once IDB data has been applied to the Y.Doc.
+	// Bumping docState.version here ensures components re-render with real data
+	// on first load offline rather than showing empty lists.
+	idbSynced.done = false;
 	_idbProvider = new IndexeddbPersistence(`pnl-${username}`, doc);
+	_idbProvider.on('synced', () => {
+		idbSynced.done = true;
+		docState.version++;
+	});
 
 	// Remote sync
 	_wsProvider = new WebsocketProvider(wsUrl, `pnl-${username}`, doc, {
@@ -64,6 +75,7 @@ export function destroyYjs() {
 	_idbProvider = null;
 	syncState.status = 'offline';
 	docState.version = 0;
+	idbSynced.done = false;
 }
 
 // ─── Data shape helpers ────────────────────────────────────────────────────────

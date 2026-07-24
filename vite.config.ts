@@ -12,7 +12,10 @@ export default defineConfig({
 	plugins: [
 		sveltekit(),
 		VitePWA({
+			// Force the registration script to be injected as a plain <script> tag.
+			// 'autoUpdate' alone can silently fail with adapter-static post-processing.
 			registerType: 'autoUpdate',
+			injectRegister: 'script',
 			manifest: {
 				name: 'Lists & Prices',
 				short_name: 'Lists',
@@ -21,16 +24,36 @@ export default defineConfig({
 				background_color: '#ffffff',
 				display: 'standalone',
 				orientation: 'portrait',
-				scope: 'https://git23069.hopto.org:8082/',
-				start_url: 'https://git23069.hopto.org:8082/',
+				// Relative paths so the installed PWA works regardless of host/port changes.
+				scope: '/',
+				start_url: '/',
 				icons: [
+					// PNG icons required by iOS Safari (SVG icons are ignored for home-screen).
+					{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+					{ src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+					{ src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+					// SVG kept as fallback for modern browsers
 					{ src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }
 				]
 			},
 			workbox: {
-				globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}']
+				// Precache all static assets including the new PNG icons.
+				globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+				// Immediately activate new SW without waiting for old tabs to close.
+				skipWaiting: true,
+				clientsClaim: true,
+				// Don't let the SW intercept non-GET API calls — let them go to network.
+				runtimeCaching: [
+					{
+						urlPattern: /^https?:\/\/[^/]+\/api\//,
+						handler: 'NetworkOnly'
+					},
+					{
+						urlPattern: /^wss?:\/\//,
+						handler: 'NetworkOnly'
+					}
+				]
 			}
 		})
 	]
 });
-

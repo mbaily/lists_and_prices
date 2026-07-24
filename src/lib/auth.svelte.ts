@@ -33,19 +33,32 @@ export async function login(
 }
 
 export async function logout() {
-	await fetch('/api/logout', { method: 'POST' });
+	try {
+		const res = await fetch('/api/logout', { method: 'POST' });
+		if (!res.ok && typeof navigator !== 'undefined' && navigator.onLine) return;
+	} catch {
+		if (typeof navigator !== 'undefined' && navigator.onLine) return;
+	}
 	auth.username = null;
 	localStorage.removeItem(AUTH_KEY);
 }
 
 export async function checkSession(): Promise<boolean> {
+	// Fast-path: if the browser knows we're offline, trust the locally cached
+	// username rather than attempting a fetch that will either throw or return a
+	// SW-generated error response — either of which previously wiped the session.
+	if (typeof navigator !== 'undefined' && !navigator.onLine && auth.username !== null) {
+		return true;
+	}
+
 	let res: Response;
 	try {
 		res = await fetch('/api/session');
 	} catch {
-		// Network failure — keep existing auth state (app may be offline / PWA)
+		// Network failure (fetch threw) — keep existing auth state (app may be offline / PWA)
 		return auth.username !== null;
 	}
+
 	if (res.ok) {
 		const body = await res.json();
 		if (typeof body.username === 'string' && body.username) {
@@ -54,6 +67,13 @@ export async function checkSession(): Promise<boolean> {
 			return true;
 		}
 	}
+
+	// Non-ok response while we believe we're online — treat as genuine auth failure.
+	// But if we have no network indicator and a saved username, keep the user logged in.
+	if (auth.username !== null && typeof navigator !== 'undefined' && !navigator.onLine) {
+		return true;
+	}
+
 	auth.username = null;
 	localStorage.removeItem(AUTH_KEY);
 	return false;

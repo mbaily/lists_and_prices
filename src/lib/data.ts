@@ -111,7 +111,7 @@ function _deleteFolderInner(id: string) {
 	const listIds = allLists
 		.filter((l) => l.get('folderId') === id)
 		.map((l) => l.get('id') as string);
-	for (const lid of listIds) deleteList(lid);
+	for (const lid of listIds) _deleteListInner(lid);
 
 	removeYMap(getFolders(doc), id);
 	// Clean up any smart folder report assignments for this folder
@@ -230,16 +230,21 @@ export function updateList(id: string, patch: Partial<Omit<ListMeta, 'id' | 'cre
 	if (!(keys.length === 1 && keys[0] === 'order')) m.set('updatedAt', new Date().toISOString());
 }
 
-export function deleteList(id: string) {
+function _deleteListInner(id: string) {
 	const doc = getDoc();
-	doc.transact(() => {
-		// Delete all items in this list
-		const allItems = getItems(doc).toArray() as Y.Map<unknown>[];
-		const itemIds = allItems
-			.filter((i) => i.get('listId') === id)
-			.map((i) => i.get('id') as string);
-		for (const iid of itemIds) deleteItem(iid);
-		removeYMap(getLists(doc), id);
+	// Delete all items in this list
+	const allItems = getItems(doc).toArray() as Y.Map<unknown>[];
+	const itemIds = allItems
+		.filter((i) => i.get('listId') === id)
+		.map((i) => i.get('id') as string);
+	for (const iid of itemIds) deleteItem(iid);
+	removeYMap(getLists(doc), id);
+}
+
+export function deleteList(id: string) {
+	getDoc().transact(() => {
+		_deleteListInner(id);
+		removeFromAllReports(id);
 	});
 }
 
@@ -290,20 +295,23 @@ function yMapToItem(m: Y.Map<unknown>): Item {
 	};
 }
 
-export function createItem(listId: string, name: string, price: number | null = null, parentId: string | null = null, note = false, addPosition: 'top' | 'bottom' = 'bottom'): string {
+export function createItem(listId: string, name: string, price: number | null = null, parentId: string | null = null, note = false, addPosition: 'top' | 'bottom' = 'bottom', explicitOrder?: number): string {
 	const doc = getDoc();
 	const id = uid();
 	const now = new Date().toISOString();
 	doc.transact(() => {
 		const items = getItems(doc);
-		const existing = (items.toArray() as Y.Map<unknown>[]).filter(
-			(i) => i.get('listId') === listId
-		);
-		// Order within siblings (same parentId)
-		const siblings = existing.filter((i) => (i.get('parentId') ?? null) === parentId);
-		const newOrder = addPosition === 'top' ? -1 : siblings.length;
-		if (addPosition === 'top') {
-			for (const sib of siblings) sib.set('order', (sib.get('order') as number ?? 0) + 1);
+		let newOrder = explicitOrder;
+		if (newOrder === undefined) {
+			const existing = (items.toArray() as Y.Map<unknown>[]).filter(
+				(i) => i.get('listId') === listId
+			);
+			// Order within siblings (same parentId)
+			const siblings = existing.filter((i) => (i.get('parentId') ?? null) === parentId);
+			newOrder = addPosition === 'top' ? -1 : siblings.length;
+			if (addPosition === 'top') {
+				for (const sib of siblings) sib.set('order', (sib.get('order') as number ?? 0) + 1);
+			}
 		}
 		const m = new Y.Map<unknown>();
 		m.set('id', id);
@@ -355,9 +363,21 @@ export function setItemsChecked(ids: string[], checked: boolean): void {
 }
 
 export function createItemsBatch(listId: string, names: string[], addPosition: 'top' | 'bottom' = 'bottom'): void {
-	// When adding at top, insert in reverse so final order matches input order
-	const ordered = addPosition === 'top' ? [...names].reverse() : names;
-	getDoc().transact(() => { for (const name of ordered) createItem(listId, name, null, null, false, addPosition); });
+	const doc = getDoc();
+	doc.transact(() => {
+		const existing = getItems(doc).toArray().filter(i => i.get('listId') === listId && (i.get('parentId') ?? null) === null);
+		
+		if (addPosition === 'top') {
+			for (const e of existing) {
+				const current = e.get('order') as number ?? 0;
+				e.set('order', current + names.length);
+			}
+			names.forEach((name, i) => createItem(listId, name, null, null, false, 'bottom', i));
+		} else {
+			const baseOrder = existing.length;
+			names.forEach((name, i) => createItem(listId, name, null, null, false, 'bottom', baseOrder + i));
+		}
+	});
 }
 
 export interface ExportedItem {

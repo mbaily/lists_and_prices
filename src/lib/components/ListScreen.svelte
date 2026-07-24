@@ -29,15 +29,26 @@
 	import InfoDialog from './InfoDialog.svelte';
 	import CopyLinkDialog from './CopyLinkDialog.svelte';
 
-	let { listId, onHome, onOpenList, onNavigateTo, savedSearch = null, onRestoreSearch = undefined, orderedLists = [], onTagClick = undefined }: {
+	let {
+		listId,
+		orderedLists = [],
+		highlightItemId = null,
+		onHome,
+		onOpenList,
+		savedSearch = null,
+		onRestoreSearch = undefined,
+		onTagClick = undefined,
+		onNavigateTo = undefined
+	}: {
 		listId: string;
+		orderedLists?: { id: string; name: string }[];
+		highlightItemId?: string | null;
 		onHome: () => void;
 		onOpenList: (id: string) => void;
-		onNavigateTo: (folderId: string | null) => void;
 		savedSearch?: string | null;
 		onRestoreSearch?: () => void;
-		orderedLists?: import('$lib/data').ListMeta[];
 		onTagClick?: (tag: string) => void;
+		onNavigateTo?: (folderId: string | null) => void;
 	} = $props();
 
 	let items = $derived.by(() => {
@@ -58,12 +69,29 @@
 		try { return readFolders(); } catch { return []; }
 	});
 	let favouriteLists = $derived(allLists.filter((l) => l.favourite && !isListEffectivelyArchived(l, allFolders)));
-	let allPinnedItems = $derived.by(() => {
+	let allItemsAll = $derived.by(() => {
 		void docState.version;
+		try { return readAllItems(); } catch { return [] as Item[]; }
+	});
+
+	let allPinnedItems = $derived.by(() => {
 		try {
 			const activeLists = new Set(allLists.filter((l) => !isListEffectivelyArchived(l, allFolders)).map((l) => l.id));
-			return readAllItems().filter((i) => i.pinned && activeLists.has(i.listId));
+			return allItemsAll.filter((i) => i.pinned && activeLists.has(i.listId));
 		} catch { return []; }
+	});
+
+	$effect(() => {
+		if (highlightItemId) {
+			tick().then(() => {
+				const el = document.querySelector(`[data-item-id="${highlightItemId}"]`);
+				if (el) {
+					el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+					el.classList.add('highlight-animation');
+					setTimeout(() => el.classList.remove('highlight-animation'), 2000);
+				}
+			});
+		}
 	});
 
 	// ── Breadcrumb ────────────────────────────────────────────────────────────────
@@ -169,26 +197,30 @@
 	type TreeItem = { item: Item; level: number; tlIdx: number; rootTlIdx: number; sibIdx: number };
 	function buildTreeOrder(allItems: Item[]): TreeItem[] {
 		const result: TreeItem[] = [];
-		const topLevel = allItems.filter((i) => i.parentId === null).sort((a, b) => a.order - b.order);
 		const validIds = new Set(allItems.map((i) => i.id));
+		const rendered = new Set<string>();
 		function addSubtree(item: Item, level: number, rootTlIdx: number) {
 			const children = allItems
 				.filter((i) => i.parentId === item.id)
 				.sort((a, b) => a.order - b.order);
 			children.forEach((child, sibIdx) => {
 				result.push({ item: child, level, tlIdx: -1, rootTlIdx, sibIdx });
+				rendered.add(child.id);
 				if (level < 2 && !child.note) addSubtree(child, level + 1, rootTlIdx);
 			});
 		}
+		const topLevel = allItems.filter((i) => i.parentId === null).sort((a, b) => a.order - b.order);
 		topLevel.forEach((item, idx) => {
 			result.push({ item, level: 0, tlIdx: idx, rootTlIdx: idx, sibIdx: idx });
+			rendered.add(item.id);
 			if (!item.heading) addSubtree(item, 1, idx);
 		});
-		// Append orphaned items (parent was deleted by a peer without cascading)
-		const rendered = new Set(result.map((t) => t.item.id));
+		// Append orphaned items
 		const orphans = allItems.filter((i) => i.parentId !== null && !validIds.has(i.parentId) && !rendered.has(i.id));
 		orphans.forEach((item, idx) => {
 			result.push({ item, level: 0, tlIdx: topLevel.length + idx, rootTlIdx: topLevel.length + idx, sibIdx: topLevel.length + idx });
+			rendered.add(item.id);
+			if (!item.heading) addSubtree(item, 1, topLevel.length + idx);
 		});
 		return result;
 	}
@@ -592,7 +624,9 @@
 				touchDragOver = parseInt(row.dataset.siblingIndex, 10);
 			}
 		}
+		let dragging = true;
 		function onEnd() {
+			dragging = false;
 			if (touchDragFrom !== null && touchDragOver !== null && touchDragFrom !== touchDragOver && touchDragParentKey !== null) {
 				const parentId = touchDragParentKey === '__top__' ? null : touchDragParentKey;
 				reorderSiblings(listId, parentId, touchDragFrom, touchDragOver);
@@ -605,9 +639,11 @@
 		document.addEventListener('pointerup', onEnd, { once: true });
 		document.addEventListener('pointercancel', onEnd, { once: true });
 		return () => {
-			document.removeEventListener('pointermove', onMove);
-			document.removeEventListener('pointerup', onEnd);
-			document.removeEventListener('pointercancel', onEnd);
+			if (!dragging) {
+				document.removeEventListener('pointermove', onMove);
+				document.removeEventListener('pointerup', onEnd);
+				document.removeEventListener('pointercancel', onEnd);
+			}
 		};
 	});
 
@@ -842,10 +878,9 @@
 
 	// ── Internal item/list/folder refs ────────────────────────────────────────────
 	let allItemsById = $derived.by(() => {
-		void docState.version;
 		try {
 			const map = new Map<string, Item>();
-			for (const i of readAllItems()) map.set(i.id, i);
+			for (const i of allItemsAll) map.set(i.id, i);
 			return map;
 		} catch { return new Map<string, Item>(); }
 	});
@@ -1129,6 +1164,7 @@
 				class:drag-below={touchDragParentKey === parentKey && touchDragOver === sibIdx && touchDragFrom !== null && touchDragFrom < sibIdx}
 				data-sibling-index={sibIdx}
 				data-parent-key={parentKey}
+				data-item-id={item.id}
 				style={level > 0 ? `padding-left:calc(0.75rem + ${level} * 1.5rem)` : undefined}
 			>
 				{#if item.heading}
@@ -2031,5 +2067,12 @@
 		border-radius: 8px;
 		font-size: 0.9rem;
 		cursor: pointer;
+	}
+	@keyframes highlightFade {
+		0% { background-color: var(--accent); }
+		100% { background-color: transparent; }
+	}
+	:global(.highlight-animation) {
+		animation: highlightFade 2s ease-out;
 	}
 </style>

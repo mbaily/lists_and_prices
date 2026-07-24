@@ -4,6 +4,11 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="text-scale" content="scale" />
+		<!-- PWA manifest — tells browsers/iOS this is an installable app -->
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<!-- Service worker registration — explicit fallback in case vite-plugin-pwa
+		     injection is silently skipped by adapter-static post-processing -->
+		<script src="/registerSW.js" defer></script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

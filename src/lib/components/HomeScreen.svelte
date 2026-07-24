@@ -76,6 +76,7 @@
 
 	// ── View state ──────────────────────────────────────────────────────────────
 	let openListId = $state<string | null>(_init.openListId);
+	let openItemId = $state<string | null>(null);
 	let showSettings = $state(false);
 
 	// ── Search ────────────────────────────────────────────────────────────────────
@@ -95,16 +96,18 @@
 		void docState.version;
 		try { return readLists(); } catch { return []; }
 	});
-	let allItems = $derived.by(() => {
-		if (!showSearch) return [] as Item[];
+	let allItemsAll = $derived.by(() => {
 		void docState.version;
 		try { return readAllItems(); } catch { return [] as Item[]; }
 	});
+	let allItems = $derived.by(() => {
+		if (!showSearch) return [] as Item[];
+		return allItemsAll;
+	});
 	let allPinnedItems = $derived.by(() => {
-		void docState.version;
 		try {
 			const activeLists = new Set(allLists.filter((l) => !isListEffectivelyArchived(l, allFolders)).map((l) => l.id));
-			return readAllItems().filter((i) => i.pinned && activeLists.has(i.listId));
+			return allItemsAll.filter((i) => i.pinned && activeLists.has(i.listId));
 		} catch { return [] as Item[]; }
 	});
 
@@ -477,7 +480,6 @@
 			}
 		}
 		if (!currentFolderId) {
-			alert('Please create a folder first.');
 			return;
 		}
 		createList(name, currentFolderId!, newListType, newListColor, settings.addListPosition);
@@ -673,14 +675,20 @@
 			breadcrumb = [null, ...ids];
 		} else if (result.kind === 'list') {
 			openListId = result.data.id;
+			openItemId = null;
 		} else {
 			openListId = result.listData.id;
+			openItemId = result.data.id;
 		}
 	}
 
 	$effect(() => {
 		void currentFolderId; // track navigation
-		renamingId = null;
+		if (renamingId && renameValue.trim()) {
+			submitRename();
+		} else {
+			renamingId = null;
+		}
 		infoTarget = null;
 		activeTagFilter = null;
 		// Close create forms so they don't linger in the wrong folder context
@@ -921,7 +929,7 @@ ${bodyHtml}
 {#if openSheetId}
 	<SpreadsheetScreen sheetId={openSheetId} onBack={() => openSheetId = null} />
 {:else if openListId}
-	<ListScreen listId={openListId} orderedLists={navOrderedLists} onHome={() => { openListId = null; breadcrumb = [null]; }} onOpenList={(id) => (openListId = id)} savedSearch={savedSearch} onRestoreSearch={() => { openListId = null; breadcrumb = [null]; restoreSearch(); }} onTagClick={(tag) => { openListId = null; breadcrumb = [null]; activeTagFilter = null; showSearch = true; searchQuery = '#' + tag; savedSearch = '#' + tag; tick().then(() => searchInputEl?.focus()); }} onNavigateTo={(folderId) => {
+	<ListScreen listId={openListId} highlightItemId={openItemId} orderedLists={navOrderedLists} onHome={() => { openListId = null; openItemId = null; breadcrumb = [null]; }} onOpenList={(id) => (openListId = id)} savedSearch={savedSearch} onRestoreSearch={() => { openListId = null; openItemId = null; breadcrumb = [null]; restoreSearch(); }} onTagClick={(tag) => { openListId = null; openItemId = null; breadcrumb = [null]; activeTagFilter = null; showSearch = true; searchQuery = '#' + tag; savedSearch = '#' + tag; tick().then(() => searchInputEl?.focus()); }} onNavigateTo={(folderId) => {
 		openListId = null;
 		// Reconstruct the full ancestor path to folderId so the breadcrumb is correct
 		// regardless of which folder the user was in when they opened the list.
