@@ -55,17 +55,9 @@ export default defineConfig({
 				// Immediately activate new SW without waiting for old tabs to close.
 				skipWaiting: true,
 				clientsClaim: true,
-				navigateFallback: null,
+				navigateFallback: '/',
 				// Don't let the SW intercept non-GET API calls — let them go to network.
 				runtimeCaching: [
-					{
-						// Cache HTML pages dynamically to support offline mode for SPA navigations
-						urlPattern: ({ request }) => request.mode === 'navigate',
-						handler: 'NetworkFirst',
-						options: {
-							cacheName: 'pages-cache',
-						}
-					},
 					{
 						urlPattern: /^https?:\/\/[^/]+\/api\//,
 						handler: 'NetworkOnly'
