@@ -50,8 +50,7 @@ export default defineConfig({
 				]
 			},
 			workbox: {
-				// Precache all static assets including the new PNG icons.
-				globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+				// Precache handled automatically by SvelteKitPWA plugin
 				// Immediately activate new SW without waiting for old tabs to close.
 				skipWaiting: true,
 				clientsClaim: true,
