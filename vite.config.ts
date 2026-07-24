@@ -51,6 +51,10 @@ export default defineConfig({
 			},
 			workbox: {
 				// Precache handled automatically by SvelteKitPWA plugin
+				// Force cache the root HTML so iOS can launch from homescreen offline.
+				additionalManifestEntries: [
+					{ url: '/', revision: pkg.version }
+				],
 				// Immediately activate new SW without waiting for old tabs to close.
 				skipWaiting: true,
 				clientsClaim: true,
