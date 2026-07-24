@@ -37,6 +37,7 @@
 	import ColorPicker from './ColorPicker.svelte';
 	import SettingsScreen from './SettingsScreen.svelte';
 	import SyncBadge from './SyncBadge.svelte';
+	import SWBadge from './SWBadge.svelte';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import RowMenu from './RowMenu.svelte';
 	import InfoDialog from './InfoDialog.svelte';
@@ -1015,6 +1016,7 @@ ${bodyHtml}
 						{/if}
 					</div>
 				{/if}
+				<SWBadge />
 				<SyncBadge status={syncState.status} />
 				<button class="icon-btn" onclick={() => (showSettings = true)} aria-label="Settings">
 					⚙
