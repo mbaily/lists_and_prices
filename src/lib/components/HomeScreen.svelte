@@ -83,7 +83,7 @@
 	let showSearch = $state(false);
 	let searchQuery = $state('');
 	let searchUncheckedOnly = $state(false);
-	let searchInputEl: HTMLInputElement | null = null;
+	let searchInputEl = $state<HTMLInputElement | null>(null);
 	let savedSearch = $state<string | null>(null); // persists after navigating to a result
 
 	// ── Live data (re-read on every Yjs change) ─────────────────────────────────

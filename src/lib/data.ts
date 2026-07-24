@@ -577,12 +577,14 @@ export function readListsInTreeOrder(folders?: Folder[], lists?: ListMeta[]): Li
 
 // ─── Internal utilities ───────────────────────────────────────────────────────
 
-function findYMap(arr: Y.Array<unknown>, id: string): Y.Map<unknown> | null {
-	const maps = arr.toArray() as Y.Map<unknown>[];
-	return maps.find((m) => m.get('id') === id) ?? null;
+function findYMap(arr: Y.Array<Y.Map<unknown>>, id: string): Y.Map<unknown> | null {
+	for (const m of arr.toArray() as Y.Map<unknown>[]) {
+		if (m.get('id') === id) return m;
+	}
+	return null;
 }
 
-function removeYMap(arr: Y.Array<unknown>, id: string) {
+function removeYMap(arr: Y.Array<Y.Map<unknown>>, id: string) {
 	const maps = arr.toArray() as Y.Map<unknown>[];
 	const idx = maps.findIndex((m) => m.get('id') === id);
 	if (idx !== -1) arr.delete(idx, 1);
@@ -684,7 +686,7 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 			}
 		} else {
 			// Merge: upsert each record by id
-			function upsert(arr: Y.Array<unknown>, record: Record<string, unknown>) {
+			function upsert(arr: Y.Array<Y.Map<unknown>>, record: Record<string, unknown>) {
 				const existing = findYMap(arr, record.id as string);
 				if (existing) {
 					for (const [k, v] of Object.entries(record)) existing.set(k, v);

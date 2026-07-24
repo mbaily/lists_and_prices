@@ -120,7 +120,7 @@
 
 	function navigateToCrumb(crumb: CrumbItem) {
 		if (crumb.id !== 'LIST') {
-			onNavigateTo(crumb.id!);
+			onNavigateTo?.(crumb.id!);
 		}
 	}
 
@@ -242,6 +242,10 @@
 				);
 			})()
 	);
+	let selectionMode = $state(false);
+	let selectedIds = $state<Set<string>>(new Set());
+
+	// Count of all checked items (excluding headings and notes)
 	const checkedCount = $derived(items.filter((i) => !i.heading && !i.note && i.checked).length);
 	const uncheckedCount = $derived(items.filter((i) => !i.heading && !i.note && !i.checked).length);
 	// Count of items that "Del checked" would actually delete
@@ -258,7 +262,7 @@
 	let inputMode = $state<InputMode>('add');
 	let universalValue = $state('');
 	// bind:this requires a plain let (not $state) to receive the real DOM node
-	let universalInputEl: HTMLTextAreaElement | null = null;
+	let universalInputEl = $state<HTMLTextAreaElement | null>(null);
 
 	function resizeUniversal() {
 		if (!universalInputEl) return;
@@ -520,10 +524,9 @@
 	}
 
 	// ── Bulk actions ─────────────────────────────────────────────────────────────
-	let selectedIds = $state<Set<string>>(new Set());
+	// Move items
 
 	// ── Selection mode ────────────────────────────────────────────────────────────
-	let selectionMode = $state(false);
 	let showSelectionPanel = $state(false);
 
 	function enterSelectionMode() {
@@ -893,7 +896,7 @@
 
 	function navigateToRef(type: string, id: string) {
 		if (type === 'list-ref') { onOpenList(id); return; }
-		if (type === 'folder-ref') { onNavigateTo(id); return; }
+		if (type === 'folder-ref') { onNavigateTo?.(id); return; }
 		const target = allItemsById.get(id);
 		if (target) onOpenList(target.listId);
 	}

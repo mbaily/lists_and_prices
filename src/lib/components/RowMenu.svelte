@@ -1,11 +1,7 @@
+<script module lang="ts">
+	export interface MenuItem { label: string; action?: () => void; danger?: boolean; submenu?: MenuItem[] }
+</script>
 <script lang="ts">
-	/**
-	 * A 3-dot (⋮) dropdown menu for folder/list rows.
-	 * Props: items — array of { label, action?, danger?, submenu? }
-	 * Items with `submenu` drill into a sub-panel; a ← Back button returns to the top.
-	 * Closes on outside tap (not scroll) or Escape.
-	 */
-	type MenuItem = { label: string; action?: () => void; danger?: boolean; submenu?: MenuItem[] };
 	let { items }: { items: MenuItem[] } = $props();
 
 	let open = $state(false);

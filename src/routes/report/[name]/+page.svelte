@@ -6,20 +6,21 @@
 	import { reloadSettings } from '$lib/settings.svelte';
 	import SmartFolderReportScreen from '$lib/components/SmartFolderReportScreen.svelte';
 
-	const reportName = $derived(decodeURIComponent(page.params.name));
+	const reportName = $derived(decodeURIComponent(page.params.name ?? ''));
 
 	let ready = $state(false);
 	let authed = $state(false);
 
-	onMount(async () => {
-		const ok = await checkSession();
-		if (ok && auth.username) {
-			reloadSettings();
-			const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-			initYjs(auth.username, `${wsProto}//${location.host}/yjs`);
-			authed = true;
-		}
-		ready = true;
+	onMount(() => {
+		checkSession().then((ok) => {
+			if (ok && auth.username) {
+				reloadSettings();
+				const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+				initYjs(auth.username, `${wsProto}//${location.host}/yjs`);
+				authed = true;
+			}
+			ready = true;
+		});
 	});
 
 	onDestroy(() => {

@@ -1,0 +1,460 @@
+
+> list-svelt5@0.0.1 check
+> svelte-kit sync && svelte-check --tsconfig ./tsconfig.json
+
+Loading svelte-check in workspace: /home/mbaily/other_git/list_svelt5
+Getting Svelte diagnostics...
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/ConfirmDialog.svelte:20:1
+Warn: Elements with the 'dialog' interactive role must have a tabindex value
+https://svelte.dev/e/a11y_interactive_supports_focus (svelte)
+
+<div class="backdrop" role="dialog" aria-modal="true" onclick={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
+	<div class="dialog">
+		<p>{message}</p>
+		<div class="actions">
+			<button class="confirm" onclick={onConfirm}>{confirmLabel}</button>
+			<button class="cancel" onclick={onCancel}>Cancel</button>
+		</div>
+	</div>
+</div>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/ConfirmDialog.svelte:20:1
+Warn: Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+
+<div class="backdrop" role="dialog" aria-modal="true" onclick={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
+	<div class="dialog">
+		<p>{message}</p>
+		<div class="actions">
+			<button class="confirm" onclick={onConfirm}>{confirmLabel}</button>
+			<button class="cancel" onclick={onCancel}>Cancel</button>
+		</div>
+	</div>
+</div>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/CopyLinkDialog.svelte:45:1
+Warn: Elements with the 'dialog' interactive role must have a tabindex value
+https://svelte.dev/e/a11y_interactive_supports_focus (svelte)
+
+<div
+	class="backdrop"
+	role="dialog"
+	aria-modal="true"
+	aria-label="Copy a link"
+	onclick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+>
+	<div class="dialog">
+		<div class="dialog-title">Copy a link</div>
+		<ul class="link-list" role="list">
+			{#each links as url}
+				<li>
+					<button
+						class="link-btn"
+						class:copied={copiedUrl === url}
+						title={url}
+						onclick={() => copyLink(url)}
+					>
+						<span class="link-text">{url}</span>
+						<span class="copy-badge">{copiedUrl === url ? '✓ Copied' : 'Copy'}</span>
+					</button>
+				</li>
+			{/each}
+		</ul>
+		<button class="close-btn" onclick={onClose}>Close</button>
+	</div>
+</div>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/CopyLinkDialog.svelte:45:1
+Warn: Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+
+<div
+	class="backdrop"
+	role="dialog"
+	aria-modal="true"
+	aria-label="Copy a link"
+	onclick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+>
+	<div class="dialog">
+		<div class="dialog-title">Copy a link</div>
+		<ul class="link-list" role="list">
+			{#each links as url}
+				<li>
+					<button
+						class="link-btn"
+						class:copied={copiedUrl === url}
+						title={url}
+						onclick={() => copyLink(url)}
+					>
+						<span class="link-text">{url}</span>
+						<span class="copy-badge">{copiedUrl === url ? '✓ Copied' : 'Copy'}</span>
+					</button>
+				</li>
+			{/each}
+		</ul>
+		<button class="close-btn" onclick={onClose}>Close</button>
+	</div>
+</div>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/InfoDialog.svelte:13:1
+Warn: Elements with the 'dialog' interactive role must have a tabindex value
+https://svelte.dev/e/a11y_interactive_supports_focus (svelte)
+
+<div class="backdrop" onclick={(e) => { if (e.target === e.currentTarget) onClose(); }} role="dialog" aria-modal="true">
+	<div class="dialog">
+		<div class="dialog-title">{title}</div>
+		<dl class="info-list">
+			{#each rows as row}
+				<div class="info-row">
+					<dt>{row.label}</dt>
+					<dd>{row.value}</dd>
+				</div>
+			{/each}
+		</dl>
+		<button class="close-btn" onclick={onClose}>Close</button>
+	</div>
+</div>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/InfoDialog.svelte:13:1
+Warn: Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+
+<div class="backdrop" onclick={(e) => { if (e.target === e.currentTarget) onClose(); }} role="dialog" aria-modal="true">
+	<div class="dialog">
+		<div class="dialog-title">{title}</div>
+		<dl class="info-list">
+			{#each rows as row}
+				<div class="info-row">
+					<dt>{row.label}</dt>
+					<dd>{row.value}</dd>
+				</div>
+			{/each}
+		</dl>
+		<button class="close-btn" onclick={onClose}>Close</button>
+	</div>
+</div>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/ListScreen.svelte:1179:263
+Warn: Elements with the 'button' interactive role must have a tabindex value
+https://svelte.dev/e/a11y_interactive_supports_focus (svelte)
+						onclick={() => { if (!selectionMode) startEditName(item); }}
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}</button>
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/ListScreen.svelte:1179:263
+Warn: Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+						onclick={() => { if (!selectionMode) startEditName(item); }}
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}</button>
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/ListScreen.svelte:1179:532
+Warn: Elements with the 'button' interactive role must have a tabindex value
+https://svelte.dev/e/a11y_interactive_supports_focus (svelte)
+						onclick={() => { if (!selectionMode) startEditName(item); }}
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}</button>
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/ListScreen.svelte:1179:532
+Warn: Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+						onclick={() => { if (!selectionMode) startEditName(item); }}
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}</button>
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/ListScreen.svelte:1200:287
+Warn: Elements with the 'button' interactive role must have a tabindex value
+https://svelte.dev/e/a11y_interactive_supports_focus (svelte)
+						onpointercancel={cancelLongPress}
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}</button>
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/ListScreen.svelte:1200:287
+Warn: Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+						onpointercancel={cancelLongPress}
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}</button>
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/ListScreen.svelte:1200:580
+Warn: Elements with the 'button' interactive role must have a tabindex value
+https://svelte.dev/e/a11y_interactive_supports_focus (svelte)
+						onpointercancel={cancelLongPress}
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}</button>
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/ListScreen.svelte:1200:580
+Warn: Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+						onpointercancel={cancelLongPress}
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}</button>
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/ListScreen.svelte:1228:288
+Warn: Elements with the 'button' interactive role must have a tabindex value
+https://svelte.dev/e/a11y_interactive_supports_focus (svelte)
+							onpointercancel={cancelLongPress}
+						>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}</button>
+					</div>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/ListScreen.svelte:1228:288
+Warn: Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+							onpointercancel={cancelLongPress}
+						>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}</button>
+					</div>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/ListScreen.svelte:1228:581
+Warn: Elements with the 'button' interactive role must have a tabindex value
+https://svelte.dev/e/a11y_interactive_supports_focus (svelte)
+							onpointercancel={cancelLongPress}
+						>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}</button>
+					</div>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/ListScreen.svelte:1228:581
+Warn: Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+							onpointercancel={cancelLongPress}
+						>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}</button>
+					</div>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/ListScreen.svelte:1274:287
+Warn: Elements with the 'button' interactive role must have a tabindex value
+https://svelte.dev/e/a11y_interactive_supports_focus (svelte)
+						onpointercancel={cancelLongPress}
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}</button>
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/ListScreen.svelte:1274:287
+Warn: Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+						onpointercancel={cancelLongPress}
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}</button>
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/ListScreen.svelte:1274:580
+Warn: Elements with the 'button' interactive role must have a tabindex value
+https://svelte.dev/e/a11y_interactive_supports_focus (svelte)
+						onpointercancel={cancelLongPress}
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}</button>
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/ListScreen.svelte:1274:580
+Warn: Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+						onpointercancel={cancelLongPress}
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}</button>
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/ListScreen.svelte:1519:2
+Warn: Unused CSS selector ".list-title"
+https://svelte.dev/e/css_unused_selector (svelte)
+	}
+	.list-title {
+		flex: 1;
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/ListScreen.svelte:1954:2
+Warn: Unused CSS selector ".del-btn"
+https://svelte.dev/e/css_unused_selector (svelte)
+	}
+	.del-btn {
+		background: none;
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/HomeScreen.svelte:1201:8
+Warn: Avoid using autofocus
+https://svelte.dev/e/a11y_autofocus (svelte)
+							onkeydown={(e) => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') renamingId = null; }}
+							autofocus
+						/>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/HomeScreen.svelte:1214:77
+Warn: Elements with the 'button' interactive role must have a tabindex value
+https://svelte.dev/e/a11y_interactive_supports_focus (svelte)
+					>
+						📁 {#each splitWithTags(folder.name) as part}{#if part.type === 'tag'}<span class="tag-pill" role="button" style="--pill-color:{folder.color}" onclick={(e) => { e.stopPropagation(); const t = part.value.slice(1).toLowerCase(); activeTagFilter = activeTagFilter === t ? null : t; }}>{part.value}</span>{:else}{part.value}{/if}{/each}{#if isPathThrough} <span class="path-through-hint">›</span>{/if}
+					</button>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/HomeScreen.svelte:1214:77
+Warn: Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+					>
+						📁 {#each splitWithTags(folder.name) as part}{#if part.type === 'tag'}<span class="tag-pill" role="button" style="--pill-color:{folder.color}" onclick={(e) => { e.stopPropagation(); const t = part.value.slice(1).toLowerCase(); activeTagFilter = activeTagFilter === t ? null : t; }}>{part.value}</span>{:else}{part.value}{/if}{/each}{#if isPathThrough} <span class="path-through-hint">›</span>{/if}
+					</button>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/HomeScreen.svelte:1273:8
+Warn: Avoid using autofocus
+https://svelte.dev/e/a11y_autofocus (svelte)
+							onkeydown={(e) => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') renamingId = null; }}
+							autofocus
+						/>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/HomeScreen.svelte:1283:111
+Warn: Elements with the 'button' interactive role must have a tabindex value
+https://svelte.dev/e/a11y_interactive_supports_focus (svelte)
+					<button class="row-name" onclick={() => { openListId = list.id; renamingId = null; }}>
+						{list.type === 'priced' ? '💰' : '📋'} {#each splitWithTags(list.name) as part}{#if part.type === 'tag'}<span class="tag-pill" role="button" style="--pill-color:{list.color}" onclick={(e) => { e.stopPropagation(); const t = part.value.slice(1).toLowerCase(); activeTagFilter = activeTagFilter === t ? null : t; }}>{part.value}</span>{:else}{part.value}{/if}{/each}
+					</button>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/HomeScreen.svelte:1283:111
+Warn: Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+					<button class="row-name" onclick={() => { openListId = list.id; renamingId = null; }}>
+						{list.type === 'priced' ? '💰' : '📋'} {#each splitWithTags(list.name) as part}{#if part.type === 'tag'}<span class="tag-pill" role="button" style="--pill-color:{list.color}" onclick={(e) => { e.stopPropagation(); const t = part.value.slice(1).toLowerCase(); activeTagFilter = activeTagFilter === t ? null : t; }}>{part.value}</span>{:else}{part.value}{/if}{/each}
+					</button>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/HomeScreen.svelte:1344:4
+Warn: Elements with the 'dialog' interactive role must have a tabindex value
+https://svelte.dev/e/a11y_interactive_supports_focus (svelte)
+			{@const fid = sfDialogFolder.id}
+			<div class="sf-backdrop" role="dialog" aria-modal="true"
+				onclick={(e) => { if (e.target === e.currentTarget) sfDialogFolder = null; }}>
+				<div class="sf-dialog">
+					<div class="sf-title">📋 Smart Folders</div>
+					<div class="sf-folder-name">📁 {sfDialogFolder.name}</div>
+					{#if sfReportNames().length > 0}
+						<div class="sf-section">Assign to report:</div>
+						<div class="sf-list">
+							{#each sfReportNames() as rname}
+								{@const assigned = (getSmartFolders()[rname] ?? []).includes(fid)}
+								<div class="sf-opt-row">
+									<button
+										class="sf-opt"
+										class:sf-opt-active={assigned}
+										onclick={() => assigned ? removeFromReport(fid, rname) : assignToReport(fid, rname)}
+									>{assigned ? '☑' : '☐'} {rname}</button>
+									<button class="sf-del-btn" onclick={() => deleteReport(rname)} aria-label="Delete report">🗑</button>
+								</div>
+							{/each}
+						</div>
+					{/if}
+					<div class="sf-section">New report name:</div>
+					<div class="sf-new-row">
+						<input
+							class="sf-input"
+							bind:value={sfNewName}
+							placeholder="Report name…"
+							onkeydown={(e) => { if (e.key === 'Enter' && sfNewName.trim()) { assignToReport(fid, sfNewName.trim()); sfNewName = ''; } }}
+						/>
+						<button
+							class="sf-add-btn"
+							onclick={() => { if (sfNewName.trim()) { assignToReport(fid, sfNewName.trim()); sfNewName = ''; } }}
+							disabled={!sfNewName.trim()}
+						>Add</button>
+					</div>
+					<button class="sf-close" onclick={() => sfDialogFolder = null}>Done</button>
+				</div>
+			</div>
+		{/if}
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/HomeScreen.svelte:1344:4
+Warn: Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+			{@const fid = sfDialogFolder.id}
+			<div class="sf-backdrop" role="dialog" aria-modal="true"
+				onclick={(e) => { if (e.target === e.currentTarget) sfDialogFolder = null; }}>
+				<div class="sf-dialog">
+					<div class="sf-title">📋 Smart Folders</div>
+					<div class="sf-folder-name">📁 {sfDialogFolder.name}</div>
+					{#if sfReportNames().length > 0}
+						<div class="sf-section">Assign to report:</div>
+						<div class="sf-list">
+							{#each sfReportNames() as rname}
+								{@const assigned = (getSmartFolders()[rname] ?? []).includes(fid)}
+								<div class="sf-opt-row">
+									<button
+										class="sf-opt"
+										class:sf-opt-active={assigned}
+										onclick={() => assigned ? removeFromReport(fid, rname) : assignToReport(fid, rname)}
+									>{assigned ? '☑' : '☐'} {rname}</button>
+									<button class="sf-del-btn" onclick={() => deleteReport(rname)} aria-label="Delete report">🗑</button>
+								</div>
+							{/each}
+						</div>
+					{/if}
+					<div class="sf-section">New report name:</div>
+					<div class="sf-new-row">
+						<input
+							class="sf-input"
+							bind:value={sfNewName}
+							placeholder="Report name…"
+							onkeydown={(e) => { if (e.key === 'Enter' && sfNewName.trim()) { assignToReport(fid, sfNewName.trim()); sfNewName = ''; } }}
+						/>
+						<button
+							class="sf-add-btn"
+							onclick={() => { if (sfNewName.trim()) { assignToReport(fid, sfNewName.trim()); sfNewName = ''; } }}
+							disabled={!sfNewName.trim()}
+						>Add</button>
+					</div>
+					<button class="sf-close" onclick={() => sfDialogFolder = null}>Done</button>
+				</div>
+			</div>
+		{/if}
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/HomeScreen.svelte:1421:7
+Warn: Avoid using autofocus
+https://svelte.dev/e/a11y_autofocus (svelte)
+						onkeydown={(e) => e.key === 'Enter' && submitNewFolder()}
+						autofocus
+					/>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/HomeScreen.svelte:1757:2
+Warn: Unused CSS selector ".dot"
+https://svelte.dev/e/css_unused_selector (svelte)
+	}
+	.dot {
+		width: 10px;
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/HomeScreen.svelte:1774:2
+Warn: Unused CSS selector ".row-actions"
+https://svelte.dev/e/css_unused_selector (svelte)
+	}
+	.row-actions {
+		display: flex;
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/HomeScreen.svelte:1779:2
+Warn: Unused CSS selector ".row-actions button"
+https://svelte.dev/e/css_unused_selector (svelte)
+	}
+	.row-actions button {
+		background: none;
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/SmartFolderReportScreen.svelte:201:6
+Warn: `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+					<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+					<div class="rf-folder-name rf-clickable" onclick={() => navigateToFolder(fb.folderId)}>{fb.folderName}</div>
+					{#each fb.lists as lb}
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/SmartFolderReportScreen.svelte:205:7
+Warn: `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+						<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+						<div class="rf-list-name rf-clickable" onclick={() => navigateToList(lb.listId)}>{lb.listName}</div>
+						{#snippet renderItem(item: ItemEntry, depth: number)}
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/SmartFolderReportScreen.svelte:208:8
+Warn: `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+							<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+							<div class="rf-item rf-clickable" style="margin-left: {depth * 2}ch" onclick={() => navigateToList(lb.listId)}>
+									{#if item.isNote}<span class="rf-note-mark">↳ </span>{/if}{#each splitWithTags(item.name) as part}{#if part.type === 'url'}<a class="rf-url" href={part.value} target="_blank" rel="noopener noreferrer" onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="rf-tag-pill" onclick={(e) => e.stopPropagation()}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="rf-ref-pill" onclick={(e) => { e.stopPropagation(); navigateToList(lb.listId); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}{#if item.date}<span class="rf-date"> ({item.date})</span>{/if}
+								</div>
+								{#each item.children as child}
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/SmartFolderReportScreen.svelte:209:294
+Warn: `<span>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+							<div class="rf-item rf-clickable" style="margin-left: {depth * 2}ch" onclick={() => navigateToList(lb.listId)}>
+									{#if item.isNote}<span class="rf-note-mark">↳ </span>{/if}{#each splitWithTags(item.name) as part}{#if part.type === 'url'}<a class="rf-url" href={part.value} target="_blank" rel="noopener noreferrer" onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="rf-tag-pill" onclick={(e) => e.stopPropagation()}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="rf-ref-pill" onclick={(e) => { e.stopPropagation(); navigateToList(lb.listId); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}{#if item.date}<span class="rf-date"> ({item.date})</span>{/if}
+								</div>
+
+/home/mbaily/other_git/list_svelt5/src/lib/components/SmartFolderReportScreen.svelte:209:469
+Warn: Elements with the 'button' interactive role must have a tabindex value
+https://svelte.dev/e/a11y_interactive_supports_focus (svelte)
+							<div class="rf-item rf-clickable" style="margin-left: {depth * 2}ch" onclick={() => navigateToList(lb.listId)}>
+									{#if item.isNote}<span class="rf-note-mark">↳ </span>{/if}{#each splitWithTags(item.name) as part}{#if part.type === 'url'}<a class="rf-url" href={part.value} target="_blank" rel="noopener noreferrer" onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="rf-tag-pill" onclick={(e) => e.stopPropagation()}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="rf-ref-pill" onclick={(e) => { e.stopPropagation(); navigateToList(lb.listId); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}{#if item.date}<span class="rf-date"> ({item.date})</span>{/if}
+								</div>
+
+====================================
+svelte-check found 0 errors and 41 warnings in 6 files

@@ -13,13 +13,14 @@
 		return `${wsProto}//${location.host}/yjs`;
 	}
 
-	onMount(async () => {
-		const ok = await checkSession();
-		if (ok && auth.username) {
-			reloadSettings(); // apply this user's theme/currency/handedness
-			initYjs(auth.username, getWsUrl());
-		}
-		ready = true;
+	onMount(() => {
+		checkSession().then((ok) => {
+			if (ok && auth.username) {
+				reloadSettings(); // apply this user's theme/currency/handedness
+				initYjs(auth.username, getWsUrl());
+			}
+			ready = true;
+		});
 
 		// When the device comes back online (e.g. iPhone rejoins Wi-Fi after being
 		// offline), re-initialise YJS so the WebSocket provider reconnects and syncs
