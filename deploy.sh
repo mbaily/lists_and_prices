@@ -11,6 +11,7 @@ echo "🚀 Starting deployment for $APP_NAME..."
 # 1. Build the Svelte 5 frontend
 echo "📦 Building Svelte frontend..."
 cd "$SOURCE_DIR"
+npm install
 npm run build
 
 # 2. Sync files to /opt
