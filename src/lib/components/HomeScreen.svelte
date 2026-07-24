@@ -1510,10 +1510,16 @@ ${bodyHtml}
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 0.75rem 1rem;
-		background: var(--bg2);
-		border-bottom: 1px solid var(--border);
+		padding: 1rem 1.25rem;
+		background: var(--glass);
+		backdrop-filter: blur(16px);
+		-webkit-backdrop-filter: blur(16px);
+		border-bottom: 1px solid var(--glass-border);
 		gap: 0.5rem;
+		position: sticky;
+		top: 0;
+		z-index: 50;
+		box-shadow: var(--shadow-sm);
 	}
 	.breadcrumb {
 		display: flex;
@@ -1585,11 +1591,22 @@ ${bodyHtml}
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		padding: var(--item-spacing, 8px) 1rem;
-		border-bottom: 1px solid var(--border);
-		transition: background 0.15s, opacity 0.15s;
+		padding: calc(var(--item-spacing, 8px) + 4px) 1rem;
+		margin: 6px 1rem;
+		background: var(--bg2);
+		border-radius: 12px;
+		border: 1px solid var(--border);
+		box-shadow: var(--shadow-sm);
+		transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 		position: relative;
 		line-height: var(--row-line-height, normal);
+	}
+	.row:active {
+		transform: scale(0.98);
+	}
+	.row:hover {
+		box-shadow: var(--shadow-md);
+		border-color: var(--accent-glow);
 	}
 	.folder-row, .list-row {
 		padding-left: 1.35rem;
@@ -1597,12 +1614,12 @@ ${bodyHtml}
 	.folder-row::before, .list-row::before {
 		content: '';
 		position: absolute;
-		left: 0;
-		top: 0;
-		bottom: 0;
-		width: 5px;
+		left: -1px;
+		top: -1px;
+		bottom: -1px;
+		width: 6px;
 		background: var(--row-color, transparent);
-		border-radius: 0 3px 3px 0;
+		border-radius: 12px 0 0 12px;
 	}
 	.row.drag-source { opacity: 0.4; }
 	.row.drag-above { background: var(--bg3); box-shadow: inset 0 2px 0 var(--accent); }
@@ -1993,39 +2010,51 @@ ${bodyHtml}
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		padding: 0.5rem 1rem;
-		background: var(--bg2);
-		border-bottom: 1px solid var(--border);
+		padding: 0.75rem 1rem;
+		background: var(--glass);
+		backdrop-filter: blur(12px);
+		-webkit-backdrop-filter: blur(12px);
+		border-bottom: 1px solid var(--glass-border);
+		position: sticky;
+		top: 60px; /* Below header */
+		z-index: 40;
 	}
 	.search-unchecked-btn {
-		background: none;
+		background: var(--bg2);
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: 99px;
 		font-size: 1.1rem;
 		cursor: pointer;
 		color: var(--text2);
-		padding: 0.25rem 0.4rem;
+		padding: 0.25rem 0.6rem;
 		min-height: 44px;
 		display: flex;
 		align-items: center;
 		flex-shrink: 0;
+		box-shadow: var(--shadow-sm);
+		transition: all 0.2s ease;
 	}
 	.search-unchecked-active {
 		color: var(--accent);
 		border-color: var(--accent);
-		background: color-mix(in srgb, var(--accent) 10%, transparent);
+		background: var(--accent-glow);
 	}
 	.search-input {
 		flex: 1;
 		border: 1px solid var(--border);
-		border-radius: 10px;
-		padding: 0.5rem 0.75rem;
+		border-radius: 99px;
+		padding: 0.5rem 1.25rem;
 		font-size: 1rem;
-		background: var(--bg);
+		background: var(--bg2);
 		color: var(--text);
 		outline: none;
+		box-shadow: var(--shadow-sm);
+		transition: all 0.2s ease;
 	}
-	.search-input:focus { border-color: var(--accent); }
+	.search-input:focus { 
+		border-color: var(--accent);
+		box-shadow: 0 0 0 3px var(--accent-glow);
+	}
 	.search-clear {
 		background: none;
 		border: none;

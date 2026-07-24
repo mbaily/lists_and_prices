@@ -1396,10 +1396,14 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		padding: 0.5rem 1rem;
-		background: var(--bg2);
-		border-bottom: 1px solid var(--border);
+		padding: 1rem 1.25rem;
+		background: var(--glass);
+		backdrop-filter: blur(16px);
+		-webkit-backdrop-filter: blur(16px);
+		border-bottom: 1px solid var(--glass-border);
 		flex-shrink: 0;
+		box-shadow: var(--shadow-sm);
+		z-index: 50;
 	}
 	.breadcrumb {
 		display: flex;
@@ -1676,10 +1680,13 @@
 		display: flex;
 		align-items: center;
 		gap: 0.4rem;
-		padding: var(--item-spacing, 8px) 0.75rem;
+		padding: calc(var(--item-spacing, 8px) + 2px) 0.75rem;
 		border-bottom: 1px solid var(--border);
-		transition: background 0.15s, opacity 0.15s;
+		transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 		line-height: var(--row-line-height, normal);
+	}
+	.item-row:active {
+		background: var(--bg3);
 	}
 	/* Priced rows: two-line layout on touch devices only */
 	@media (pointer: coarse) {
@@ -1983,10 +1990,16 @@
 	.drag-handle:active { color: var(--accent); }
 	/* ── Universal input bar ──────────────────────────────────────── */
 	.universal-bar {
-		padding: 0.5rem 0.75rem 0.4rem;
-		border-bottom: 1px solid var(--border);
-		background: var(--bg2);
+		padding: 0.75rem 1rem 0.5rem;
+		border-top: 1px solid var(--glass-border);
+		background: var(--glass);
+		backdrop-filter: blur(16px);
+		-webkit-backdrop-filter: blur(16px);
 		flex-shrink: 0;
+		position: sticky;
+		bottom: 0;
+		z-index: 50;
+		box-shadow: 0 -4px 10px -1px rgba(0,0,0,0.05);
 	}
 	.universal-row {
 		display: flex;
