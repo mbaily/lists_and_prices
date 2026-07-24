@@ -26,6 +26,7 @@
 	},
 	"dependencies": {
 		"@sveltejs/adapter-static": "^3.0.10",
+		"@vite-pwa/sveltekit": "^1.1.0",
 		"bcryptjs": "^3.0.3",
 		"better-sqlite3": "^12.8.0",
 		"cookie-parser": "^1.4.7",

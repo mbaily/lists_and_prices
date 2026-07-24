@@ -1,6 +1,6 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
-import { VitePWA } from 'vite-plugin-pwa';
+import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 import { readFileSync } from 'node:fs';
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
@@ -24,7 +24,7 @@ export default defineConfig({
 	},
 	plugins: [
 		sveltekit(),
-		VitePWA({
+		SvelteKitPWA({
 			// Force the registration script to be injected as a plain <script> tag.
 			// 'autoUpdate' alone can silently fail with adapter-static post-processing.
 			registerType: 'autoUpdate',
@@ -55,8 +55,17 @@ export default defineConfig({
 				// Immediately activate new SW without waiting for old tabs to close.
 				skipWaiting: true,
 				clientsClaim: true,
+				navigateFallback: null,
 				// Don't let the SW intercept non-GET API calls — let them go to network.
 				runtimeCaching: [
+					{
+						// Cache HTML pages dynamically to support offline mode for SPA navigations
+						urlPattern: ({ request }) => request.mode === 'navigate',
+						handler: 'NetworkFirst',
+						options: {
+							cacheName: 'pages-cache',
+						}
+					},
 					{
 						urlPattern: /^https?:\/\/[^/]+\/api\//,
 						handler: 'NetworkOnly'
