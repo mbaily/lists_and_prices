@@ -59,7 +59,6 @@ export default defineConfig({
 				skipWaiting: true,
 				clientsClaim: true,
 				navigateFallback: 'index.html',
-				inlineWorkboxRuntime: true,
 				// Don't let the SW intercept non-GET API calls — let them go to network.
 				runtimeCaching: [
 					{
