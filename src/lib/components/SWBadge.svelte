@@ -10,19 +10,29 @@
 			return;
 		}
 
-		if (navigator.serviceWorker.controller) {
-			swStatus = 'active';
-		} else {
-			swStatus = 'installing';
-		}
+		swStatus = 'installing';
+
+		const check = async () => {
+			const reg = await navigator.serviceWorker.getRegistration();
+			if (reg?.active || navigator.serviceWorker.controller) {
+				swStatus = 'active';
+			}
+		};
+
+		check();
+		const interval = setInterval(check, 1000);
 
 		navigator.serviceWorker.ready.then(() => {
 			swStatus = 'active';
+			clearInterval(interval);
 		});
 
 		navigator.serviceWorker.addEventListener('controllerchange', () => {
 			swStatus = 'active';
+			clearInterval(interval);
 		});
+
+		return () => clearInterval(interval);
 	});
 
 	const label: Record<SWStatus, string> = {
