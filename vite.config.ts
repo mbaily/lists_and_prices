@@ -11,10 +11,14 @@ export default defineConfig({
 	},
 	server: {
 		proxy: {
-			'/api': 'http://localhost:3000',
+			'/api': {
+				target: 'https://127.0.0.1:8080',
+				secure: false
+			},
 			'/yjs': {
-				target: 'ws://localhost:3000',
-				ws: true
+				target: 'wss://127.0.0.1:8080',
+				ws: true,
+				secure: false
 			}
 		}
 	},
