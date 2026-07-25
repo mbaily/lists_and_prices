@@ -201,7 +201,10 @@ app.get('/api/session', requireAuth, (req, res) => {
 
 // Serve built SPA
 app.use(express.static(BUILD_DIR));
-app.get('/{*path}', (_req, res) => {
+app.get('/{*path}', (req, res) => {
+	if (req.path.match(/\.[a-zA-Z0-9]+$/)) {
+		return res.status(404).json({ error: 'Not found' });
+	}
 	res.sendFile(path.join(BUILD_DIR, 'index.html'));
 });
 
