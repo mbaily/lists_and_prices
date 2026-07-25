@@ -8,6 +8,8 @@
 	onMount(() => {
 		applyTheme();
 		applyItemSpacing();
+		// @ts-expect-error injected by Vite
+		window.APP_VERSIONS = { svelte: __SVELTE_VERSION__, yjs: __YJS_VERSION__ };
 	});
 </script>
 

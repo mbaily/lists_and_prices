@@ -2,12 +2,15 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 import { readFileSync } from 'node:fs';
+import { VERSION as SVELTE_VERSION } from 'svelte/compiler';
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
 
 export default defineConfig({
 	define: {
-		__APP_VERSION__: JSON.stringify(pkg.version)
+		__APP_VERSION__: JSON.stringify(pkg.version),
+		__SVELTE_VERSION__: JSON.stringify(SVELTE_VERSION),
+		__YJS_VERSION__: JSON.stringify(pkg.dependencies.yjs.replace(/[\^~]/g, ''))
 	},
 	server: {
 		proxy: {
