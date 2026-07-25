@@ -35,12 +35,6 @@
 		return () => clearInterval(interval);
 	});
 
-	const label: Record<SWStatus, string> = {
-		unsupported: 'No SW',
-		installing: 'SW Wait',
-		active: 'SW Ready'
-	};
-	
 	const color: Record<SWStatus, string> = {
 		unsupported: '#ef4444',
 		installing: '#f97316',
@@ -50,7 +44,7 @@
 
 <span class="badge" style="--dot:{color[swStatus]}">
 	<span class="dot"></span>
-	{label[swStatus]}
+	SW
 </span>
 
 <style>

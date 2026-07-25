@@ -2,11 +2,6 @@
 	import type { SyncStatus } from '$lib/yjsStore.svelte';
 	let { status }: { status: SyncStatus } = $props();
 
-	const label: Record<SyncStatus, string> = {
-		offline: 'Offline',
-		connecting: 'Connecting…',
-		synced: 'Synced'
-	};
 	const color: Record<SyncStatus, string> = {
 		offline: '#ef4444',
 		connecting: '#f97316',
@@ -16,7 +11,7 @@
 
 <span class="badge" style="--dot:{color[status]}">
 	<span class="dot"></span>
-	{label[status]}
+	Sync
 </span>
 
 <style>
