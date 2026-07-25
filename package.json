@@ -27,7 +27,6 @@
 	"dependencies": {
 		"@sveltejs/adapter-static": "^3.0.10",
 		"@vite-pwa/sveltekit": "^1.1.0",
-		"@y/websocket-server": "^0.1.5",
 		"bcryptjs": "^3.0.3",
 		"better-sqlite3": "^13.0.1",
 		"cookie-parser": "^1.4.7",
@@ -43,7 +42,7 @@
 		"workbox-window": "^7.4.1",
 		"ws": "^8.21.1",
 		"y-indexeddb": "^9.0.12",
-		"y-websocket": "^3.0.0",
+		"y-websocket": "^1.5.4",
 		"yjs": "^13.6.31"
 	}
 }

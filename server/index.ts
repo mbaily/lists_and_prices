@@ -22,7 +22,7 @@ import { createRequire } from 'node:module';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { WebSocketServer } from 'ws';
-import { setupWSConnection } from '@y/websocket-server/utils';
+import { setupWSConnection } from 'y-websocket/bin/utils';
 import forge from 'node-forge';
 import bcrypt from 'bcryptjs';
 import cookieSignature from 'cookie-signature';
