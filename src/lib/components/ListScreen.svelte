@@ -1044,7 +1044,7 @@
 					{#if inputMode === 'edit'}
 						<button type="button" class="input-clear" onclick={cancelEdit} aria-label="Cancel edit">✕</button>
 					{:else}
-						<button type="button" class="type-toggle-btn" class:is-note={newItemIsNote} onpointerdown={(e) => { e.preventDefault(); newItemIsNote = !newItemIsNote; focusInput(); }} aria-label="Toggle note/todo">{newItemIsNote ? '📝 Note' : '☑ Todo'}</button>
+						<button type="button" class="type-toggle-btn" class:is-note={newItemIsNote} onpointerdown={(e) => { e.preventDefault(); newItemIsNote = !newItemIsNote; focusInput(); }} aria-label="Toggle note/todo">{newItemIsNote ? '📝' : '☑'}</button>
 					{/if}
 				</div>
 
@@ -2051,7 +2051,7 @@
 	}
 	.universal-input:focus { border-color: var(--accent); }
 	.universal-input.editing { border-color: var(--accent); }
-	.universal-input.has-toggle { padding-right: 5.5rem; }
+	.universal-input.has-toggle { padding-right: 2.8rem; }
 	.type-toggle-btn {
 		position: absolute;
 		right: 0.3rem;
@@ -2060,9 +2060,9 @@
 		border: 1px solid var(--border);
 		border-radius: 6px;
 		color: var(--text2);
-		font-size: 0.85rem;
+		font-size: 1.1rem;
 		cursor: pointer;
-		padding: 0.3rem 0.5rem;
+		padding: 0.2rem 0.4rem;
 		line-height: 1.2;
 		white-space: nowrap;
 	}
