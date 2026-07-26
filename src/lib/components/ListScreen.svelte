@@ -1027,7 +1027,8 @@
 						bind:this={universalInputEl}
 						class="universal-input"
 						class:editing={inputMode === 'edit'}
-						placeholder={inputMode === 'edit' ? 'Edit name…' : newItemParentId ? (newItemIsNote ? 'Add subnote…' : 'Add subtask…') : 'Add item…'}
+						class:has-toggle={inputMode !== 'edit'}
+						placeholder={inputMode === 'edit' ? 'Edit name…' : newItemParentId ? (newItemIsNote ? 'Add subnote…' : 'Add subtask…') : (newItemIsNote ? 'Add note…' : 'Add item…')}
 						bind:value={universalValue}
 						rows="1"
 						enterkeyhint="done"
@@ -1040,6 +1041,8 @@
 					></textarea>
 					{#if inputMode === 'edit'}
 						<button type="button" class="input-clear" onclick={cancelEdit} aria-label="Cancel edit">✕</button>
+					{:else}
+						<button type="button" class="type-toggle-btn" class:is-note={newItemIsNote} onpointerdown={(e) => { e.preventDefault(); newItemIsNote = !newItemIsNote; focusInput(); }} aria-label="Toggle note/todo">{newItemIsNote ? '📝 Note' : '☑ Todo'}</button>
 					{/if}
 				</div>
 
@@ -1215,6 +1218,10 @@
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoItem = item },
 						{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => updateItem(item.id, { pinned: !item.pinned }) },
+						...(canAddChildren ? [
+							{ label: '➕ Add Subtask', action: () => { newItemParentId = item.id; newItemIsNote = false; focusInput(); } },
+							{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
+						] : []),
 						{ label: '🔗 Tag as Link', action: () => copyRefToClipboard(item.id) },
 						...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItem = item) }] : []),
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
@@ -2042,6 +2049,26 @@
 	}
 	.universal-input:focus { border-color: var(--accent); }
 	.universal-input.editing { border-color: var(--accent); }
+	.universal-input.has-toggle { padding-right: 5.5rem; }
+	.type-toggle-btn {
+		position: absolute;
+		right: 0.3rem;
+		top: 0.35rem;
+		background: var(--bg2);
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		color: var(--text2);
+		font-size: 0.85rem;
+		cursor: pointer;
+		padding: 0.3rem 0.5rem;
+		line-height: 1.2;
+		white-space: nowrap;
+	}
+	.type-toggle-btn.is-note {
+		color: var(--accent);
+		border-color: var(--accent);
+		background: transparent;
+	}
 	.input-clear {
 		position: absolute;
 		right: 0.4rem;
