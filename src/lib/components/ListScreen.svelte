@@ -208,7 +208,7 @@
 			children.forEach((child, sibIdx) => {
 				result.push({ item: child, level, tlIdx: -1, rootTlIdx, sibIdx });
 				rendered.add(child.id);
-				if (level < 2 && !child.note) addSubtree(child, level + 1, rootTlIdx);
+				if (level < 2) addSubtree(child, level + 1, rootTlIdx);
 			});
 		}
 		const topLevel = allItems.filter((i) => i.parentId === null).sort((a, b) => a.order - b.order);
@@ -232,16 +232,18 @@
 		filterView === 'all'
 			? treeItems
 			: (() => {
-				const visibleIds = new Set<string>(
-					treeItems
-						.filter(({ item }) => item.heading || (!item.note && (filterView === 'checked' ? item.checked : !item.checked)))
-						.map(({ item }) => item.id)
-				);
-				return treeItems.filter(({ item }) =>
-					item.heading ||
-					(!item.note && (filterView === 'checked' ? item.checked : !item.checked)) ||
-					(item.note && item.parentId !== null && visibleIds.has(item.parentId))
-				);
+				const visibleIds = new Set<string>();
+				for (const { item } of treeItems) {
+					if (item.heading || (item.note && item.parentId === null) || (!item.note && !item.heading && (filterView === 'checked' ? item.checked : !item.checked))) {
+						visibleIds.add(item.id);
+					}
+				}
+				for (const { item } of treeItems) {
+					if (item.note && item.parentId !== null && visibleIds.has(item.parentId)) {
+						visibleIds.add(item.id);
+					}
+				}
+				return treeItems.filter(({ item }) => visibleIds.has(item.id));
 			})()
 	);
 	let selectionMode = $state(false);
@@ -1167,7 +1169,7 @@
 			</div>
 		{/if}
 		{#each filteredTreeItems as {item, level, tlIdx, rootTlIdx, sibIdx}}
-			{@const canAddChildren = !item.note && !item.heading && level < 2}
+			{@const canAddChildren = !item.heading && level < 2}
 			{@const linkParts = parseNameParts(item.name)}
 			{@const itemLinks = linkParts.filter(p => p.type === 'url').map(p => p.value)}
 			{@const parentKey = item.parentId ?? '__top__'}
