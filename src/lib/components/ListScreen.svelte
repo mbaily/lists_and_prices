@@ -972,6 +972,13 @@
 			<button class="crumb search-crumb" onclick={onRestoreSearch} title="Back to search results">🔍 "{savedSearch}"</button>
 		{/if}
 		<button
+			class="list-fav-btn"
+			class:active={listMeta?.favourite}
+			onclick={() => listMeta && updateList(listId, { favourite: !listMeta.favourite })}
+			aria-label={listMeta?.favourite ? 'Unfavourite list' : 'Favourite list'}
+			title={listMeta?.favourite ? 'Unfavourite list' : 'Favourite list'}
+		>★</button>
+		<button
 			class="list-done-btn"
 			onclick={() => listMeta && updateList(listId, { done: !listMeta.done })}
 			aria-label={listMeta?.done ? 'Mark list incomplete' : 'Mark list complete'}
@@ -1554,6 +1561,19 @@
 		font-size: 1.2rem;
 		cursor: pointer;
 		padding: 0.2rem;
+	}
+
+	.list-fav-btn {
+		background: none;
+		border: none;
+		font-size: 1.2rem;
+		cursor: pointer;
+		padding: 0.2rem;
+		flex-shrink: 0;
+		color: var(--text2);
+	}
+	.list-fav-btn.active {
+		color: #facc15;
 	}
 
 	.list-done-btn {
