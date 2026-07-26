@@ -47,9 +47,17 @@
 				if (folder.updatedAt && folder.updatedAt > maxDate) maxDate = folder.updatedAt;
 			}
 
-			// Safe sizes
+			// Safe sizes and checksum
 			const totalSize = Y.encodeStateAsUpdate(doc).byteLength;
-			const vectorSize = Y.encodeStateVector(doc).byteLength;
+			const sv = Y.encodeStateVector(doc);
+			const vectorSize = sv.byteLength;
+			
+			// Compute a quick 8-character hex checksum (djb2) of the state vector
+			let hash = 5381;
+			for (let i = 0; i < sv.length; i++) {
+				hash = ((hash << 5) + hash) + sv[i];
+			}
+			const checksum = (hash >>> 0).toString(16).toUpperCase().padStart(8, '0');
 			
 			const formatSize = (bytes: number) => {
 				if (bytes < 1024) return `${bytes} B`;
@@ -57,6 +65,7 @@
 			};
 			
 			return [
+				{ label: 'Sync Checksum', value: checksum },
 				{ label: 'Total Sync Size', value: formatSize(totalSize) },
 				{ label: 'State Vector Size', value: formatSize(vectorSize) },
 				{ label: 'Sync Client ID', value: doc.clientID.toString() },
