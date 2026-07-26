@@ -39,6 +39,7 @@
 				const backup = JSON.parse(reader.result as string) as BackupFile;
 				if (backup.version !== 1 || !Array.isArray(backup.folders) || !Array.isArray(backup.lists) || !Array.isArray(backup.items)) {
 					restoreError = 'Invalid backup file.';
+					restoreStatus = null;
 					return;
 				}
 				pendingBackup = backup;

@@ -732,24 +732,28 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 
 			// Insert folders
 			for (const f of backup.folders) {
+				if (typeof f !== 'object' || f === null) continue;
 				const m = new Y.Map<unknown>();
 				for (const [k, v] of Object.entries(f)) m.set(k, v);
 				fArr.push([m]);
 			}
 			// Insert lists
 			for (const l of backup.lists) {
+				if (typeof l !== 'object' || l === null) continue;
 				const m = new Y.Map<unknown>();
 				for (const [k, v] of Object.entries(l)) m.set(k, v);
 				lArr.push([m]);
 			}
 			// Insert items
 			for (const i of backup.items) {
+				if (typeof i !== 'object' || i === null) continue;
 				const m = new Y.Map<unknown>();
 				for (const [k, v] of Object.entries(i)) m.set(k, v);
 				iArr.push([m]);
 			}
 			// Insert sheets (metadata only — cell data is not backed up)
 			for (const s of (backup.sheets ?? [])) {
+				if (typeof s !== 'object' || s === null) continue;
 				const m = new Y.Map<unknown>();
 				for (const [k, v] of Object.entries(s)) m.set(k, v);
 				sArr.push([m]);
@@ -761,6 +765,7 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 		} else {
 			// Merge: upsert each record by id
 			function upsert(arr: Y.Array<Y.Map<unknown>>, record: Record<string, unknown>) {
+				if (typeof record !== 'object' || record === null) return;
 				const existing = findYMap(arr, record.id as string);
 				if (existing) {
 					for (const [k, v] of Object.entries(record)) existing.set(k, v);
@@ -776,6 +781,7 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 			for (const s of (backup.sheets ?? [])) upsert(sArr, s as unknown as Record<string, unknown>);
 			// Merge smart folder report assignments (union of existing + backup)
 			for (const [name, ids] of Object.entries(backup.smartFolders ?? {})) {
+				if (!Array.isArray(ids)) continue;
 				const existing: string[] = (() => { try { return JSON.parse(sfMap.get(name) ?? '[]'); } catch { return []; } })();
 				const merged = [...new Set([...existing, ...ids])];
 				sfMap.set(name, JSON.stringify(merged));
