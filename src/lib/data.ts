@@ -85,11 +85,14 @@ export function createFolder(name: string, parentId: string | null, color = '#63
 }
 
 export function updateFolder(id: string, patch: Partial<Omit<Folder, 'id' | 'createdAt' | 'updatedAt'>>) {
-	const m = findYMap(getFolders(getDoc()), id);
-	if (!m) return;
-	for (const [k, v] of Object.entries(patch)) m.set(k, v);
-	const keys = Object.keys(patch);
-	if (!(keys.length === 1 && keys[0] === 'order')) m.set('updatedAt', new Date().toISOString());
+	const doc = getDoc();
+	doc.transact(() => {
+		const m = findYMap(getFolders(doc), id);
+		if (!m) return;
+		for (const [k, v] of Object.entries(patch)) m.set(k, v);
+		const keys = Object.keys(patch);
+		if (!(keys.length === 1 && keys[0] === 'order')) m.set('updatedAt', new Date().toISOString());
+	});
 }
 
 export function deleteFolder(id: string) {
@@ -119,14 +122,12 @@ function _deleteFolderInner(id: string) {
 }
 
 export function isDescendant(folderId: string, targetId: string, _visited = new Set<string>()): boolean {
-	// Returns true if targetId is folderId or a descendant of folderId
 	if (folderId === targetId) return true;
-	if (_visited.has(folderId)) return false; // cycle guard
+	if (_visited.has(folderId)) return false; // Cycle detected
 	_visited.add(folderId);
-	const folders = getFolders(getDoc()).toArray() as Y.Map<unknown>[];
-	const children = folders
-		.filter((f) => f.get('parentId') === folderId)
-		.map((f) => f.get('id') as string);
+	const doc = getDoc();
+	const all = getFolders(doc).toArray() as Y.Map<unknown>[];
+	const children = all.filter((f) => f.get('parentId') === folderId).map((f) => f.get('id') as string);
 	return children.some((cid) => isDescendant(cid, targetId, _visited));
 }
 
@@ -223,11 +224,14 @@ export function createList(
 }
 
 export function updateList(id: string, patch: Partial<Omit<ListMeta, 'id' | 'createdAt' | 'updatedAt'>>) {
-	const m = findYMap(getLists(getDoc()), id);
-	if (!m) return;
-	for (const [k, v] of Object.entries(patch)) m.set(k, v);
-	const keys = Object.keys(patch);
-	if (!(keys.length === 1 && keys[0] === 'order')) m.set('updatedAt', new Date().toISOString());
+	const doc = getDoc();
+	doc.transact(() => {
+		const m = findYMap(getLists(doc), id);
+		if (!m) return;
+		for (const [k, v] of Object.entries(patch)) m.set(k, v);
+		const keys = Object.keys(patch);
+		if (!(keys.length === 1 && keys[0] === 'order')) m.set('updatedAt', new Date().toISOString());
+	});
 }
 
 function _deleteListInner(id: string) {
@@ -330,11 +334,14 @@ export function createItem(listId: string, name: string, price: number | null = 
 }
 
 export function updateItem(id: string, patch: Partial<Omit<Item, 'id' | 'listId' | 'createdAt' | 'updatedAt'>>) {
-	const m = findYMap(getItems(getDoc()), id);
-	if (!m) return;
-	for (const [k, v] of Object.entries(patch)) m.set(k, v);
-	const keys = Object.keys(patch);
-	if (!(keys.length === 1 && keys[0] === 'order')) m.set('updatedAt', new Date().toISOString());
+	const doc = getDoc();
+	doc.transact(() => {
+		const m = findYMap(getItems(doc), id);
+		if (!m) return;
+		for (const [k, v] of Object.entries(patch)) m.set(k, v);
+		const keys = Object.keys(patch);
+		if (!(keys.length === 1 && keys[0] === 'order')) m.set('updatedAt', new Date().toISOString());
+	});
 }
 
 export function deleteItem(id: string) {
@@ -444,6 +451,8 @@ export function archiveList(id: string) {
 			.filter((l) => l.folderId === list.folderId && !l.archived)
 			.sort((a, b) => a.order - b.order);
 		const idx = allSiblings.findIndex((l) => l.id === id);
+		// If idx === -1, it's already archived (or not found), so skip
+		if (idx === -1) return;
 		const prevId = idx > 0 ? allSiblings[idx - 1].id : null;
 		const nextId = idx < allSiblings.length - 1 ? allSiblings[idx + 1].id : null;
 		updateList(id, { archived: true, archivedPrevId: prevId, archivedNextId: nextId });
@@ -481,6 +490,8 @@ export function archiveFolder(id: string) {
 			.filter((f) => f.parentId === folder.parentId && !f.archived)
 			.sort((a, b) => a.order - b.order);
 		const idx = allSiblings.findIndex((f) => f.id === id);
+		// If idx === -1, it's already archived (or not found), so skip
+		if (idx === -1) return;
 		const prevId = idx > 0 ? allSiblings[idx - 1].id : null;
 		const nextId = idx < allSiblings.length - 1 ? allSiblings[idx + 1].id : null;
 		updateFolder(id, { archived: true, archivedPrevId: prevId, archivedNextId: nextId });
@@ -530,23 +541,73 @@ export function reorderSiblings(listId: string, parentId: string | null, fromIdx
 
 export function reorderFolders(parentId: string | null, fromIndex: number, toIndex: number, visibleIds?: string[]) {
 	const doc = getDoc();
-	// If the caller provides a pre-filtered ordered list of IDs, use that.
-	// Otherwise fall back to all siblings (used internally / from tests).
-	const all = visibleIds
-		? readFolders().filter((f) => visibleIds.includes(f.id)).sort((a, b) => visibleIds.indexOf(a.id) - visibleIds.indexOf(b.id))
-		: readFolders().filter((f) => f.parentId === parentId).sort((a, b) => a.order - b.order);
-	const [moved] = all.splice(fromIndex, 1);
-	all.splice(toIndex, 0, moved);
+	const all = readFolders().filter((f) => f.parentId === parentId).sort((a, b) => a.order - b.order);
+
+	if (visibleIds && visibleIds.length > 0) {
+		const draggedId = visibleIds[fromIndex];
+		const draggedItemIndex = all.findIndex((f) => f.id === draggedId);
+		if (draggedItemIndex === -1) return;
+
+		const newVisible = [...visibleIds];
+		const [movedId] = newVisible.splice(fromIndex, 1);
+		newVisible.splice(toIndex, 0, movedId);
+
+		const prevVisibleId = toIndex > 0 ? newVisible[toIndex - 1] : null;
+		const nextVisibleId = toIndex < newVisible.length - 1 ? newVisible[toIndex + 1] : null;
+
+		const [moved] = all.splice(draggedItemIndex, 1);
+
+		let insertIndex = all.length;
+		if (nextVisibleId) {
+			const nextIdx = all.findIndex((f) => f.id === nextVisibleId);
+			insertIndex = nextIdx !== -1 ? nextIdx : all.length;
+		} else if (prevVisibleId) {
+			const prevIdx = all.findIndex((f) => f.id === prevVisibleId);
+			insertIndex = prevIdx !== -1 ? prevIdx + 1 : all.length;
+		}
+
+		all.splice(insertIndex, 0, moved);
+	} else {
+		const [moved] = all.splice(fromIndex, 1);
+		all.splice(toIndex, 0, moved);
+	}
+
 	doc.transact(() => all.forEach((f, idx) => updateFolder(f.id, { order: idx })));
 }
 
 export function reorderLists(folderId: string, fromIndex: number, toIndex: number, visibleIds?: string[]) {
 	const doc = getDoc();
-	const all = visibleIds
-		? readLists().filter((l) => visibleIds.includes(l.id)).sort((a, b) => visibleIds.indexOf(a.id) - visibleIds.indexOf(b.id))
-		: readLists().filter((l) => l.folderId === folderId).sort((a, b) => a.order - b.order);
-	const [moved] = all.splice(fromIndex, 1);
-	all.splice(toIndex, 0, moved);
+	const all = readLists().filter((l) => l.folderId === folderId).sort((a, b) => a.order - b.order);
+
+	if (visibleIds && visibleIds.length > 0) {
+		const draggedId = visibleIds[fromIndex];
+		const draggedItemIndex = all.findIndex((l) => l.id === draggedId);
+		if (draggedItemIndex === -1) return;
+
+		const newVisible = [...visibleIds];
+		const [movedId] = newVisible.splice(fromIndex, 1);
+		newVisible.splice(toIndex, 0, movedId);
+
+		const prevVisibleId = toIndex > 0 ? newVisible[toIndex - 1] : null;
+		const nextVisibleId = toIndex < newVisible.length - 1 ? newVisible[toIndex + 1] : null;
+
+		const [moved] = all.splice(draggedItemIndex, 1);
+
+		let insertIndex = all.length;
+		if (nextVisibleId) {
+			const nextIdx = all.findIndex((l) => l.id === nextVisibleId);
+			insertIndex = nextIdx !== -1 ? nextIdx : all.length;
+		} else if (prevVisibleId) {
+			const prevIdx = all.findIndex((l) => l.id === prevVisibleId);
+			insertIndex = prevIdx !== -1 ? prevIdx + 1 : all.length;
+		}
+
+		all.splice(insertIndex, 0, moved);
+	} else {
+		const [moved] = all.splice(fromIndex, 1);
+		all.splice(toIndex, 0, moved);
+	}
+
 	doc.transact(() => all.forEach((l, idx) => updateList(l.id, { order: idx })));
 }
 
@@ -559,8 +620,15 @@ export function readListsInTreeOrder(folders?: Folder[], lists?: ListMeta[]): Li
 	const allLists = lists ?? readLists();
 	const result: ListMeta[] = [];
 
-	function visit(parentId: string | null) {
-		const folder = allFolders.find((f) => f.id === parentId);
+	function visit(parentId: string | null, visited = new Set<string>()) {
+		if (parentId !== null) {
+			if (visited.has(parentId)) return;
+			visited.add(parentId);
+		}
+
+		const folder = parentId === null ? null : allFolders.find((f) => f.id === parentId);
+		if (folder?.archived) return;
+
 		const childFolders = allFolders
 			.filter((f) => f.parentId === parentId && !isFolderEffectivelyArchived(f.id, allFolders))
 			.sort((a, b) => a.order - b.order);
@@ -760,11 +828,14 @@ export function createSheet(name: string, folderId: string | null): string {
 }
 
 export function updateSheet(id: string, patch: Partial<Omit<SheetMeta, 'id' | 'createdAt' | 'updatedAt'>>) {
-	const m = findYMap(getSpreadsheets(getDoc()), id);
-	if (!m) return;
-	for (const [k, v] of Object.entries(patch)) m.set(k, v);
-	const keys = Object.keys(patch);
-	if (!(keys.length === 1 && keys[0] === 'order')) m.set('updatedAt', new Date().toISOString());
+	const doc = getDoc();
+	doc.transact(() => {
+		const m = findYMap(getSpreadsheets(doc), id);
+		if (!m) return;
+		for (const [k, v] of Object.entries(patch)) m.set(k, v);
+		const keys = Object.keys(patch);
+		if (!(keys.length === 1 && keys[0] === 'order')) m.set('updatedAt', new Date().toISOString());
+	});
 }
 
 export function deleteSheet(id: string) {

@@ -83,14 +83,16 @@
 
 	$effect(() => {
 		if (highlightItemId) {
+			let t: ReturnType<typeof setTimeout>;
 			tick().then(() => {
 				const el = document.querySelector(`[data-item-id="${highlightItemId}"]`);
 				if (el) {
 					el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 					el.classList.add('highlight-animation');
-					setTimeout(() => el.classList.remove('highlight-animation'), 2000);
+					t = setTimeout(() => el.classList.remove('highlight-animation'), 2000);
 				}
 			});
+			return () => clearTimeout(t);
 		}
 	});
 
@@ -324,7 +326,11 @@
 		showHeaderMenu = false;
 	}
 
+	let isPasting = false;
+
 	async function importFromClipboard() {
+		if (isPasting) return;
+		isPasting = true;
 		let text: string;
 		try {
 			text = await navigator.clipboard.readText();

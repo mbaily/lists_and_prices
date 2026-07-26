@@ -39,39 +39,47 @@ const _smartFolders: SmartFolderMap = $derived.by(() => {
 export function getSmartFolders(): SmartFolderMap { return _smartFolders; }
 
 export function assignToReport(folderId: string, reportName: string) {
-	const m = getYMap();
-	const current: string[] = (() => { try { return JSON.parse(m.get(reportName) ?? '[]'); } catch { return []; } })();
-	if (!current.includes(folderId)) {
-		m.set(reportName, JSON.stringify([...current, folderId]));
-	}
+	getDoc().transact(() => {
+		const m = getYMap();
+		const current: string[] = (() => { try { return JSON.parse(m.get(reportName) ?? '[]'); } catch { return []; } })();
+		if (!current.includes(folderId)) {
+			m.set(reportName, JSON.stringify([...current, folderId]));
+		}
+	});
 }
 
 export function removeFromReport(folderId: string, reportName: string) {
-	const m = getYMap();
-	const current: string[] = (() => { try { return JSON.parse(m.get(reportName) ?? '[]'); } catch { return []; } })();
-	const next = current.filter((id) => id !== folderId);
-	if (next.length === 0) {
-		m.delete(reportName);
-	} else {
-		m.set(reportName, JSON.stringify(next));
-	}
+	getDoc().transact(() => {
+		const m = getYMap();
+		const current: string[] = (() => { try { return JSON.parse(m.get(reportName) ?? '[]'); } catch { return []; } })();
+		const next = current.filter((id) => id !== folderId);
+		if (next.length === 0) {
+			m.delete(reportName);
+		} else {
+			m.set(reportName, JSON.stringify(next));
+		}
+	});
 }
 
 export function deleteReport(reportName: string) {
-	getYMap().delete(reportName);
+	getDoc().transact(() => {
+		getYMap().delete(reportName);
+	});
 }
 
 /** Called by deleteFolder to purge a folder ID from all reports. */
 export function removeFromAllReports(folderId: string) {
-	const m = getYMap();
-	m.forEach((val, reportName) => {
-		try {
-			const ids: string[] = JSON.parse(val);
-			if (ids.includes(folderId)) {
-				const next = ids.filter((id) => id !== folderId);
-				if (next.length === 0) m.delete(reportName);
-				else m.set(reportName, JSON.stringify(next));
-			}
-		} catch { /* skip corrupt entry */ }
+	getDoc().transact(() => {
+		const m = getYMap();
+		m.forEach((val, reportName) => {
+			try {
+				const ids: string[] = JSON.parse(val);
+				if (ids.includes(folderId)) {
+					const next = ids.filter((id) => id !== folderId);
+					if (next.length === 0) m.delete(reportName);
+					else m.set(reportName, JSON.stringify(next));
+				}
+			} catch { /* skip corrupt entry */ }
+		});
 	});
 }

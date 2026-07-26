@@ -118,6 +118,12 @@
 	}
 
 	let copyStatus = $state<'idle' | 'copied'>('idle');
+	let copyTimeout: ReturnType<typeof setTimeout> | null = null;
+
+	import { onDestroy } from 'svelte';
+	onDestroy(() => {
+		if (copyTimeout) clearTimeout(copyTimeout);
+	});
 
 	function navigate(url: string) {
 		const a = document.createElement('a');
@@ -170,7 +176,7 @@
 		try {
 			await navigator.clipboard.writeText(lines.join('\n'));
 			copyStatus = 'copied';
-			setTimeout(() => (copyStatus = 'idle'), 2000);
+			copyTimeout = setTimeout(() => (copyStatus = 'idle'), 2000);
 		} catch {
 			/* silently fail */
 		}

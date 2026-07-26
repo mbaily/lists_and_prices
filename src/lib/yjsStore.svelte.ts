@@ -78,6 +78,13 @@ export function destroyYjs() {
 	idbSynced.done = false;
 }
 
+export function reconnectYjs() {
+	// Force the WebSocket provider to reconnect. Useful for iOS Safari when
+	// returning from background/offline where the connection drops.
+	_wsProvider?.disconnect();
+	_wsProvider?.connect();
+}
+
 // ─── Data shape helpers ────────────────────────────────────────────────────────
 // All data lives in a single Y.Map at the root of the document.
 // Structure:

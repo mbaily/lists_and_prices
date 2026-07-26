@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { auth, checkSession, logout } from '$lib/auth.svelte';
-	import { initYjs, destroyYjs } from '$lib/yjsStore.svelte';
+	import { initYjs, destroyYjs, reconnectYjs } from '$lib/yjsStore.svelte';
 	import { reloadSettings } from '$lib/settings.svelte';
 	import LoginScreen from '$lib/components/LoginScreen.svelte';
 	import HomeScreen from '$lib/components/HomeScreen.svelte';
@@ -23,13 +23,10 @@
 		});
 
 		// When the device comes back online (e.g. iPhone rejoins Wi-Fi after being
-		// offline), re-initialise YJS so the WebSocket provider reconnects and syncs
-		// any changes made while offline.
+		// offline), force the WebSocket provider to reconnect.
 		function handleOnline() {
 			if (auth.username) {
-				// destroyYjs tears down the stale WS; initYjs creates a fresh one.
-				// y-indexeddb will merge the offline edits automatically.
-				initYjs(auth.username, getWsUrl());
+				reconnectYjs();
 			}
 		}
 
