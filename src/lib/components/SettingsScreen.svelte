@@ -58,8 +58,10 @@
 		try {
 			importBackup(pendingBackup, restoreMode);
 			restoreStatus = `Restored ${pendingBackup.folders.length} folders, ${pendingBackup.lists.length} lists, ${pendingBackup.items.length} items${pendingBackup.sheets?.length ? `, ${pendingBackup.sheets.length} spreadsheets (names only — cell content is not included in backups)` : ''}.`;
+			restoreError = null;
 		} catch (err) {
 			restoreError = `Restore failed: ${err}`;
+			restoreStatus = null;
 		}
 		pendingBackup = null;
 	}
@@ -171,13 +173,20 @@
 					class="font-size-input"
 					min="8"
 					max="72"
-					value={settings.reportFontSize}
-					oninput={(e) => {
-						const v = parseInt((e.target as HTMLInputElement).value, 10);
-						if (!isNaN(v) && v >= 8 && v <= 72) updateSettings({ reportFontSize: v });
+					bind:value={settings.reportFontSize}
+					onchange={(e) => {
+						const val = parseInt((e.target as HTMLInputElement).value, 10);
+						if (!isNaN(val) && val >= 8 && val <= 72) {
+							updateSettings({ reportFontSize: val });
+						} else {
+							// Force re-render to revert invalid input
+							const current = settings.reportFontSize;
+							settings.reportFontSize = 0;
+							setTimeout(() => settings.reportFontSize = current, 0);
+						}
 					}}
 				/>
-				<span class="font-size-unit">pt</span>
+				<span class="font-size-unit">px</span>
 			</div>
 		</section>
 

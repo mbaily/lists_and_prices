@@ -25,7 +25,9 @@ function loadSettings(): Settings {
 	if (typeof localStorage === 'undefined') return { currency: '$', theme: 'light', handedness: 'right', addItemPosition: 'bottom', addListPosition: 'bottom', reportFontSize: 14, itemSpacing: 8 };
 	try {
 		const saved = JSON.parse(localStorage.getItem(settingsKey()) ?? 'null');
-			if (saved) return { currency: '$', theme: 'light' as const, handedness: 'right' as const, addItemPosition: 'bottom' as const, addListPosition: 'bottom' as const, reportFontSize: 14, itemSpacing: 8, ...saved };
+		if (typeof saved === 'object' && saved !== null && !Array.isArray(saved)) {
+			return { currency: '$', theme: 'light' as const, handedness: 'right' as const, addItemPosition: 'bottom' as const, addListPosition: 'bottom' as const, reportFontSize: 14, itemSpacing: 8, ...saved };
+		}
 	} catch { /* fall through */ }
 	// No saved settings — detect OS preference rather than hardcoding light
 	const prefersDark =

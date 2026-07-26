@@ -8,9 +8,25 @@
 		rows: { label: string; value: string }[];
 		onClose: () => void;
 	} = $props();
+
+	let backdropEl: HTMLDivElement | null = null;
+
+	import { onMount } from 'svelte';
+	onMount(() => {
+		function handleKey(e: KeyboardEvent) {
+			if (e.key === 'Escape') {
+				const backdrops = document.querySelectorAll('.backdrop');
+				if (backdrops[backdrops.length - 1] === backdropEl) {
+					onClose();
+				}
+			}
+		}
+		document.addEventListener('keydown', handleKey);
+		return () => document.removeEventListener('keydown', handleKey);
+	});
 </script>
 
-<div class="backdrop" onclick={(e) => { if (e.target === e.currentTarget) onClose(); }} role="dialog" aria-modal="true">
+<div bind:this={backdropEl} class="backdrop" onclick={(e) => { if (e.target === e.currentTarget) onClose(); }} role="dialog" aria-modal="true">
 	<div class="dialog">
 		<div class="dialog-title">{title}</div>
 		<dl class="info-list">

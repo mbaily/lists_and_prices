@@ -30,9 +30,16 @@
 		copyTimer = setTimeout(() => { copiedUrl = null; }, 1500);
 	}
 
+	let backdropEl: HTMLDivElement | null = null;
+
 	onMount(() => {
 		function handleKey(e: KeyboardEvent) {
-			if (e.key === 'Escape') onClose();
+			if (e.key === 'Escape') {
+				const backdrops = document.querySelectorAll('.backdrop');
+				if (backdrops[backdrops.length - 1] === backdropEl) {
+					onClose();
+				}
+			}
 		}
 		document.addEventListener('keydown', handleKey);
 		return () => {
@@ -43,6 +50,7 @@
 </script>
 
 <div
+	bind:this={backdropEl}
 	class="backdrop"
 	role="dialog"
 	aria-modal="true"

@@ -8,16 +8,23 @@
 		onCancel
 	}: { message: string; confirmLabel?: string; onConfirm: () => void; onCancel: () => void } = $props();
 
+	let backdropEl: HTMLDivElement | null = null;
+
 	onMount(() => {
 		function handleKey(e: KeyboardEvent) {
-			if (e.key === 'Escape') onCancel();
+			if (e.key === 'Escape') {
+				const backdrops = document.querySelectorAll('.backdrop');
+				if (backdrops[backdrops.length - 1] === backdropEl) {
+					onCancel();
+				}
+			}
 		}
 		document.addEventListener('keydown', handleKey);
 		return () => document.removeEventListener('keydown', handleKey);
 	});
 </script>
 
-<div class="backdrop" role="dialog" aria-modal="true" onclick={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
+<div bind:this={backdropEl} class="backdrop" role="dialog" aria-modal="true" onclick={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
 	<div class="dialog">
 		<p>{message}</p>
 		<div class="actions">

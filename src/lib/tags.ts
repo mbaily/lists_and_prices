@@ -3,7 +3,7 @@
  * Tags are stored inline in item/list/folder names as #word tokens.
  */
 
-const TAG_RE = /#(\w+)/g;
+const TAG_RE = /(?<=^|\s)#(\w+)/g;
 
 /** Extract all hashtag values (lowercase, without #) from a name string. */
 export function extractTags(name: string): string[] {
