@@ -436,15 +436,18 @@ function computeInsertIndex(visible: { id: string }[], prevId: string | null, ne
 }
 
 export function archiveList(id: string) {
-	const list = readLists().find((l) => l.id === id);
-	if (!list) return;
-	const allSiblings = readLists()
-		.filter((l) => l.folderId === list.folderId && !l.archived)
-		.sort((a, b) => a.order - b.order);
-	const idx = allSiblings.findIndex((l) => l.id === id);
-	const prevId = idx > 0 ? allSiblings[idx - 1].id : null;
-	const nextId = idx < allSiblings.length - 1 ? allSiblings[idx + 1].id : null;
-	updateList(id, { archived: true, archivedPrevId: prevId, archivedNextId: nextId });
+	const doc = getDoc();
+	doc.transact(() => {
+		const list = readLists().find((l) => l.id === id);
+		if (!list) return;
+		const allSiblings = readLists()
+			.filter((l) => l.folderId === list.folderId && !l.archived)
+			.sort((a, b) => a.order - b.order);
+		const idx = allSiblings.findIndex((l) => l.id === id);
+		const prevId = idx > 0 ? allSiblings[idx - 1].id : null;
+		const nextId = idx < allSiblings.length - 1 ? allSiblings[idx + 1].id : null;
+		updateList(id, { archived: true, archivedPrevId: prevId, archivedNextId: nextId });
+	});
 }
 
 export function unarchiveList(id: string) {
@@ -469,16 +472,19 @@ export function unarchiveList(id: string) {
 }
 
 export function archiveFolder(id: string) {
-	const allFolders = readFolders();
-	const folder = allFolders.find((f) => f.id === id);
-	if (!folder) return;
-	const allSiblings = allFolders
-		.filter((f) => f.parentId === folder.parentId && !f.archived)
-		.sort((a, b) => a.order - b.order);
-	const idx = allSiblings.findIndex((f) => f.id === id);
-	const prevId = idx > 0 ? allSiblings[idx - 1].id : null;
-	const nextId = idx < allSiblings.length - 1 ? allSiblings[idx + 1].id : null;
-	updateFolder(id, { archived: true, archivedPrevId: prevId, archivedNextId: nextId });
+	const doc = getDoc();
+	doc.transact(() => {
+		const allFolders = readFolders();
+		const folder = allFolders.find((f) => f.id === id);
+		if (!folder) return;
+		const allSiblings = allFolders
+			.filter((f) => f.parentId === folder.parentId && !f.archived)
+			.sort((a, b) => a.order - b.order);
+		const idx = allSiblings.findIndex((f) => f.id === id);
+		const prevId = idx > 0 ? allSiblings[idx - 1].id : null;
+		const nextId = idx < allSiblings.length - 1 ? allSiblings[idx + 1].id : null;
+		updateFolder(id, { archived: true, archivedPrevId: prevId, archivedNextId: nextId });
+	});
 }
 
 export function unarchiveFolder(id: string) {

@@ -18,7 +18,7 @@ export type NameSegment = { type: 'text' | 'url' | 'tag' | 'item-ref' | 'list-re
  * URLs are matched before # so a URL containing # isn't misread as a tag.
  */
 export function splitWithTags(name: string): NameSegment[] {
-	const combined = /\[\[(item|list|folder):([^\]]+)\]\]|https?:\/\/[^\s]+|#\w+/g;
+	const combined = /\[\[(item|list|folder):([^\]]+)\]\]|https?:\/\/[^\s]+(?<![.,!?;:'")])|#\w+/g;
 	const result: NameSegment[] = [];
 	let last = 0;
 	let m: RegExpExecArray | null;

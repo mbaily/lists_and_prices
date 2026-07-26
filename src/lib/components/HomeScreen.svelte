@@ -141,12 +141,13 @@
 		}
 		// Sort by createdAt descending (newest first); nulls go last
 		results.sort((a, b) => {
-			const aDate = a.kind === 'item' ? a.data.createdAt : a.data.createdAt;
-			const bDate = b.kind === 'item' ? b.data.createdAt : b.data.createdAt;
+			const aDate = a.data.createdAt;
+			const bDate = b.data.createdAt;
 			if (!aDate && !bDate) return 0;
 			if (!aDate) return 1;
 			if (!bDate) return -1;
-			return bDate.localeCompare(aDate);
+			// ISO strings are lexicographically sortable; use > / < for locale-agnostic comparison
+			return bDate > aDate ? 1 : bDate < aDate ? -1 : 0;
 		});
 		return results;
 	});
@@ -480,10 +481,10 @@
 				});
 			}
 		}
-		if (!currentFolderId) {
+		if (currentFolderId === null) {
 			return;
 		}
-		createList(name, currentFolderId!, newListType, newListColor, settings.addListPosition);
+		createList(name, currentFolderId, newListType, newListColor, settings.addListPosition);
 		newListName = '';
 		newListType = 'plain';
 		newListColor = '#6366f1';
@@ -685,11 +686,10 @@
 
 	$effect(() => {
 		void currentFolderId; // track navigation
-		if (renamingId && renameValue.trim()) {
-			submitRename();
-		} else {
-			renamingId = null;
-		}
+		// Always cancel any in-progress rename when navigating — don't auto-submit,
+		// as calling submitRename() inside this effect can cause a secondary effect
+		// cycle when it mutates renamingId.
+		renamingId = null;
 		infoTarget = null;
 		activeTagFilter = null;
 		// Close create forms so they don't linger in the wrong folder context
@@ -2074,11 +2074,6 @@ ${bodyHtml}
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
-	}
-	.result-done {
-		text-decoration: line-through;
-		color: var(--text2);
-		opacity: 0.55;
 	}
 	.result-done {
 		text-decoration: line-through;

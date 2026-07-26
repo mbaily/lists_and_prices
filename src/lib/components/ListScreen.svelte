@@ -120,7 +120,7 @@
 
 	function navigateToCrumb(crumb: CrumbItem) {
 		if (crumb.id !== 'LIST') {
-			onNavigateTo?.(crumb.id!);
+			onNavigateTo?.(crumb.id);
 		}
 	}
 
@@ -642,11 +642,11 @@
 		document.addEventListener('pointerup', onEnd, { once: true });
 		document.addEventListener('pointercancel', onEnd, { once: true });
 		return () => {
-			if (!dragging) {
-				document.removeEventListener('pointermove', onMove);
-				document.removeEventListener('pointerup', onEnd);
-				document.removeEventListener('pointercancel', onEnd);
-			}
+			// Always remove listeners regardless of drag state — if the effect
+			// re-runs while a drag is in flight the old listeners must be cleaned up.
+			document.removeEventListener('pointermove', onMove);
+			document.removeEventListener('pointerup', onEnd);
+			document.removeEventListener('pointercancel', onEnd);
 		};
 	});
 

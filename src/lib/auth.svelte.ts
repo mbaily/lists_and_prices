@@ -34,11 +34,14 @@ export async function login(
 
 export async function logout() {
 	try {
-		const res = await fetch('/api/logout', { method: 'POST' });
-		if (!res.ok && typeof navigator !== 'undefined' && navigator.onLine) return;
+		await fetch('/api/logout', { method: 'POST' });
 	} catch {
+		// Genuine network failure (fetch threw) — if we appear to be online,
+		// don't force-logout (the session is probably still valid on the server).
 		if (typeof navigator !== 'undefined' && navigator.onLine) return;
 	}
+	// Always clear local state after a deliberate logout attempt,
+	// even if the server returned a non-OK status.
 	auth.username = null;
 	localStorage.removeItem(AUTH_KEY);
 }

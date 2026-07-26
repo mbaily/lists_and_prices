@@ -42,7 +42,9 @@
 		if (!open && btnEl) {
 			const rect = btnEl.getBoundingClientRect();
 			const ITEM_H = 52;
-			const panelH = items.length * ITEM_H + 8;
+			// Account for the largest possible submenu (submenu items + 1 Back button)
+			const maxSubItems = items.reduce((m, it) => Math.max(m, it.submenu ? it.submenu.length + 1 : 0), 0);
+			const panelH = Math.max(items.length, maxSubItems) * ITEM_H + 8;
 			const MARGIN = 8;
 			const rightEdge = window.innerWidth - rect.right;
 
