@@ -209,14 +209,14 @@
 		</section>
 
 		<section>
-			<h2>Advanced / Troubleshooting</h2>
-			<button class="action-btn restore-btn" onclick={() => {
-				if (confirm('This will wipe your local database and re-sync a fresh, compressed snapshot from the server. The app will reload. Continue?')) {
+			<h2>Danger Zone</h2>
+			<button class="logout-btn" onclick={() => {
+				if (confirm('WARNING: This will completely delete your local database. Any unsynced offline changes will be PERMANENTLY LOST. Only do this if you are fully synced with the server and want to clear a fragmented local database. Continue?')) {
 					indexedDB.deleteDatabase(`pnl-${auth.username}`);
 					location.reload();
 				}
-			}}>Compact Local Database</button>
-			<p class="restore-err" style="color: var(--text2); margin-top: 0.25rem;">Use this if the app is taking several seconds to load on desktop.</p>
+			}}>Delete Local Storage</button>
+			<p class="restore-err" style="margin-top: 0.25rem;">Use with extreme caution: this wipes your local data to force a fresh sync.</p>
 		</section>
 
 		<section>
