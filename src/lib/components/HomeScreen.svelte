@@ -90,14 +90,17 @@
 	// ── Live data (re-read on every Yjs change) ─────────────────────────────────
 	// docState.version increments on every Yjs update, making these $derived re-run.
 	let allFolders = $derived.by(() => {
+		if (!idbSynced.done) return [];
 		void docState.version; // track version
 		try { return readFolders(); } catch { return []; }
 	});
 	let allLists = $derived.by(() => {
+		if (!idbSynced.done) return [];
 		void docState.version;
 		try { return readLists(); } catch { return []; }
 	});
 	let allItemsAll = $derived.by(() => {
+		if (!idbSynced.done) return [];
 		void docState.version;
 		try { return readAllItems(); } catch { return [] as Item[]; }
 	});
