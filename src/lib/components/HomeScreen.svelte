@@ -28,7 +28,7 @@
 		type SheetMeta,
 		type Item
 	} from '$lib/data';
-	import { syncState, docState } from '$lib/yjsStore.svelte';
+	import { syncState, docState, idbSynced } from '$lib/yjsStore.svelte';
 	import { settings } from '$lib/settings.svelte';
 	import { getSmartFolders, assignToReport, removeFromReport, deleteReport } from '$lib/smartFolders.svelte';
 	import { extractTags, splitWithTags } from '$lib/tags';
@@ -633,7 +633,7 @@
 	});
 
 	// ── First-launch guard ───────────────────────────────────────────────────────
-	let showFirstLaunch = $derived(allFolders.length === 0 && !showNewFolder);
+	let showFirstLaunch = $derived(idbSynced.done && allFolders.length === 0 && !showNewFolder);
 
 	// ── Search actions ────────────────────────────────────────────────────────────
 	function toggleSearch() {
