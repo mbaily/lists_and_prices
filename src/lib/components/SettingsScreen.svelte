@@ -2,6 +2,7 @@
 	import { settings, updateSettings } from '$lib/settings.svelte';
 	import { exportBackup, importBackup, type BackupFile } from '$lib/data';
 	import ConfirmDialog from './ConfirmDialog.svelte';
+	import { auth } from '$lib/auth.svelte';
 
 	let { onBack, onLogout }: { onBack: () => void; onLogout: () => void } = $props();
 
@@ -205,6 +206,17 @@
 				/>
 				<span class="spacing-value">{settings.itemSpacing}px</span>
 			</div>
+		</section>
+
+		<section>
+			<h2>Advanced / Troubleshooting</h2>
+			<button class="action-btn restore-btn" onclick={() => {
+				if (confirm('This will wipe your local database and re-sync a fresh, compressed snapshot from the server. The app will reload. Continue?')) {
+					indexedDB.deleteDatabase(`pnl-${auth.username}`);
+					location.reload();
+				}
+			}}>Compact Local Database</button>
+			<p class="restore-err" style="color: var(--text2); margin-top: 0.25rem;">Use this if the app is taking several seconds to load on desktop.</p>
 		</section>
 
 		<section>
