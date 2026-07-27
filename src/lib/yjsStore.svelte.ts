@@ -27,23 +27,25 @@ export const docState = $state<{ version: number }>({ version: 0 });
 
 /** Call once after login to initialise the shared Y.Doc for this user. */
 export function initYjs(username: string, wsUrl: string) {
+	console.log(`[Perf] initYjs started for user ${username}`);
+	const t0 = performance.now();
+
 	if (_doc) destroyYjs();
 
 	const doc = new Y.Doc();
 	_doc = doc;
 
-	// Local persistence (survives offline).
-	// The 'synced' event fires once IDB data has been applied to the Y.Doc.
-	// Bumping docState.version here ensures components re-render with real data
-	// on first load offline rather than showing empty lists.
 	idbSynced.done = false;
+	const tIdbStart = performance.now();
 	_idbProvider = new IndexeddbPersistence(`pnl-${username}`, doc);
 	_idbProvider.on('synced', () => {
+		const tIdbEnd = performance.now();
+		console.log(`[Perf] IndexedDB synced in ${Math.round(tIdbEnd - tIdbStart)}ms`);
 		idbSynced.done = true;
 		docState.version++;
 	});
 
-	// Remote sync
+	const tWsStart = performance.now();
 	_wsProvider = new WebsocketProvider(wsUrl, `pnl-${username}`, doc, {
 		connect: true
 	});
@@ -53,11 +55,15 @@ export function initYjs(username: string, wsUrl: string) {
 	doc.on('update', () => { docState.version++; });
 
 	_wsProvider.on('status', ({ status }: { status: string }) => {
+		const tWsStatus = performance.now();
+		console.log(`[Perf] WebSocket status changed to '${status}' at ${Math.round(tWsStatus - tWsStart)}ms`);
 		if (status === 'connected') syncState.status = 'synced';
 		else if (status === 'connecting') syncState.status = 'connecting';
 		else syncState.status = 'offline';
 	});
 
+	const tEnd = performance.now();
+	console.log(`[Perf] initYjs synchronous setup completed in ${Math.round(tEnd - t0)}ms`);
 	return doc;
 }
 

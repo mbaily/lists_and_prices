@@ -91,18 +91,33 @@
 	// docState.version increments on every Yjs update, making these $derived re-run.
 	let allFolders = $derived.by(() => {
 		if (!idbSynced.done) return [];
+		const t0 = performance.now();
 		void docState.version; // track version
-		try { return readFolders(); } catch { return []; }
+		try { 
+			const res = readFolders(); 
+			console.log(`[Perf] readFolders took ${Math.round(performance.now() - t0)}ms`);
+			return res;
+		} catch { return []; }
 	});
 	let allLists = $derived.by(() => {
 		if (!idbSynced.done) return [];
+		const t0 = performance.now();
 		void docState.version;
-		try { return readLists(); } catch { return []; }
+		try { 
+			const res = readLists(); 
+			console.log(`[Perf] readLists took ${Math.round(performance.now() - t0)}ms`);
+			return res;
+		} catch { return []; }
 	});
 	let allItemsAll = $derived.by(() => {
 		if (!idbSynced.done) return [];
+		const t0 = performance.now();
 		void docState.version;
-		try { return readAllItems(); } catch { return [] as Item[]; }
+		try { 
+			const res = readAllItems(); 
+			console.log(`[Perf] readAllItems took ${Math.round(performance.now() - t0)}ms`);
+			return res;
+		} catch { return [] as Item[]; }
 	});
 	let allItems = $derived.by(() => {
 		if (!showSearch) return [] as Item[];
