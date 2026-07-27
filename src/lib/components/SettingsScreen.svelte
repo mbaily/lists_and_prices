@@ -216,7 +216,7 @@
 					location.reload();
 				}
 			}}>Delete Local Storage</button>
-			<p class="restore-err" style="margin-top: 0.25rem;">Use with extreme caution: this wipes your local data to force a fresh sync.</p>
+			<p class="restore-err" style="margin-top: 0.25rem;">Don't use offline, use while able to connect to server: this wipes your local data to force a fresh sync and defragment the local storage. Use when loading the app is taking 2-3 seconds.</p>
 		</section>
 
 		<section>
