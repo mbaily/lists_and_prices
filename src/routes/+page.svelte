@@ -14,12 +14,25 @@
 	}
 
 	onMount(() => {
-		checkSession().then((ok) => {
-			if (ok && auth.username) {
-				reloadSettings(); // apply this user's theme/currency/handedness
-				initYjs(auth.username, getWsUrl());
-			}
+		// Optimistically load the app from local storage immediately so there's no delay
+		if (auth.username) {
+			reloadSettings();
+			initYjs(auth.username, getWsUrl());
 			ready = true;
+		}
+
+		checkSession().then((ok) => {
+			if (!ready) {
+				// We didn't optimistically load, so handle the login based on checkSession
+				if (ok && auth.username) {
+					reloadSettings();
+					initYjs(auth.username, getWsUrl());
+				}
+				ready = true;
+			} else if (!ok) {
+				// We optimistically loaded, but the session is actually invalid
+				destroyYjs();
+			}
 		});
 
 		// When the device comes back online (e.g. iPhone rejoins Wi-Fi after being

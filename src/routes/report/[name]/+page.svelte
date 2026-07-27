@@ -12,14 +12,27 @@
 	let authed = $state(false);
 
 	onMount(() => {
-		checkSession().then((ok) => {
-			if (ok && auth.username) {
-				reloadSettings();
-				const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-				initYjs(auth.username, `${wsProto}//${location.host}/yjs`);
-				authed = true;
-			}
+		if (auth.username) {
+			reloadSettings();
+			const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+			initYjs(auth.username, `${wsProto}//${location.host}/yjs`);
+			authed = true;
 			ready = true;
+		}
+
+		checkSession().then((ok) => {
+			if (!ready) {
+				if (ok && auth.username) {
+					reloadSettings();
+					const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+					initYjs(auth.username, `${wsProto}//${location.host}/yjs`);
+					authed = true;
+				}
+				ready = true;
+			} else if (!ok) {
+				authed = false;
+				destroyYjs();
+			}
 		});
 	});
 
