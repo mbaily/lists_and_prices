@@ -1,0 +1,2 @@
+# To defragment local storage for this app in JS Console in Chrome
+indexedDB.deleteDatabase('pnl-mb');
