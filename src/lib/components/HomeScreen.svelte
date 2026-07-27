@@ -29,6 +29,7 @@
 		type Item
 	} from '$lib/data';
 	import { syncState, docState, idbSynced } from '$lib/yjsStore.svelte';
+	import { auth } from '$lib/auth.svelte';
 	import { settings } from '$lib/settings.svelte';
 	import { getSmartFolders, assignToReport, removeFromReport, deleteReport } from '$lib/smartFolders.svelte';
 	import { extractTags, splitWithTags } from '$lib/tags';
