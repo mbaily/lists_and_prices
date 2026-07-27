@@ -88,9 +88,19 @@
 	let savedSearch = $state<string | null>(null); // persists after navigating to a result
 
 	// ── Live data (re-read on every Yjs change) ─────────────────────────────────
+	let snapFolders = $state<Folder[] | null>(null);
+	let snapLists = $state<ListMeta[] | null>(null);
+	
+	if (typeof localStorage !== 'undefined' && auth.username) {
+		try {
+			snapFolders = JSON.parse(localStorage.getItem(`pnl-snap-f-${auth.username}`) || 'null');
+			snapLists = JSON.parse(localStorage.getItem(`pnl-snap-l-${auth.username}`) || 'null');
+		} catch {}
+	}
+
 	// docState.version increments on every Yjs update, making these $derived re-run.
 	let allFolders = $derived.by(() => {
-		if (!idbSynced.done) return [];
+		if (!idbSynced.done) return snapFolders || [];
 		const t0 = performance.now();
 		void docState.version; // track version
 		try { 
@@ -99,8 +109,9 @@
 			return res;
 		} catch { return []; }
 	});
+	
 	let allLists = $derived.by(() => {
-		if (!idbSynced.done) return [];
+		if (!idbSynced.done) return snapLists || [];
 		const t0 = performance.now();
 		void docState.version;
 		try { 
@@ -109,6 +120,14 @@
 			return res;
 		} catch { return []; }
 	});
+
+	$effect(() => {
+		if (idbSynced.done && auth.username) {
+			if (allFolders.length > 0) localStorage.setItem(`pnl-snap-f-${auth.username}`, JSON.stringify(allFolders));
+			if (allLists.length > 0) localStorage.setItem(`pnl-snap-l-${auth.username}`, JSON.stringify(allLists));
+		}
+	});
+
 	let allItemsAll = $derived.by(() => {
 		if (!idbSynced.done) return [];
 		const t0 = performance.now();
