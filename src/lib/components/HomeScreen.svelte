@@ -1172,6 +1172,13 @@ ${bodyHtml}
 				<button onclick={() => (showNewFolder = true)}>Create Folder</button>
 			</div>
 		{/if}
+		
+		<!-- Local database loading state -->
+		{#if !idbSynced.done}
+			<div class="empty-prompt">
+				<p>Loading data from local storage...</p>
+			</div>
+		{/if}
 
 		<!-- Folders and Lists — order controlled by parent folder's foldersFirst setting -->
 		{#snippet folderRows()}
