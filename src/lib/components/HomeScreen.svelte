@@ -81,6 +81,22 @@
 	let openItemId = $state<string | null>(null);
 	let showSettings = $state(false);
 
+	let rootFilterView = $state<'all' | 'unchecked' | 'checked'>('all');
+	let filterView = $derived<'all' | 'unchecked' | 'checked'>(
+		currentFolderId && currentFolderId !== ARCHIVE_ID 
+			? (allFolders.find(f => f.id === currentFolderId)?.filterView ?? 'all') 
+			: rootFilterView
+	);
+
+	function cycleFilter() {
+		const next = filterView === 'all' ? 'unchecked' : filterView === 'unchecked' ? 'checked' : 'all';
+		if (currentFolderId && currentFolderId !== ARCHIVE_ID) {
+			updateFolder(currentFolderId, { filterView: next });
+		} else {
+			rootFilterView = next;
+		}
+	}
+
 	// ── Search ────────────────────────────────────────────────────────────────────
 	let showSearch = $state(false);
 	let searchQuery = $state('');
@@ -264,6 +280,7 @@
 			: allFolders
 					.filter((f) => f.parentId === currentFolderId && !isFolderEffectivelyArchived(f.id, allFolders) && (!activeTagFilter || extractTags(f.name).includes(activeTagFilter)))
 					.sort((a, b) => a.order - b.order)
+		).filter(f => filterView === 'all' ? true : filterView === 'unchecked' ? !f.done : f.done)
 	);
 	let childLists = $derived(
 		currentFolderId === ARCHIVE_ID
@@ -286,6 +303,7 @@
 			: allLists
 					.filter((l) => l.folderId === currentFolderId && !isListEffectivelyArchived(l, allFolders) && (!activeTagFilter || extractTags(l.name).includes(activeTagFilter)))
 					.sort((a, b) => a.order - b.order)
+		).filter(l => filterView === 'all' ? true : filterView === 'unchecked' ? !l.done : l.done)
 	);
 	let hasArchived = $derived(
 		allFolders.some((f) => f.archived) || allLists.some((l) => l.archived)
@@ -1205,6 +1223,12 @@ ${bodyHtml}
 					{#if currentFolderId}
 						<button class="nav-action" onclick={() => openNewList()}>+ List</button>
 					{/if}
+					<button
+						class="nav-action filter-btn"
+						class:filter-active={filterView !== 'all'}
+						onclick={cycleFilter}
+						title="Filter: show all, unchecked only, or checked only"
+					>{filterView === 'all' ? 'All' : filterView === 'unchecked' ? '✗ only' : '✓ only'}</button>
 				{/if}
 			</div>
 		{/if}
@@ -1652,6 +1676,16 @@ ${bodyHtml}
 		font-weight: 600;
 		color: #fff;
 		cursor: pointer;
+	}
+	.nav-action.filter-btn {
+		margin-left: auto;
+		background: var(--bg2);
+		color: var(--text);
+		border: 1px solid var(--border);
+	}
+	.nav-action.filter-btn.filter-active {
+		color: var(--accent);
+		border-color: var(--accent);
 	}
 	.row {
 		display: flex;

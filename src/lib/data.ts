@@ -29,6 +29,7 @@ export interface Folder {
 	/** If true, lists in this folder are excluded from global left/right navigation
 	 *  and instead navigate only within the folder. */
 	localNav: boolean;
+	filterView?: 'all' | 'unchecked' | 'checked';
 }
 
 export function readFolders(): Folder[] {
@@ -50,7 +51,8 @@ function yMapToFolder(m: Y.Map<unknown>): Folder {
 		createdAt: (m.get('createdAt') as string | null) ?? null,
 		updatedAt: (m.get('updatedAt') as string | null) ?? null,
 		foldersFirst: (m.get('foldersFirst') as boolean) ?? true,
-		localNav: (m.get('localNav') as boolean) ?? false
+		localNav: (m.get('localNav') as boolean) ?? false,
+		filterView: (m.get('filterView') as 'all' | 'unchecked' | 'checked') ?? 'all'
 	};
 }
 
