@@ -2,11 +2,14 @@
 	import { settings, updateSettings } from '$lib/settings.svelte';
 	import { exportBackup, importBackup, type BackupFile } from '$lib/data';
 	import ConfirmDialog from './ConfirmDialog.svelte';
+	import KeyboardSettingsScreen from './KeyboardSettingsScreen.svelte';
 	import { auth } from '$lib/auth.svelte';
 
 	let { onBack, onLogout }: { onBack: () => void; onLogout: () => void } = $props();
 
 	const APP_VERSION = __APP_VERSION__;
+
+	let showKeyboardSettings = $state(false);
 
 	// ── Backup ──────────────────────────────────────────────────────────────────
 	function downloadBackup() {
@@ -81,6 +84,9 @@
 	];
 </script>
 
+{#if showKeyboardSettings}
+	<KeyboardSettingsScreen onBack={() => (showKeyboardSettings = false)} />
+{:else}
 <div class="screen">
 	<header>
 		<button class="back-btn" onclick={onBack}>← Back</button>
@@ -220,6 +226,11 @@
 		</section>
 
 		<section>
+			<h2>Keyboard Shortcuts</h2>
+			<button class="action-btn" onclick={() => (showKeyboardSettings = true)}>⌨ Configure Shortcuts</button>
+		</section>
+
+		<section>
 			<h2>Account</h2>
 			<button class="logout-btn" onclick={onLogout}>Sign out</button>
 		</section>
@@ -271,6 +282,7 @@
 		onConfirm={confirmRestore}
 		onCancel={() => pendingBackup = null}
 	/>
+{/if}
 {/if}
 
 <style>
