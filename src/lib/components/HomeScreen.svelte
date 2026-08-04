@@ -512,7 +512,7 @@
 		let name = newListName.trim();
 		if (!name) {
 			if (newListType === 'divider') {
-				name = 'Divider';
+				name = '↑ future days | previous days ↓';
 			} else if (newListDateMode === 'offset') {
 				const d = new Date();
 				d.setDate(d.getDate() + newListDateOffset);
@@ -1321,7 +1321,7 @@ ${bodyHtml}
 			>
 				{#if list.type === 'divider'}
 					<div style="flex: 1; text-align: center; font-size: 0.85em; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted, #888); pointer-events: none;">
-						↑ future days | previous days ↓
+						{list.name}
 					</div>
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'list', i)}>☰</button>
 					<RowMenu items={[
