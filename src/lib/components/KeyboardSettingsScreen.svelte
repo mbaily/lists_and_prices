@@ -32,7 +32,6 @@
 			// Normalize some common key names
 			if (keyName === ' ') keyName = 'Space';
 			else if (keyName === 'Escape') keyName = 'Esc';
-			else if (keyName.length === 1) keyName = keyName.toUpperCase(); // Capitalize letters
 
 			const combo = [...modifiers, keyName].join('+');
 
