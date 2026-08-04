@@ -97,6 +97,41 @@
 		}
 	}
 
+	function handleGlobalKeydown(e: KeyboardEvent) {
+		// Do not trigger global shortcuts if the user is typing in an input
+		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+		
+		// Or if a modal/overlay is open
+		if (showSettings || showNewFolder || showNewList || showReportsMenu || infoTarget || sfDialogFolder || renamingId) return;
+
+		// Modifier keys should not trigger a bind by themselves
+		if (['Control', 'Meta', 'Alt', 'Shift', 'CapsLock'].includes(e.key)) return;
+
+		let modifiers = [];
+		if (e.ctrlKey) modifiers.push('Ctrl');
+		if (e.metaKey) modifiers.push('Meta');
+		if (e.altKey) modifiers.push('Alt');
+		if (e.shiftKey) modifiers.push('Shift');
+
+		let keyName = e.key;
+		if (keyName === ' ') keyName = 'Space';
+		else if (keyName === 'Escape') keyName = 'Esc';
+		
+		const combo = [...modifiers, keyName].join('+');
+
+		if (combo === settings.keybindings?.['upOneLevel']) {
+			e.preventDefault();
+			if (openSheetId) {
+				openSheetId = null;
+			} else if (openListId) {
+				openListId = null;
+				openItemId = null;
+			} else if (breadcrumb.length > 1) {
+				breadcrumb = breadcrumb.slice(0, -1);
+			}
+		}
+	}
+
 	// ── Search ────────────────────────────────────────────────────────────────────
 	let showSearch = $state(false);
 	let searchQuery = $state('');
@@ -993,6 +1028,8 @@ ${bodyHtml}
 		};
 	});
 </script>
+
+<svelte:window onkeydown={handleGlobalKeydown} />
 
 {#if openSheetId}
 	<SpreadsheetScreen sheetId={openSheetId} onBack={() => openSheetId = null} />
