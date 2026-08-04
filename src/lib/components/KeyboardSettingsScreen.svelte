@@ -5,6 +5,9 @@
 
 	const ACTIONS = [
 		{ id: 'upOneLevel', label: 'Up one level' },
+		{ id: 'up', label: 'Up' },
+		{ id: 'down', label: 'Down' },
+		{ id: 'open', label: 'Open' },
 		// Add more actions here later
 	];
 
@@ -32,6 +35,10 @@
 			// Normalize some common key names
 			if (keyName === ' ') keyName = 'Space';
 			else if (keyName === 'Escape') keyName = 'Esc';
+			else if (keyName === 'ArrowUp') keyName = 'Up';
+			else if (keyName === 'ArrowDown') keyName = 'Down';
+			else if (keyName === 'ArrowLeft') keyName = 'Left';
+			else if (keyName === 'ArrowRight') keyName = 'Right';
 
 			const combo = [...modifiers, keyName].join('+');
 

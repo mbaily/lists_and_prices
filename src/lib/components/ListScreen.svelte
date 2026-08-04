@@ -142,6 +142,68 @@
 		return parts.join(' › ');
 	}
 
+	let cursorMemory = $state<Record<string, string>>(
+		(typeof sessionStorage !== 'undefined')
+			? (function(){ try { return JSON.parse(sessionStorage.getItem('pnl-cursor-memory') || '{}'); } catch { return {}; } })()
+			: {}
+	);
+
+	$effect(() => {
+		if (typeof sessionStorage !== 'undefined') {
+			sessionStorage.setItem('pnl-cursor-memory', JSON.stringify(cursorMemory));
+		}
+	});
+
+	let activeCursorId = $derived(cursorMemory[listId] || null);
+	let activeCursorIndex = $derived(activeCursorId ? filteredTreeItems.findIndex(i => i.item.id === activeCursorId) : -1);
+
+	function handleGlobalKeydown(e: KeyboardEvent) {
+		// Do not trigger global shortcuts if the user is typing in an input
+		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+		// Modifier keys should not trigger a bind by themselves
+		if (['Control', 'Meta', 'Alt', 'Shift', 'CapsLock'].includes(e.key)) return;
+
+		let modifiers = [];
+		if (e.ctrlKey) modifiers.push('Ctrl');
+		if (e.metaKey) modifiers.push('Meta');
+		if (e.altKey) modifiers.push('Alt');
+		if (e.shiftKey) modifiers.push('Shift');
+
+		let keyName = e.key;
+		if (keyName === ' ') keyName = 'Space';
+		else if (keyName === 'Escape') keyName = 'Esc';
+		else if (keyName === 'ArrowUp') keyName = 'Up';
+		else if (keyName === 'ArrowDown') keyName = 'Down';
+		else if (keyName === 'ArrowLeft') keyName = 'Left';
+		else if (keyName === 'ArrowRight') keyName = 'Right';
+
+		const combo = [...modifiers, keyName].join('+');
+
+		if (combo === settings.keybindings?.['up'] || combo === settings.keybindings?.['down']) {
+			if (filteredTreeItems.length === 0) return;
+			e.preventDefault();
+			const dir = combo === settings.keybindings?.['up'] ? -1 : 1;
+			let nextIdx = activeCursorIndex + dir;
+			if (nextIdx < 0) nextIdx = filteredTreeItems.length - 1;
+			if (nextIdx >= filteredTreeItems.length) nextIdx = 0;
+			
+			const nextId = filteredTreeItems[nextIdx].item.id;
+			cursorMemory[listId] = nextId;
+
+			// Scroll into view
+			tick().then(() => {
+				document.getElementById('item-' + nextId)?.scrollIntoView({ block: 'nearest' });
+			});
+		} else if (combo === settings.keybindings?.['open']) {
+			if (activeCursorIndex >= 0 && activeCursorIndex < filteredTreeItems.length) {
+				e.preventDefault();
+				const item = filteredTreeItems[activeCursorIndex].item;
+				startEditName(item);
+			}
+		}
+	}
+
 	// Sum in integer cents to avoid float accumulation (e.g. 0.1+0.2 = 0.300...04)
 	const total = $derived(
 		Math.round(items
@@ -956,7 +1018,9 @@
 	});
 </script>
 
-<div class="screen" class:has-keypad={(pricingItemId || qtyItemId) && isPriced} style="--list-color:{listMeta?.color ?? 'var(--text)'}">
+<svelte:window onkeydown={handleGlobalKeydown} />
+
+<div class="screen" bind:this={screenEl} class:has-keypad={(pricingItemId || qtyItemId) && isPriced} style="--list-color:{listMeta?.color ?? 'var(--text)'}">
 	<!-- Header -->
 	<header>
 		<button class="home-btn" onclick={onHome} aria-label="Home">🏠</button>
@@ -1174,7 +1238,9 @@
 			{@const itemLinks = linkParts.filter(p => p.type === 'url').map(p => p.value)}
 			{@const parentKey = item.parentId ?? '__top__'}
 			<div
+				id="item-{item.id}"
 				class="item-row"
+				class:cursored={activeCursorId === item.id}
 				class:heading={item.heading}
 				class:note={item.note}
 				class:priced-row={isPriced && !item.heading && !item.note}
@@ -1743,6 +1809,12 @@
 		.priced-bottom { display: contents; }
 	}
 	.item-row.selected { background: var(--bg3); }
+	.item-row.cursored {
+		background-color: var(--bg2);
+		outline: 2px solid var(--accent);
+		outline-offset: -2px;
+		border-radius: 4px;
+	}
 	.item-row.drag-source { opacity: 0.4; }
 	.item-row.drag-above { background: var(--bg3); box-shadow: inset 0 2px 0 var(--accent); }
 	.item-row.drag-below { background: var(--bg3); box-shadow: inset 0 -2px 0 var(--accent); }

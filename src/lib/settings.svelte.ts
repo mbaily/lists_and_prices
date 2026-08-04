@@ -24,6 +24,9 @@ interface Settings {
 
 export const DEFAULT_KEYBINDINGS: Record<string, string> = {
 	'upOneLevel': 'Escape',
+	'up': 'Up',
+	'down': 'Down',
+	'open': 'Enter',
 };
 
 function loadSettings(): Settings {

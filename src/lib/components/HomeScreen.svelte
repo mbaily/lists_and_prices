@@ -81,6 +81,18 @@
 	let openItemId = $state<string | null>(null);
 	let showSettings = $state(false);
 
+	let cursorMemory = $state<Record<string, string>>(
+		(typeof sessionStorage !== 'undefined')
+			? (function(){ try { return JSON.parse(sessionStorage.getItem('pnl-cursor-memory') || '{}'); } catch { return {}; } })()
+			: {}
+	);
+
+	$effect(() => {
+		if (typeof sessionStorage !== 'undefined') {
+			sessionStorage.setItem('pnl-cursor-memory', JSON.stringify(cursorMemory));
+		}
+	});
+
 	let rootFilterView = $state<'all' | 'unchecked' | 'checked'>('all');
 	let filterView = $derived<'all' | 'unchecked' | 'checked'>(
 		currentFolderId && currentFolderId !== ARCHIVE_ID 
@@ -116,8 +128,13 @@
 		let keyName = e.key;
 		if (keyName === ' ') keyName = 'Space';
 		else if (keyName === 'Escape') keyName = 'Esc';
+		else if (keyName === 'ArrowUp') keyName = 'Up';
+		else if (keyName === 'ArrowDown') keyName = 'Down';
+		else if (keyName === 'ArrowLeft') keyName = 'Left';
+		else if (keyName === 'ArrowRight') keyName = 'Right';
 		
 		const combo = [...modifiers, keyName].join('+');
+		const curFolderKey = currentFolderId || 'root';
 
 		if (combo === settings.keybindings?.['upOneLevel']) {
 			e.preventDefault();
@@ -128,6 +145,35 @@
 				openItemId = null;
 			} else if (breadcrumb.length > 1) {
 				breadcrumb = breadcrumb.slice(0, -1);
+			}
+		} else if (combo === settings.keybindings?.['up'] || combo === settings.keybindings?.['down']) {
+			if (viewableItems.length === 0) return;
+			e.preventDefault();
+			const dir = combo === settings.keybindings?.['up'] ? -1 : 1;
+			let nextIdx = activeCursorIndex + dir;
+			if (nextIdx < 0) nextIdx = viewableItems.length - 1;
+			if (nextIdx >= viewableItems.length) nextIdx = 0;
+			
+			const nextId = viewableItems[nextIdx].id;
+			cursorMemory[curFolderKey] = nextId;
+
+			// Scroll into view
+			import('svelte').then(({ tick }) => {
+				tick().then(() => {
+					document.getElementById('row-' + nextId)?.scrollIntoView({ block: 'nearest' });
+				});
+			});
+		} else if (combo === settings.keybindings?.['open']) {
+			if (activeCursorIndex >= 0 && activeCursorIndex < viewableItems.length) {
+				e.preventDefault();
+				const item = viewableItems[activeCursorIndex];
+				if (item.type === 'folder') {
+					breadcrumb = [...breadcrumb, item.id];
+				} else if (item.type === 'list') {
+					openListId = item.id;
+				} else if (item.type === 'sheet') {
+					openSheetId = item.id;
+				}
 			}
 		}
 	}
@@ -1296,7 +1342,9 @@ ${bodyHtml}
 		{#each childFolders as folder, i}
 			{@const isPathThrough = isInArchiveView && pathThroughFolderIds.has(folder.id) && !folder.archived}
 			<div
+				id="row-{folder.id}"
 				class="row folder-row"
+				class:cursored={activeCursorId === folder.id}
 				class:done={folder.done}
 				class:archived={folder.archived}
 				class:drag-source={touchDragKind === 'folder' && touchDragFrom === i}
@@ -1370,7 +1418,9 @@ ${bodyHtml}
 		<!-- Lists -->
 		{#each childLists as list, i}
 			<div
+				id="row-{list.id}"
 				class="row list-row"
+				class:cursored={activeCursorId === list.id}
 				class:done={list.done}
 				class:archived={list.archived}
 				class:drag-source={touchDragKind === 'list' && touchDragFrom === i}
@@ -1758,6 +1808,14 @@ ${bodyHtml}
 	.row.archived .check-circle { opacity: 0.6; }
 	.row.archived .fav-btn { opacity: 0.6; }
 	.row.archived .drag-handle { opacity: 0.6; }
+
+	.row.cursored {
+		background-color: var(--bg2);
+		outline: 2px solid var(--accent);
+		outline-offset: -2px;
+		border-radius: 4px;
+	}
+
 	.path-through-hint { color: var(--accent); font-size: 0.85em; opacity: 0.7; }
 	/* ── Pinned items bar ────────────────────────────────────────────────────── */
 	.pin-bar {
