@@ -255,7 +255,7 @@
 	);
 
 	let childFolders = $derived(
-		currentFolderId === ARCHIVE_ID
+		(currentFolderId === ARCHIVE_ID
 			// Archive root: tops of archived subtrees (archived folder whose parent is not archived),
 			// plus root-level path-through folders that lead to archived content.
 			? allFolders
@@ -283,7 +283,7 @@
 		).filter(f => filterView === 'all' ? true : filterView === 'unchecked' ? !f.done : f.done)
 	);
 	let childLists = $derived(
-		currentFolderId === ARCHIVE_ID
+		(currentFolderId === ARCHIVE_ID
 			// Archive root: only orphaned archived lists (whose folder has been deleted)
 			? allLists
 					.filter((l) => l.archived && !allFolders.some((f) => f.id === l.folderId))
