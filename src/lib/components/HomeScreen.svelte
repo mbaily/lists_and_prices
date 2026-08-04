@@ -477,7 +477,7 @@
 
 	// ── Create list ──────────────────────────────────────────────────────────────
 	let newListName = $state('');
-	let newListType = $state<'plain' | 'priced'>('plain');
+	let newListType = $state<'plain' | 'priced' | 'divider'>('plain');
 	let newListColor = $state('#6366f1');
 	let showNewList = $state(false);
 	let newListDateMode = $state<'default' | 'offset' | 'custom'>('default');
@@ -500,9 +500,20 @@
 	}
 
 	function submitNewList() {
+		let isFutureList = false;
+		if (newListDateMode === 'offset' && newListDateOffset > 0) isFutureList = true;
+		if (newListDateMode === 'custom' && newListCustomDate) {
+			const d = new Date(newListCustomDate);
+			const today = new Date();
+			today.setHours(0,0,0,0);
+			if (d > today) isFutureList = true;
+		}
+
 		let name = newListName.trim();
 		if (!name) {
-			if (newListDateMode === 'offset') {
+			if (newListType === 'divider') {
+				name = 'Divider';
+			} else if (newListDateMode === 'offset') {
 				const d = new Date();
 				d.setDate(d.getDate() + newListDateOffset);
 				name = d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
@@ -522,7 +533,7 @@
 		if (currentFolderId === null) {
 			return;
 		}
-		createList(name, currentFolderId, newListType, newListColor, settings.addListPosition);
+		createList(name, currentFolderId, newListType, newListColor, settings.addListPosition, isFutureList);
 		newListName = '';
 		newListType = 'plain';
 		newListColor = '#6366f1';
@@ -1308,45 +1319,55 @@ ${bodyHtml}
 				data-drag-index={i}
 				style="--row-color:{list.color}"
 			>
-				<button class="check-circle" onclick={() => updateList(list.id, { done: !list.done })} aria-label={list.done ? 'Unmark complete' : 'Mark complete'}>
-					{list.done ? '☑' : '☐'}
-				</button>
-				{#if renamingId === list.id}
-					<div class="rename-wrap">
-						<input
-							class="rename-input"
-							bind:value={renameValue}
-							onkeydown={(e) => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') renamingId = null; }}
-							autofocus
-						/>
-						<ColorPicker bind:value={renameColor} />
-						<div class="rename-actions">
-							<button class="rename-ok" onclick={submitRename}>✓</button>
-							<button class="rename-cancel" onclick={() => renamingId = null}>✕</button>
-						</div>
+				{#if list.type === 'divider'}
+					<div style="flex: 1; text-align: center; font-size: 0.85em; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted, #888); pointer-events: none;">
+						↑ future days | previous days ↓
 					</div>
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'list', i)}>☰</button>
+					<RowMenu items={[
+						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete divider?`, () => deleteList(list.id)) }
+					]} />
 				{:else}
-					<button class="row-name" onclick={() => { openListId = list.id; renamingId = null; }}>
-						{list.type === 'priced' ? '💰' : '📋'} {#each splitWithTags(list.name) as part}{#if part.type === 'tag'}<span class="tag-pill" role="button" style="--pill-color:{list.color}" onclick={(e) => { e.stopPropagation(); const t = part.value.slice(1).toLowerCase(); activeTagFilter = activeTagFilter === t ? null : t; }}>{part.value}</span>{:else}{part.value}{/if}{/each}
+					<button class="check-circle" onclick={() => updateList(list.id, { done: !list.done })} aria-label={list.done ? 'Unmark complete' : 'Mark complete'}>
+						{list.done ? '☑' : '☐'}
 					</button>
+					{#if renamingId === list.id}
+						<div class="rename-wrap">
+							<input
+								class="rename-input"
+								bind:value={renameValue}
+								onkeydown={(e) => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') renamingId = null; }}
+								autofocus
+							/>
+							<ColorPicker bind:value={renameColor} />
+							<div class="rename-actions">
+								<button class="rename-ok" onclick={submitRename}>✓</button>
+								<button class="rename-cancel" onclick={() => renamingId = null}>✕</button>
+							</div>
+						</div>
+					{:else}
+						<button class="row-name" onclick={() => { openListId = list.id; renamingId = null; }}>
+							{list.type === 'priced' ? '💰' : '📋'} {#each splitWithTags(list.name) as part}{#if part.type === 'tag'}<span class="tag-pill" role="button" style="--pill-color:{list.color}" onclick={(e) => { e.stopPropagation(); const t = part.value.slice(1).toLowerCase(); activeTagFilter = activeTagFilter === t ? null : t; }}>{part.value}</span>{:else}{part.value}{/if}{/each}
+						</button>
+					{/if}
+					<button
+						class="fav-btn"
+						class:active={list.favourite}
+						onclick={() => updateList(list.id, { favourite: !list.favourite })}
+						aria-label={list.favourite ? 'Unfavourite' : 'Favourite'}
+					>★</button>
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'list', i)}>☰</button>
+					<RowMenu items={[
+						{ label: 'ℹ️ Info', action: () => infoTarget = { kind: 'list', data: list } },
+						{ label: '✏ Rename', action: () => startRename(list.id, list.name, 'list', list.color) },
+						{ label: list.archived ? '📤 Unarchive' : '📥 Archive', action: () => list.archived ? unarchiveList(list.id) : archiveList(list.id) },
+						{ label: '🔗 Tag as Link', action: () => writeClipboard(`[[list:${list.id}]]`) },
+						...(hasTag
+							? [{ label: '✕ Clear Tag', action: clearTag }]
+							: [{ label: '🏷 Tag (to move)', action: () => tagList(list.id) }]),
+						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete list "${list.name}"?`, () => deleteList(list.id)) }
+					]} />
 				{/if}
-				<button
-					class="fav-btn"
-					class:active={list.favourite}
-					onclick={() => updateList(list.id, { favourite: !list.favourite })}
-					aria-label={list.favourite ? 'Unfavourite' : 'Favourite'}
-				>★</button>
-				<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'list', i)}>☰</button>
-				<RowMenu items={[
-					{ label: 'ℹ️ Info', action: () => infoTarget = { kind: 'list', data: list } },
-					{ label: '✏ Rename', action: () => startRename(list.id, list.name, 'list', list.color) },
-					{ label: list.archived ? '📤 Unarchive' : '📥 Archive', action: () => list.archived ? unarchiveList(list.id) : archiveList(list.id) },
-					{ label: '🔗 Tag as Link', action: () => writeClipboard(`[[list:${list.id}]]`) },
-					...(hasTag
-						? [{ label: '✕ Clear Tag', action: clearTag }]
-						: [{ label: '🏷 Tag (to move)', action: () => tagList(list.id) }]),
-					{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete list "${list.name}"?`, () => deleteList(list.id)) }
-				]} />
 			</div>
 		{/each}
 		{/snippet}
@@ -1526,6 +1547,10 @@ ${bodyHtml}
 							class:active={newListType === 'priced'}
 							onclick={() => (newListType = 'priced')}
 						>Priced</button>
+						<button
+							class:active={newListType === 'divider'}
+							onclick={() => (newListType = 'divider')}
+						>Divider</button>
 					</div>
 					<ColorPicker bind:value={newListColor} />
 					<div class="modal-actions">

@@ -155,7 +155,7 @@ export interface ListMeta {
 	name: string;
 	color: string;
 	folderId: string;
-	type: 'plain' | 'priced';
+	type: 'plain' | 'priced' | 'divider';
 	order: number;
 	done: boolean;
 	favourite: boolean;
@@ -177,7 +177,7 @@ function yMapToList(m: Y.Map<unknown>): ListMeta {
 		name: m.get('name') as string,
 		color: (m.get('color') as string) ?? '#6366f1',
 		folderId: m.get('folderId') as string,
-		type: (m.get('type') as 'plain' | 'priced') ?? 'plain',
+		type: (m.get('type') as 'plain' | 'priced' | 'divider') ?? 'plain',
 		order: (m.get('order') as number) ?? 0,
 		done: (m.get('done') as boolean) ?? false,
 		favourite: (m.get('favourite') as boolean) ?? false,
@@ -193,9 +193,10 @@ function yMapToList(m: Y.Map<unknown>): ListMeta {
 export function createList(
 	name: string,
 	folderId: string,
-	type: 'plain' | 'priced',
+	type: 'plain' | 'priced' | 'divider',
 	color = '#6366f1',
-	addPosition: 'top' | 'bottom' = 'bottom'
+	addPosition: 'top' | 'bottom' = 'bottom',
+	isFutureList = false
 ): string {
 	const doc = getDoc();
 	const id = uid();
@@ -205,10 +206,36 @@ export function createList(
 		const existing = (lists.toArray() as Y.Map<unknown>[]).filter(
 			(l) => l.get('folderId') === folderId
 		);
-		const newOrder = addPosition === 'top' ? -1 : existing.length;
-		if (addPosition === 'top') {
+		let newOrder = addPosition === 'top' ? -1 : existing.length;
+		let placedRelativeToDivider = false;
+
+		if (isFutureList) {
+			const divider = existing.find(l => l.get('type') === 'divider');
+			if (divider) {
+				const dividerOrder = divider.get('order') as number;
+				if (addPosition === 'top') {
+					newOrder = dividerOrder;
+					for (const sib of existing) {
+						if ((sib.get('order') as number) >= dividerOrder) {
+							sib.set('order', (sib.get('order') as number) + 1);
+						}
+					}
+				} else {
+					newOrder = dividerOrder + 1;
+					for (const sib of existing) {
+						if ((sib.get('order') as number) > dividerOrder) {
+							sib.set('order', (sib.get('order') as number) + 1);
+						}
+					}
+				}
+				placedRelativeToDivider = true;
+			}
+		}
+
+		if (!placedRelativeToDivider && addPosition === 'top') {
 			for (const sib of existing) sib.set('order', (sib.get('order') as number ?? 0) + 1);
 		}
+
 		const m = new Y.Map<unknown>();
 		m.set('id', id);
 		m.set('name', name);
