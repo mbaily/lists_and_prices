@@ -428,6 +428,26 @@
 			? allSheets.filter((s) => s.folderId === (currentFolderId ?? null)).sort((a, b) => a.order - b.order)
 			: []
 	);
+
+	let currentFolderData = $derived(currentFolderId ? allFolders.find(f => f.id === currentFolderId) : null);
+	
+	let viewableItems = $derived.by(() => {
+		const folders = childFolders.map(f => ({ type: 'folder', id: f.id, original: f }));
+		const lists = childLists.map(l => ({ type: 'list', id: l.id, original: l }));
+		const sheets = childSheets.map(s => ({ type: 'sheet', id: s.id, original: s }));
+		
+		let items = [];
+		if (currentFolderData?.foldersFirst) {
+			items = [...folders, ...lists];
+		} else {
+			items = [...lists, ...folders];
+		}
+		items = [...items, ...sheets];
+		return items;
+	});
+
+	let activeCursorId = $derived(cursorMemory[currentFolderId || 'root'] || null);
+	let activeCursorIndex = $derived(activeCursorId ? viewableItems.findIndex(i => i.id === activeCursorId) : -1);
 	let openSheetId = $state<string | null>(null);
 
 	// ── Favourites ───────────────────────────────────────────────────────────────────────
@@ -1493,7 +1513,11 @@ ${bodyHtml}
 
 		<!-- Spreadsheets -->
 		{#each childSheets as sheet}
-			<div class="row sheet-row">
+			<div 
+				id="row-{sheet.id}"
+				class="row sheet-row"
+				class:cursored={activeCursorId === sheet.id}
+			>
 				<span class="sheet-icon">📊</span>
 				<button class="row-name" onclick={() => openSheetId = sheet.id}>{sheet.name}</button>
 				<RowMenu items={[
