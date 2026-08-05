@@ -146,7 +146,7 @@
 			} else if (breadcrumb.length > 1) {
 				breadcrumb = breadcrumb.slice(0, -1);
 			}
-		} else if (combo === settings.keybindings?.['up'] || combo === settings.keybindings?.['down']) {
+		} else if (!openListId && !openSheetId && (combo === settings.keybindings?.['up'] || combo === settings.keybindings?.['down'])) {
 			if (viewableItems.length === 0) return;
 			e.preventDefault();
 			const dir = combo === settings.keybindings?.['up'] ? -1 : 1;
@@ -163,7 +163,7 @@
 					document.getElementById('row-' + nextId)?.scrollIntoView({ block: 'nearest' });
 				});
 			});
-		} else if (combo === settings.keybindings?.['open']) {
+		} else if (!openListId && !openSheetId && combo === settings.keybindings?.['open']) {
 			if (activeCursorIndex >= 0 && activeCursorIndex < viewableItems.length) {
 				e.preventDefault();
 				const item = viewableItems[activeCursorIndex];
