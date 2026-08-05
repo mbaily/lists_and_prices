@@ -95,6 +95,11 @@
 
 	<div class="content">
 		<section>
+			<h2>Keyboard Shortcuts</h2>
+			<button class="action-btn" onclick={() => (showKeyboardSettings = true)}>⌨ Configure Shortcuts</button>
+		</section>
+
+		<section>
 			<h2>Currency</h2>
 			<div class="currency-list">
 				{#each currencies as c}
@@ -225,10 +230,7 @@
 			<p class="restore-err" style="margin-top: 0.25rem;">Don't use offline, use while able to connect to server: this wipes your local data to force a fresh sync and defragment the local storage. Use when loading the app is taking 2-3 seconds.</p>
 		</section>
 
-		<section>
-			<h2>Keyboard Shortcuts</h2>
-			<button class="action-btn" onclick={() => (showKeyboardSettings = true)}>⌨ Configure Shortcuts</button>
-		</section>
+
 
 		<section>
 			<h2>Account</h2>
