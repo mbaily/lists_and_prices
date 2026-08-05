@@ -169,7 +169,7 @@
 				const item = viewableItems[activeCursorIndex];
 				if (item.type === 'folder') {
 					breadcrumb = [...breadcrumb, item.id];
-				} else if (item.type === 'list') {
+				} else if (item.type === 'list' && item.original.type !== 'divider') {
 					openListId = item.id;
 				} else if (item.type === 'sheet') {
 					openSheetId = item.id;
