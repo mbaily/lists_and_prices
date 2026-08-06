@@ -1020,10 +1020,12 @@
 		const delta = _anchorEl.getBoundingClientRect().top - _anchorTop;
 		if (delta !== 0) itemListEl.scrollTop += delta;
 	});
+	let screenEl = $state<HTMLElement | null>(null);
 </script>
 
 <svelte:window onkeydown={handleGlobalKeydown} />
 
+<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 <div class="screen" bind:this={screenEl} class:has-keypad={(pricingItemId || qtyItemId) && isPriced} style="--list-color:{listMeta?.color ?? 'var(--text)'}">
 	<!-- Header -->
 	<header>
