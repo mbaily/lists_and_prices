@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { docState } from '$lib/yjsStore.svelte';
-	import { onDestroy, tick } from 'svelte';
+	import { onDestroy, tick, untrack } from 'svelte';
 	import {
 		readItems,
 		readAllItems,
@@ -866,51 +866,55 @@
 	// If a peer deletes the item currently being priced or named, clear stale state
 	$effect(() => {
 		const ids = new Set(items.map((i) => i.id));
-		if (pricingItemId !== null && !ids.has(pricingItemId)) {
-			pricingItemId = null;
-			priceBuffer = '';
-		}
-		if (qtyItemId !== null && !ids.has(qtyItemId)) {
-			qtyItemId = null;
-			qtyBuffer = '';
-		}
-		if (editingId !== null && !ids.has(editingId)) {
-			cancelEdit();
-		}
-		if (infoItem !== null && !ids.has(infoItem.id)) {
-			infoItem = null;
-		}
-		// Also clear any selected IDs that no longer exist
-		if (selectedIds.size > 0) {
-			const next = new Set([...selectedIds].filter((id) => ids.has(id)));
-			if (next.size !== selectedIds.size) selectedIds = next;
-		}
+		untrack(() => {
+			if (pricingItemId !== null && !ids.has(pricingItemId)) {
+				pricingItemId = null;
+				priceBuffer = '';
+			}
+			if (qtyItemId !== null && !ids.has(qtyItemId)) {
+				qtyItemId = null;
+				qtyBuffer = '';
+			}
+			if (editingId !== null && !ids.has(editingId)) {
+				cancelEdit();
+			}
+			if (infoItem !== null && !ids.has(infoItem.id)) {
+				infoItem = null;
+			}
+			// Also clear any selected IDs that no longer exist
+			if (selectedIds.size > 0) {
+				const next = new Set([...selectedIds].filter((id) => ids.has(id)));
+				if (next.size !== selectedIds.size) selectedIds = next;
+			}
+		});
 	});
 
 	// Reset all transient editing/drag state when navigating to a different list
 	$effect(() => {
 		void listId; // track prop change
-		editingId = null;
-		inputMode = 'add';
-		universalValue = '';
-		newItemParentId = null;
-		newItemIsNote = false;
-		pricingItemId = null;
-		priceBuffer = '';
-		qtyItemId = null;
-		qtyBuffer = '';
-		selectedIds = new Set();
-		selectionMode = false;
-		showSelectionPanel = false;
-		touchDragFrom = null;
-		touchDragOver = null;
-		touchDragParentKey = null;
-		confirmAction = null;
-		infoItem = null;
-		showHeaderMenu = false;
-		// Reset scroll-shrink when switching lists — set scrollTop to 0;
-		// the scroll listener will fire and restore max-height to fullHeight automatically.
-		if (itemListEl) itemListEl.scrollTop = 0;
+		untrack(() => {
+			editingId = null;
+			inputMode = 'add';
+			universalValue = '';
+			newItemParentId = null;
+			newItemIsNote = false;
+			pricingItemId = null;
+			priceBuffer = '';
+			qtyItemId = null;
+			qtyBuffer = '';
+			selectedIds = new Set();
+			selectionMode = false;
+			showSelectionPanel = false;
+			touchDragFrom = null;
+			touchDragOver = null;
+			touchDragParentKey = null;
+			confirmAction = null;
+			infoItem = null;
+			showHeaderMenu = false;
+			// Reset scroll-shrink when switching lists — set scrollTop to 0;
+			// the scroll listener will fire and restore max-height to fullHeight automatically.
+			if (itemListEl) itemListEl.scrollTop = 0;
+		});
 	});
 
 	// ── Scroll-shrink favourites bar ──────────────────────────────────────────────
