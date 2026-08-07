@@ -148,6 +148,32 @@
 			: {}
 	);
 
+	let listNotePrefs = $state<Record<string, boolean>>(
+		(typeof localStorage !== 'undefined')
+			? (function(){ try { return JSON.parse(localStorage.getItem('pnl-list-note-prefs') || '{}'); } catch { return {}; } })()
+			: {}
+	);
+
+	let listJournalPrefs = $state<Record<string, boolean>>(
+		(typeof localStorage !== 'undefined')
+			? (function(){ try { return JSON.parse(localStorage.getItem('pnl-list-journal-prefs') || '{}'); } catch { return {}; } })()
+			: {}
+	);
+
+	let journalMode = $derived(listJournalPrefs[listId] || false);
+
+	function toggleJournalMode() {
+		listJournalPrefs[listId] = !journalMode;
+		if (typeof localStorage !== 'undefined') {
+			localStorage.setItem('pnl-list-journal-prefs', JSON.stringify(listJournalPrefs));
+		}
+	}
+
+	function formatJournalDate(dateStr: string) {
+		const d = new Date(dateStr);
+		return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+	}
+
 	$effect(() => {
 		if (typeof sessionStorage !== 'undefined') {
 			sessionStorage.setItem('pnl-cursor-memory', JSON.stringify(cursorMemory));
@@ -342,7 +368,7 @@
 	});
 	// Subtask / subnote context when adding a child item
 	let newItemParentId = $state<string | null>(null);
-	let newItemIsNote = $state(false);
+	let newItemIsNote = $state(listNotePrefs[listId] || false);
 
 	function focusInput() {
 		tick().then(() => universalInputEl?.focus());
@@ -355,7 +381,7 @@
 		createItem(listId, universalValue.trim(), null, newItemParentId, newItemIsNote, pos);
 		universalValue = '';
 		newItemParentId = null;
-		newItemIsNote = false;
+		newItemIsNote = listNotePrefs[listId] || false;
 		// Blur dismisses the iOS keyboard and hides the confirm FAB
 		universalInputEl?.blur();
 	}
@@ -448,7 +474,7 @@
 		pricingItemId = null;
 		qtyItemId = null;
 		newItemParentId = null;
-		newItemIsNote = false;
+		newItemIsNote = listNotePrefs[listId] || false;
 		focusInput();
 	}
 
@@ -465,7 +491,7 @@
 		inputMode = 'add';
 		universalValue = '';
 		newItemParentId = null;
-		newItemIsNote = false;
+		newItemIsNote = listNotePrefs[listId] || false;
 		universalInputEl?.blur();
 	}
 
@@ -897,7 +923,7 @@
 			inputMode = 'add';
 			universalValue = '';
 			newItemParentId = null;
-			newItemIsNote = false;
+			newItemIsNote = listNotePrefs[listId] || false;
 			pricingItemId = null;
 			priceBuffer = '';
 			qtyItemId = null;
@@ -1064,6 +1090,7 @@
 					<button role="menuitem" onclick={enterSelectionMode}>☑ Select items</button>
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsTSV(); }}>📋 Copy as spreadsheet</button>
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsJournal(); }}>📓 Copy as journal</button>
+					<button role="menuitem" onclick={() => { showHeaderMenu = false; toggleJournalMode(); }}>{journalMode ? '🗓 Hide dates (journal mode)' : '🗓 Show dates (journal mode)'}</button>
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; exportToClipboard(); }}>📤 Export to clipboard (JSON)</button>
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; importFromClipboard(); }}>📥 Import from clipboard</button>
 				</div>
@@ -1114,7 +1141,17 @@
 					{#if inputMode === 'edit'}
 						<button type="button" class="input-clear" onclick={cancelEdit} aria-label="Cancel edit">✕</button>
 					{:else}
-						<button type="button" class="type-toggle-btn" class:is-note={newItemIsNote} onpointerdown={(e) => { e.preventDefault(); newItemIsNote = !newItemIsNote; focusInput(); }} aria-label="Toggle note/todo">{newItemIsNote ? '📝' : '☑'}</button>
+						<button type="button" class="type-toggle-btn" class:is-note={newItemIsNote} onpointerdown={(e) => { 
+							e.preventDefault(); 
+							newItemIsNote = !newItemIsNote; 
+							if (newItemParentId === null) {
+								listNotePrefs[listId] = newItemIsNote;
+								if (typeof localStorage !== 'undefined') {
+									localStorage.setItem('pnl-list-note-prefs', JSON.stringify(listNotePrefs));
+								}
+							}
+							focusInput(); 
+						}} aria-label="Toggle note/todo">{newItemIsNote ? '📝' : '☑'}</button>
 					{/if}
 				</div>
 
@@ -1129,7 +1166,7 @@
 		{#if newItemParentId}
 				<div class="subtask-hint">
 					{newItemIsNote ? '📝 Subnote' : '➕ Subtask'} → <em>{items.find((i) => i.id === newItemParentId)?.name ?? '…'}</em>
-					<button type="button" onclick={() => { newItemParentId = null; newItemIsNote = false; universalValue = ''; }} aria-label="Cancel">✕</button>
+					<button type="button" onclick={() => { newItemParentId = null; newItemIsNote = listNotePrefs[listId] || false; universalValue = ''; }} aria-label="Cancel">✕</button>
 				</div>
 			{/if}
 		</div>
@@ -1246,6 +1283,7 @@
 			<div
 				id="item-{item.id}"
 				class="item-row"
+				class:journal-mode={journalMode}
 				class:cursored={activeCursorId === item.id}
 				class:heading={item.heading}
 				class:note={item.note}
@@ -1380,6 +1418,9 @@
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 					]} />
 				{/if}
+				{#if journalMode && item.createdAt && !item.heading}
+					<div class="journal-date">{formatJournalDate(item.createdAt)}</div>
+				{/if}
 			</div>
 		{/each}
 	</div>
@@ -1406,7 +1447,7 @@
 				class:fab-right={settings.handedness !== 'right'}
 				class:fab-left={settings.handedness === 'right'}
 				aria-label="Add item"
-				onpointerdown={(e) => { e.preventDefault(); newItemParentId = null; newItemIsNote = false; cancelEdit(); focusInput(); }}
+				onpointerdown={(e) => { e.preventDefault(); newItemParentId = null; newItemIsNote = listNotePrefs[listId] || false; cancelEdit(); focusInput(); }}
 			>＋</button>
 		{/if}
 	{/if}
@@ -1787,6 +1828,17 @@
 		border-bottom: 1px solid var(--border);
 		transition: background 0.15s, opacity 0.15s;
 		line-height: var(--row-line-height, normal);
+	}
+	.item-row.journal-mode {
+		flex-wrap: wrap;
+	}
+	.journal-date {
+		width: 100%;
+		font-size: 0.75rem;
+		color: var(--text-muted, #888);
+		padding-left: 2.2rem;
+		margin-top: -0.3rem;
+		opacity: 0.7;
 	}
 	/* Priced rows: two-line layout on touch devices only */
 	@media (pointer: coarse) {
