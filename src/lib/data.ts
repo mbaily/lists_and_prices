@@ -167,6 +167,8 @@ export interface ListMeta {
 	createdAt: string | null;
 	updatedAt: string | null;
 	filterView: FilterView;
+	defaultIsNote?: boolean;
+	journalMode?: boolean;
 }
 
 export function readLists(): ListMeta[] {
@@ -188,7 +190,9 @@ function yMapToList(m: Y.Map<unknown>): ListMeta {
 		archivedNextId: (m.get('archivedNextId') as string | null) ?? null,
 		createdAt: (m.get('createdAt') as string | null) ?? null,
 		updatedAt: (m.get('updatedAt') as string | null) ?? null,
-		filterView: (m.get('filterView') as FilterView) ?? 'all'
+		filterView: (m.get('filterView') as FilterView) ?? 'all',
+		defaultIsNote: (m.get('defaultIsNote') as boolean) ?? false,
+		journalMode: (m.get('journalMode') as boolean) ?? false
 	};
 }
 
@@ -247,6 +251,8 @@ export function createList(
 		m.set('order', newOrder);
 		m.set('createdAt', now);
 		m.set('updatedAt', now);
+		m.set('defaultIsNote', false);
+		m.set('journalMode', false);
 		lists.push([m]);
 	});
 	return id;

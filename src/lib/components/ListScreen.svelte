@@ -148,24 +148,11 @@
 			: {}
 	);
 
-	let listNotePrefs = $state<Record<string, boolean>>(
-		(typeof localStorage !== 'undefined')
-			? (function(){ try { return JSON.parse(localStorage.getItem('pnl-list-note-prefs') || '{}'); } catch { return {}; } })()
-			: {}
-	);
-
-	let listJournalPrefs = $state<Record<string, boolean>>(
-		(typeof localStorage !== 'undefined')
-			? (function(){ try { return JSON.parse(localStorage.getItem('pnl-list-journal-prefs') || '{}'); } catch { return {}; } })()
-			: {}
-	);
-
-	let journalMode = $derived(listJournalPrefs[listId] || false);
+	let journalMode = $derived(listMeta?.journalMode ?? false);
 
 	function toggleJournalMode() {
-		listJournalPrefs[listId] = !journalMode;
-		if (typeof localStorage !== 'undefined') {
-			localStorage.setItem('pnl-list-journal-prefs', JSON.stringify(listJournalPrefs));
+		if (listMeta) {
+			updateList(listId, { journalMode: !(listMeta.journalMode ?? false) });
 		}
 	}
 
@@ -368,7 +355,7 @@
 	});
 	// Subtask / subnote context when adding a child item
 	let newItemParentId = $state<string | null>(null);
-	let newItemIsNote = $state(listNotePrefs[listId] || false);
+	let newItemIsNote = $state(listMeta?.defaultIsNote ?? false);
 
 	function focusInput() {
 		tick().then(() => universalInputEl?.focus());
@@ -381,7 +368,7 @@
 		createItem(listId, universalValue.trim(), null, newItemParentId, newItemIsNote, pos);
 		universalValue = '';
 		newItemParentId = null;
-		newItemIsNote = listNotePrefs[listId] || false;
+		newItemIsNote = listMeta?.defaultIsNote ?? false;
 		// Blur dismisses the iOS keyboard and hides the confirm FAB
 		universalInputEl?.blur();
 	}
@@ -474,7 +461,7 @@
 		pricingItemId = null;
 		qtyItemId = null;
 		newItemParentId = null;
-		newItemIsNote = listNotePrefs[listId] || false;
+		newItemIsNote = listMeta?.defaultIsNote ?? false;
 		focusInput();
 	}
 
@@ -491,7 +478,7 @@
 		inputMode = 'add';
 		universalValue = '';
 		newItemParentId = null;
-		newItemIsNote = listNotePrefs[listId] || false;
+		newItemIsNote = listMeta?.defaultIsNote ?? false;
 		universalInputEl?.blur();
 	}
 
@@ -923,7 +910,7 @@
 			inputMode = 'add';
 			universalValue = '';
 			newItemParentId = null;
-			newItemIsNote = listNotePrefs[listId] || false;
+			newItemIsNote = listMeta?.defaultIsNote ?? false;
 			pricingItemId = null;
 			priceBuffer = '';
 			qtyItemId = null;
@@ -1145,9 +1132,8 @@
 							e.preventDefault(); 
 							newItemIsNote = !newItemIsNote; 
 							if (newItemParentId === null) {
-								listNotePrefs[listId] = newItemIsNote;
-								if (typeof localStorage !== 'undefined') {
-									localStorage.setItem('pnl-list-note-prefs', JSON.stringify(listNotePrefs));
+								if (listMeta) {
+									updateList(listId, { defaultIsNote: newItemIsNote });
 								}
 							}
 							focusInput(); 
@@ -1166,7 +1152,7 @@
 		{#if newItemParentId}
 				<div class="subtask-hint">
 					{newItemIsNote ? '📝 Subnote' : '➕ Subtask'} → <em>{items.find((i) => i.id === newItemParentId)?.name ?? '…'}</em>
-					<button type="button" onclick={() => { newItemParentId = null; newItemIsNote = listNotePrefs[listId] || false; universalValue = ''; }} aria-label="Cancel">✕</button>
+					<button type="button" onclick={() => { newItemParentId = null; newItemIsNote = listMeta?.defaultIsNote ?? false; universalValue = ''; }} aria-label="Cancel">✕</button>
 				</div>
 			{/if}
 		</div>
@@ -1447,7 +1433,7 @@
 				class:fab-right={settings.handedness !== 'right'}
 				class:fab-left={settings.handedness === 'right'}
 				aria-label="Add item"
-				onpointerdown={(e) => { e.preventDefault(); newItemParentId = null; newItemIsNote = listNotePrefs[listId] || false; cancelEdit(); focusInput(); }}
+				onpointerdown={(e) => { e.preventDefault(); newItemParentId = null; newItemIsNote = listMeta?.defaultIsNote ?? false; cancelEdit(); focusInput(); }}
 			>＋</button>
 		{/if}
 	{/if}
