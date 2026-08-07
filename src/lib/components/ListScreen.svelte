@@ -357,6 +357,12 @@
 	let newItemParentId = $state<string | null>(null);
 	let newItemIsNote = $state(listMeta?.defaultIsNote ?? false);
 
+	$effect(() => {
+		if (newItemParentId === null) {
+			newItemIsNote = listMeta?.defaultIsNote ?? false;
+		}
+	});
+
 	function focusInput() {
 		tick().then(() => universalInputEl?.focus());
 	}
