@@ -381,9 +381,10 @@
 
 	// ── Clipboard import ───────────────────────────────────────────────────
 	async function exportToClipboard() {
+		const source = selectedIds.size > 0 ? selectedItems : treeItems.map(({ item }) => item);
 		const exportData = {
 			__list_app__: true,
-			items: treeItems.map(({ item }) => {
+			items: source.map((item) => {
 				const ex: ExportedItem = { id: item.id, name: item.name };
 				if (item.price !== null) ex.price = item.price;
 				if (item.qty !== null) ex.qty = item.qty;
