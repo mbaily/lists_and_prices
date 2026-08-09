@@ -2071,8 +2071,8 @@
 		min-width: 22px;
 	}
 	.chip-btn.chip-checked {
-		background: var(--list-color, var(--accent));
-		border-color: var(--list-color, var(--accent));
+		background: #ef4444;
+		border-color: #ef4444;
 		color: #fff;
 	}
 	.item-name {
