@@ -107,6 +107,7 @@
 									class="fc-input"
 									bind:value={renameValue}
 									autofocus
+									oninput={() => renameError = ''}
 									onkeydown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') { renamingId = null; renameError = ''; } }}
 									onblur={commitRename}
 								/>

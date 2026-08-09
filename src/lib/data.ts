@@ -606,6 +606,11 @@ export function createItemsFromExport(listId: string, exportedItems: ExportedIte
 					const box = checkboxes.find((c) => c.name.toLowerCase() === name.toLowerCase());
 					if (box) setItemCheckboxState(newId, box.id, true);
 				}
+			} else if (ex.checked && checkboxes.length > 0) {
+				// Legacy single-checkbox export ("checked": true) landing in a list
+				// that now has named checkboxes — treat it as fully done rather than
+				// silently showing every chip unchecked.
+				for (const box of checkboxes) setItemCheckboxState(newId, box.id, true);
 			}
 		}
 	});
