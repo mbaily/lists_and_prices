@@ -30,7 +30,18 @@ export interface Folder {
 	 *  and instead navigate only within the folder. */
 	localNav: boolean;
 	filterView?: 'all' | 'unchecked' | 'checked';
+	/** Named checkboxes configured for lists directly in this folder.
+	 *  Empty/absent = legacy single-checkbox mode. Order matters: the LAST
+	 *  entry is the one that determines whether an item counts as "done". */
+	checkboxes?: FolderCheckbox[];
 }
+
+export interface FolderCheckbox {
+	id: string;
+	name: string;
+}
+
+const MAX_FOLDER_CHECKBOXES = 8;
 
 export function readFolders(): Folder[] {
 	return (getFolders(getDoc()).toArray() as Y.Map<unknown>[]).map(yMapToFolder);
@@ -52,7 +63,8 @@ function yMapToFolder(m: Y.Map<unknown>): Folder {
 		updatedAt: (m.get('updatedAt') as string | null) ?? null,
 		foldersFirst: (m.get('foldersFirst') as boolean) ?? true,
 		localNav: (m.get('localNav') as boolean) ?? false,
-		filterView: (m.get('filterView') as 'all' | 'unchecked' | 'checked') ?? 'all'
+		filterView: (m.get('filterView') as 'all' | 'unchecked' | 'checked') ?? 'all',
+		checkboxes: (m.get('checkboxes') as FolderCheckbox[] | undefined) ?? undefined
 	};
 }
 
@@ -94,6 +106,80 @@ export function updateFolder(id: string, patch: Partial<Omit<Folder, 'id' | 'cre
 		for (const [k, v] of Object.entries(patch)) m.set(k, v);
 		const keys = Object.keys(patch);
 		if (!(keys.length === 1 && keys[0] === 'order')) m.set('updatedAt', new Date().toISOString());
+	});
+}
+
+// ─── Named checkboxes (per folder) ─────────────────────────────────────────────
+// Configured on a Folder; applies to lists directly inside it. Order matters —
+// the LAST entry determines whether an item counts as "done". Item-level state
+// is stored per-checkbox-id directly on the item (see setItemCheckboxState),
+// never as a single JSON blob, so concurrent offline edits to different names
+// merge safely instead of one overwriting the other.
+
+export function addFolderCheckbox(folderId: string, name: string): string | null {
+	const trimmed = name.trim();
+	if (!trimmed) return null;
+	const doc = getDoc();
+	let newId: string | null = null;
+	doc.transact(() => {
+		const m = findYMap(getFolders(doc), folderId);
+		if (!m) return;
+		const current = ((m.get('checkboxes') as FolderCheckbox[] | undefined) ?? []).slice();
+		if (current.length >= MAX_FOLDER_CHECKBOXES) return;
+		if (current.some((c) => c.name.toLowerCase() === trimmed.toLowerCase())) return;
+		newId = uid();
+		current.push({ id: newId, name: trimmed });
+		m.set('checkboxes', current);
+		m.set('updatedAt', new Date().toISOString());
+	});
+	return newId;
+}
+
+export function renameFolderCheckbox(folderId: string, checkboxId: string, name: string): void {
+	const trimmed = name.trim();
+	if (!trimmed) return;
+	const doc = getDoc();
+	doc.transact(() => {
+		const m = findYMap(getFolders(doc), folderId);
+		if (!m) return;
+		const current = ((m.get('checkboxes') as FolderCheckbox[] | undefined) ?? []).slice();
+		const idx = current.findIndex((c) => c.id === checkboxId);
+		if (idx === -1) return;
+		current[idx] = { ...current[idx], name: trimmed };
+		m.set('checkboxes', current);
+		m.set('updatedAt', new Date().toISOString());
+	});
+}
+
+/** Removes a named checkbox from a folder's config. Per-item checked state for
+ *  this id is left in place (orphaned) — harmless, and simply ignored once the
+ *  id is no longer configured. Removing the last remaining name reverts the
+ *  folder's lists back to the legacy single-checkbox mode. */
+export function removeFolderCheckbox(folderId: string, checkboxId: string): void {
+	const doc = getDoc();
+	doc.transact(() => {
+		const m = findYMap(getFolders(doc), folderId);
+		if (!m) return;
+		const current = ((m.get('checkboxes') as FolderCheckbox[] | undefined) ?? []).slice();
+		const next = current.filter((c) => c.id !== checkboxId);
+		m.set('checkboxes', next);
+		m.set('updatedAt', new Date().toISOString());
+	});
+}
+
+export function moveFolderCheckbox(folderId: string, checkboxId: string, direction: 'up' | 'down'): void {
+	const doc = getDoc();
+	doc.transact(() => {
+		const m = findYMap(getFolders(doc), folderId);
+		if (!m) return;
+		const current = ((m.get('checkboxes') as FolderCheckbox[] | undefined) ?? []).slice();
+		const idx = current.findIndex((c) => c.id === checkboxId);
+		if (idx === -1) return;
+		const swapWith = direction === 'up' ? idx - 1 : idx + 1;
+		if (swapWith < 0 || swapWith >= current.length) return;
+		[current[idx], current[swapWith]] = [current[swapWith], current[idx]];
+		m.set('checkboxes', current);
+		m.set('updatedAt', new Date().toISOString());
 	});
 }
 
@@ -303,6 +389,9 @@ export interface Item {
 	pinned: boolean;
 	createdAt: string | null;
 	updatedAt: string | null;
+	/** Per-named-checkbox state, keyed by FolderCheckbox.id. Only meaningful
+	 *  when the item's list's folder has `checkboxes` configured. */
+	checks: Record<string, boolean>;
 }
 
 export function readItems(listId: string): Item[] {
@@ -317,6 +406,10 @@ export function readAllItems(): Item[] {
 }
 
 function yMapToItem(m: Y.Map<unknown>): Item {
+	const checks: Record<string, boolean> = {};
+	m.forEach((value, key) => {
+		if (key.startsWith('chk_')) checks[key.slice(4)] = value === true;
+	});
 	return {
 		id: m.get('id') as string,
 		listId: m.get('listId') as string,
@@ -330,7 +423,8 @@ function yMapToItem(m: Y.Map<unknown>): Item {
 		note: (m.get('note') as boolean) ?? false,
 		pinned: (m.get('pinned') as boolean) ?? false,
 		createdAt: (m.get('createdAt') as string | null) ?? null,
-		updatedAt: (m.get('updatedAt') as string | null) ?? null
+		updatedAt: (m.get('updatedAt') as string | null) ?? null,
+		checks
 	};
 }
 
@@ -368,7 +462,7 @@ export function createItem(listId: string, name: string, price: number | null = 
 	return id;
 }
 
-export function updateItem(id: string, patch: Partial<Omit<Item, 'id' | 'listId' | 'createdAt' | 'updatedAt'>>) {
+export function updateItem(id: string, patch: Partial<Omit<Item, 'id' | 'listId' | 'createdAt' | 'updatedAt' | 'checks'>>) {
 	const doc = getDoc();
 	doc.transact(() => {
 		const m = findYMap(getItems(doc), id);
@@ -377,6 +471,44 @@ export function updateItem(id: string, patch: Partial<Omit<Item, 'id' | 'listId'
 		const keys = Object.keys(patch);
 		if (!(keys.length === 1 && keys[0] === 'order')) m.set('updatedAt', new Date().toISOString());
 	});
+}
+
+/** Sets a single named checkbox's state on an item. Stored as its own Yjs key
+ *  (`chk_<checkboxId>`) rather than a merged blob so concurrent offline edits
+ *  to different checkboxes on the same item don't clobber each other. */
+export function setItemCheckboxState(itemId: string, checkboxId: string, value: boolean): void {
+	const doc = getDoc();
+	doc.transact(() => {
+		const m = findYMap(getItems(doc), itemId);
+		if (!m) return;
+		m.set(`chk_${checkboxId}`, value);
+		m.set('updatedAt', new Date().toISOString());
+	});
+}
+
+/** Clears (sets false) the given named checkboxes across a batch of items —
+ *  used for bulk "uncheck" actions on lists using named checkboxes. */
+export function clearItemCheckboxes(itemIds: string[], checkboxIds: string[]): void {
+	const doc = getDoc();
+	doc.transact(() => {
+		for (const itemId of itemIds) {
+			const m = findYMap(getItems(doc), itemId);
+			if (!m) continue;
+			for (const cid of checkboxIds) m.set(`chk_${cid}`, false);
+			m.set('updatedAt', new Date().toISOString());
+		}
+	});
+}
+
+/** Whether an item counts as "done". For folders with named checkboxes
+ *  configured, that's whether the LAST configured checkbox is checked;
+ *  otherwise falls back to the legacy single `checked` boolean. */
+export function isItemDone(item: Item, folder: Folder | null | undefined): boolean {
+	const boxes = folder?.checkboxes;
+	if (boxes && boxes.length > 0) {
+		return !!item.checks[boxes[boxes.length - 1].id];
+	}
+	return item.checked;
 }
 
 export function deleteItem(id: string) {
@@ -428,6 +560,11 @@ export interface ExportedItem {
 	price?: number | null;
 	qty?: number | null;
 	checked?: boolean;
+	/** Names (not ids) of named checkboxes checked on this item — portable
+	 *  across devices/folders since checkbox ids aren't meaningful outside
+	 *  their originating folder. Only present when the source folder had
+	 *  named checkboxes configured. */
+	checkedNames?: string[];
 	heading?: boolean;
 	note?: boolean;
 	pinned?: boolean;
@@ -439,17 +576,26 @@ export interface ExportedItem {
 export function createItemsFromExport(listId: string, exportedItems: ExportedItem[]): void {
 	const doc = getDoc();
 	const idMap = new Map<string, string>(); // old id → new id
+	const list = readLists().find((l) => l.id === listId);
+	const folder = list ? readFolders().find((f) => f.id === list.folderId) : undefined;
+	const checkboxes = folder?.checkboxes ?? [];
 	doc.transact(() => {
 		for (const ex of exportedItems) {
 			const resolvedParentId = ex.parentId ? (idMap.get(ex.parentId) ?? null) : null;
 			const newId = createItem(listId, ex.name, ex.price ?? null, resolvedParentId, ex.note ?? false, 'bottom');
 			idMap.set(ex.id, newId);
-			const patch: Partial<Omit<Item, 'id' | 'listId' | 'createdAt' | 'updatedAt'>> = {};
+			const patch: Partial<Omit<Item, 'id' | 'listId' | 'createdAt' | 'updatedAt' | 'checks'>> = {};
 			if (ex.qty != null) patch.qty = ex.qty;
 			if (ex.checked) patch.checked = true;
 			if (ex.heading) patch.heading = true;
 			if (ex.pinned) patch.pinned = true;
 			if (Object.keys(patch).length > 0) updateItem(newId, patch);
+			if (ex.checkedNames && ex.checkedNames.length > 0 && checkboxes.length > 0) {
+				for (const name of ex.checkedNames) {
+					const box = checkboxes.find((c) => c.name === name);
+					if (box) setItemCheckboxState(newId, box.id, true);
+				}
+			}
 		}
 	});
 }

@@ -13,6 +13,9 @@
 		deleteItemCascade,
 		deleteItemsBatch,
 		setItemsChecked,
+		setItemCheckboxState,
+		clearItemCheckboxes,
+		isItemDone,
 		updateList,
 		reorderSiblings,
 		isListEffectivelyArchived,
@@ -68,6 +71,38 @@
 		void docState.version;
 		try { return readFolders(); } catch { return []; }
 	});
+	let currentFolder = $derived(listMeta ? (allFolders.find((f) => f.id === listMeta.folderId) ?? null) : null);
+	// Named checkboxes configured on the current list's folder — empty = legacy single checkbox.
+	let folderCheckboxes = $derived(currentFolder?.checkboxes ?? []);
+	function isChecked(item: Item, checkboxId: string): boolean {
+		return !!item.checks[checkboxId];
+	}
+	function toggleItemCheckbox(item: Item, checkboxId: string) {
+		setItemCheckboxState(item.id, checkboxId, !isChecked(item, checkboxId));
+	}
+	function chipLabel(name: string): string {
+		return name.trim().slice(0, 2).toUpperCase();
+	}
+	function isDone(item: Item): boolean {
+		return isItemDone(item, currentFolder);
+	}
+	/** Quick "mark done" toggle used where there's no room for individual chips
+	 *  (e.g. the pinned-items bar) — toggles the last (done-determining) named
+	 *  checkbox, or the legacy checked flag if the folder has none configured. */
+	function toggleDone(item: Item) {
+		if (folderCheckboxes.length > 0) {
+			toggleItemCheckbox(item, folderCheckboxes[folderCheckboxes.length - 1].id);
+		} else {
+			toggleCheck(item);
+		}
+	}
+	function doneLabel(item: Item): string {
+		if (folderCheckboxes.length > 0) {
+			const names = folderCheckboxes.filter((c) => isChecked(item, c.id)).map((c) => c.name);
+			return names.length > 0 ? `✓(${names.join(',')})` : '';
+		}
+		return item.checked ? '✓' : '';
+	}
 	let favouriteLists = $derived(allLists.filter((l) => l.favourite && !isListEffectivelyArchived(l, allFolders)));
 	let allItemsAll = $derived.by(() => {
 		void docState.version;
@@ -309,7 +344,7 @@
 			: (() => {
 				const visibleIds = new Set<string>();
 				for (const { item } of treeItems) {
-					if (item.heading || (item.note && item.parentId === null) || (!item.note && !item.heading && (filterView === 'checked' ? item.checked : !item.checked))) {
+					if (item.heading || (item.note && item.parentId === null) || (!item.note && !item.heading && (filterView === 'checked' ? isDone(item) : !isDone(item)))) {
 						visibleIds.add(item.id);
 					}
 				}
@@ -325,12 +360,12 @@
 	let selectedIds = $state<Set<string>>(new Set());
 
 	// Count of all checked items (excluding headings and notes)
-	const checkedCount = $derived(items.filter((i) => !i.heading && !i.note && i.checked).length);
-	const uncheckedCount = $derived(items.filter((i) => !i.heading && !i.note && !i.checked).length);
+	const checkedCount = $derived(items.filter((i) => !i.heading && !i.note && isDone(i)).length);
+	const uncheckedCount = $derived(items.filter((i) => !i.heading && !i.note && !isDone(i)).length);
 	// Count of items that "Del checked" would actually delete
 	const delCheckedCount = $derived(
 		selectedIds.size > 0
-			? items.filter((i) => selectedIds.has(i.id) && i.checked).length
+			? items.filter((i) => selectedIds.has(i.id) && isDone(i)).length
 			: checkedCount
 	);
 
@@ -388,7 +423,12 @@
 				const ex: ExportedItem = { id: item.id, name: item.name };
 				if (item.price !== null) ex.price = item.price;
 				if (item.qty !== null) ex.qty = item.qty;
-				if (item.checked) ex.checked = true;
+				if (folderCheckboxes.length > 0) {
+					const names = folderCheckboxes.filter((c) => isChecked(item, c.id)).map((c) => c.name);
+					if (names.length > 0) ex.checkedNames = names;
+				} else if (item.checked) {
+					ex.checked = true;
+				}
 				if (item.heading) ex.heading = true;
 				if (item.note) ex.note = true;
 				if (item.pinned) ex.pinned = true;
@@ -661,15 +701,19 @@
 		const ids = selectedIds.size > 0
 			? [...selectedIds].filter((id) => { const it = items.find((i) => i.id === id); return it && !it.heading && !it.note; })
 			: items.filter((i) => !i.heading && !i.note).map((i) => i.id);
-		setItemsChecked(ids, false);
+		if (folderCheckboxes.length > 0) {
+			clearItemCheckboxes(ids, folderCheckboxes.map((c) => c.id));
+		} else {
+			setItemsChecked(ids, false);
+		}
 		selectedIds = new Set();
 	}
 
 	function bulkDeleteChecked() {
 		const targets =
 			selectedIds.size > 0
-				? items.filter((i) => selectedIds.has(i.id) && i.checked).map((i) => i.id)
-				: items.filter((i) => i.checked).map((i) => i.id);
+				? items.filter((i) => selectedIds.has(i.id) && isDone(i)).map((i) => i.id)
+				: items.filter((i) => isDone(i)).map((i) => i.id);
 		deleteItemsBatch(targets);
 		selectedIds = new Set();
 	}
@@ -799,10 +843,10 @@
 			} else if (isPriced) {
 				const price = item.price !== null ? (item.price).toFixed(2) : '';
 				const qty = item.qty !== null ? String(item.qty) : '1';
-				const done = item.checked ? '✓' : '';
+				const done = doneLabel(item);
 				rows.push(`${done}\t${price}\t${qty}\t${itemName}`);
 			} else {
-				const done = item.checked ? '✓' : '';
+				const done = doneLabel(item);
 				rows.push(`${done}\t${itemName}`);
 			}
 		}
@@ -1180,7 +1224,7 @@
 			<span>Total: <strong>{formatPrice(total)}</strong></span>
 		{/if}
 		<span class="check-counts">✓ {checkedCount} / ✗ {uncheckedCount}</span>
-		{#if items.some((i) => i.checked)}
+		{#if items.some((i) => isDone(i))}
 			<button class="bulk-btn icon-btn" onclick={bulkUncheck} title={selectedIds.size > 0 ? 'Uncheck selected' : 'Uncheck all'} aria-label={selectedIds.size > 0 ? 'Uncheck selected' : 'Uncheck all'}>☐</button>
 		{/if}
 		{#if delCheckedCount > 0}
@@ -1191,7 +1235,7 @@
 				bulkDeleteChecked
 			)} title={selectedIds.size > 0 ? 'Delete selected checked' : 'Delete all checked'} aria-label={selectedIds.size > 0 ? 'Delete selected checked' : 'Delete all checked'}>🗑</button>
 		{/if}
-		{#if items.some((i) => i.checked)}
+		{#if items.some((i) => isDone(i))}
 			<button
 				class="bulk-btn filter-btn"
 				class:filter-active={filterView !== 'all'}
@@ -1232,9 +1276,10 @@
 				{#each allPinnedItems as pItem}
 					{@const inThisList = pItem.listId === listId}
 					{@const pItemList = allLists.find((l) => l.id === pItem.listId)}
+					{@const pItemFolder = allFolders.find((f) => f.id === pItemList?.folderId)}
 					<span
 						class="pin-chip"
-						class:pin-chip-checked={!pItem.heading && !pItem.note && pItem.checked}
+						class:pin-chip-checked={!pItem.heading && !pItem.note && isItemDone(pItem, pItemFolder)}
 						class:pin-chip-foreign={!inThisList}
 					>
 						<button
@@ -1246,7 +1291,7 @@
 						><button
 							class="pin-chip-label"
 							onclick={() => {
-								if (inThisList && !pItem.heading && !pItem.note) toggleCheck(pItem);
+								if (inThisList && !pItem.heading && !pItem.note) toggleDone(pItem);
 								else onOpenList(pItem.listId);
 							}}
 							title={inThisList ? pItem.name : `${pItem.name} — ${pItemList?.name ?? '…'}`}
@@ -1268,6 +1313,34 @@
 				{/each}
 			</div>
 		{/if}
+		{#snippet checkControl(item: Item)}
+			{#if selectionMode}
+				<button
+					class="check-btn sel-check"
+					class:sel-checked={selectedIds.has(item.id)}
+					onclick={() => toggleSelectionItem(item.id)}
+					aria-label={selectedIds.has(item.id) ? 'Deselect' : 'Select'}
+				>{selectedIds.has(item.id) ? '◆' : '◇'}</button>
+			{:else if folderCheckboxes.length > 0}
+				<div class="chip-row">
+					{#each folderCheckboxes as cb}
+						<button
+							class="chip-btn"
+							class:chip-checked={isChecked(item, cb.id)}
+							onclick={() => toggleItemCheckbox(item, cb.id)}
+							title={cb.name}
+							aria-label={`${cb.name}: ${isChecked(item, cb.id) ? 'Uncheck' : 'Check'}`}
+						>{chipLabel(cb.name)}</button>
+					{/each}
+				</div>
+			{:else}
+				<button
+					class="check-btn"
+					onclick={() => toggleCheck(item)}
+					aria-label={item.checked ? 'Uncheck' : 'Check'}
+				>{item.checked ? '☑' : '☐'}</button>
+			{/if}
+		{/snippet}
 		{#each filteredTreeItems as {item, level, tlIdx, rootTlIdx, sibIdx}}
 			{@const canAddChildren = !item.heading && level < 2}
 			{@const linkParts = parseNameParts(item.name)}
@@ -1281,7 +1354,7 @@
 				class:heading={item.heading}
 				class:note={item.note}
 				class:priced-row={isPriced && !item.heading && !item.note}
-				class:checked={item.checked}
+				class:checked={isDone(item)}
 				class:selected={selectedIds.has(item.id)}
 				class:drag-source={touchDragParentKey === parentKey && sibIdx === touchDragFrom}
 				class:drag-above={touchDragParentKey === parentKey && touchDragOver === sibIdx && touchDragFrom !== null && touchDragFrom > sibIdx}
@@ -1334,16 +1407,10 @@
 				{:else if isPriced}
 					<!-- Priced: name wraps top line, controls on bottom line -->
 					<div class="priced-top">
-						<button
-							class="check-btn"
-							class:sel-check={selectionMode}
-							class:sel-checked={selectionMode && selectedIds.has(item.id)}
-							onclick={() => selectionMode ? toggleSelectionItem(item.id) : toggleCheck(item)}
-							aria-label={selectionMode ? (selectedIds.has(item.id) ? 'Deselect' : 'Select') : (item.checked ? 'Uncheck' : 'Check')}
-						>{selectionMode ? (selectedIds.has(item.id) ? '◆' : '◇') : (item.checked ? '☑' : '☐')}</button>
+						{@render checkControl(item)}
 						<button
 							class="item-name"
-							class:strikethrough={item.checked}
+							class:strikethrough={isDone(item)}
 							class:editing={editingId === item.id}
 							onclick={() => selectionMode ? toggleSelectionItem(item.id) : startEditName(item)}
 							onpointerdown={(e) => { if (!selectionMode) onPointerDown(e, item.id); }}
@@ -1380,16 +1447,10 @@
 					</div>
 				{:else}
 					<!-- Plain: single row -->
-					<button
-						class="check-btn"
-						class:sel-check={selectionMode}
-						class:sel-checked={selectionMode && selectedIds.has(item.id)}
-						onclick={() => selectionMode ? toggleSelectionItem(item.id) : toggleCheck(item)}
-						aria-label={selectionMode ? (selectedIds.has(item.id) ? 'Deselect' : 'Select') : (item.checked ? 'Uncheck' : 'Check')}
-					>{selectionMode ? (selectedIds.has(item.id) ? '◆' : '◇') : (item.checked ? '☑' : '☐')}</button>
+					{@render checkControl(item)}
 					<button
 						class="item-name"
-						class:strikethrough={item.checked}
+						class:strikethrough={isDone(item)}
 						class:editing={editingId === item.id}
 						onclick={() => selectionMode ? toggleSelectionItem(item.id) : startEditName(item)}
 						onpointerdown={(e) => { if (!selectionMode) onPointerDown(e, item.id); }}
@@ -1969,6 +2030,30 @@
 	@media (pointer: fine) {
 		/* Mouse/trackpad users: revert to original size */
 		.check-btn { font-size: var(--row-icon-size, 1.4rem); min-width: 44px; }
+	}
+	.chip-row {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 3px;
+		flex-shrink: 0;
+		max-width: 40%;
+	}
+	.chip-btn {
+		background: none;
+		border: 1.5px solid var(--border);
+		border-radius: 6px;
+		font-size: 0.7rem;
+		font-weight: 600;
+		line-height: 1;
+		cursor: pointer;
+		padding: 4px 5px;
+		color: var(--text2);
+		min-width: 22px;
+	}
+	.chip-btn.chip-checked {
+		background: var(--list-color, var(--accent));
+		border-color: var(--list-color, var(--accent));
+		color: #fff;
 	}
 	.item-name {
 		flex: 1;

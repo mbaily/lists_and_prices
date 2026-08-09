@@ -7,7 +7,9 @@
 		readAllItems,
 		isFolderEffectivelyArchived,
 		isListEffectivelyArchived,
-		type Item
+		isItemDone,
+		type Item,
+		type Folder
 	} from '$lib/data';
 	import { getSmartFolders } from '$lib/smartFolders.svelte';
 	import { splitWithTags } from '$lib/tags';
@@ -28,20 +30,20 @@
 			: '';
 	}
 
-	function buildItemTree(allListItems: Item[], parentId: string | null): ItemEntry[] {
+	function buildItemTree(allListItems: Item[], parentId: string | null, folder: Folder | null): ItemEntry[] {
 		return allListItems
 			.filter(
 				(i) =>
 					(i.parentId ?? null) === parentId &&
 					!i.heading &&
-					(!i.checked || i.note)
+					(!isItemDone(i, folder) || i.note)
 			)
 			.sort((a, b) => a.order - b.order)
 			.map((i) => ({
 				name: i.name,
 				date: formatDate(i.createdAt),
 				isNote: i.note,
-				children: buildItemTree(allListItems, i.id)
+				children: buildItemTree(allListItems, i.id, folder)
 			}));
 	}
 
@@ -75,7 +77,7 @@
 				const listItems = allItems.filter((i) => i.listId === list.id);
 				const topItems = listItems
 					.filter(
-						(i) => !i.checked && !i.heading && !i.note && (i.parentId ?? null) === null
+						(i) => !isItemDone(i, folder) && !i.heading && !i.note && (i.parentId ?? null) === null
 					)
 					.sort((a, b) => {
 						const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -86,7 +88,7 @@
 						name: i.name,
 						date: formatDate(i.createdAt),
 						isNote: false,
-						children: buildItemTree(listItems, i.id)
+						children: buildItemTree(listItems, i.id, folder)
 					}));
 				if (topItems.length > 0) {
 					blocks.push({ listName: list.name, listId: list.id, items: topItems });

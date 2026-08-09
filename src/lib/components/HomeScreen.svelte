@@ -23,6 +23,7 @@
 		readSheets,
 		deleteSheet,
 		updateSheet,
+		isItemDone,
 		type Folder,
 		type ListMeta,
 		type SheetMeta,
@@ -42,6 +43,7 @@
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import RowMenu from './RowMenu.svelte';
 	import InfoDialog from './InfoDialog.svelte';
+	import FolderCheckboxesDialog from './FolderCheckboxesDialog.svelte';
 
 	let { onLogout }: { onLogout: () => void } = $props();
 
@@ -114,7 +116,7 @@
 		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 		
 		// Or if a modal/overlay is open
-		if (showSettings || showNewFolder || showNewList || showReportsMenu || infoTarget || sfDialogFolder || renamingId) return;
+		if (showSettings || showNewFolder || showNewList || showReportsMenu || infoTarget || sfDialogFolder || checkboxesFolder || renamingId) return;
 
 		// Modifier keys should not trigger a bind by themselves
 		if (['Control', 'Meta', 'Alt', 'Shift', 'CapsLock'].includes(e.key)) return;
@@ -266,9 +268,10 @@
 				results.push({ kind: 'list', data: list, path: listPath(list) });
 		}
 		for (const item of allItems) {
-			if (searchUncheckedOnly && item.checked) continue;
 			const list = allLists.find(l => l.id === item.listId);
 			if (!list) continue;
+			const folder = allFolders.find(f => f.id === list.folderId);
+			if (searchUncheckedOnly && isItemDone(item, folder)) continue;
 			if (searchUncheckedOnly && list.done) continue;
 			if (item.name.toLowerCase().includes(q)) {
 				results.push({ kind: 'item', data: item, listData: list });
@@ -873,6 +876,7 @@
 
 	// ── Smart folders (reports) ──────────────────────────────────────────────────
 	let sfDialogFolder = $state<Folder | null>(null);
+	let checkboxesFolder = $state<Folder | null>(null);
 	let sfNewName = $state('');
 	let showReportsMenu = $state(false);
 
@@ -924,7 +928,7 @@
 			const blocks: ListBlock[] = [];
 			for (const list of folderLists) {
 				const items = allItemsNow
-					.filter((i) => i.listId === list.id && !i.checked && !i.heading && !i.note)
+					.filter((i) => i.listId === list.id && !isItemDone(i, folder) && !i.heading && !i.note)
 					.sort((a, b) => {
 						const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
 						const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
@@ -1225,9 +1229,10 @@ ${bodyHtml}
 				<span class="pin-label">📍</span>
 				{#each allPinnedItems as pItem}
 					{@const pItemList = allLists.find((l) => l.id === pItem.listId)}
+					{@const pItemFolder = allFolders.find((f) => f.id === pItemList?.folderId)}
 					<button
 						class="pin-chip"
-						class:pin-chip-checked={!pItem.heading && !pItem.note && pItem.checked}
+						class:pin-chip-checked={!pItem.heading && !pItem.note && isItemDone(pItem, pItemFolder)}
 						onclick={() => { openListId = pItem.listId; renamingId = null; }}
 						title={`${pItem.name} — ${pItemList?.name ?? '…'}`}
 					>{pItem.name}<span class="pin-chip-list"> ({pItemList?.name ?? '…'})</span></button>
@@ -1305,9 +1310,11 @@ ${bodyHtml}
 							</span>
 							<span class="result-kind-badge">List</span>
 						{:else}
-							<span class="result-icon">{result.data.checked ? '☑' : '📄'}</span>
+							{@const itemFolder = allFolders.find((f) => f.id === result.listData.folderId)}
+							{@const itemDone = isItemDone(result.data, itemFolder)}
+							<span class="result-icon">{itemDone ? '☑' : '📄'}</span>
 							<span class="result-info">
-								<span class="result-name" class:result-done={result.data.checked}>{#each splitWithTags(result.data.name) as part}{#if part.type === 'tag'}<span class="tag-pill" style="--pill-color:{result.listData.color}">{part.value}</span>{:else}{part.value}{/if}{/each}</span>
+								<span class="result-name" class:result-done={itemDone}>{#each splitWithTags(result.data.name) as part}{#if part.type === 'tag'}<span class="tag-pill" style="--pill-color:{result.listData.color}">{part.value}</span>{:else}{part.value}{/if}{/each}</span>
 								<span class="result-path">{result.listData.name}</span>
 							</span>
 							<span class="result-kind-badge">Item</span>
@@ -1413,6 +1420,7 @@ ${bodyHtml}
 						{ label: '⚙ Folder settings', submenu: [
 							{ label: 'ℹ️ Info', action: () => infoTarget = { kind: 'folder', data: folder } },
 							{ label: '✏ Rename', action: () => startRename(folder.id, folder.name, 'folder', folder.color) },
+							{ label: '☑ Checkboxes', action: () => checkboxesFolder = folder },
 							{ label: folder.localNav ? '🌐 Global navigation' : '📂 Local navigation', action: () => updateFolder(folder.id, { localNav: !folder.localNav }) },
 						]},
 						{ label: '📋 Smart Folder', action: () => { sfDialogFolder = folder; sfNewName = ''; } },
@@ -1582,6 +1590,11 @@ ${bodyHtml}
 					<button class="sf-close" onclick={() => sfDialogFolder = null}>Done</button>
 				</div>
 			</div>
+		{/if}
+
+		<!-- Named checkboxes dialog -->
+		{#if checkboxesFolder !== null}
+			<FolderCheckboxesDialog folder={checkboxesFolder} onClose={() => checkboxesFolder = null} />
 		{/if}
 
 		<!-- Info dialog -->
