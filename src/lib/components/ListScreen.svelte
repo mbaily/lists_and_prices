@@ -81,7 +81,8 @@
 		setItemCheckboxState(item.id, checkboxId, !isChecked(item, checkboxId));
 	}
 	function chipLabel(name: string): string {
-		return name.trim().slice(0, 2).toUpperCase();
+		// Array.from (not .slice) so we don't cut a surrogate pair / emoji in half.
+		return Array.from(name.trim()).slice(0, 2).join('').toUpperCase();
 	}
 	function isDone(item: Item): boolean {
 		return isItemDone(item, currentFolder);
@@ -95,6 +96,15 @@
 		} else {
 			toggleCheck(item);
 		}
+	}
+	/** Converting an item to a heading should clear ALL done-state — including
+	 *  any named-checkbox state — so it doesn't silently reappear if the item
+	 *  is later turned back into a regular item. */
+	function makeHeading(item: Item) {
+		if (folderCheckboxes.length > 0) {
+			clearItemCheckboxes([item.id], folderCheckboxes.map((c) => c.id));
+		}
+		updateItem(item.id, { heading: true, checked: false, price: null, qty: null });
 	}
 	function doneLabel(item: Item): string {
 		if (folderCheckboxes.length > 0) {
@@ -1439,7 +1449,7 @@
 								{ label: '➕ Add Subtask', action: () => { newItemParentId = item.id; newItemIsNote = false; focusInput(); } },
 								{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
 							] : []),
-							...(level === 0 ? [{ label: '📌 Make Heading', action: () => updateItem(item.id, { heading: true, checked: false, price: null, qty: null }) }] : []),
+							...(level === 0 ? [{ label: '📌 Make Heading', action: () => makeHeading(item) }] : []),
 							{ label: '🔗 Tag as Link', action: () => copyRefToClipboard(item.id) },
 							...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItem = item) }] : []),
 							{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
@@ -1466,7 +1476,7 @@
 							{ label: '➕ Add Subtask', action: () => { newItemParentId = item.id; newItemIsNote = false; focusInput(); } },
 							{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
 						] : []),
-						...(level === 0 ? [{ label: '📌 Make Heading', action: () => updateItem(item.id, { heading: true, checked: false, price: null, qty: null }) }] : []),
+						...(level === 0 ? [{ label: '📌 Make Heading', action: () => makeHeading(item) }] : []),
 						{ label: '🔗 Tag as Link', action: () => copyRefToClipboard(item.id) },
 						...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItem = item) }] : []),
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }

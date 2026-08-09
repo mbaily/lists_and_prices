@@ -135,20 +135,25 @@ export function addFolderCheckbox(folderId: string, name: string): string | null
 	return newId;
 }
 
-export function renameFolderCheckbox(folderId: string, checkboxId: string, name: string): void {
+export function renameFolderCheckbox(folderId: string, checkboxId: string, name: string): boolean {
 	const trimmed = name.trim();
-	if (!trimmed) return;
+	if (!trimmed) return false;
 	const doc = getDoc();
+	let ok = false;
 	doc.transact(() => {
 		const m = findYMap(getFolders(doc), folderId);
 		if (!m) return;
 		const current = ((m.get('checkboxes') as FolderCheckbox[] | undefined) ?? []).slice();
 		const idx = current.findIndex((c) => c.id === checkboxId);
 		if (idx === -1) return;
+		// Reject if another checkbox already has this name (case-insensitive).
+		if (current.some((c, i) => i !== idx && c.name.toLowerCase() === trimmed.toLowerCase())) return;
 		current[idx] = { ...current[idx], name: trimmed };
 		m.set('checkboxes', current);
 		m.set('updatedAt', new Date().toISOString());
+		ok = true;
 	});
+	return ok;
 }
 
 /** Removes a named checkbox from a folder's config. Per-item checked state for
@@ -592,7 +597,7 @@ export function createItemsFromExport(listId: string, exportedItems: ExportedIte
 			if (Object.keys(patch).length > 0) updateItem(newId, patch);
 			if (ex.checkedNames && ex.checkedNames.length > 0 && checkboxes.length > 0) {
 				for (const name of ex.checkedNames) {
-					const box = checkboxes.find((c) => c.name === name);
+					const box = checkboxes.find((c) => c.name.toLowerCase() === name.toLowerCase());
 					if (box) setItemCheckboxState(newId, box.id, true);
 				}
 			}
