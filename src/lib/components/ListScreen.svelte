@@ -1080,13 +1080,13 @@
 			<button class="type-btn" onclick={() => showHeaderMenu = !showHeaderMenu} aria-label="More options">⋮</button>
 			{#if showHeaderMenu}
 				<div class="header-menu" role="menu">
-					<button role="menuitem" onclick={() => { showHeaderMenu = false; toggleType(); }}>{isPriced ? '📋 Switch to plain list' : '💰 Switch to priced list'}</button>
 					<button role="menuitem" onclick={enterSelectionMode}>☑ Select items</button>
+					<button role="menuitem" onclick={() => { showHeaderMenu = false; exportToClipboard(); }}>📤 Export to clipboard (JSON)</button>
+					<button role="menuitem" onclick={() => { showHeaderMenu = false; importFromClipboard(); }}>📥 Import from clipboard</button>
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsTSV(); }}>📋 Copy as spreadsheet</button>
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsJournal(); }}>📓 Copy as journal</button>
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; toggleJournalMode(); }}>{journalMode ? '🗓 Hide dates (journal mode)' : '🗓 Show dates (journal mode)'}</button>
-					<button role="menuitem" onclick={() => { showHeaderMenu = false; exportToClipboard(); }}>📤 Export to clipboard (JSON)</button>
-					<button role="menuitem" onclick={() => { showHeaderMenu = false; importFromClipboard(); }}>📥 Import from clipboard</button>
+					<button role="menuitem" onclick={() => { showHeaderMenu = false; toggleType(); }}>{isPriced ? '📋 Switch to plain list' : '💰 Switch to priced list'}</button>
 				</div>
 			{/if}
 		</div>
