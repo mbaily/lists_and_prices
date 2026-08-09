@@ -87,6 +87,16 @@
 	function isDone(item: Item): boolean {
 		return isItemDone(item, currentFolder);
 	}
+	/** Whether ANY checkbox is checked on this item — used for "is there
+	 *  anything to uncheck" (bulkUncheck clears every named checkbox, not just
+	 *  the done-determining last one, so its visibility must match that, not
+	 *  isDone()). */
+	function hasAnyChecked(item: Item): boolean {
+		if (folderCheckboxes.length > 0) {
+			return folderCheckboxes.some((c) => isChecked(item, c.id));
+		}
+		return item.checked;
+	}
 	/** Quick "mark done" toggle used where there's no room for individual chips
 	 *  (e.g. the pinned-items bar) — toggles the last (done-determining) named
 	 *  checkbox, or the legacy checked flag if the folder has none configured. */
@@ -1234,7 +1244,7 @@
 			<span>Total: <strong>{formatPrice(total)}</strong></span>
 		{/if}
 		<span class="check-counts">✓ {checkedCount} / ✗ {uncheckedCount}</span>
-		{#if items.some((i) => isDone(i))}
+		{#if items.some((i) => hasAnyChecked(i))}
 			<button class="bulk-btn icon-btn" onclick={bulkUncheck} title={selectedIds.size > 0 ? 'Uncheck selected' : 'Uncheck all'} aria-label={selectedIds.size > 0 ? 'Uncheck selected' : 'Uncheck all'}>☐</button>
 		{/if}
 		{#if delCheckedCount > 0}
