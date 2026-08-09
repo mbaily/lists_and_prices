@@ -41,7 +41,7 @@ export interface FolderCheckbox {
 	name: string;
 }
 
-const MAX_FOLDER_CHECKBOXES = 8;
+export const MAX_FOLDER_CHECKBOXES = 8;
 
 export function readFolders(): Folder[] {
 	return (getFolders(getDoc()).toArray() as Y.Map<unknown>[]).map(yMapToFolder);
@@ -116,8 +116,14 @@ export function updateFolder(id: string, patch: Partial<Omit<Folder, 'id' | 'cre
 // never as a single JSON blob, so concurrent offline edits to different names
 // merge safely instead of one overwriting the other.
 
+/** Tabs/newlines would corrupt the TSV export's column alignment, so they're
+ *  collapsed to spaces; length is capped as a defensive limit. */
+function sanitizeCheckboxName(name: string): string {
+	return name.replace(/[\t\r\n]+/g, ' ').trim().slice(0, 40);
+}
+
 export function addFolderCheckbox(folderId: string, name: string): string | null {
-	const trimmed = name.trim();
+	const trimmed = sanitizeCheckboxName(name);
 	if (!trimmed) return null;
 	const doc = getDoc();
 	let newId: string | null = null;
@@ -136,7 +142,7 @@ export function addFolderCheckbox(folderId: string, name: string): string | null
 }
 
 export function renameFolderCheckbox(folderId: string, checkboxId: string, name: string): boolean {
-	const trimmed = name.trim();
+	const trimmed = sanitizeCheckboxName(name);
 	if (!trimmed) return false;
 	const doc = getDoc();
 	let ok = false;
