@@ -20,7 +20,11 @@ let _doc: Y.Doc | null = null;
 let _wsProvider: WebsocketProvider | null = null;
 let _idbProvider: IndexeddbPersistence | null = null;
 
+let _historicalDoc: Y.Doc | null = null;
+
 export const syncState = $state<{ status: SyncStatus }>({ status: 'offline' });
+export const commitState = $state<{ isHistorical: boolean, commitId: string | null }>({ isHistorical: false, commitId: null });
+
 
 /** Increments on every Yjs doc update — derive from this to re-read data reactively. */
 export const docState = $state<{ version: number }>({ version: 0 });
@@ -32,7 +36,7 @@ export function initYjs(username: string, wsUrl: string) {
 
 	if (_doc) destroyYjs();
 
-	const doc = new Y.Doc();
+	const doc = new Y.Doc({ gc: false });
 	_doc = doc;
 
 	idbSynced.done = false;
@@ -68,6 +72,7 @@ export function initYjs(username: string, wsUrl: string) {
 }
 
 export function getDoc(): Y.Doc {
+	if (_historicalDoc) return _historicalDoc;
 	if (!_doc) throw new Error('Yjs not initialised');
 	return _doc;
 }
@@ -76,12 +81,16 @@ export function destroyYjs() {
 	_wsProvider?.destroy();
 	_idbProvider?.destroy();
 	_doc?.destroy();
+	_historicalDoc?.destroy();
 	_doc = null;
+	_historicalDoc = null;
 	_wsProvider = null;
 	_idbProvider = null;
 	syncState.status = 'offline';
 	docState.version = 0;
 	idbSynced.done = false;
+	commitState.isHistorical = false;
+	commitState.commitId = null;
 }
 
 export function reconnectYjs() {
@@ -89,6 +98,62 @@ export function reconnectYjs() {
 	// returning from background/offline where the connection drops.
 	_wsProvider?.disconnect();
 	_wsProvider?.connect();
+}
+
+// ─── Commits / Snapshots ────────────────────────────────────────────────────────
+
+export interface Commit {
+	id: string;
+	name: string;
+	createdAt: string;
+	snapshot: Uint8Array;
+}
+
+export function createCommit(name: string) {
+	if (!_doc) return;
+	const snapshot = Y.snapshot(_doc);
+	const snapshotBytes = Y.encodeSnapshot(snapshot);
+
+	const commits = _doc.getArray('commits');
+	const commitObj = new Y.Map();
+	commitObj.set('id', crypto.randomUUID());
+	commitObj.set('name', name);
+	commitObj.set('createdAt', new Date().toISOString());
+	commitObj.set('snapshot', snapshotBytes);
+
+	commits.insert(0, [commitObj]); // Add to front
+	docState.version++; // Trigger re-render
+}
+
+export function readCommits(): Commit[] {
+	if (!_doc) return [];
+	return _doc.getArray('commits').toArray().map((m: any) => ({
+		id: m.get('id'),
+		name: m.get('name'),
+		createdAt: m.get('createdAt'),
+		snapshot: m.get('snapshot')
+	}));
+}
+
+export function viewCommit(commitId: string) {
+	if (!_doc) return;
+	const commits = readCommits();
+	const commit = commits.find(c => c.id === commitId);
+	if (!commit) return;
+
+	const snap = Y.decodeSnapshot(commit.snapshot);
+	_historicalDoc = Y.createDocFromSnapshot(_doc, snap);
+	commitState.isHistorical = true;
+	commitState.commitId = commitId;
+	docState.version++;
+}
+
+export function exitCommitView() {
+	_historicalDoc?.destroy();
+	_historicalDoc = null;
+	commitState.isHistorical = false;
+	commitState.commitId = null;
+	docState.version++;
 }
 
 // ─── Data shape helpers ────────────────────────────────────────────────────────

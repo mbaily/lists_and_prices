@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { docState } from '$lib/yjsStore.svelte';
+	import { docState, commitState } from '$lib/yjsStore.svelte';
 	import { onDestroy, tick, untrack } from 'svelte';
 	import {
 		readItems,
@@ -1133,27 +1133,35 @@
 		<button
 			class="list-fav-btn"
 			class:active={listMeta?.favourite}
-			onclick={() => listMeta && updateList(listId, { favourite: !listMeta.favourite })}
+			onclick={() => { if (listMeta && !commitState.isHistorical) updateList(listId, { favourite: !listMeta.favourite }); }}
 			aria-label={listMeta?.favourite ? 'Unfavourite list' : 'Favourite list'}
 			title={listMeta?.favourite ? 'Unfavourite list' : 'Favourite list'}
+			style={commitState.isHistorical ? 'cursor: default' : ''}
 		>★</button>
 		<button
 			class="list-done-btn"
-			onclick={() => listMeta && updateList(listId, { done: !listMeta.done })}
+			onclick={() => { if (listMeta && !commitState.isHistorical) updateList(listId, { done: !listMeta.done }); }}
 			aria-label={listMeta?.done ? 'Mark list incomplete' : 'Mark list complete'}
 			title={listMeta?.done ? 'Mark list incomplete' : 'Mark list complete'}
+			style={commitState.isHistorical ? 'cursor: default; opacity: 0.7' : ''}
 		>{listMeta?.done ? '☑' : '☐'}</button>
 		<div class="header-menu-wrap">
 			<button class="type-btn" onclick={() => showHeaderMenu = !showHeaderMenu} aria-label="More options">⋮</button>
 			{#if showHeaderMenu}
 				<div class="header-menu" role="menu">
+					{#if !commitState.isHistorical}
 					<button role="menuitem" onclick={enterSelectionMode}>☑ Select items</button>
+					{/if}
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; exportToClipboard(); }}>📤 Export to clipboard (JSON)</button>
+					{#if !commitState.isHistorical}
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; importFromClipboard(); }}>📥 Import from clipboard</button>
+					{/if}
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsTSV(); }}>📋 Copy as spreadsheet</button>
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsJournal(); }}>📓 Copy as journal</button>
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; toggleJournalMode(); }}>{journalMode ? '🗓 Hide dates (journal mode)' : '🗓 Show dates (journal mode)'}</button>
+					{#if !commitState.isHistorical}
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; toggleType(); }}>{isPriced ? '📋 Switch to plain list' : '💰 Switch to priced list'}</button>
+					{/if}
 				</div>
 			{/if}
 		</div>
@@ -1176,7 +1184,7 @@
 	{/if}
 
 	<!-- Universal input bar: always present so iOS keyboard opens at a fixed position -->
-	{#if (!pricingItemId && !qtyItemId) || !isPriced}
+	{#if !commitState.isHistorical && ((!pricingItemId && !qtyItemId) || !isPriced)}
 		<div class="universal-bar">
 			<!-- form fires submit on iOS keyboard return/tick, more reliable than keydown -->
 			<form
@@ -1249,15 +1257,19 @@
 		{/if}
 		<span class="check-counts">✓ {checkedCount} / ✗ {uncheckedCount}</span>
 		{#if items.some((i) => hasAnyChecked(i))}
+			{#if !commitState.isHistorical}
 			<button class="bulk-btn icon-btn" onclick={bulkUncheck} title={selectedIds.size > 0 ? 'Uncheck selected' : 'Uncheck all'} aria-label={selectedIds.size > 0 ? 'Uncheck selected' : 'Uncheck all'}>☐</button>
+			{/if}
 		{/if}
 		{#if delCheckedCount > 0}
+			{#if !commitState.isHistorical}
 			<button class="bulk-btn icon-btn danger" onclick={() => askDelete(
 				selectedIds.size > 0
 					? `Delete ${delCheckedCount} checked item(s)?`
 					: `Delete all ${checkedCount} checked item(s)?`,
 				bulkDeleteChecked
 			)} title={selectedIds.size > 0 ? 'Delete selected checked' : 'Delete all checked'} aria-label={selectedIds.size > 0 ? 'Delete selected checked' : 'Delete all checked'}>🗑</button>
+			{/if}
 		{/if}
 		{#if items.some((i) => isDone(i))}
 			<button
@@ -1306,13 +1318,14 @@
 						class:pin-chip-checked={!pItem.heading && !pItem.note && isItemDone(pItem, pItemFolder)}
 						class:pin-chip-foreign={!inThisList}
 					>
+						{#if !commitState.isHistorical}
 						<button
 							class="pin-chip-unpin"
 							onclick={() => askDelete(`Unpin "${pItem.name}"?`, () => updateItem(pItem.id, { pinned: false }), 'Unpin')}
 							title="Unpin"
 							aria-label="Unpin"
 						>📍</button
-						><button
+						>{/if}<button
 							class="pin-chip-label"
 							onclick={() => {
 								if (inThisList && !pItem.heading && !pItem.note) toggleDone(pItem);
@@ -1344,7 +1357,17 @@
 			</div>
 		{/if}
 		{#snippet checkControl(item: Item)}
-			{#if selectionMode}
+			{#if commitState.isHistorical}
+				{#if folderCheckboxes.length > 0}
+					<div class="chip-row">
+						{#each folderCheckboxes as cb}
+							<button class="chip-btn" class:chip-checked={isChecked(item, cb.id)} title={cb.name} style="cursor: default; opacity: 0.7" aria-label={cb.name} disabled>{chipLabel(cb.name)}</button>
+						{/each}
+					</div>
+				{:else}
+					<button class="check-btn" style="cursor: default; opacity: 0.7" disabled>{item.checked ? '☑' : '☐'}</button>
+				{/if}
+			{:else if selectionMode}
 				<button
 					class="check-btn sel-check"
 					class:sel-checked={selectedIds.has(item.id)}
@@ -1401,6 +1424,7 @@
 						class:editing={editingId === item.id}
 						onclick={() => { if (!selectionMode) startEditName(item); }}
 					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}</button>
+					{#if !commitState.isHistorical}
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoItem = item },
@@ -1410,6 +1434,7 @@
 						...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItem = item) }] : []),
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 					]} />
+					{/if}
 				{:else if item.note}
 					<!-- Note: no checkbox, italic text -->
 					<span class="note-icon">📝</span>
@@ -1422,6 +1447,7 @@
 						onpointerup={cancelLongPress}
 						onpointercancel={cancelLongPress}
 					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}</button>
+					{#if !commitState.isHistorical}
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoItem = item },
@@ -1434,6 +1460,7 @@
 						...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItem = item) }] : []),
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 					]} />
+					{/if}
 				{:else if isPriced}
 					<!-- Priced: name wraps top line, controls on bottom line -->
 					<div class="priced-top">
@@ -1461,6 +1488,7 @@
 							onclick={() => { if (!selectionMode) { qtyItemId === item.id ? commitQty() : startEditQty(item); } }}
 							title="Quantity"
 						>×{qtyItemId === item.id ? (qtyBuffer || '1') : (item.qty ?? 1)}</button>
+						{#if !commitState.isHistorical}
 						<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 						<RowMenu items={[
 							{ label: 'ℹ️ Info', action: () => infoItem = item },
@@ -1474,6 +1502,7 @@
 							...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItem = item) }] : []),
 							{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 						]} />
+						{/if}
 					</div>
 				{:else}
 					<!-- Plain: single row -->
@@ -1488,6 +1517,7 @@
 						onpointerup={cancelLongPress}
 						onpointercancel={cancelLongPress}
 					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}</button>
+					{#if !commitState.isHistorical}
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoItem = item },
@@ -1501,6 +1531,7 @@
 						...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItem = item) }] : []),
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 					]} />
+					{/if}
 				{/if}
 				{#if journalMode && item.createdAt && !item.heading}
 					<div class="journal-date">{formatJournalDate(item.createdAt)}</div>
@@ -1511,7 +1542,7 @@
 
 	<!-- Floating + / ✕ button: add item when idle; cancel when typing -->
 	<!-- Position depends on handedness: left-handed = right side, right-handed = left side -->
-	{#if (!pricingItemId && !qtyItemId) || !isPriced}
+	{#if !commitState.isHistorical && ((!pricingItemId && !qtyItemId) || !isPriced)}
 		{#if universalValue.trim()}
 			<!-- Cancel: discard typed text / revert edit -->
 			<button
@@ -1537,7 +1568,7 @@
 	{/if}
 
 	<!-- Floating green confirm button: opposite side to +/✕ button -->
-	{#if universalValue.trim()}
+	{#if !commitState.isHistorical && universalValue.trim()}
 		<button
 			class="fab fab-confirm"
 			class:fab-left={settings.handedness !== 'right'}

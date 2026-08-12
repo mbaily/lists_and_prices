@@ -29,7 +29,7 @@
 		type SheetMeta,
 		type Item
 	} from '$lib/data';
-	import { syncState, docState, idbSynced } from '$lib/yjsStore.svelte';
+	import { syncState, docState, idbSynced, commitState, readCommits, viewCommit, createCommit, exitCommitView, type Commit } from '$lib/yjsStore.svelte';
 	import { auth } from '$lib/auth.svelte';
 	import { settings, updateSettings } from '$lib/settings.svelte';
 	import { getSmartFolders, assignToReport, removeFromReport, deleteReport } from '$lib/smartFolders.svelte';
@@ -82,6 +82,8 @@
 	let openListId = $state<string | null>(_init.openListId);
 	let openItemId = $state<string | null>(null);
 	let showSettings = $state(false);
+	let showCommitsModal = $state(false);
+	let newCommitName = $state('');
 
 	let cursorMemory = $state<Record<string, string>>(
 		(typeof sessionStorage !== 'undefined')
@@ -1127,6 +1129,12 @@ ${bodyHtml}
 	<div class="screen">
 		<!-- Header -->
 		<header>
+			{#if commitState.isHistorical}
+				<div class="historical-banner">
+					<span class="historical-label">Viewing Historical Commit</span>
+					<button class="historical-exit" onclick={exitCommitView}>Exit</button>
+				</div>
+			{/if}
 			<div class="header-left">
 				<div class="breadcrumb">
 					<!-- Home icon always first -->
@@ -1190,6 +1198,7 @@ ${bodyHtml}
 						{/if}
 					</div>
 				{/if}
+				<button class="icon-btn" onclick={() => (showCommitsModal = true)} aria-label="Version History">🕒</button>
 				<SWBadge />
 				<SyncBadge status={syncState.status} />
 				<button class="icon-btn" onclick={() => (showSettings = true)} aria-label="Settings">
@@ -1335,7 +1344,7 @@ ${bodyHtml}
 				{#if breadcrumb.length > 1}
 					<button class="nav-up" onclick={() => (breadcrumb = breadcrumb.slice(0, -1))}>↑ Up</button>
 				{/if}
-				{#if !isInArchiveView}
+				{#if !isInArchiveView && !commitState.isHistorical}
 					<button class="nav-action" onclick={() => (showNewFolder = true)}>+ Folder</button>
 					{#if currentFolderId}
 						<button class="nav-action" onclick={() => openNewList()}>+ List</button>
@@ -1389,7 +1398,7 @@ ${bodyHtml}
 				style="--row-color:{folder.color}"
 			>
 				{#if !isPathThrough}
-					<button class="check-circle" onclick={() => updateFolder(folder.id, { done: !folder.done })} aria-label={folder.done ? 'Unmark complete' : 'Mark complete'}>
+					<button class="check-circle" onclick={() => { if (!commitState.isHistorical) updateFolder(folder.id, { done: !folder.done }); }} aria-label={folder.done ? 'Unmark complete' : 'Mark complete'} style={commitState.isHistorical ? 'cursor: default; opacity: 0.7' : ''}>
 						{folder.done ? '☑' : '☐'}
 					</button>
 				{/if}
@@ -1419,9 +1428,11 @@ ${bodyHtml}
 					<button
 						class="fav-btn"
 						class:active={folder.favourite}
-						onclick={() => updateFolder(folder.id, { favourite: !folder.favourite })}
+						onclick={() => { if (!commitState.isHistorical) updateFolder(folder.id, { favourite: !folder.favourite }); }}
 						aria-label={folder.favourite ? 'Unfavourite' : 'Favourite'}
+						style={commitState.isHistorical ? 'cursor: default' : ''}
 					>★</button>
+					{#if !commitState.isHistorical}
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'folder', i)}>☰</button>
 					<RowMenu items={[
 						{ label: '⚙ Folder settings', submenu: [
@@ -1444,6 +1455,7 @@ ${bodyHtml}
 							: [{ label: '🏷 Tag (to move)', action: () => tagFolder(folder.id) }]),
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete folder "${folder.name}" and all its contents?`, () => deleteFolder(folder.id)) }
 					]} />
+					{/if}
 				{/if}
 			</div>
 		{/each}
@@ -1469,12 +1481,14 @@ ${bodyHtml}
 					<div style="flex: 1; text-align: center; font-size: 0.85em; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted, #888); pointer-events: none;">
 						{list.name}
 					</div>
+					{#if !commitState.isHistorical}
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'list', i)}>☰</button>
 					<RowMenu items={[
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete divider?`, () => deleteList(list.id)) }
 					]} />
+					{/if}
 				{:else}
-					<button class="check-circle" onclick={() => updateList(list.id, { done: !list.done })} aria-label={list.done ? 'Unmark complete' : 'Mark complete'}>
+					<button class="check-circle" onclick={() => { if (!commitState.isHistorical) updateList(list.id, { done: !list.done }); }} aria-label={list.done ? 'Unmark complete' : 'Mark complete'} style={commitState.isHistorical ? 'cursor: default; opacity: 0.7' : ''}>
 						{list.done ? '☑' : '☐'}
 					</button>
 					{#if renamingId === list.id}
@@ -1499,9 +1513,11 @@ ${bodyHtml}
 					<button
 						class="fav-btn"
 						class:active={list.favourite}
-						onclick={() => updateList(list.id, { favourite: !list.favourite })}
+						onclick={() => { if (!commitState.isHistorical) updateList(list.id, { favourite: !list.favourite }); }}
 						aria-label={list.favourite ? 'Unfavourite' : 'Favourite'}
+						style={commitState.isHistorical ? 'cursor: default' : ''}
 					>★</button>
+					{#if !commitState.isHistorical}
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'list', i)}>☰</button>
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoTarget = { kind: 'list', data: list } },
@@ -1513,6 +1529,7 @@ ${bodyHtml}
 							: [{ label: '🏷 Tag (to move)', action: () => tagList(list.id) }]),
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete list "${list.name}"?`, () => deleteList(list.id)) }
 					]} />
+					{/if}
 				{/if}
 			</div>
 		{/each}
@@ -1535,17 +1552,48 @@ ${bodyHtml}
 			>
 				<span class="sheet-icon">📊</span>
 				<button class="row-name" onclick={() => openSheetId = sheet.id}>{sheet.name}</button>
+				{#if !commitState.isHistorical}
 				<RowMenu items={[
 					{ label: 'ℹ️ Info', action: () => infoTarget = { kind: 'sheet', data: sheet } },
 					{ label: '✏ Rename', action: () => startRename(sheet.id, sheet.name, 'sheet') },
 					{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete spreadsheet "${sheet.name}"? All data will be lost.`, () => deleteSheet(sheet.id)) }
 				]} />
+				{/if}
 			</div>
 		{/each}
 
 
 
 
+
+		<!-- Commits Modal -->
+		{#if showCommitsModal}
+			<div class="modal-backdrop" onclick={(e) => { if (e.target === e.currentTarget) showCommitsModal = false; }}>
+				<div class="commits-modal">
+					<h2>Version History</h2>
+					<div class="commits-list">
+						{#each readCommits() as commit}
+							<div class="commit-row">
+								<div class="commit-info">
+									<div class="commit-name">{commit.name}</div>
+									<div class="commit-date">{fmtDate(commit.createdAt)}</div>
+								</div>
+								<button class="commit-view-btn" onclick={() => { viewCommit(commit.id); showCommitsModal = false; }}>View</button>
+							</div>
+						{:else}
+							<div class="commits-empty">No commits yet.</div>
+						{/each}
+					</div>
+					{#if !commitState.isHistorical}
+						<div class="commits-new">
+							<input placeholder="Commit name..." bind:value={newCommitName} onkeydown={(e) => { if (e.key === 'Enter' && newCommitName.trim()) { createCommit(newCommitName.trim()); newCommitName = ''; } }} />
+							<button onclick={() => { if (newCommitName.trim()) { createCommit(newCommitName.trim()); newCommitName = ''; } }}>Commit</button>
+						</div>
+					{/if}
+					<button class="commits-close" onclick={() => (showCommitsModal = false)}>Close</button>
+				</div>
+			</div>
+		{/if}
 
 		<!-- Confirm dialog -->
 		{#if confirmAction}
@@ -2555,5 +2603,113 @@ ${bodyHtml}
 		cursor: pointer;
 		color: var(--text);
 		margin-top: 0.25rem;
+	}
+
+	/* ── Commits / History ─────────────────────────────────────────────────── */
+	.historical-banner {
+		background: #ef4444;
+		color: #fff;
+		padding: 0.5rem 1rem;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		font-size: 0.9rem;
+		font-weight: 600;
+	}
+	.historical-exit {
+		background: #fff;
+		color: #ef4444;
+		border: none;
+		border-radius: 6px;
+		padding: 0.25rem 0.75rem;
+		font-weight: 700;
+		cursor: pointer;
+	}
+	.commits-modal {
+		background: var(--bg);
+		border-radius: 16px;
+		padding: 1.5rem;
+		max-width: 400px;
+		width: 100%;
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+		max-height: 80vh;
+	}
+	.commits-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		overflow-y: auto;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 0.5rem;
+		background: var(--bg2);
+	}
+	.commits-empty {
+		padding: 1rem;
+		text-align: center;
+		color: var(--text2);
+		font-style: italic;
+	}
+	.commit-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 0.5rem;
+		background: var(--bg);
+		border-radius: 6px;
+		border: 1px solid var(--border);
+	}
+	.commit-info {
+		display: flex;
+		flex-direction: column;
+	}
+	.commit-name {
+		font-weight: 600;
+		font-size: 0.95rem;
+	}
+	.commit-date {
+		font-size: 0.75rem;
+		color: var(--text2);
+	}
+	.commit-view-btn {
+		background: var(--accent);
+		color: #fff;
+		border: none;
+		border-radius: 6px;
+		padding: 0.4rem 0.8rem;
+		cursor: pointer;
+		font-size: 0.85rem;
+	}
+	.commits-new {
+		display: flex;
+		gap: 0.5rem;
+	}
+	.commits-new input {
+		flex: 1;
+		padding: 0.6rem;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--bg2);
+		color: var(--text);
+	}
+	.commits-new button {
+		background: var(--accent);
+		color: #fff;
+		border: none;
+		border-radius: 8px;
+		padding: 0 1rem;
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.commits-close {
+		background: var(--bg3);
+		color: var(--text);
+		border: none;
+		border-radius: 8px;
+		padding: 0.7rem;
+		font-weight: 600;
+		cursor: pointer;
 	}
 </style>
