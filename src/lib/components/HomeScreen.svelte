@@ -31,7 +31,7 @@
 	} from '$lib/data';
 	import { syncState, docState, idbSynced } from '$lib/yjsStore.svelte';
 	import { auth } from '$lib/auth.svelte';
-	import { settings } from '$lib/settings.svelte';
+	import { settings, updateSettings } from '$lib/settings.svelte';
 	import { getSmartFolders, assignToReport, removeFromReport, deleteReport } from '$lib/smartFolders.svelte';
 	import { extractTags, splitWithTags } from '$lib/tags';
 	import ListScreen from './ListScreen.svelte';
@@ -1242,21 +1242,28 @@ ${bodyHtml}
 
 		<!-- Favourites bar -->
 		{#if favouriteLists.length > 0 || favouriteFolders.length > 0}
-			<div class="fav-bar">
-				<span class="fav-label">★</span>
+			<div class="fav-bar" class:fav-bar-collapsed={settings.favouritesCollapsed}>
+				<button
+					class="fav-label"
+					onclick={() => updateSettings({ favouritesCollapsed: !settings.favouritesCollapsed })}
+					aria-label={settings.favouritesCollapsed ? 'Expand favourites' : 'Collapse favourites'}
+					title={settings.favouritesCollapsed ? 'Expand favourites' : 'Collapse favourites'}
+				>★</button>
 				{#each favouriteFolders as fav}
 					<button
 						class="fav-chip"
 						style="--chip-color:{fav.color}"
+						title={folderPath(fav)}
 						onclick={() => { breadcrumb = [null, ...ancestorIds(fav), fav.id]; openListId = null; renamingId = null; }}
-					>📁 {folderPath(fav)}</button>
+					>📁 {settings.favouritesCollapsed ? fav.name : folderPath(fav)}</button>
 				{/each}
 				{#each favouriteLists as fav}
 					<button
 						class="fav-chip"
 						style="--chip-color:{fav.color}"
+						title={listPath(fav)}
 						onclick={() => { openListId = fav.id; renamingId = null; }}
-					>{listPath(fav)}</button>
+					>{settings.favouritesCollapsed ? fav.name : listPath(fav)}</button>
 				{/each}
 			</div>
 		{/if}
@@ -1898,10 +1905,16 @@ ${bodyHtml}
 		border-bottom: 1px solid var(--border);
 	}
 	.fav-label {
+		background: none;
+		border: none;
 		color: #f59e0b;
 		font-size: 1rem;
 		flex-shrink: 0;
+		cursor: pointer;
+		padding: 0.1rem 0.2rem;
+		line-height: 1;
 	}
+	.fav-label:hover { opacity: 0.75; }
 	.fav-chip {
 		background: none;
 		border: 1px solid var(--chip-color, var(--accent));
@@ -1914,8 +1927,14 @@ ${bodyHtml}
 		overflow: hidden;
 		text-overflow: ellipsis;
 		max-width: 200px;
+		transition: max-width 0.15s ease;
 	}
 	.fav-chip:hover { background: color-mix(in srgb, var(--chip-color) 12%, transparent); }
+	.fav-bar-collapsed .fav-chip {
+		max-width: 90px;
+		padding: 0.15rem 0.5rem;
+		font-size: 0.78rem;
+	}
 	/* ── Tags bar ───────────────────────────────────────────────────────────────── */
 	.tags-bar {
 		display: flex;
