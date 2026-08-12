@@ -1198,7 +1198,13 @@ ${bodyHtml}
 						{/if}
 					</div>
 				{/if}
-				<button class="icon-btn" onclick={() => (showCommitsModal = true)} aria-label="Version History">🕒</button>
+				<button class="icon-btn" onclick={() => {
+					showCommitsModal = true;
+					newCommitName = new Date().toLocaleString(undefined, {
+						day: 'numeric', month: 'short', year: 'numeric',
+						hour: '2-digit', minute: '2-digit', second: '2-digit'
+					});
+				}} aria-label="Version History">🕒</button>
 				<SWBadge />
 				<SyncBadge status={syncState.status} />
 				<button class="icon-btn" onclick={() => (showSettings = true)} aria-label="Settings">
