@@ -1746,9 +1746,14 @@ ${bodyHtml}
 		display: flex;
 		align-items: center;
 		gap: 0.25rem;
-		flex-wrap: wrap;
+		flex-wrap: nowrap;
+		flex-shrink: 1;
+		min-width: 0;
+		overflow-x: auto;
+		scrollbar-width: none;
 		font-size: 1rem;
 	}
+	.breadcrumb::-webkit-scrollbar { display: none; }
 	.crumb {
 		background: none;
 		border: none;
@@ -1756,14 +1761,21 @@ ${bodyHtml}
 		cursor: pointer;
 		padding: 0;
 		font-size: inherit;
+		white-space: nowrap;
+		flex-shrink: 0;
 	}
 	.crumb.current {
 		color: var(--text);
 		font-weight: 600;
 		cursor: default;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 160px;
+		display: inline-block;
+		vertical-align: bottom;
 	}
 	.home-crumb { font-size: 1.25rem; }
-	.sep { color: var(--text2); }
+	.sep { color: var(--text2); flex-shrink: 0; }
 
 	/* Sheet row */
 	.sheet-row { gap: 0.5rem; }

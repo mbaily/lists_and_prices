@@ -1620,10 +1620,14 @@
 		display: flex;
 		align-items: center;
 		gap: 0.25rem;
-		flex-wrap: wrap;
+		flex-wrap: nowrap;
+		flex-shrink: 1;
 		font-size: 1rem;
 		min-width: 0;
+		overflow-x: auto;
+		scrollbar-width: none;
 	}
+	.breadcrumb::-webkit-scrollbar { display: none; }
 	.crumb {
 		background: none;
 		border: none;
@@ -1632,6 +1636,7 @@
 		padding: 0;
 		font-size: inherit;
 		white-space: nowrap;
+		flex-shrink: 0;
 	}
 	.crumb.current {
 		color: var(--text);
@@ -1640,10 +1645,11 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		max-width: 180px;
+		max-width: 160px;
 		display: inline-block;
+		vertical-align: bottom;
 	}
-	.sep { color: var(--text2); }
+	.sep { color: var(--text2); flex-shrink: 0; }
 	/* ── Pinned items bar ───────────────────────────────────────────────────── */
 	/* Lives inside .item-list before fav-bar — scrolls away naturally */
 	.pin-bar {
