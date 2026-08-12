@@ -1113,6 +1113,7 @@
 <div class="screen" bind:this={screenEl} class:has-keypad={(pricingItemId || qtyItemId) && isPriced} style="--list-color:{listMeta?.color ?? 'var(--text)'}">
 	<!-- Header -->
 	<header>
+		<div class="header-row1">
 		<button class="home-btn" onclick={onHome} aria-label="Home">🏠</button>
 		<div class="breadcrumb">
 			{#each breadcrumbItems as crumb, i}
@@ -1127,6 +1128,8 @@
 		{#if savedSearch && onRestoreSearch}
 			<button class="crumb search-crumb" onclick={onRestoreSearch} title="Back to search results">🔍 "{savedSearch}"</button>
 		{/if}
+		</div>
+		<div class="header-row2">
 		<button
 			class="list-fav-btn"
 			class:active={listMeta?.favourite}
@@ -1162,6 +1165,7 @@
 					<button class="nav-btn" onclick={() => navTo(1)} aria-label="Next list">›</button>
 				</div>
 			{/if}
+		</div>
 		</div>
 	</header>
 
@@ -1615,6 +1619,23 @@
 		background: var(--bg2);
 		border-bottom: 1px solid var(--border);
 		flex-shrink: 0;
+	}
+	/* On wide screens the two "rows" are invisible wrappers — their children
+	   flow as direct flex items of <header>, same as before this was added. */
+	.header-row1, .header-row2 { display: contents; }
+	/* On narrow (mobile) screens, give the breadcrumb its own full-width row
+	   so it isn't squeezed to a fraction of the header by the star/done/menu/nav
+	   buttons — those move to a second row below instead. */
+	@media (max-width: 600px) {
+		header { flex-wrap: wrap; row-gap: 0.35rem; }
+		.header-row1, .header-row2 {
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+			flex: 1 1 100%;
+			min-width: 0;
+		}
+		.header-row2 { justify-content: flex-end; }
 	}
 	.breadcrumb {
 		display: flex;

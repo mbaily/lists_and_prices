@@ -1742,6 +1742,14 @@ ${bodyHtml}
 		border-bottom: 1px solid var(--border);
 		gap: 0.5rem;
 	}
+	/* On narrow (mobile) screens, give the breadcrumb its own full-width row
+	   so it isn't squeezed by the archive/reports/sync/settings icon buttons —
+	   those move to a second row below instead. */
+	@media (max-width: 600px) {
+		header { flex-wrap: wrap; row-gap: 0.35rem; }
+		.header-left { flex: 1 1 100%; min-width: 0; }
+		.header-actions { flex: 1 1 100%; justify-content: flex-end; }
+	}
 	.breadcrumb {
 		display: flex;
 		align-items: center;
