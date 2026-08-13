@@ -56,21 +56,13 @@
 
 		const reportFolders = allFolders
 			.filter((f) => folderIds.includes(f.id) && !isFolderEffectivelyArchived(f.id, allFolders))
-			.sort((a, b) => {
-				const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-				const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-				return db - da;
-			});
+			.sort((a, b) => a.order - b.order);
 
 		const result: FolderBlock[] = [];
 		for (const folder of reportFolders) {
 			const folderLists = allLists
 				.filter((l) => l.folderId === folder.id && !isListEffectivelyArchived(l, allFolders) && !l.done)
-				.sort((a, b) => {
-					const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-					const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-					return db - da;
-				});
+				.sort((a, b) => a.order - b.order);
 
 			const blocks: ListBlock[] = [];
 			for (const list of folderLists) {
@@ -79,11 +71,7 @@
 					.filter(
 						(i) => !isItemDone(i, folder) && !i.heading && !i.note && (i.parentId ?? null) === null
 					)
-					.sort((a, b) => {
-						const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-						const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-						return db - da;
-					})
+					.sort((a, b) => a.order - b.order)
 					.map((i) => ({
 						name: i.name,
 						date: formatDate(i.createdAt),
