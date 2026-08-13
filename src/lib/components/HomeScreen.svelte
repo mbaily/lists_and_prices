@@ -983,7 +983,7 @@
 
 		function addItemLines(lines: string[], items: ItemEntry[], indent: string) {
 			for (const item of items) {
-				const prefix = item.isNote ? '↳ ' : '- ';
+				const prefix = item.isNote ? '↳ ' : '• ';
 				const resolved = splitWithTags(item.name)
 					.map((p) => (p.type === 'item-ref' || p.type === 'list-ref' || p.type === 'folder-ref')
 						? resolveRef(p.type, p.value) : p.value)

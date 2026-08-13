@@ -156,7 +156,7 @@
 
 	function addItemLines(lines: string[], items: ItemEntry[], indent: string) {
 		for (const item of items) {
-			const prefix = item.isNote ? '↳ ' : '- ';
+			const prefix = item.isNote ? '↳ ' : '• ';
 			lines.push(`${indent}${prefix}${item.name}${item.date ? `  (${item.date})` : ''}`);
 			if (item.children.length > 0) addItemLines(lines, item.children, indent + '  ');
 		}
