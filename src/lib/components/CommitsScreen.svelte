@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { commitState, createCommit, readCommits, viewCommit } from '$lib/yjsStore.svelte';
+	import { commitState, createCommit, readCommits, viewCommit, docState } from '$lib/yjsStore.svelte';
 
 	let { onBack }: { onBack: () => void } = $props();
 
@@ -9,6 +9,11 @@
 			hour: '2-digit', minute: '2-digit', second: '2-digit'
 		})
 	);
+
+	let commitsList = $derived.by(() => {
+		void docState.version;
+		return readCommits();
+	});
 
 	function handleCommit() {
 		if (newCommitName.trim()) {
@@ -48,7 +53,7 @@
 		<section>
 			<h2>Past Commits</h2>
 			<div class="commits-list">
-				{#each readCommits() as commit}
+				{#each commitsList as commit}
 					<div class="commit-row">
 						<div class="commit-info">
 							<div class="commit-name">{commit.name}</div>

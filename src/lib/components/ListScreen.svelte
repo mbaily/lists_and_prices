@@ -522,6 +522,7 @@
 	let qtyBuffer = $state('');
 
 	function startEditName(item: Item) {
+		if (commitState.isHistorical) return;
 		editingId = item.id;
 		inputMode = 'edit';
 		universalValue = item.name;
