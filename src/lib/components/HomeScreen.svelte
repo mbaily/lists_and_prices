@@ -1812,6 +1812,7 @@ ${bodyHtml}
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
+		flex-shrink: 0;
 	}
 	.icon-btn {
 		background: none;
@@ -1820,6 +1821,7 @@ ${bodyHtml}
 		cursor: pointer;
 		padding: 0.25rem;
 		color: var(--text);
+		flex-shrink: 0;
 	}
 	.nav-bar {
 		display: flex;
@@ -2283,8 +2285,7 @@ ${bodyHtml}
 		display: flex;
 		align-items: center;
 		gap: 0.35rem;
-		min-width: 0;
-		flex: 1;
+		flex-shrink: 0;
 	}
 	.search-bar {
 		display: flex;
