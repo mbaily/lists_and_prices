@@ -1189,12 +1189,12 @@ ${bodyHtml}
 								}
 							}}>
 								<span class="split-left-zone" aria-hidden="true">⟳</span>
-								<span class="split-name" style="font-weight: 600;">⭐ Favourites</span>
+								<span class="split-name" style="font-weight: 600;"><span style="font-size: 0.85em;">⭐</span> Favourites</span>
 								<span class="split-right-zone" aria-hidden="true">📤</span>
 							</button>
 
 							{#if sfReportNames().length > 0}
-								<div class="reports-header" style="margin-top: 0.5rem; border-top: 1px solid var(--border); padding-top: 0.5rem;">Smart Folders</div>
+								<div class="reports-header" style="margin-top: 0.5rem; padding-top: 0.5rem;">Smart Folders</div>
 								{#each sfReportNames() as rname}
 					<button class="reports-item reports-item-split" onclick={(e) => {
 							const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
