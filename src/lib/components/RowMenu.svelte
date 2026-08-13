@@ -171,4 +171,8 @@
 	.menu-item.danger { color: #ef4444; }
 	.menu-item.menu-back { color: var(--text2); font-size: 0.9rem; }
 	.menu-item.menu-group { display: flex; justify-content: space-between; }
+
+	@media (max-width: 600px) {
+		.menu-trigger { min-width: 24px; }
+	}
 </style>

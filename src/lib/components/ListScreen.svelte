@@ -2487,4 +2487,11 @@
 	:global(.highlight-animation) {
 		animation: highlightFade 2s ease-out;
 	}
+
+	@media (max-width: 600px) {
+		.item-row { padding-left: 0.25rem; padding-right: 0.25rem; gap: 0.1rem; }
+		.drag-handle { min-width: 24px; }
+		.check-btn { min-width: 32px; }
+		.note-icon { min-width: 32px; }
+	}
 </style>
