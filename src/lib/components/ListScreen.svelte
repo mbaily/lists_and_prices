@@ -818,6 +818,7 @@
 
 	// ── Copy as TSV (for pasting into Google Sheets) ──────────────────────────────
 	let showHeaderMenu = $state(false);
+	let menuStyle = $state('');
 
 	// ── Tree-order navigation ────────────────────────────────────────────────────
 	const navIndex = $derived(orderedLists.findIndex((l) => l.id === listId));
@@ -942,7 +943,7 @@
 		if (!showHeaderMenu) return;
 		function dismiss(e: PointerEvent) {
 			const el = e.target as HTMLElement | null;
-			if (!el?.closest('.header-menu-wrap')) showHeaderMenu = false;
+			if (!el?.closest('.header-menu-wrap') && !el?.closest('.header-menu')) showHeaderMenu = false;
 		}
 		document.addEventListener('pointerdown', dismiss, { capture: true });
 		return () => document.removeEventListener('pointerdown', dismiss, { capture: true });
@@ -1147,24 +1148,18 @@
 			style={commitState.isHistorical ? 'cursor: default; opacity: 0.7' : ''}
 		>{listMeta?.done ? '☑' : '☐'}</button>
 		<div class="header-menu-wrap">
-			<button class="type-btn" onclick={() => showHeaderMenu = !showHeaderMenu} aria-label="More options">⋮</button>
-			{#if showHeaderMenu}
-				<div class="header-menu" role="menu">
-					{#if !commitState.isHistorical}
-					<button role="menuitem" onclick={enterSelectionMode}>☑ Select items</button>
-					{/if}
-					<button role="menuitem" onclick={() => { showHeaderMenu = false; exportToClipboard(); }}>📤 Export to clipboard (JSON)</button>
-					{#if !commitState.isHistorical}
-					<button role="menuitem" onclick={() => { showHeaderMenu = false; importFromClipboard(); }}>📥 Import from clipboard</button>
-					{/if}
-					<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsTSV(); }}>📋 Copy as spreadsheet</button>
-					<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsJournal(); }}>📓 Copy as journal</button>
-					<button role="menuitem" onclick={() => { showHeaderMenu = false; toggleJournalMode(); }}>{journalMode ? '🗓 Hide dates (journal mode)' : '🗓 Show dates (journal mode)'}</button>
-					{#if !commitState.isHistorical}
-					<button role="menuitem" onclick={() => { showHeaderMenu = false; toggleType(); }}>{isPriced ? '📋 Switch to plain list' : '💰 Switch to priced list'}</button>
-					{/if}
-				</div>
-			{/if}
+			<button class="type-btn" onclick={(e) => {
+				showHeaderMenu = !showHeaderMenu;
+				if (showHeaderMenu) {
+					const rect = e.currentTarget.getBoundingClientRect();
+					// The menu is ~13rem (208px) wide. Align to right if it would overflow.
+					if (rect.left + 220 > window.innerWidth) {
+						menuStyle = `top: ${rect.bottom + 4}px; right: ${window.innerWidth - rect.right}px; left: auto;`;
+					} else {
+						menuStyle = `top: ${rect.bottom + 4}px; left: ${rect.left}px; right: auto;`;
+					}
+				}
+			}} aria-label="More options">⋮</button>
 		</div>
 		<div class="header-right">
 			{#if navTotal > 1}
@@ -1629,6 +1624,25 @@
 			links={parseNameParts(cl.name).filter(p => p.type === 'url').map(p => p.value)}
 			onClose={() => copyLinksItem = null}
 		/>
+	{/if}
+
+	{#if showHeaderMenu}
+		<!-- Render header menu absolute to the screen so it's not clipped by header overflow -->
+		<div class="header-menu" role="menu" style={menuStyle}>
+			{#if !commitState.isHistorical}
+			<button role="menuitem" onclick={enterSelectionMode}>☑ Select items</button>
+			{/if}
+			<button role="menuitem" onclick={() => { showHeaderMenu = false; exportToClipboard(); }}>📤 Export to clipboard (JSON)</button>
+			{#if !commitState.isHistorical}
+			<button role="menuitem" onclick={() => { showHeaderMenu = false; importFromClipboard(); }}>📥 Import from clipboard</button>
+			{/if}
+			<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsTSV(); }}>📋 Copy as spreadsheet</button>
+			<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsJournal(); }}>📓 Copy as journal</button>
+			<button role="menuitem" onclick={() => { showHeaderMenu = false; toggleJournalMode(); }}>{journalMode ? '🗓 Hide dates (journal mode)' : '🗓 Show dates (journal mode)'}</button>
+			{#if !commitState.isHistorical}
+			<button role="menuitem" onclick={() => { showHeaderMenu = false; toggleType(); }}>{isPriced ? '📋 Switch to plain list' : '💰 Switch to priced list'}</button>
+			{/if}
+		</div>
 	{/if}
 </div>
 
