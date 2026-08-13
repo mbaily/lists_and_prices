@@ -1651,30 +1651,18 @@
 		background: var(--bg2);
 		border-bottom: 1px solid var(--border);
 		flex-shrink: 0;
+		overflow-x: auto;
+		scrollbar-width: none;
+		flex-wrap: nowrap;
 	}
-	/* On wide screens the two "rows" are invisible wrappers — their children
-	   flow as direct flex items of <header>, same as before this was added. */
+	header::-webkit-scrollbar { display: none; }
 	.header-row1, .header-row2 { display: contents; }
-	/* On narrow (mobile) screens, give the breadcrumb its own full-width row
-	   so it isn't squeezed to a fraction of the header by the star/done/menu/nav
-	   buttons — those move to a second row below instead. */
-	@media (max-width: 600px) {
-		header { flex-wrap: wrap; row-gap: 0.35rem; }
-		.header-row1, .header-row2 {
-			display: flex;
-			align-items: center;
-			gap: 0.5rem;
-			flex: 1 1 100%;
-			min-width: 0;
-		}
-		.header-row2 { justify-content: flex-end; }
-	}
 	.breadcrumb {
 		display: flex;
 		align-items: center;
 		gap: 0.25rem;
 		flex-wrap: nowrap;
-		flex-shrink: 1;
+		flex-shrink: 0;
 		font-size: 1rem;
 		min-width: 0;
 		overflow-x: auto;
