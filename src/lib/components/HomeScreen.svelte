@@ -886,21 +886,23 @@
 		return Object.keys(getSmartFolders()).sort();
 	}
 
-	function generateReport(reportName: string) {
+	function generateReport(reportName: string, mode: 'smart-folder' | 'favourites' = 'smart-folder') {
 		showReportsMenu = false;
-		const folderIds: string[] = getSmartFolders()[reportName] ?? [];
+		const folderIds: string[] = mode === 'smart-folder' ? (getSmartFolders()[reportName] ?? []) : [];
 		const now = new Date();
 		const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 		const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
-		// Sort assigned folders by creation date descending
+		// Sort assigned folders by custom order
 		const reportFolders = allFolders
-			.filter((f) => folderIds.includes(f.id) && !isFolderEffectivelyArchived(f.id, allFolders))
-			.sort((a, b) => {
-				const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-				const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-				return db - da;
-			});
+			.filter((f) => !isFolderEffectivelyArchived(f.id, allFolders))
+			.filter((f) => {
+				if (mode === 'favourites') {
+					return f.favourite || allLists.some((l) => l.folderId === f.id && l.favourite);
+				}
+				return folderIds.includes(f.id);
+			})
+			.sort((a, b) => a.order - b.order);
 		const allItemsNow = readAllItems();
 
 		// Lookup maps for resolving [[ref]] display names
@@ -921,21 +923,19 @@
 		for (const folder of reportFolders) {
 			const folderLists = allLists
 				.filter((l) => l.folderId === folder.id && !isListEffectivelyArchived(l, allFolders) && !l.done)
-				.sort((a, b) => {
-					const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-					const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-					return db - da;
-				});
+				.filter((l) => {
+					if (mode === 'favourites') {
+						return l.favourite || folder.favourite;
+					}
+					return true;
+				})
+				.sort((a, b) => a.order - b.order);
 
 			const blocks: ListBlock[] = [];
 			for (const list of folderLists) {
 				const items = allItemsNow
 					.filter((i) => i.listId === list.id && !isItemDone(i, folder) && !i.heading && !i.note)
-					.sort((a, b) => {
-						const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-						const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-						return db - da;
-					});
+					.sort((a, b) => a.order - b.order);
 				if (items.length > 0) {
 					blocks.push({
 						listName: list.name,
@@ -1175,12 +1175,26 @@ ${bodyHtml}
 						📦
 					</button>
 				{/if}
-				{#if sfReportNames().length > 0}
-					<div class="reports-wrap">
-						<button class="icon-btn" onclick={() => showReportsMenu = !showReportsMenu} aria-label="Smart Folder Reports">📋</button>
-						{#if showReportsMenu}
-							<div class="reports-menu">
-								<div class="reports-header">Smart Folders</div>
+				<div class="reports-wrap">
+					<button class="icon-btn" onclick={() => showReportsMenu = !showReportsMenu} aria-label="Smart Folder Reports">📋</button>
+					{#if showReportsMenu}
+						<div class="reports-menu">
+							<button class="reports-item reports-item-split" onclick={(e) => {
+								const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+								showReportsMenu = false;
+								if (e.clientX < rect.left + rect.width / 2) {
+									window.open('/favourites', '_blank');
+								} else {
+									generateReport('⭐ Favourites', 'favourites');
+								}
+							}}>
+								<span class="split-left-zone" aria-hidden="true">⟳</span>
+								<span class="split-name" style="font-weight: 600;">⭐ Favourites</span>
+								<span class="split-right-zone" aria-hidden="true">📤</span>
+							</button>
+
+							{#if sfReportNames().length > 0}
+								<div class="reports-header" style="margin-top: 0.5rem; border-top: 1px solid var(--border); padding-top: 0.5rem;">Smart Folders</div>
 								{#each sfReportNames() as rname}
 					<button class="reports-item reports-item-split" onclick={(e) => {
 							const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
@@ -1196,10 +1210,10 @@ ${bodyHtml}
 							<span class="split-right-zone" aria-hidden="true">📤</span>
 						</button>
 								{/each}
+							{/if}
 							</div>
 						{/if}
 					</div>
-				{/if}
 				<button class="icon-btn" onclick={() => {
 					showCommitsModal = true;
 				}} aria-label="Version History">🕒</button>

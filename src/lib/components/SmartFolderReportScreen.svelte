@@ -14,7 +14,7 @@
 	import { getSmartFolders } from '$lib/smartFolders.svelte';
 	import { splitWithTags } from '$lib/tags';
 
-	let { reportName, onBack }: { reportName: string; onBack: () => void } = $props();
+	let { reportName, mode = 'smart-folder', onBack }: { reportName: string; mode?: 'smart-folder' | 'favourites'; onBack: () => void } = $props();
 
 	type ItemEntry = { name: string; date: string; isNote: boolean; children: ItemEntry[] };
 	type ListBlock = { listName: string; listId: string; items: ItemEntry[] };
@@ -55,13 +55,25 @@
 		const folderIds = getSmartFolders()[reportName] ?? [];
 
 		const reportFolders = allFolders
-			.filter((f) => folderIds.includes(f.id) && !isFolderEffectivelyArchived(f.id, allFolders))
+			.filter((f) => !isFolderEffectivelyArchived(f.id, allFolders))
+			.filter((f) => {
+				if (mode === 'favourites') {
+					return f.favourite || allLists.some((l) => l.folderId === f.id && l.favourite);
+				}
+				return folderIds.includes(f.id);
+			})
 			.sort((a, b) => a.order - b.order);
 
 		const result: FolderBlock[] = [];
 		for (const folder of reportFolders) {
 			const folderLists = allLists
 				.filter((l) => l.folderId === folder.id && !isListEffectivelyArchived(l, allFolders) && !l.done)
+				.filter((l) => {
+					if (mode === 'favourites') {
+						return l.favourite || folder.favourite;
+					}
+					return true;
+				})
 				.sort((a, b) => a.order - b.order);
 
 			const blocks: ListBlock[] = [];
