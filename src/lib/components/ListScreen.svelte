@@ -713,6 +713,34 @@
 		exitSelectionMode();
 	}
 
+	function isInvalidReparentTarget(targetId: string): boolean {
+		if (selectedIds.has(targetId)) return true;
+		let curr = targetId;
+		while (curr) {
+			const item = items.find(i => i.id === curr);
+			if (!item) break;
+			if (item.parentId && selectedIds.has(item.parentId)) return true;
+			curr = item.parentId || '';
+		}
+		return false;
+	}
+
+	function reparentSelectedTo(targetId: string) {
+		if (isInvalidReparentTarget(targetId)) return;
+		for (const id of selectedIds) {
+			updateItem(id, { parentId: targetId });
+		}
+		exitSelectionMode();
+	}
+
+	function getReparentMenuItem(targetId: string) {
+		if (selectionMode && selectedIds.size > 0 && !isInvalidReparentTarget(targetId)) {
+			return [{ label: '↳ Reparent selected here', action: () => reparentSelectedTo(targetId) }];
+		}
+		return [];
+	}
+
+
 	function cycleFilter() {
 		const next: FilterView = filterView === 'all' ? 'unchecked' : filterView === 'unchecked' ? 'checked' : 'all';
 		updateList(listId, { filterView: next });
@@ -1428,6 +1456,7 @@
 						{ label: '📌 Unheading', action: () => updateItem(item.id, { heading: false }) },
 						{ label: '🔗 Tag as Link', action: () => copyRefToClipboard(item.id) },
 						...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItem = item) }] : []),
+						...getReparentMenuItem(item.id),
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 					]} />
 					{/if}
@@ -1454,6 +1483,7 @@
 						] : []),
 						{ label: '🔗 Tag as Link', action: () => copyRefToClipboard(item.id) },
 						...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItem = item) }] : []),
+						...getReparentMenuItem(item.id),
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 					]} />
 					{/if}
@@ -1496,6 +1526,7 @@
 							...(level === 0 ? [{ label: '📌 Make Heading', action: () => makeHeading(item) }] : []),
 							{ label: '🔗 Tag as Link', action: () => copyRefToClipboard(item.id) },
 							...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItem = item) }] : []),
+							...getReparentMenuItem(item.id),
 							{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 						]} />
 						{/if}
@@ -1525,6 +1556,7 @@
 						...(level === 0 ? [{ label: '📌 Make Heading', action: () => makeHeading(item) }] : []),
 						{ label: '🔗 Tag as Link', action: () => copyRefToClipboard(item.id) },
 						...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItem = item) }] : []),
+						...getReparentMenuItem(item.id),
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
 					]} />
 					{/if}
@@ -2053,13 +2085,13 @@
 		cursor: pointer;
 	}
 	.sel-done-btn {
-		background: none;
-		border: 1px solid var(--text2);
+		background: var(--bg);
+		border: 1px solid var(--border);
 		border-radius: 6px;
 		padding: 0.2rem 0.6rem;
 		font-size: 0.85rem;
 		cursor: pointer;
-		color: var(--text2);
+		color: var(--text);
 	}
 	/* Selection panel */
 	.selection-panel {
