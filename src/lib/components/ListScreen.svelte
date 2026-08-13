@@ -733,6 +733,13 @@
 		exitSelectionMode();
 	}
 
+	function reparentSelectedToRoot() {
+		for (const id of selectedIds) {
+			updateItem(id, { parentId: null });
+		}
+		exitSelectionMode();
+	}
+
 	function getReparentMenuItem(targetId: string) {
 		if (selectionMode && selectedIds.size > 0 && !isInvalidReparentTarget(targetId)) {
 			return [{ label: '↳ Reparent selected here', action: () => reparentSelectedTo(targetId) }];
@@ -1662,7 +1669,11 @@
 		<!-- Render header menu absolute to the screen so it's not clipped by header overflow -->
 		<div class="header-menu" role="menu" style={menuStyle}>
 			{#if !commitState.isHistorical}
+			{#if selectionMode && selectedIds.size > 0}
+			<button role="menuitem" onclick={() => { showHeaderMenu = false; reparentSelectedToRoot(); }}>↳ Move selected to root</button>
+			{:else}
 			<button role="menuitem" onclick={enterSelectionMode}>☑ Select items</button>
+			{/if}
 			{/if}
 			<button role="menuitem" onclick={() => { showHeaderMenu = false; exportToClipboard(); }}>📤 Export to clipboard (JSON)</button>
 			{#if !commitState.isHistorical}
