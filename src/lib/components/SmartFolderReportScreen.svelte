@@ -156,7 +156,8 @@
 
 	function addItemLines(lines: string[], items: ItemEntry[], indent: string) {
 		for (const item of items) {
-			lines.push(`${indent}${item.name}${item.date ? `  (${item.date})` : ''}`);
+			const prefix = item.isNote ? '↳ ' : '- ';
+			lines.push(`${indent}${prefix}${item.name}${item.date ? `  (${item.date})` : ''}`);
 			if (item.children.length > 0) addItemLines(lines, item.children, indent + '  ');
 		}
 	}
@@ -214,7 +215,7 @@
 						{#snippet renderItem(item: ItemEntry, depth: number)}
 							<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 							<div class="rf-item rf-clickable" style="margin-left: {depth * 2}ch" onclick={() => navigateToList(lb.listId)}>
-									{#if item.isNote}<span class="rf-note-mark">↳ </span>{/if}{#each splitWithTags(item.name) as part}{#if part.type === 'url'}<a class="rf-url" href={part.value} target="_blank" rel="noopener noreferrer" onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="rf-tag-pill" onclick={(e) => e.stopPropagation()}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="rf-ref-pill" onclick={(e) => { e.stopPropagation(); navigateToList(lb.listId); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}{#if item.date}<span class="rf-date"> ({item.date})</span>{/if}
+									{#if item.isNote}<span class="rf-note-mark">↳ </span>{:else}<span class="rf-bullet">• </span>{/if}{#each splitWithTags(item.name) as part}{#if part.type === 'url'}<a class="rf-url" href={part.value} target="_blank" rel="noopener noreferrer" onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="rf-tag-pill" onclick={(e) => e.stopPropagation()}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="rf-ref-pill" onclick={(e) => { e.stopPropagation(); navigateToList(lb.listId); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}{#if item.date}<span class="rf-date"> ({item.date})</span>{/if}
 								</div>
 								{#each item.children as child}
 									{@render renderItem(child, depth + 1)}
@@ -316,6 +317,9 @@
 		cursor: pointer;
 	}
 	.rf-note-mark {
+		color: #888;
+	}
+	.rf-bullet {
 		color: #888;
 	}
 	.rf-date {
