@@ -916,9 +916,29 @@
 		}
 
 		// Build structured data for both HTML and plain-text
-		type ListBlock = { listName: string; items: { name: string; date: string }[] };
-		type FolderBlock = { folderName: string; lists: ListBlock[] };
+		type ItemEntry = { name: string; date: string; isNote: boolean; children: ItemEntry[] };
+		type ListBlock = { listName: string; listId: string; items: ItemEntry[] };
+		type FolderBlock = { folderName: string; folderId: string; lists: ListBlock[] };
 		const folderBlocks: FolderBlock[] = [];
+
+		function buildItemTree(allListItems: Item[], parentId: string | null, folder: Folder | null): ItemEntry[] {
+			return allListItems
+				.filter(
+					(i) =>
+						(i.parentId ?? null) === parentId &&
+						!i.heading &&
+						(!isItemDone(i, folder) || i.note)
+				)
+				.sort((a, b) => a.order - b.order)
+				.map((i) => ({
+					name: i.name,
+					date: i.createdAt
+						? new Date(i.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })
+						: '',
+					isNote: i.note,
+					children: buildItemTree(allListItems, i.id, folder)
+				}));
+		}
 
 		for (const folder of reportFolders) {
 			const folderLists = allLists
@@ -933,22 +953,25 @@
 
 			const blocks: ListBlock[] = [];
 			for (const list of folderLists) {
-				const items = allItemsNow
-					.filter((i) => i.listId === list.id && !isItemDone(i, folder) && !i.heading && !i.note)
-					.sort((a, b) => a.order - b.order);
-				if (items.length > 0) {
-					blocks.push({
-						listName: list.name,
-						items: items.map((i) => ({
-							name: i.name,
-							date: i.createdAt
-								? new Date(i.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })
-								: ''
-						}))
-					});
+				const listItems = allItemsNow.filter((i) => i.listId === list.id);
+				const topItems = listItems
+					.filter(
+						(i) => !isItemDone(i, folder) && !i.heading && !i.note && (i.parentId ?? null) === null
+					)
+					.sort((a, b) => a.order - b.order)
+					.map((i) => ({
+						name: i.name,
+						date: i.createdAt
+							? new Date(i.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })
+							: '',
+						isNote: false,
+						children: buildItemTree(listItems, i.id, folder)
+					}));
+				if (topItems.length > 0) {
+					blocks.push({ listName: list.name, listId: list.id, items: topItems });
 				}
 			}
-			if (blocks.length > 0) folderBlocks.push({ folderName: folder.name, lists: blocks });
+			if (blocks.length > 0) folderBlocks.push({ folderName: folder.name, folderId: folder.id, lists: blocks });
 		}
 
 		// Build plain-text version (for "Copy as text" button)
@@ -957,6 +980,19 @@
 			`Generated: ${dateStr} ${timeStr}`,
 			''
 		];
+
+		function addItemLines(lines: string[], items: ItemEntry[], indent: string) {
+			for (const item of items) {
+				const prefix = item.isNote ? '↳ ' : '- ';
+				const resolved = splitWithTags(item.name)
+					.map((p) => (p.type === 'item-ref' || p.type === 'list-ref' || p.type === 'folder-ref')
+						? resolveRef(p.type, p.value) : p.value)
+					.join('');
+				lines.push(`${indent}${prefix}${resolved}${item.date ? `  (${item.date})` : ''}`);
+				if (item.children.length > 0) addItemLines(lines, item.children, indent + '  ');
+			}
+		}
+
 		if (folderBlocks.length === 0) {
 			plainLines.push('(No uncompleted todos found)');
 		} else {
@@ -964,13 +1000,7 @@
 				plainLines.push(fb.folderName);
 				for (const lb of fb.lists) {
 					plainLines.push(`  ${lb.listName}`);
-					for (const item of lb.items) {
-						const resolved = splitWithTags(item.name)
-							.map((p) => (p.type === 'item-ref' || p.type === 'list-ref' || p.type === 'folder-ref')
-								? resolveRef(p.type, p.value) : p.value)
-							.join('');
-						plainLines.push(`    ${resolved}${item.date ? `  (${item.date})` : ''}`);
-					}
+					addItemLines(plainLines, lb.items, '    ');
 				}
 				plainLines.push('');
 			}
@@ -982,6 +1012,26 @@
 		function esc(s: string) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 		let bodyHtml = '';
+
+		function renderItemHtml(item: ItemEntry, depth: number): string {
+			let html = `<div class="item" style="margin-left: ${depth * 2}ch">`;
+			html += item.isNote ? `<span class="note-mark">↳ </span>` : `<span class="bullet">• </span>`;
+			const nameHtml = splitWithTags(item.name)
+				.map((p) => {
+					if (p.type === 'url') return `<a class="ref-url" href="${esc(p.value)}" target="_blank" rel="noopener noreferrer">${esc(p.value)}</a>`;
+					if (p.type === 'tag') return `<span class="ref-tag">${esc(p.value)}</span>`;
+					if (p.type === 'item-ref' || p.type === 'list-ref' || p.type === 'folder-ref') return `<span class="ref-pill">${esc(resolveRef(p.type, p.value))}</span>`;
+					return esc(p.value);
+				})
+				.join('');
+			const date = item.date ? `<span class="date"> (${esc(item.date)})</span>` : '';
+			html += `${nameHtml}${date}</div>`;
+			for (const child of item.children) {
+				html += renderItemHtml(child, depth + 1);
+			}
+			return html;
+		}
+
 		if (folderBlocks.length === 0) {
 			bodyHtml = '<p class="empty">(No uncompleted todos found)</p>';
 		} else {
@@ -992,16 +1042,7 @@
 					bodyHtml += `<div class="list-block">`;
 					bodyHtml += `<div class="list-name">${esc(lb.listName)}</div>`;
 					for (const item of lb.items) {
-						const date = item.date ? `<span class="date">(${esc(item.date)})</span>` : '';
-						const nameHtml = splitWithTags(item.name)
-							.map((p) => {
-								if (p.type === 'url') return `<a class="ref-url" href="${esc(p.value)}" target="_blank" rel="noopener noreferrer">${esc(p.value)}</a>`;
-								if (p.type === 'tag') return `<span class="ref-tag">${esc(p.value)}</span>`;
-								if (p.type === 'item-ref' || p.type === 'list-ref' || p.type === 'folder-ref') return `<span class="ref-pill">${esc(resolveRef(p.type, p.value))}</span>`;
-								return esc(p.value);
-							})
-							.join('');
-						bodyHtml += `<div class="item">${nameHtml} ${date}</div>`;
+						bodyHtml += renderItemHtml(item, 0);
 					}
 					bodyHtml += `</div>`;
 				}
@@ -1024,7 +1065,8 @@
   .folder-name { font-weight: 700; color: #89b4fa; padding-bottom: 0.15rem; border-bottom: 1px solid #333; margin-bottom: 0.4rem; }
   .list-block { margin-left: 2ch; margin-top: 0.6rem; }
   .list-name { color: #a6e3a1; font-style: italic; margin-bottom: 0.15rem; }
-  .item { margin-left: 2ch; color: #fff; word-break: break-word; }
+  .item { color: #fff; word-break: break-word; }
+  .bullet, .note-mark { color: #888; }
   .date { color: #888; font-size: 0.85em; }
   .empty { color: #888; }
   .ref-pill { background: #313244; color: #cba6f7; border-radius: 4px; padding: 0 0.3em; font-size: 0.9em; }
