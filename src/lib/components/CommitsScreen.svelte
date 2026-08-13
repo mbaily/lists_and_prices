@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { commitState, createCommit, readCommits, viewCommit, docState } from '$lib/yjsStore.svelte';
+	import { commitState, createCommit, readCommits, viewCommit, deleteCommit, docState } from '$lib/yjsStore.svelte';
+	import ConfirmDialog from './ConfirmDialog.svelte';
 
 	let { onBack }: { onBack: () => void } = $props();
 
@@ -14,6 +15,8 @@
 		void docState.version;
 		return readCommits();
 	});
+
+	let deleteCommitId = $state<string | null>(null);
 
 	function handleCommit() {
 		if (newCommitName.trim()) {
@@ -59,7 +62,12 @@
 							<div class="commit-name">{commit.name}</div>
 							<div class="commit-date">{fmtDate(commit.createdAt)}</div>
 						</div>
-						<button class="commit-view-btn" onclick={() => { viewCommit(commit.id); onBack(); }}>View</button>
+						<div class="commit-actions">
+							<button class="commit-view-btn" onclick={() => { viewCommit(commit.id); onBack(); }}>View</button>
+							{#if !commitState.isHistorical}
+							<button class="commit-del-btn" onclick={() => deleteCommitId = commit.id} aria-label="Delete">🗑</button>
+							{/if}
+						</div>
 					</div>
 				{:else}
 					<div class="commits-empty">No commits yet.</div>
@@ -68,6 +76,18 @@
 		</section>
 	</div>
 </div>
+
+{#if deleteCommitId}
+	<ConfirmDialog
+		message="Are you sure you want to delete this version? This action cannot be undone."
+		confirmLabel="Delete Version"
+		onConfirm={() => {
+			if (deleteCommitId) deleteCommit(deleteCommitId);
+			deleteCommitId = null;
+		}}
+		onCancel={() => deleteCommitId = null}
+	/>
+{/if}
 
 <style>
 	.screen {
@@ -171,6 +191,11 @@
 		font-size: 0.85rem;
 		color: var(--text2);
 	}
+	.commit-actions {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
 	.commit-view-btn {
 		background: var(--accent);
 		color: #fff;
@@ -180,6 +205,18 @@
 		cursor: pointer;
 		font-size: 0.95rem;
 		font-weight: 600;
+	}
+	.commit-del-btn {
+		background: none;
+		border: none;
+		color: #ef4444;
+		font-size: 1.25rem;
+		cursor: pointer;
+		padding: 0.25rem 0.5rem;
+		border-radius: 8px;
+	}
+	.commit-del-btn:hover {
+		background: color-mix(in srgb, #ef4444 12%, transparent);
 	}
 	.commits-empty {
 		padding: 2rem;

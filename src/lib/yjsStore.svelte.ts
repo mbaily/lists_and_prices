@@ -135,6 +135,16 @@ export function readCommits(): Commit[] {
 	}));
 }
 
+export function deleteCommit(commitId: string) {
+	if (!_doc) return;
+	const commits = _doc.getArray('commits');
+	const idx = commits.toArray().findIndex((m: any) => m.get('id') === commitId);
+	if (idx !== -1) {
+		commits.delete(idx, 1);
+		docState.version++;
+	}
+}
+
 export function viewCommit(commitId: string) {
 	if (!_doc) return;
 	const commits = readCommits();
