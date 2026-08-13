@@ -1194,7 +1194,7 @@ ${bodyHtml}
 							</button>
 
 							{#if sfReportNames().length > 0}
-								<div class="reports-header" style="margin-top: 0.5rem; padding-top: 0.5rem;">Smart Folders</div>
+								<div class="reports-header">Smart Folders</div>
 								{#each sfReportNames() as rname}
 					<button class="reports-item reports-item-split" onclick={(e) => {
 							const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
