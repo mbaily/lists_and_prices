@@ -1677,7 +1677,6 @@
 			<button role="menuitem" onclick={enterSelectionMode}>☑ Select items</button>
 			{/if}
 			{/if}
-			<button role="menuitem" onclick={() => { showHeaderMenu = false; showUndoConfirm = true; }}>↩️ Undo last action</button>
 			<button role="menuitem" onclick={() => { showHeaderMenu = false; exportToClipboard(); }}>📤 Export to clipboard (JSON)</button>
 			{#if !commitState.isHistorical}
 			<button role="menuitem" onclick={() => { showHeaderMenu = false; importFromClipboard(); }}>📥 Import from clipboard</button>
@@ -1688,6 +1687,7 @@
 			{#if !commitState.isHistorical}
 			<button role="menuitem" onclick={() => { showHeaderMenu = false; toggleType(); }}>{isPriced ? '📋 Switch to plain list' : '💰 Switch to priced list'}</button>
 			{/if}
+			<button role="menuitem" onclick={() => { showHeaderMenu = false; showUndoConfirm = true; }}>↩️ Undo last action</button>
 		</div>
 	{/if}
 </div>
