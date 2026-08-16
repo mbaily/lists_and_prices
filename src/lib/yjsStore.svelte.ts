@@ -21,6 +21,8 @@ let _wsProvider: WebsocketProvider | null = null;
 let _idbProvider: IndexeddbPersistence | null = null;
 
 let _historicalDoc: Y.Doc | null = null;
+let _undoManager: Y.UndoManager | null = null;
+
 
 export const syncState = $state<{ status: SyncStatus }>({ status: 'offline' });
 export const commitState = $state<{ isHistorical: boolean, commitId: string | null }>({ isHistorical: false, commitId: null });
@@ -38,6 +40,13 @@ export function initYjs(username: string, wsUrl: string) {
 
 	const doc = new Y.Doc({ gc: false });
 	_doc = doc;
+
+	_undoManager = new Y.UndoManager([
+		getFolders(doc),
+		getLists(doc),
+		getItems(doc),
+		getSpreadsheets(doc)
+	]);
 
 	idbSynced.done = false;
 	const tIdbStart = performance.now();
@@ -77,13 +86,20 @@ export function getDoc(): Y.Doc {
 	return _doc;
 }
 
+export function getUndoManager(): Y.UndoManager {
+	if (!_undoManager) throw new Error('UndoManager not initialised');
+	return _undoManager;
+}
+
 export function destroyYjs() {
 	_wsProvider?.destroy();
 	_idbProvider?.destroy();
 	_doc?.destroy();
 	_historicalDoc?.destroy();
+	_undoManager?.destroy();
 	_doc = null;
 	_historicalDoc = null;
+	_undoManager = null;
 	_wsProvider = null;
 	_idbProvider = null;
 	syncState.status = 'offline';

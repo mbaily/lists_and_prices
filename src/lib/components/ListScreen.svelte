@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { docState, commitState } from '$lib/yjsStore.svelte';
+	import { docState, commitState, getUndoManager } from '$lib/yjsStore.svelte';
 	import { onDestroy, tick, untrack } from 'svelte';
 	import {
 		readItems,
@@ -53,6 +53,8 @@
 		onTagClick?: (tag: string) => void;
 		onNavigateTo?: (folderId: string | null) => void;
 	} = $props();
+
+	let showUndoConfirm = $state(false);
 
 	let items = $derived.by(() => {
 		void docState.version;
@@ -1675,6 +1677,7 @@
 			<button role="menuitem" onclick={enterSelectionMode}>☑ Select items</button>
 			{/if}
 			{/if}
+			<button role="menuitem" onclick={() => { showHeaderMenu = false; showUndoConfirm = true; }}>↩️ Undo last action</button>
 			<button role="menuitem" onclick={() => { showHeaderMenu = false; exportToClipboard(); }}>📤 Export to clipboard (JSON)</button>
 			{#if !commitState.isHistorical}
 			<button role="menuitem" onclick={() => { showHeaderMenu = false; importFromClipboard(); }}>📥 Import from clipboard</button>
@@ -1688,6 +1691,18 @@
 		</div>
 	{/if}
 </div>
+
+{#if showUndoConfirm}
+	<ConfirmDialog
+		message="Are you sure you want to undo your last action?"
+		confirmLabel="Undo"
+		onConfirm={() => {
+			getUndoManager().undo();
+			showUndoConfirm = false;
+		}}
+		onCancel={() => showUndoConfirm = false}
+	/>
+{/if}
 
 <style>
 	.screen {

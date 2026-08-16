@@ -29,7 +29,7 @@
 		type SheetMeta,
 		type Item
 	} from '$lib/data';
-	import { syncState, docState, idbSynced, commitState, readCommits, viewCommit, createCommit, exitCommitView, type Commit } from '$lib/yjsStore.svelte';
+	import { syncState, docState, idbSynced, commitState, readCommits, viewCommit, createCommit, exitCommitView, type Commit, getUndoManager } from '$lib/yjsStore.svelte';
 	import { auth } from '$lib/auth.svelte';
 	import { settings, updateSettings } from '$lib/settings.svelte';
 	import { getSmartFolders, assignToReport, removeFromReport, deleteReport } from '$lib/smartFolders.svelte';
@@ -47,6 +47,7 @@
 	import CommitsScreen from './CommitsScreen.svelte';
 
 	let { onLogout }: { onLogout: () => void } = $props();
+	let showUndoConfirm = $state(false);
 
 	// ── URL hash navigation ──────────────────────────────────────────────────────
 	// Format: #f/id1/id2  (folder path, skipping the implicit null root)
@@ -76,6 +77,9 @@
 
 	// ── Navigation state ────────────────────────────────────────────────────────
 	// breadcrumb is an array of folder ids. null means root.
+	// Special virtual folder id for the Archived view
+	const ARCHIVE_ID = '__archive__';
+	
 	let breadcrumb = $state<(string | null)[]>(_init.breadcrumb);
 	let currentFolderId = $derived(breadcrumb[breadcrumb.length - 1]);
 
@@ -97,21 +101,7 @@
 		}
 	});
 
-	let rootFilterView = $state<'all' | 'unchecked' | 'checked'>('all');
-	let filterView = $derived<'all' | 'unchecked' | 'checked'>(
-		currentFolderId && currentFolderId !== ARCHIVE_ID 
-			? (allFolders.find(f => f.id === currentFolderId)?.filterView ?? 'all') 
-			: rootFilterView
-	);
 
-	function cycleFilter() {
-		const next = filterView === 'all' ? 'unchecked' : filterView === 'unchecked' ? 'checked' : 'all';
-		if (currentFolderId && currentFolderId !== ARCHIVE_ID) {
-			updateFolder(currentFolderId, { filterView: next });
-		} else {
-			rootFilterView = next;
-		}
-	}
 
 	function handleGlobalKeydown(e: KeyboardEvent) {
 		// Do not trigger global shortcuts if the user is typing in an input
@@ -173,7 +163,7 @@
 				const item = viewableItems[activeCursorIndex];
 				if (item.type === 'folder') {
 					breadcrumb = [...breadcrumb, item.id];
-				} else if (item.type === 'list' && item.original.type !== 'divider') {
+				} else if (item.type === 'list' && ('type' in item.original) && item.original.type !== 'divider') {
 					openListId = item.id;
 				} else if (item.type === 'sheet') {
 					openSheetId = item.id;
@@ -291,9 +281,21 @@
 		});
 		return results;
 	});
+	let rootFilterView = $state<'all' | 'unchecked' | 'checked'>('all');
+	let filterView = $derived<'all' | 'unchecked' | 'checked'>(
+		currentFolderId && currentFolderId !== ARCHIVE_ID 
+			? (allFolders.find(f => f.id === currentFolderId)?.filterView ?? 'all') 
+			: rootFilterView
+	);
 
-	// Special virtual folder id for the Archived view
-	const ARCHIVE_ID = '__archive__';
+	function cycleFilter() {
+		const next = filterView === 'all' ? 'unchecked' : filterView === 'unchecked' ? 'checked' : 'all';
+		if (currentFolderId && currentFolderId !== ARCHIVE_ID) {
+			updateFolder(currentFolderId, { filterView: next });
+		} else {
+			rootFilterView = next;
+		}
+	}
 
 	// True whenever ARCHIVE_ID is anywhere in the breadcrumb (including as currentFolderId)
 	let isInArchiveView = $derived(breadcrumb.includes(ARCHIVE_ID));
@@ -1218,6 +1220,7 @@ ${bodyHtml}
 					</button>
 				{/if}
 				<div class="reports-wrap">
+					<button class="icon-btn" onclick={() => showUndoConfirm = true} aria-label="Undo last action" title="Undo last action">↩️</button>
 					<button class="icon-btn" onclick={() => showReportsMenu = !showReportsMenu} aria-label="Smart Folder Reports">📋</button>
 					{#if showReportsMenu}
 						<div class="reports-menu">
@@ -1796,6 +1799,18 @@ ${bodyHtml}
 			</div>
 		{/if}
 	</div>
+{/if}
+
+{#if showUndoConfirm}
+	<ConfirmDialog
+		message="Are you sure you want to undo your last action?"
+		confirmLabel="Undo"
+		onConfirm={() => {
+			getUndoManager().undo();
+			showUndoConfirm = false;
+		}}
+		onCancel={() => showUndoConfirm = false}
+	/>
 {/if}
 
 <style>
