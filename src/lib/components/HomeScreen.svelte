@@ -1797,10 +1797,13 @@ ${bodyHtml}
 					</div>
 				</div>
 			</div>
+		{/if}
+	</div>
+{/if}
+
 {#if showUndoConfirm}
 	{#if canUndo()}
 		<ConfirmDialog
-			title="Undo"
 			message={`Are you sure you want to undo your last action? (${getUndoCount()} action${getUndoCount() === 1 ? '' : 's'} left)`}
 			confirmLabel="Yes, undo"
 			onConfirm={() => {
@@ -1813,7 +1816,6 @@ ${bodyHtml}
 		/>
 	{:else}
 		<ConfirmDialog
-			title="Undo"
 			message="There is nothing to undo."
 			confirmLabel="OK"
 			hideCancel={true}
