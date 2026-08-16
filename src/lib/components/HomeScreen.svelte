@@ -1262,11 +1262,13 @@ ${bodyHtml}
 				<button class="icon-btn" onclick={() => {
 					showCommitsModal = true;
 				}} aria-label="Version History">🕒</button>
-				<SWBadge />
-				<SyncBadge status={syncState.status} />
 				<button class="icon-btn" onclick={() => (showSettings = true)} aria-label="Settings">
 					⚙
 				</button>
+				<div class="system-status">
+					<SWBadge />
+					<SyncBadge status={syncState.status} />
+				</div>
 			</div>
 		</header>
 
@@ -2666,5 +2668,12 @@ ${bodyHtml}
 		margin-top: 0.25rem;
 	}
 
-
+	.system-status {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		margin-left: 0.25rem;
+		padding: 2px;
+		background: transparent;
+	}
 </style>

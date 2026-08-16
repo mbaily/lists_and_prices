@@ -42,9 +42,8 @@
 	};
 </script>
 
-<span class="badge" style="--dot:{color[swStatus]}">
+<span class="badge" style="--dot:{color[swStatus]}" title="Service Worker: {swStatus}">
 	<span class="dot"></span>
-	SW
 </span>
 
 <style>
@@ -56,9 +55,9 @@
 		color: var(--text2);
 	}
 	.dot {
-		width: 7px;
-		height: 7px;
-		border-radius: 50%;
+		width: 8px;
+		height: 8px;
+		border-radius: 2px;
 		background: var(--dot);
 	}
 </style>

@@ -84,9 +84,8 @@
 
 </script>
 
-<button class="badge" style="--dot:{color[status]}" onclick={() => showDialog = true} aria-label="Show sync info">
+<button class="badge" style="--dot:{color[status]}" onclick={() => showDialog = true} aria-label="Show sync info" title="Sync: {status}">
 	<span class="dot"></span>
-	Sync
 </button>
 
 {#if showDialog}
@@ -114,9 +113,9 @@
 		color: var(--text);
 	}
 	.dot {
-		width: 7px;
-		height: 7px;
-		border-radius: 50%;
+		width: 8px;
+		height: 8px;
+		border-radius: 2px;
 		background: var(--dot);
 	}
 </style>
