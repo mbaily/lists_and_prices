@@ -29,7 +29,7 @@
 		type SheetMeta,
 		type Item
 	} from '$lib/data';
-	import { syncState, docState, idbSynced, commitState, readCommits, viewCommit, createCommit, exitCommitView, type Commit, getUndoManager, canUndo } from '$lib/yjsStore.svelte';
+	import { syncState, docState, idbSynced, commitState, readCommits, viewCommit, createCommit, exitCommitView, type Commit, getUndoManager, canUndo, getUndoCount } from '$lib/yjsStore.svelte';
 	import { auth } from '$lib/auth.svelte';
 	import { settings, updateSettings } from '$lib/settings.svelte';
 	import { getSmartFolders, assignToReport, removeFromReport, deleteReport } from '$lib/smartFolders.svelte';
@@ -1797,20 +1797,35 @@ ${bodyHtml}
 					</div>
 				</div>
 			</div>
-		{/if}
-	</div>
-{/if}
-
 {#if showUndoConfirm}
-	<ConfirmDialog
-		message="Are you sure you want to undo your last action?"
-		confirmLabel="Undo"
-		onConfirm={() => {
-			getUndoManager().undo();
-			showUndoConfirm = false;
-		}}
-		onCancel={() => showUndoConfirm = false}
-	/>
+	{#if canUndo()}
+		<ConfirmDialog
+			title="Undo"
+			message={`Are you sure you want to undo your last action? (${getUndoCount()} action${getUndoCount() === 1 ? '' : 's'} left)`}
+			confirmLabel="Yes, undo"
+			onConfirm={() => {
+				getUndoManager().undo();
+				showUndoConfirm = false;
+			}}
+			onCancel={() => {
+				showUndoConfirm = false;
+			}}
+		/>
+	{:else}
+		<ConfirmDialog
+			title="Undo"
+			message="There is nothing to undo."
+			confirmLabel="OK"
+			hideCancel={true}
+			isDanger={false}
+			onConfirm={() => {
+				showUndoConfirm = false;
+			}}
+			onCancel={() => {
+				showUndoConfirm = false;
+			}}
+		/>
+	{/if}
 {/if}
 
 <style>

@@ -96,6 +96,11 @@ export function canUndo(): boolean {
 	return _undoManager.undoStack.length > 0;
 }
 
+export function getUndoCount(): number {
+	if (!_undoManager) return 0;
+	return _undoManager.undoStack.length;
+}
+
 export function destroyYjs() {
 	_wsProvider?.destroy();
 	_idbProvider?.destroy();
