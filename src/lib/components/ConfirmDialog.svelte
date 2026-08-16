@@ -4,9 +4,12 @@
 	let {
 		message,
 		confirmLabel = 'Delete',
+		cancelLabel = 'Cancel',
+		hideCancel = false,
+		isDanger = true,
 		onConfirm,
 		onCancel
-	}: { message: string; confirmLabel?: string; onConfirm: () => void; onCancel: () => void } = $props();
+	}: { message: string; confirmLabel?: string; cancelLabel?: string; hideCancel?: boolean; isDanger?: boolean; onConfirm: () => void; onCancel: () => void } = $props();
 
 	let backdropEl: HTMLDivElement | null = null;
 
@@ -28,8 +31,10 @@
 	<div class="dialog">
 		<p>{message}</p>
 		<div class="actions">
-			<button class="confirm" onclick={onConfirm}>{confirmLabel}</button>
-			<button class="cancel" onclick={onCancel}>Cancel</button>
+			<button class="confirm" class:danger={isDanger} onclick={onConfirm}>{confirmLabel}</button>
+			{#if !hideCancel}
+			<button class="cancel" onclick={onCancel}>{cancelLabel}</button>
+			{/if}
 		</div>
 	</div>
 </div>
@@ -63,6 +68,7 @@
 		font-weight: 600;
 		cursor: pointer;
 	}
-	.confirm { background: #ef4444; color: #fff; }
+	.confirm { background: #6366f1; color: #fff; }
+	.confirm.danger { background: #ef4444; color: #fff; }
 	.cancel { background: var(--bg3); color: var(--text); }
 </style>

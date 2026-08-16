@@ -29,7 +29,7 @@
 		type SheetMeta,
 		type Item
 	} from '$lib/data';
-	import { syncState, docState, idbSynced, commitState, readCommits, viewCommit, createCommit, exitCommitView, type Commit, getUndoManager } from '$lib/yjsStore.svelte';
+	import { syncState, docState, idbSynced, commitState, readCommits, viewCommit, createCommit, exitCommitView, type Commit, getUndoManager, canUndo } from '$lib/yjsStore.svelte';
 	import { auth } from '$lib/auth.svelte';
 	import { settings, updateSettings } from '$lib/settings.svelte';
 	import { getSmartFolders, assignToReport, removeFromReport, deleteReport } from '$lib/smartFolders.svelte';

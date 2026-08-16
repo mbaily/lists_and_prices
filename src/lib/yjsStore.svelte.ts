@@ -91,6 +91,11 @@ export function getUndoManager(): Y.UndoManager {
 	return _undoManager;
 }
 
+export function canUndo(): boolean {
+	if (!_undoManager) return false;
+	return _undoManager.undoStack.length > 0;
+}
+
 export function destroyYjs() {
 	_wsProvider?.destroy();
 	_idbProvider?.destroy();

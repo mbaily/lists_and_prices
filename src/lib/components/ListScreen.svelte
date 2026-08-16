@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { docState, commitState, getUndoManager } from '$lib/yjsStore.svelte';
+	import { docState, commitState, getUndoManager, canUndo } from '$lib/yjsStore.svelte';
 	import { onDestroy, tick, untrack } from 'svelte';
 	import {
 		readItems,
