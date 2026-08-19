@@ -113,6 +113,7 @@
 		z-index: 9999;
 		display: flex;
 		flex-direction: column;
+		overscroll-behavior: none;
 	}
 	.header {
 		display: flex;
@@ -160,7 +161,6 @@
 	}
 	:global(.ql-container) {
 		flex: 1;
-		overflow-y: auto;
 		font-size: 1.05rem;
 		font-family: inherit;
 	}
