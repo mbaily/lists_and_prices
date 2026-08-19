@@ -22,14 +22,7 @@
 			quill = new Quill(editorContainer, {
 				theme: 'snow',
 				modules: {
-					toolbar: [
-						[{ 'header': [1, 2, 3, false] }],
-						['bold', 'italic', 'underline', 'strike'],
-						['blockquote', 'code-block'],
-						[{ 'list': 'ordered'}, { 'list': 'bullet' }],
-						['link'],
-						['clean']
-					]
+					toolbar: false
 				}
 			});
 			
@@ -66,7 +59,6 @@
 <div class="fullscreen-editor-overlay">
 	<div class="header">
 		<button class="close-btn" onclick={requestClose}>Cancel</button>
-		<div class="title">Edit Note</div>
 		<button class="save-btn" onclick={handleSave}>Save</button>
 	</div>
 	
@@ -99,21 +91,16 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		padding: 1rem;
+		padding: 0 1rem;
 		border-bottom: 1px solid var(--border);
 		background: var(--bg2);
-	}
-	.title {
-		font-weight: 600;
-		font-size: 1.1rem;
-		color: var(--text);
 	}
 	.close-btn, .save-btn {
 		background: none;
 		border: none;
 		font-size: 1rem;
 		cursor: pointer;
-		padding: 0.5rem 1rem;
+		padding: 0.25rem 1rem;
 		border-radius: 6px;
 	}
 	.close-btn {
