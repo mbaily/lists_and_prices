@@ -148,9 +148,15 @@
 		flex: 1;
 		display: flex;
 		flex-direction: column;
-		background: #fff;
-		color: #000;
+		background: var(--bg);
+		color: var(--text);
 		overflow: hidden;
+	}
+	:global(.ql-editor) {
+		color: var(--text) !important;
+	}
+	:global(.ql-editor.ql-blank::before) {
+		color: var(--text3) !important;
 	}
 	:global(.ql-container) {
 		flex: 1;
