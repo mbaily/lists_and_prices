@@ -101,15 +101,17 @@
 	}
 </script>
 
-<div class="fullscreen-editor-overlay" style="height: {viewportHeight}; top: {viewportTop};">
-	<div class="header">
-		<button class="close-btn" onclick={requestCancel}>Cancel</button>
-		<button class="close-btn" onclick={requestClose}>Close</button>
-		<button class="save-btn" onclick={handleSave}>Save</button>
-	</div>
-	
-	<div class="editor-wrapper">
-		<div bind:this={editorContainer}></div>
+<div class="fullscreen-editor-overlay">
+	<div class="visual-viewport-container" style="height: {viewportHeight}; top: {viewportTop};">
+		<div class="header">
+			<button class="close-btn" onclick={requestCancel}>Cancel</button>
+			<button class="close-btn" onclick={requestClose}>Close</button>
+			<button class="save-btn" onclick={handleSave}>Save</button>
+		</div>
+		
+		<div class="editor-wrapper">
+			<div bind:this={editorContainer}></div>
+		</div>
 	</div>
 
 	{#if showConfirmCancel}
@@ -140,14 +142,17 @@
 <style>
 	.fullscreen-editor-overlay {
 		position: fixed;
-		top: 0;
-		left: 0;
-		right: 0;
+		inset: 0;
 		background: var(--bg);
 		z-index: 9999;
+		overscroll-behavior: none;
+	}
+	.visual-viewport-container {
+		position: absolute;
+		left: 0;
+		right: 0;
 		display: flex;
 		flex-direction: column;
-		overscroll-behavior: none;
 	}
 	.header {
 		display: flex;
