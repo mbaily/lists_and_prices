@@ -41,6 +41,7 @@
 		if (quill) {
 			let text = quill.getText().replace(/\n$/, '');
 			onSave(text);
+			normalizedInitial = text;
 		}
 	}
 
@@ -59,6 +60,7 @@
 <div class="fullscreen-editor-overlay">
 	<div class="header">
 		<button class="close-btn" onclick={requestClose}>Cancel</button>
+		<button class="close-btn" onclick={requestClose}>Close</button>
 		<button class="save-btn" onclick={handleSave}>Save</button>
 	</div>
 	

@@ -1655,7 +1655,6 @@
 			onSave={(newContent) => {
 				if (fullScreenNoteItem) {
 					updateItem(fullScreenNoteItem.id, { name: newContent });
-					fullScreenNoteItem = null;
 				}
 			}}
 			onClose={() => fullScreenNoteItem = null}
