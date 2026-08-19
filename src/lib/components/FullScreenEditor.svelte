@@ -15,6 +15,7 @@
 	let showConfirmCancel = $state(false);
 	let showConfirmClose = $state(false);
 	let viewportHeight = $state('100vh');
+	let viewportTop = $state('0px');
 	
 	// We keep a normalized version of initialContent to compare against later
 	let normalizedInitial = '';
@@ -23,8 +24,10 @@
 		const updateHeight = () => {
 			if (window.visualViewport) {
 				viewportHeight = `${window.visualViewport.height}px`;
+				viewportTop = `${window.visualViewport.offsetTop}px`;
 			} else {
 				viewportHeight = `${window.innerHeight}px`;
+				viewportTop = `0px`;
 			}
 		};
 
@@ -98,7 +101,7 @@
 	}
 </script>
 
-<div class="fullscreen-editor-overlay" style="height: {viewportHeight};">
+<div class="fullscreen-editor-overlay" style="height: {viewportHeight}; top: {viewportTop};">
 	<div class="header">
 		<button class="close-btn" onclick={requestCancel}>Cancel</button>
 		<button class="close-btn" onclick={requestClose}>Close</button>
