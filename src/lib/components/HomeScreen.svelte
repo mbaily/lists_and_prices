@@ -105,7 +105,7 @@
 
 	function handleGlobalKeydown(e: KeyboardEvent) {
 		// Do not trigger global shortcuts if the user is typing in an input
-		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || (e.target instanceof HTMLElement && e.target.isContentEditable)) return;
 		
 		// Or if a modal/overlay is open
 		if (showSettings || showNewFolder || showNewList || showReportsMenu || infoTarget || sfDialogFolder || checkboxesFolder || renamingId) return;
