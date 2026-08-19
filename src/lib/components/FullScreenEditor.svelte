@@ -194,13 +194,18 @@
 	}
 	:global(.ql-editor) {
 		color: var(--text) !important;
+		padding: 3px !important;
 	}
 	:global(.ql-editor.ql-blank::before) {
 		color: var(--text3) !important;
+		left: 3px !important;
 	}
 	:global(.ql-container) {
 		flex: 1;
 		font-size: 1.05rem;
 		font-family: inherit;
+	}
+	:global(.ql-container.ql-snow) {
+		border: none !important;
 	}
 </style>
