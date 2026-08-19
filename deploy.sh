@@ -34,7 +34,7 @@ sudo chown -R www-data:www-data "$DEST_DIR"
 
 # 4. Install production dependencies in /opt
 echo "📥 Checking dependencies..."
-sudo -u www-data npm install --prefix "$DEST_DIR" --omit=dev
+sudo -u www-data npm install --prefix "$DEST_DIR" --omit=dev --ignore-scripts
 
 # 4a. Rebuild native addons against the current Node version
 echo "🔧 Rebuilding native addons..."
