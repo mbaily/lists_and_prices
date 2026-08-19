@@ -398,6 +398,7 @@ export interface Item {
 	parentId: string | null;
 	note: boolean;
 	pinned: boolean;
+	fullScreen?: boolean;
 	createdAt: string | null;
 	updatedAt: string | null;
 	/** Per-named-checkbox state, keyed by FolderCheckbox.id. Only meaningful
@@ -433,6 +434,7 @@ function yMapToItem(m: Y.Map<unknown>): Item {
 		parentId: (m.get('parentId') as string | null) ?? null,
 		note: (m.get('note') as boolean) ?? false,
 		pinned: (m.get('pinned') as boolean) ?? false,
+		fullScreen: (m.get('fullScreen') as boolean) ?? false,
 		createdAt: (m.get('createdAt') as string | null) ?? null,
 		updatedAt: (m.get('updatedAt') as string | null) ?? null,
 		checks

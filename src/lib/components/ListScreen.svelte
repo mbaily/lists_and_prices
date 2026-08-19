@@ -1478,7 +1478,15 @@
 					<button
 						class="item-name note-name"
 						class:editing={editingId === item.id}
-						onclick={() => selectionMode ? toggleSelectionItem(item.id) : startEditName(item)}
+						onclick={() => {
+							if (selectionMode) {
+								toggleSelectionItem(item.id);
+							} else if (item.fullScreen) {
+								fullScreenNoteItem = item;
+							} else {
+								startEditName(item);
+							}
+						}}
 						onpointerdown={(e) => { if (!selectionMode) onPointerDown(e, item.id); }}
 						onpointermove={cancelLongPress}
 						onpointerup={cancelLongPress}
@@ -1487,7 +1495,14 @@
 					{#if !commitState.isHistorical}
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
-						{ label: '📝 Full Screen', action: () => fullScreenNoteItem = item },
+						{ label: item.fullScreen ? '📉 Not FS' : '📝 Full Screen', action: () => {
+							if (item.fullScreen) {
+								updateItem(item.id, { fullScreen: false });
+							} else {
+								updateItem(item.id, { fullScreen: true });
+								fullScreenNoteItem = item;
+							}
+						}},
 						{ label: 'ℹ️ Info', action: () => infoItem = item },
 						{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => updateItem(item.id, { pinned: !item.pinned }) },
 						...(canAddChildren ? [
