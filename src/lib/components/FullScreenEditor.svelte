@@ -12,6 +12,7 @@
 
 	let editorContainer: HTMLDivElement | null = null;
 	let quill: Quill | null = null;
+	let showConfirmCancel = $state(false);
 	let showConfirmClose = $state(false);
 	
 	// We keep a normalized version of initialContent to compare against later
@@ -45,6 +46,17 @@
 		}
 	}
 
+	function requestCancel() {
+		if (quill) {
+			let currentText = quill.getText().replace(/\n$/, '');
+			if (currentText !== normalizedInitial) {
+				showConfirmCancel = true;
+				return;
+			}
+		}
+		onClose();
+	}
+
 	function requestClose() {
 		if (quill) {
 			let currentText = quill.getText().replace(/\n$/, '');
@@ -59,7 +71,7 @@
 
 <div class="fullscreen-editor-overlay">
 	<div class="header">
-		<button class="close-btn" onclick={requestClose}>Cancel</button>
+		<button class="close-btn" onclick={requestCancel}>Cancel</button>
 		<button class="close-btn" onclick={requestClose}>Close</button>
 		<button class="save-btn" onclick={handleSave}>Save</button>
 	</div>
@@ -68,13 +80,26 @@
 		<div bind:this={editorContainer}></div>
 	</div>
 
-	{#if showConfirmClose}
+	{#if showConfirmCancel}
 		<ConfirmDialog
 			message="You have unsaved changes. Are you sure you want to discard them?"
 			confirmLabel="Discard"
 			cancelLabel="Keep Editing"
 			isDanger={true}
+			onConfirm={() => { showConfirmCancel = false; onClose(); }}
+			onCancel={() => showConfirmCancel = false}
+		/>
+	{/if}
+
+	{#if showConfirmClose}
+		<ConfirmDialog
+			message="You have unsaved changes. Would you like to save them before closing?"
+			confirmLabel="Discard"
+			altLabel="Save"
+			cancelLabel="Cancel"
+			isDanger={true}
 			onConfirm={() => { showConfirmClose = false; onClose(); }}
+			onAlt={() => { showConfirmClose = false; handleSave(); onClose(); }}
 			onCancel={() => showConfirmClose = false}
 		/>
 	{/if}

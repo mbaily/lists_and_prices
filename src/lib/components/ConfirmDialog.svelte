@@ -5,11 +5,13 @@
 		message,
 		confirmLabel = 'Delete',
 		cancelLabel = 'Cancel',
+		altLabel,
 		hideCancel = false,
 		isDanger = true,
 		onConfirm,
-		onCancel
-	}: { message: string; confirmLabel?: string; cancelLabel?: string; hideCancel?: boolean; isDanger?: boolean; onConfirm: () => void; onCancel: () => void } = $props();
+		onCancel,
+		onAlt
+	}: { message: string; confirmLabel?: string; cancelLabel?: string; altLabel?: string; hideCancel?: boolean; isDanger?: boolean; onConfirm: () => void; onCancel: () => void; onAlt?: () => void } = $props();
 
 	let backdropEl: HTMLDivElement | null = null;
 
@@ -32,6 +34,9 @@
 		<p>{message}</p>
 		<div class="actions">
 			<button class="confirm" class:danger={isDanger} onclick={onConfirm}>{confirmLabel}</button>
+			{#if altLabel}
+			<button class="alt" onclick={onAlt}>{altLabel}</button>
+			{/if}
 			{#if !hideCancel}
 			<button class="cancel" onclick={onCancel}>{cancelLabel}</button>
 			{/if}
@@ -59,7 +64,7 @@
 	}
 	p { margin: 0 0 1.25rem; font-size: 0.95rem; }
 	.actions { display: flex; gap: 0.5rem; }
-	.confirm, .cancel {
+	.confirm, .alt, .cancel {
 		flex: 1;
 		padding: 0.7rem;
 		border: none;
@@ -70,5 +75,6 @@
 	}
 	.confirm { background: #6366f1; color: #fff; }
 	.confirm.danger { background: #ef4444; color: #fff; }
+	.alt { background: #6366f1; color: #fff; }
 	.cancel { background: var(--bg3); color: var(--text); }
 </style>
