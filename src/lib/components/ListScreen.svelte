@@ -230,7 +230,8 @@
 
 	function handleGlobalKeydown(e: KeyboardEvent) {
 		// Do not trigger global shortcuts if the user is typing in an input
-		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || (e.target instanceof HTMLElement && e.target.isContentEditable)) return;
+		if (fullScreenNoteItem !== null) return;
 
 		// Modifier keys should not trigger a bind by themselves
 		if (['Control', 'Meta', 'Alt', 'Shift', 'CapsLock'].includes(e.key)) return;
