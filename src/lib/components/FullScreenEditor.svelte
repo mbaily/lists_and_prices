@@ -14,9 +14,38 @@
 	let quill: Quill | null = null;
 	let showConfirmCancel = $state(false);
 	let showConfirmClose = $state(false);
+	let viewportHeight = $state('100vh');
 	
 	// We keep a normalized version of initialContent to compare against later
 	let normalizedInitial = '';
+
+	$effect(() => {
+		const updateHeight = () => {
+			if (window.visualViewport) {
+				viewportHeight = `${window.visualViewport.height}px`;
+			} else {
+				viewportHeight = `${window.innerHeight}px`;
+			}
+		};
+
+		if (window.visualViewport) {
+			window.visualViewport.addEventListener('resize', updateHeight);
+			window.visualViewport.addEventListener('scroll', updateHeight);
+		} else {
+			window.addEventListener('resize', updateHeight);
+		}
+		
+		updateHeight();
+
+		return () => {
+			if (window.visualViewport) {
+				window.visualViewport.removeEventListener('resize', updateHeight);
+				window.visualViewport.removeEventListener('scroll', updateHeight);
+			} else {
+				window.removeEventListener('resize', updateHeight);
+			}
+		};
+	});
 
 	onMount(() => {
 		if (editorContainer) {
@@ -69,7 +98,7 @@
 	}
 </script>
 
-<div class="fullscreen-editor-overlay">
+<div class="fullscreen-editor-overlay" style="height: {viewportHeight};">
 	<div class="header">
 		<button class="close-btn" onclick={requestCancel}>Cancel</button>
 		<button class="close-btn" onclick={requestClose}>Close</button>
@@ -108,7 +137,9 @@
 <style>
 	.fullscreen-editor-overlay {
 		position: fixed;
-		inset: 0;
+		top: 0;
+		left: 0;
+		right: 0;
 		background: var(--bg);
 		z-index: 9999;
 		display: flex;
