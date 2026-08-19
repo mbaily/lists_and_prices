@@ -10,6 +10,7 @@
 		deleteList,
 		updateFolder,
 		updateList,
+		reorderMixedItems,
 		reorderFolders,
 		reorderLists,
 		readListsInTreeOrder,
@@ -443,12 +444,7 @@
 		const lists = childLists.map(l => ({ type: 'list', id: l.id, original: l }));
 		const sheets = childSheets.map(s => ({ type: 'sheet', id: s.id, original: s }));
 		
-		let items = [];
-		if (currentFolderData?.foldersFirst) {
-			items = [...folders, ...lists];
-		} else {
-			items = [...lists, ...folders];
-		}
+		let items = [...folders, ...lists].sort((a, b) => a.original.order - b.original.order);
 		items = [...items, ...sheets];
 		return items;
 	});
@@ -757,13 +753,13 @@
 
 	// ── Touch drag reorder ────────────────────────────────────────────────────────
 	// HTML5 drag doesn't work on iOS — use touch events instead.
-	// 'folder' or 'list' drag, tracked independently.
-	type DragKind = 'folder' | 'list';
+	// 'mixed' (folders/lists) or 'sheet' drag, tracked independently.
+	type DragKind = 'mixed' | 'sheet';
 	let touchDragKind = $state<DragKind | null>(null);
 	let touchDragFrom = $state<number | null>(null);
 	let touchDragOver = $state<number | null>(null);
 
-	function startDrag(e: PointerEvent, kind: DragKind, index: number) {
+	function startDrag(e: PointerEvent, kind: 'mixed' | 'sheet', index: number) {
 		e.stopPropagation();
 		// Close any open tag so drag and move can't conflict
 		clearTag();
@@ -785,12 +781,15 @@
 		}
 		function onEnd() {
 			if (touchDragFrom !== null && touchDragOver !== null && touchDragFrom !== touchDragOver) {
-				if (kind === 'folder') {
-					// Don't reorder inside the virtual archive root
-					if (currentFolderId !== ARCHIVE_ID) reorderFolders(currentFolderId, touchDragFrom, touchDragOver, childFolders.map((f) => f.id));
-				} else {
-					// Lists always have a real folderId (archive root shows no lists)
-					if (currentFolderId && currentFolderId !== ARCHIVE_ID) reorderLists(currentFolderId, touchDragFrom, touchDragOver, childLists.map((l) => l.id));
+				if (kind === 'mixed') {
+					if (currentFolderId !== ARCHIVE_ID) {
+						const mixedItems = viewableItems
+							.filter(i => i.type === 'folder' || i.type === 'list')
+							.map(i => ({ id: i.id, type: i.type }));
+						reorderMixedItems(currentFolderId, touchDragFrom, touchDragOver, mixedItems);
+					}
+				} else if (kind === 'sheet') {
+					reorderSheets(currentFolderId, touchDragFrom, touchDragOver, childSheets.map((s) => s.id));
 				}
 			}
 			touchDragKind = null;
@@ -1444,10 +1443,8 @@ ${bodyHtml}
 			</div>
 		{/if}
 
-		<!-- Folders and Lists — order controlled by parent folder's foldersFirst setting -->
-		{#snippet folderRows()}
-		<!-- Folders -->
-		{#each childFolders as folder, i}
+		<!-- Mixed Folders and Lists -->
+		{#snippet folderRow(folder, i)}
 			{@const isPathThrough = isInArchiveView && pathThroughFolderIds.has(folder.id) && !folder.archived}
 			<div
 				id="row-{folder.id}"
@@ -1455,10 +1452,10 @@ ${bodyHtml}
 				class:cursored={activeCursorId === folder.id}
 				class:done={folder.done}
 				class:archived={folder.archived}
-				class:drag-source={touchDragKind === 'folder' && touchDragFrom === i}
-				class:drag-above={touchDragKind === 'folder' && touchDragOver === i && touchDragFrom !== null && touchDragFrom > i}
-				class:drag-below={touchDragKind === 'folder' && touchDragOver === i && touchDragFrom !== null && touchDragFrom < i}
-				data-drag-kind="folder"
+				class:drag-source={touchDragKind === 'mixed' && touchDragFrom === i}
+				class:drag-above={touchDragKind === 'mixed' && touchDragOver === i && touchDragFrom !== null && touchDragFrom > i}
+				class:drag-below={touchDragKind === 'mixed' && touchDragOver === i && touchDragFrom !== null && touchDragFrom < i}
+				data-drag-kind="mixed"
 				data-drag-index={i}
 				style="--row-color:{folder.color}"
 			>
@@ -1498,7 +1495,7 @@ ${bodyHtml}
 						style={commitState.isHistorical ? 'cursor: default' : ''}
 					>★</button>
 					{#if !commitState.isHistorical}
-					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'folder', i)}>☰</button>
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'mixed', i)}>☰</button>
 					<RowMenu items={[
 						{ label: '⚙ Folder settings', submenu: [
 							{ label: 'ℹ️ Info', action: () => infoTarget = { kind: 'folder', data: folder } },
@@ -1507,9 +1504,6 @@ ${bodyHtml}
 							{ label: folder.localNav ? '🌐 Global navigation' : '📂 Local navigation', action: () => updateFolder(folder.id, { localNav: !folder.localNav }) },
 						]},
 						{ label: '📋 Smart Folder', action: () => { sfDialogFolder = folder; sfNewName = ''; } },
-						...(folderHasBothKinds(folder.id)
-							? [{ label: folder.foldersFirst ? '📋 Lists first' : '📁 Folders first', action: () => updateFolder(folder.id, { foldersFirst: !folder.foldersFirst }) }]
-							: []),
 						{ label: folder.archived ? '📤 Unarchive' : '📥 Archive', action: () => folder.archived ? unarchiveFolder(folder.id) : archiveFolder(folder.id) },
 						{ label: '🔗 Tag as Link', action: () => writeClipboard(`[[folder:${folder.id}]]`) },
 						...(hasTag && taggedFolderId !== folder.id
@@ -1523,22 +1517,19 @@ ${bodyHtml}
 					{/if}
 				{/if}
 			</div>
-		{/each}
 		{/snippet}
 
-		{#snippet listRows()}
-		<!-- Lists -->
-		{#each childLists as list, i}
+		{#snippet listRow(list, i)}
 			<div
 				id="row-{list.id}"
 				class="row list-row"
 				class:cursored={activeCursorId === list.id}
 				class:done={list.done}
 				class:archived={list.archived}
-				class:drag-source={touchDragKind === 'list' && touchDragFrom === i}
-				class:drag-above={touchDragKind === 'list' && touchDragOver === i && touchDragFrom !== null && touchDragFrom > i}
-				class:drag-below={touchDragKind === 'list' && touchDragOver === i && touchDragFrom !== null && touchDragFrom < i}
-				data-drag-kind="list"
+				class:drag-source={touchDragKind === 'mixed' && touchDragFrom === i}
+				class:drag-above={touchDragKind === 'mixed' && touchDragOver === i && touchDragFrom !== null && touchDragFrom > i}
+				class:drag-below={touchDragKind === 'mixed' && touchDragOver === i && touchDragFrom !== null && touchDragFrom < i}
+				data-drag-kind="mixed"
 				data-drag-index={i}
 				style="--row-color:{list.color}"
 			>
@@ -1547,7 +1538,7 @@ ${bodyHtml}
 						{list.name}
 					</div>
 					{#if !commitState.isHistorical}
-					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'list', i)}>☰</button>
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'mixed', i)}>☰</button>
 					<RowMenu items={[
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete divider?`, () => deleteList(list.id)) }
 					]} />
@@ -1583,7 +1574,7 @@ ${bodyHtml}
 						style={commitState.isHistorical ? 'cursor: default' : ''}
 					>★</button>
 					{#if !commitState.isHistorical}
-					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'list', i)}>☰</button>
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startDrag(e, 'mixed', i)}>☰</button>
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoTarget = { kind: 'list', data: list } },
 						{ label: '✏ Rename', action: () => startRename(list.id, list.name, 'list', list.color) },
@@ -1597,16 +1588,15 @@ ${bodyHtml}
 					{/if}
 				{/if}
 			</div>
-		{/each}
 		{/snippet}
 
-		{#if currentFolderFoldersFirst}
-			{@render folderRows()}
-			{@render listRows()}
-		{:else}
-			{@render listRows()}
-			{@render folderRows()}
-		{/if}
+		{#each viewableItems.filter(i => i.type !== 'sheet') as item, i}
+			{#if item.type === 'folder'}
+				{@render folderRow(item.original, i)}
+			{:else if item.type === 'list'}
+				{@render listRow(item.original, i)}
+			{/if}
+		{/each}
 
 		<!-- Spreadsheets -->
 		{#each childSheets as sheet}

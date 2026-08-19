@@ -68,18 +68,30 @@ function yMapToFolder(m: Y.Map<unknown>): Folder {
 	};
 }
 
+export function getSharedOrderExtremes(doc: Y.Doc, parentId: string | null) {
+	const folders = (getFolders(doc).toArray() as Y.Map<unknown>[]).filter((f) => f.get('parentId') === parentId);
+	const lists = (getLists(doc).toArray() as Y.Map<unknown>[]).filter((l) => l.get('folderId') === parentId);
+	const all = [...folders, ...lists];
+	if (all.length === 0) return { min: 0, max: -1 };
+	let min = Infinity;
+	let max = -Infinity;
+	for (const m of all) {
+		const o = m.get('order') as number ?? 0;
+		if (o < min) min = o;
+		if (o > max) max = o;
+	}
+	return { min, max };
+}
+
 export function createFolder(name: string, parentId: string | null, color = '#6366f1', addPosition: 'top' | 'bottom' = 'bottom'): string {
 	const doc = getDoc();
 	const id = uid();
 	const now = new Date().toISOString();
 	doc.transact(() => {
 		const folders = getFolders(doc);
-		const existing = folders.toArray() as Y.Map<unknown>[];
-		const siblings = existing.filter((f) => f.get('parentId') === parentId);
-		const newOrder = addPosition === 'top' ? -1 : siblings.length;
-		if (addPosition === 'top') {
-			for (const sib of siblings) sib.set('order', (sib.get('order') as number ?? 0) + 1);
-		}
+		const extremes = getSharedOrderExtremes(doc, parentId);
+		const newOrder = addPosition === 'top' ? extremes.min - 1 : extremes.max + 1;
+		
 		const m = new Y.Map<unknown>();
 		m.set('id', id);
 		m.set('name', name);
@@ -309,34 +321,32 @@ export function createList(
 		const existing = (lists.toArray() as Y.Map<unknown>[]).filter(
 			(l) => l.get('folderId') === folderId
 		);
-		let newOrder = addPosition === 'top' ? -1 : existing.length;
-		let placedRelativeToDivider = false;
+		const extremes = getSharedOrderExtremes(doc, folderId);
+		let newOrder = addPosition === 'top' ? extremes.min - 1 : extremes.max + 1;
 
 		if (isFutureList) {
 			const divider = existing.find(l => l.get('type') === 'divider');
 			if (divider) {
 				const dividerOrder = divider.get('order') as number;
+				const allFolders = (getFolders(doc).toArray() as Y.Map<unknown>[]).filter((f) => f.get('parentId') === folderId);
+				const all = [...allFolders, ...existing];
+				
 				if (addPosition === 'top') {
 					newOrder = dividerOrder;
-					for (const sib of existing) {
+					for (const sib of all) {
 						if ((sib.get('order') as number) >= dividerOrder) {
 							sib.set('order', (sib.get('order') as number) + 1);
 						}
 					}
 				} else {
 					newOrder = dividerOrder + 1;
-					for (const sib of existing) {
+					for (const sib of all) {
 						if ((sib.get('order') as number) > dividerOrder) {
 							sib.set('order', (sib.get('order') as number) + 1);
 						}
 					}
 				}
-				placedRelativeToDivider = true;
 			}
-		}
-
-		if (!placedRelativeToDivider && addPosition === 'top') {
-			for (const sib of existing) sib.set('order', (sib.get('order') as number ?? 0) + 1);
 		}
 
 		const m = new Y.Map<unknown>();
@@ -774,6 +784,52 @@ export function reorderFolders(parentId: string | null, fromIndex: number, toInd
 	doc.transact(() => all.forEach((f, idx) => updateFolder(f.id, { order: idx })));
 }
 
+export function reorderMixedItems(parentId: string | null, fromIndex: number, toIndex: number, visibleItems?: {id: string, type: string}[]) {
+	const doc = getDoc();
+	const folders = readFolders().filter((f) => f.parentId === parentId).map((f) => ({ ...f, _type: 'folder' }));
+	const lists = readLists().filter((l) => l.folderId === parentId).map((l) => ({ ...l, _type: 'list' }));
+	const all = [...folders, ...lists].sort((a, b) => a.order - b.order);
+
+	if (visibleItems && visibleItems.length > 0) {
+		const draggedId = visibleItems[fromIndex].id;
+		const draggedItemIndex = all.findIndex((i) => i.id === draggedId);
+		if (draggedItemIndex === -1) return;
+
+		const newVisible = [...visibleItems];
+		const [movedId] = newVisible.splice(fromIndex, 1);
+		newVisible.splice(toIndex, 0, movedId);
+
+		const prevVisibleId = toIndex > 0 ? newVisible[toIndex - 1].id : null;
+		const nextVisibleId = toIndex < newVisible.length - 1 ? newVisible[toIndex + 1].id : null;
+
+		const [moved] = all.splice(draggedItemIndex, 1);
+
+		let insertIndex = all.length;
+		if (nextVisibleId) {
+			const nextIdx = all.findIndex((i) => i.id === nextVisibleId);
+			insertIndex = nextIdx !== -1 ? nextIdx : all.length;
+		} else if (prevVisibleId) {
+			const prevIdx = all.findIndex((i) => i.id === prevVisibleId);
+			insertIndex = prevIdx !== -1 ? prevIdx + 1 : all.length;
+		}
+
+		all.splice(insertIndex, 0, moved);
+	} else {
+		const [moved] = all.splice(fromIndex, 1);
+		all.splice(toIndex, 0, moved);
+	}
+
+	doc.transact(() => {
+		all.forEach((item, idx) => {
+			if (item._type === 'folder') {
+				updateFolder(item.id, { order: idx });
+			} else {
+				updateList(item.id, { order: idx });
+			}
+		});
+	});
+}
+
 export function reorderLists(folderId: string, fromIndex: number, toIndex: number, visibleIds?: string[]) {
 	const doc = getDoc();
 	const all = readLists().filter((l) => l.folderId === folderId).sort((a, b) => a.order - b.order);
@@ -830,17 +886,14 @@ export function readListsInTreeOrder(folders?: Folder[], lists?: ListMeta[]): Li
 
 		const childFolders = allFolders
 			.filter((f) => f.parentId === parentId && !isFolderEffectivelyArchived(f.id, allFolders))
-			.sort((a, b) => a.order - b.order);
+			.map((f) => ({ ...f, _type: 'folder' }));
 		const childLists = allLists
 			.filter((l) => l.folderId === parentId && !isListEffectivelyArchived(l, allFolders) && !l.done && !folder?.localNav)
-			.sort((a, b) => a.order - b.order);
-		const foldersFirst = folder?.foldersFirst ?? true;
-		if (foldersFirst) {
-			for (const f of childFolders) visit(f.id);
-			result.push(...childLists);
-		} else {
-			result.push(...childLists);
-			for (const f of childFolders) visit(f.id);
+			.map((l) => ({ ...l, _type: 'list' }));
+		const mixed = [...childFolders, ...childLists].sort((a, b) => a.order - b.order);
+		for (const item of mixed) {
+			if (item._type === 'folder') visit(item.id);
+			else result.push(item as unknown as ListMeta);
 		}
 	}
 
