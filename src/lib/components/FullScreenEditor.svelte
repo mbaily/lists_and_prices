@@ -1,0 +1,147 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import Quill from 'quill';
+	import 'quill/dist/quill.snow.css';
+	import ConfirmDialog from './ConfirmDialog.svelte';
+
+	let {
+		initialContent,
+		onSave,
+		onClose
+	}: { initialContent: string; onSave: (content: string) => void; onClose: () => void } = $props();
+
+	let editorContainer: HTMLDivElement | null = null;
+	let quill: Quill | null = null;
+	let showConfirmClose = $state(false);
+	
+	// We keep a normalized version of initialContent to compare against later
+	let normalizedInitial = '';
+
+	onMount(() => {
+		if (editorContainer) {
+			quill = new Quill(editorContainer, {
+				theme: 'snow',
+				modules: {
+					toolbar: [
+						[{ 'header': [1, 2, 3, false] }],
+						['bold', 'italic', 'underline', 'strike'],
+						['blockquote', 'code-block'],
+						[{ 'list': 'ordered'}, { 'list': 'bullet' }],
+						['link'],
+						['clean']
+					]
+				}
+			});
+			
+			if (initialContent.includes('<') && initialContent.includes('>')) {
+				quill.root.innerHTML = initialContent;
+			} else {
+				quill.setText(initialContent);
+			}
+			
+			normalizedInitial = quill.getText().replace(/\n$/, '');
+			quill.focus();
+		}
+	});
+
+	function handleSave() {
+		if (quill) {
+			let text = quill.getText().replace(/\n$/, '');
+			onSave(text);
+		}
+	}
+
+	function requestClose() {
+		if (quill) {
+			let currentText = quill.getText().replace(/\n$/, '');
+			if (currentText !== normalizedInitial) {
+				showConfirmClose = true;
+				return;
+			}
+		}
+		onClose();
+	}
+</script>
+
+<div class="fullscreen-editor-overlay">
+	<div class="header">
+		<button class="close-btn" onclick={requestClose}>Cancel</button>
+		<div class="title">Edit Note</div>
+		<button class="save-btn" onclick={handleSave}>Save</button>
+	</div>
+	
+	<div class="editor-wrapper">
+		<div bind:this={editorContainer}></div>
+	</div>
+
+	{#if showConfirmClose}
+		<ConfirmDialog
+			message="You have unsaved changes. Are you sure you want to discard them?"
+			confirmLabel="Discard"
+			cancelLabel="Keep Editing"
+			isDanger={true}
+			onConfirm={() => { showConfirmClose = false; onClose(); }}
+			onCancel={() => showConfirmClose = false}
+		/>
+	{/if}
+</div>
+
+<style>
+	.fullscreen-editor-overlay {
+		position: fixed;
+		inset: 0;
+		background: var(--bg);
+		z-index: 9999;
+		display: flex;
+		flex-direction: column;
+	}
+	.header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 1rem;
+		border-bottom: 1px solid var(--border);
+		background: var(--bg2);
+	}
+	.title {
+		font-weight: 600;
+		font-size: 1.1rem;
+		color: var(--text);
+	}
+	.close-btn, .save-btn {
+		background: none;
+		border: none;
+		font-size: 1rem;
+		cursor: pointer;
+		padding: 0.5rem 1rem;
+		border-radius: 6px;
+	}
+	.close-btn {
+		color: var(--text2);
+	}
+	.close-btn:hover {
+		background: var(--bg3);
+	}
+	.save-btn {
+		background: #6366f1;
+		color: #fff;
+		font-weight: 600;
+	}
+	.save-btn:hover {
+		background: #4f46e5;
+	}
+	.editor-wrapper {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		background: #fff;
+		color: #000;
+		overflow: hidden;
+	}
+	:global(.ql-container) {
+		flex: 1;
+		overflow-y: auto;
+		font-size: 1.05rem;
+		font-family: inherit;
+	}
+</style>

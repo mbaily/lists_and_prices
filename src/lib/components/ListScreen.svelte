@@ -31,6 +31,7 @@
 	import RowMenu from './RowMenu.svelte';
 	import InfoDialog from './InfoDialog.svelte';
 	import CopyLinkDialog from './CopyLinkDialog.svelte';
+	import FullScreenEditor from './FullScreenEditor.svelte';
 
 	let {
 		listId,
@@ -1058,6 +1059,7 @@
 
 	// ── Info dialog ───────────────────────────────────────────────────────────
 	let infoItem = $state<Item | null>(null);
+	let fullScreenNoteItem = $state<Item | null>(null);
 
 	// ── Copy-link dialog ─────────────────────────────────────────────────────
 	let copyLinksItem = $state<Item | null>(null);
@@ -1484,6 +1486,7 @@
 					{#if !commitState.isHistorical}
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
+						{ label: '📝 Full Screen', action: () => fullScreenNoteItem = item },
 						{ label: 'ℹ️ Info', action: () => infoItem = item },
 						{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => updateItem(item.id, { pinned: !item.pinned }) },
 						...(canAddChildren ? [
@@ -1645,6 +1648,19 @@
 	{/if}
 
 	<!-- Info dialog -->
+	{#if fullScreenNoteItem}
+		<FullScreenEditor
+			initialContent={fullScreenNoteItem.name}
+			onSave={(newContent) => {
+				if (fullScreenNoteItem) {
+					updateItem(fullScreenNoteItem.id, { name: newContent });
+					fullScreenNoteItem = null;
+				}
+			}}
+			onClose={() => fullScreenNoteItem = null}
+		/>
+	{/if}
+
 	{#if infoItem}
 		{@const it = infoItem}
 		<InfoDialog
