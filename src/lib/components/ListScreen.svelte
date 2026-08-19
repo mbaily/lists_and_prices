@@ -1051,6 +1051,10 @@
 	let confirmMsg = $state('');
 	let confirmLabel = $state('Delete');
 	let confirmAction = $state<(() => void) | null>(null);
+	function tName(name: string) {
+		if (!name) return '';
+		return name.length > 30 ? name.slice(0, 30) + '…' : name;
+	}
 
 	function askDelete(msg: string, action: () => void, label = 'Delete') {
 		confirmMsg = msg;
@@ -1357,7 +1361,7 @@
 						{#if !commitState.isHistorical}
 						<button
 							class="pin-chip-unpin"
-							onclick={() => askDelete(`Unpin "${pItem.name}"?`, () => updateItem(pItem.id, { pinned: false }), 'Unpin')}
+							onclick={() => askDelete(`Unpin "${tName(pItem.name)}"?`, () => updateItem(pItem.id, { pinned: false }), 'Unpin')}
 							title="Unpin"
 							aria-label="Unpin"
 						>📍</button
@@ -1469,7 +1473,7 @@
 						{ label: '🔗 Tag as Link', action: () => copyRefToClipboard(item.id) },
 						...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItem = item) }] : []),
 						...getReparentMenuItem(item.id),
-						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
+						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${tName(item.name)}"?`, () => deleteItemCascade(item.id)) }
 					]} />
 					{/if}
 				{:else if item.note}
@@ -1512,7 +1516,7 @@
 						{ label: '🔗 Tag as Link', action: () => copyRefToClipboard(item.id) },
 						...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItem = item) }] : []),
 						...getReparentMenuItem(item.id),
-						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
+						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${tName(item.name)}"?`, () => deleteItemCascade(item.id)) }
 					]} />
 					{/if}
 				{:else if isPriced}
@@ -1555,7 +1559,7 @@
 							{ label: '🔗 Tag as Link', action: () => copyRefToClipboard(item.id) },
 							...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItem = item) }] : []),
 							...getReparentMenuItem(item.id),
-							{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
+							{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${tName(item.name)}"?`, () => deleteItemCascade(item.id)) }
 						]} />
 						{/if}
 					</div>
@@ -1585,7 +1589,7 @@
 						{ label: '🔗 Tag as Link', action: () => copyRefToClipboard(item.id) },
 						...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItem = item) }] : []),
 						...getReparentMenuItem(item.id),
-						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${item.name}"?`, () => deleteItemCascade(item.id)) }
+						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${tName(item.name)}"?`, () => deleteItemCascade(item.id)) }
 					]} />
 					{/if}
 				{/if}
