@@ -958,8 +958,16 @@
 
 	async function copyAsJournal() {
 		const lines: string[] = [];
-		for (const { item } of treeItems) {
-			if (item.heading) continue;
+		const journalItems = treeItems
+			.map(({ item }) => item)
+			.filter((item) => !item.heading)
+			.sort((a, b) => {
+				const tA = a.createdAt ? new Date(a.createdAt).getTime() : Infinity;
+				const tB = b.createdAt ? new Date(b.createdAt).getTime() : Infinity;
+				return (isNaN(tA) ? Infinity : tA) - (isNaN(tB) ? Infinity : tB);
+			});
+
+		for (const item of journalItems) {
 			const dateStr = fmtJournalDate(item.createdAt);
 			const prefix = dateStr ? `${dateStr} ` : '';
 			lines.push(`  * ${prefix}${item.name}`);
