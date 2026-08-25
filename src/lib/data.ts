@@ -18,6 +18,7 @@ export interface Folder {
 	color: string;
 	parentId: string | null;
 	order: number;
+	favouriteOrder?: number;
 	done: boolean;
 	favourite: boolean;
 	archived: boolean;
@@ -54,6 +55,7 @@ function yMapToFolder(m: Y.Map<unknown>): Folder {
 		color: (m.get('color') as string) ?? '#6366f1',
 		parentId: (m.get('parentId') as string | null) ?? null,
 		order: (m.get('order') as number) ?? 0,
+		favouriteOrder: (m.get('favouriteOrder') as number | undefined) ?? (m.get('order') as number) ?? 0,
 		done: (m.get('done') as boolean) ?? false,
 		favourite: (m.get('favourite') as boolean) ?? false,
 		archived: (m.get('archived') as boolean) ?? false,
@@ -268,6 +270,7 @@ export interface ListMeta {
 	folderId: string;
 	type: 'plain' | 'priced' | 'divider';
 	order: number;
+	favouriteOrder?: number;
 	done: boolean;
 	favourite: boolean;
 	archived: boolean;
@@ -292,6 +295,7 @@ function yMapToList(m: Y.Map<unknown>): ListMeta {
 		folderId: m.get('folderId') as string,
 		type: (m.get('type') as 'plain' | 'priced' | 'divider') ?? 'plain',
 		order: (m.get('order') as number) ?? 0,
+		favouriteOrder: (m.get('favouriteOrder') as number | undefined) ?? (m.get('order') as number) ?? 0,
 		done: (m.get('done') as boolean) ?? false,
 		favourite: (m.get('favourite') as boolean) ?? false,
 		archived: (m.get('archived') as boolean) ?? false,
@@ -864,6 +868,38 @@ export function reorderLists(folderId: string, fromIndex: number, toIndex: numbe
 	}
 
 	doc.transact(() => all.forEach((l, idx) => updateList(l.id, { order: idx })));
+}
+
+export function getMaxFavouriteOrder(): number {
+	const folders = readFolders().filter((f) => f.favourite);
+	const lists = readLists().filter((l) => l.favourite);
+	let max = -1;
+	for (const f of folders) {
+		const fo = f.favouriteOrder ?? 0;
+		if (fo > max) max = fo;
+	}
+	for (const l of lists) {
+		const fo = l.favouriteOrder ?? 0;
+		if (fo > max) max = fo;
+	}
+	return max;
+}
+
+export function reorderFavourites(items: { id: string; type: 'folder' | 'list' }[], fromIndex: number, toIndex: number) {
+	const doc = getDoc();
+	const reordered = [...items];
+	const [moved] = reordered.splice(fromIndex, 1);
+	reordered.splice(toIndex, 0, moved);
+
+	doc.transact(() => {
+		reordered.forEach((item, idx) => {
+			if (item.type === 'folder') {
+				updateFolder(item.id, { favouriteOrder: idx });
+			} else {
+				updateList(item.id, { favouriteOrder: idx });
+			}
+		});
+	});
 }
 
 /**

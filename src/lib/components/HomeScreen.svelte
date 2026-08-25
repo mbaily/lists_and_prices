@@ -14,6 +14,7 @@
 		reorderFolders,
 		reorderLists,
 		readListsInTreeOrder,
+		getMaxFavouriteOrder,
 		isDescendant,
 		isFolderEffectivelyArchived,
 		isListEffectivelyArchived,
@@ -46,6 +47,7 @@
 	import InfoDialog from './InfoDialog.svelte';
 	import FolderCheckboxesDialog from './FolderCheckboxesDialog.svelte';
 	import CommitsScreen from './CommitsScreen.svelte';
+	import FavouritesOrderScreen from './FavouritesOrderScreen.svelte';
 
 	let { onLogout }: { onLogout: () => void } = $props();
 	let showUndoConfirm = $state(false);
@@ -88,6 +90,7 @@
 	let openListId = $state<string | null>(_init.openListId);
 	let openItemId = $state<string | null>(null);
 	let showSettings = $state(false);
+	let showFavouritesOrder = $state(false);
 	let showCommitsModal = $state(false);
 
 	let cursorMemory = $state<Record<string, string>>(
@@ -109,7 +112,7 @@
 		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || (e.target instanceof HTMLElement && e.target.isContentEditable)) return;
 		
 		// Or if a modal/overlay is open
-		if (showSettings || showNewFolder || showNewList || showReportsMenu || infoTarget || sfDialogFolder || checkboxesFolder || renamingId) return;
+		if (showSettings || showFavouritesOrder || showNewFolder || showNewList || showReportsMenu || infoTarget || sfDialogFolder || checkboxesFolder || renamingId) return;
 
 		// Modifier keys should not trigger a bind by themselves
 		if (['Control', 'Meta', 'Alt', 'Shift', 'CapsLock'].includes(e.key)) return;
@@ -456,6 +459,11 @@
 	// ── Favourites ───────────────────────────────────────────────────────────────────────
 	let favouriteLists = $derived(allLists.filter((l) => l.favourite && !isListEffectivelyArchived(l, allFolders)));
 	let favouriteFolders = $derived(allFolders.filter((f) => f.favourite && !isFolderEffectivelyArchived(f.id, allFolders)));
+	let favouriteItems = $derived.by(() => {
+		const folders = favouriteFolders.map((f) => ({ type: 'folder' as const, item: f, order: f.favouriteOrder ?? f.order ?? 0 }));
+		const lists = favouriteLists.map((l) => ({ type: 'list' as const, item: l, order: l.favouriteOrder ?? l.order ?? 0 }));
+		return [...folders, ...lists].sort((a, b) => a.order - b.order);
+	});
 
 	// ── Tags ──────────────────────────────────────────────────────────────────────
 	// Scoped to the current folder's direct visible children (pre-filter) so that
@@ -1149,7 +1157,7 @@ ${bodyHtml}
 {#if openSheetId}
 	<SpreadsheetScreen sheetId={openSheetId} onBack={() => openSheetId = null} />
 {:else if openListId}
-	<ListScreen listId={openListId} highlightItemId={openItemId} orderedLists={navOrderedLists} onHome={() => { openListId = null; openItemId = null; breadcrumb = [null]; }} onOpenList={(id) => (openListId = id)} savedSearch={savedSearch} onRestoreSearch={() => { openListId = null; openItemId = null; breadcrumb = [null]; restoreSearch(); }} onTagClick={(tag) => { openListId = null; openItemId = null; breadcrumb = [null]; activeTagFilter = null; showSearch = true; searchQuery = '#' + tag; savedSearch = '#' + tag; tick().then(() => searchInputEl?.focus()); }} onNavigateTo={(folderId) => {
+	<ListScreen listId={openListId} highlightItemId={openItemId} orderedLists={navOrderedLists} onHome={() => { openListId = null; openItemId = null; breadcrumb = [null]; }} onOpenList={(id) => (openListId = id)} onOpenFavouritesOrder={() => { openListId = null; showFavouritesOrder = true; }} savedSearch={savedSearch} onRestoreSearch={() => { openListId = null; openItemId = null; breadcrumb = [null]; restoreSearch(); }} onTagClick={(tag) => { openListId = null; openItemId = null; breadcrumb = [null]; activeTagFilter = null; showSearch = true; searchQuery = '#' + tag; savedSearch = '#' + tag; tick().then(() => searchInputEl?.focus()); }} onNavigateTo={(folderId) => {
 		openListId = null;
 		// Reconstruct the full ancestor path to folderId so the breadcrumb is correct
 		// regardless of which folder the user was in when they opened the list.
@@ -1166,6 +1174,29 @@ ${bodyHtml}
 		}
 		breadcrumb = [...trail, ...ancestors];
 	}} />
+{:else if showFavouritesOrder}
+	<FavouritesOrderScreen
+		onBack={() => (showFavouritesOrder = false)}
+		onNavigateFolder={(folderId) => {
+			showFavouritesOrder = false;
+			const trail: (string | null)[] = [null];
+			const visited = new Set<string>();
+			let fid: string | null = folderId;
+			const ancestors: string[] = [];
+			while (fid !== null) {
+				if (visited.has(fid)) break;
+				visited.add(fid);
+				ancestors.unshift(fid);
+				const f = allFolders.find((x) => x.id === fid);
+				fid = f?.parentId ?? null;
+			}
+			breadcrumb = [...trail, ...ancestors];
+		}}
+		onNavigateList={(listId) => {
+			showFavouritesOrder = false;
+			openListId = listId;
+		}}
+	/>
 {:else if showSettings}
 	<SettingsScreen onBack={() => (showSettings = false)} {onLogout} />
 {:else if showCommitsModal}
@@ -1314,7 +1345,7 @@ ${bodyHtml}
 		{/if}
 
 		<!-- Favourites bar -->
-		{#if favouriteLists.length > 0 || favouriteFolders.length > 0}
+		{#if favouriteItems.length > 0}
 			<div class="fav-bar" class:fav-bar-collapsed={settings.favouritesCollapsed}>
 				<button
 					class="fav-label"
@@ -1322,21 +1353,28 @@ ${bodyHtml}
 					aria-label={settings.favouritesCollapsed ? 'Expand favourites' : 'Collapse favourites'}
 					title={settings.favouritesCollapsed ? 'Expand favourites' : 'Collapse favourites'}
 				>★</button>
-				{#each favouriteFolders as fav}
-					<button
-						class="fav-chip"
-						style="--chip-color:{fav.color}"
-						title={folderPath(fav)}
-						onclick={() => { breadcrumb = [null, ...ancestorIds(fav), fav.id]; openListId = null; renamingId = null; }}
-					>📁 {settings.favouritesCollapsed ? fav.name : folderPath(fav)}</button>
-				{/each}
-				{#each favouriteLists as fav}
-					<button
-						class="fav-chip"
-						style="--chip-color:{fav.color}"
-						title={listPath(fav)}
-						onclick={() => { openListId = fav.id; renamingId = null; }}
-					>{settings.favouritesCollapsed ? fav.name : listPath(fav)}</button>
+				<button
+					class="fav-reorder-btn"
+					onclick={() => (showFavouritesOrder = true)}
+					aria-label="Rearrange favourites"
+					title="Rearrange favourites"
+				>⇅</button>
+				{#each favouriteItems as fav (fav.type + ':' + fav.item.id)}
+					{#if fav.type === 'folder'}
+						<button
+							class="fav-chip"
+							style="--chip-color:{fav.item.color}"
+							title={folderPath(fav.item)}
+							onclick={() => { breadcrumb = [null, ...ancestorIds(fav.item), fav.item.id]; openListId = null; renamingId = null; }}
+						>📁 {settings.favouritesCollapsed ? fav.item.name : folderPath(fav.item)}</button>
+					{:else}
+						<button
+							class="fav-chip"
+							style="--chip-color:{fav.item.color}"
+							title={listPath(fav.item)}
+							onclick={() => { openListId = fav.item.id; renamingId = null; }}
+						>{settings.favouritesCollapsed ? fav.item.name : listPath(fav.item)}</button>
+					{/if}
 				{/each}
 			</div>
 		{/if}
@@ -1490,7 +1528,12 @@ ${bodyHtml}
 					<button
 						class="fav-btn"
 						class:active={folder.favourite}
-						onclick={() => { if (!commitState.isHistorical) updateFolder(folder.id, { favourite: !folder.favourite }); }}
+						onclick={() => { 
+							if (!commitState.isHistorical) {
+								const nextFav = !folder.favourite;
+								updateFolder(folder.id, { favourite: nextFav, ...(nextFav && folder.favouriteOrder === undefined ? { favouriteOrder: getMaxFavouriteOrder() + 1 } : {}) });
+							}
+						}}
 						aria-label={folder.favourite ? 'Unfavourite' : 'Favourite'}
 						style={commitState.isHistorical ? 'cursor: default' : ''}
 					>★</button>
@@ -1569,7 +1612,12 @@ ${bodyHtml}
 					<button
 						class="fav-btn"
 						class:active={list.favourite}
-						onclick={() => { if (!commitState.isHistorical) updateList(list.id, { favourite: !list.favourite }); }}
+						onclick={() => { 
+							if (!commitState.isHistorical) {
+								const nextFav = !list.favourite;
+								updateList(list.id, { favourite: nextFav, ...(nextFav && list.favouriteOrder === undefined ? { favouriteOrder: getMaxFavouriteOrder() + 1 } : {}) });
+							}
+						}}
 						aria-label={list.favourite ? 'Unfavourite' : 'Favourite'}
 						style={commitState.isHistorical ? 'cursor: default' : ''}
 					>★</button>
@@ -2037,6 +2085,24 @@ ${bodyHtml}
 		line-height: 1;
 	}
 	.fav-label:hover { opacity: 0.75; }
+	.fav-reorder-btn {
+		background: none;
+		border: none;
+		color: var(--text2);
+		font-size: 0.95rem;
+		flex-shrink: 0;
+		cursor: pointer;
+		padding: 0.1rem 0.2rem;
+		line-height: 1;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		transition: color 0.15s ease;
+	}
+	.fav-reorder-btn:hover {
+		color: var(--accent);
+		opacity: 0.9;
+	}
 	.fav-chip {
 		background: none;
 		border: 1px solid var(--chip-color, var(--accent));

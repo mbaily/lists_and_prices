@@ -19,9 +19,12 @@
 		updateList,
 		reorderSiblings,
 		isListEffectivelyArchived,
+		isFolderEffectivelyArchived,
+		getMaxFavouriteOrder,
 		type Item,
 		type ExportedItem,
 		type ListMeta,
+		type Folder,
 		type FilterView
 	} from '$lib/data';
 	import { settings, updateSettings } from '$lib/settings.svelte';
@@ -39,6 +42,7 @@
 		highlightItemId = null,
 		onHome,
 		onOpenList,
+		onOpenFavouritesOrder = undefined,
 		savedSearch = null,
 		onRestoreSearch = undefined,
 		onTagClick = undefined,
@@ -49,6 +53,7 @@
 		highlightItemId?: string | null;
 		onHome: () => void;
 		onOpenList: (id: string) => void;
+		onOpenFavouritesOrder?: () => void;
 		savedSearch?: string | null;
 		onRestoreSearch?: () => void;
 		onTagClick?: (tag: string) => void;
@@ -127,6 +132,12 @@
 		return item.checked ? '✓' : '';
 	}
 	let favouriteLists = $derived(allLists.filter((l) => l.favourite && !isListEffectivelyArchived(l, allFolders)));
+	let favouriteFolders = $derived(allFolders.filter((f) => f.favourite && !isFolderEffectivelyArchived(f.id, allFolders)));
+	let favouriteItems = $derived.by(() => {
+		const folders = favouriteFolders.map((f) => ({ type: 'folder' as const, item: f, order: f.favouriteOrder ?? f.order ?? 0 }));
+		const lists = favouriteLists.map((l) => ({ type: 'list' as const, item: l, order: l.favouriteOrder ?? l.order ?? 0 }));
+		return [...folders, ...lists].sort((a, b) => a.order - b.order);
+	});
 	let allItemsAll = $derived.by(() => {
 		void docState.version;
 		try { return readAllItems(); } catch { return [] as Item[]; }
@@ -197,6 +208,22 @@
 			fid = f.parentId;
 		}
 		parts.push(list.name);
+		return parts.join(' › ');
+	}
+
+	function folderPath(folder: Folder): string {
+		const parts: string[] = [];
+		const visited = new Set<string>();
+		let fid: string | null = folder.parentId;
+		while (fid !== null) {
+			if (visited.has(fid)) break;
+			visited.add(fid);
+			const f = allFolders.find((x) => x.id === fid);
+			if (!f) break;
+			parts.unshift(f.name);
+			fid = f.parentId;
+		}
+		parts.push(folder.name);
 		return parts.join(' › ');
 	}
 
@@ -1187,7 +1214,12 @@
 		<button
 			class="list-fav-btn"
 			class:active={listMeta?.favourite}
-			onclick={() => { if (listMeta && !commitState.isHistorical) updateList(listId, { favourite: !listMeta.favourite }); }}
+			onclick={() => { 
+				if (listMeta && !commitState.isHistorical) {
+					const nextFav = !listMeta.favourite;
+					updateList(listId, { favourite: nextFav, ...(nextFav && listMeta.favouriteOrder === undefined ? { favouriteOrder: getMaxFavouriteOrder() + 1 } : {}) });
+				}
+			}}
 			aria-label={listMeta?.favourite ? 'Unfavourite list' : 'Favourite list'}
 			title={listMeta?.favourite ? 'Unfavourite list' : 'Favourite list'}
 			style={commitState.isHistorical ? 'cursor: default' : ''}
@@ -1385,7 +1417,7 @@
 				{/each}
 			</div>
 		{/if}
-		{#if favouriteLists.length > 0}
+		{#if favouriteItems.length > 0}
 			<div class="fav-bar" class:fav-bar-collapsed={settings.favouritesCollapsed}>
 				<button
 					class="fav-label"
@@ -1393,14 +1425,31 @@
 					aria-label={settings.favouritesCollapsed ? 'Expand favourites' : 'Collapse favourites'}
 					title={settings.favouritesCollapsed ? 'Expand favourites' : 'Collapse favourites'}
 				>★</button>
-				{#each favouriteLists as fav}
+				{#if onOpenFavouritesOrder}
 					<button
-						class="fav-chip"
-						class:fav-chip-active={fav.id === listId}
-						style="--chip-color:{fav.color}"
-						title={listPath(fav)}
-						onclick={() => { if (fav.id !== listId) onOpenList(fav.id); }}
-					>{settings.favouritesCollapsed ? fav.name : listPath(fav)}</button>
+						class="fav-reorder-btn"
+						onclick={onOpenFavouritesOrder}
+						aria-label="Rearrange favourites"
+						title="Rearrange favourites"
+					>⇅</button>
+				{/if}
+				{#each favouriteItems as fav (fav.type + ':' + fav.item.id)}
+					{#if fav.type === 'folder'}
+						<button
+							class="fav-chip"
+							style="--chip-color:{fav.item.color}"
+							title={folderPath(fav.item)}
+							onclick={() => { if (onNavigateTo) onNavigateTo(fav.item.id); }}
+						>📁 {settings.favouritesCollapsed ? fav.item.name : folderPath(fav.item)}</button>
+					{:else}
+						<button
+							class="fav-chip"
+							class:fav-chip-active={fav.item.id === listId}
+							style="--chip-color:{fav.item.color}"
+							title={listPath(fav.item)}
+							onclick={() => { if (fav.item.id !== listId) onOpenList(fav.item.id); }}
+						>{settings.favouritesCollapsed ? fav.item.name : listPath(fav.item)}</button>
+					{/if}
 				{/each}
 			</div>
 		{/if}
@@ -1903,6 +1952,24 @@
 		line-height: 1;
 	}
 	.fav-label:hover { opacity: 0.75; }
+	.fav-reorder-btn {
+		background: none;
+		border: none;
+		color: var(--text2);
+		font-size: 0.95rem;
+		flex-shrink: 0;
+		cursor: pointer;
+		padding: 0.1rem 0.2rem;
+		line-height: 1;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		transition: color 0.15s ease;
+	}
+	.fav-reorder-btn:hover {
+		color: var(--accent);
+		opacity: 0.9;
+	}
 	.fav-chip {
 		background: none;
 		border: 1px solid var(--chip-color, var(--accent));
