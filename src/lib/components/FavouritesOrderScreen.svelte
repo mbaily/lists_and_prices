@@ -5,7 +5,7 @@
 		readLists,
 		updateFolder,
 		updateList,
-		reorderFavourites,
+		saveFavouritesOrder,
 		isFolderEffectivelyArchived,
 		isListEffectivelyArchived,
 		type Folder,
@@ -142,7 +142,7 @@
 		const [moved] = next.splice(index, 1);
 		next.splice(targetIndex, 0, moved);
 		entries = next;
-		reorderFavourites(entries, index, targetIndex);
+		saveFavouritesOrder(entries);
 	}
 
 	// ── Touch & pointer drag reorder ─────────────────────────────────────────────
@@ -173,7 +173,7 @@
 				const [moved] = next.splice(from, 1);
 				next.splice(to, 0, moved);
 				entries = next;
-				reorderFavourites(entries, from, to);
+				saveFavouritesOrder(entries);
 			}
 			touchDragFrom = null;
 			touchDragOver = null;

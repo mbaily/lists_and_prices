@@ -885,6 +885,19 @@ export function getMaxFavouriteOrder(): number {
 	return max;
 }
 
+export function saveFavouritesOrder(items: { id: string; type: 'folder' | 'list' }[]) {
+	const doc = getDoc();
+	doc.transact(() => {
+		items.forEach((item, idx) => {
+			if (item.type === 'folder') {
+				updateFolder(item.id, { favouriteOrder: idx });
+			} else {
+				updateList(item.id, { favouriteOrder: idx });
+			}
+		});
+	});
+}
+
 export function reorderFavourites(items: { id: string; type: 'folder' | 'list' }[], fromIndex: number, toIndex: number) {
 	const doc = getDoc();
 	const reordered = [...items];
