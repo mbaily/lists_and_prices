@@ -91,6 +91,7 @@
 	let openItemId = $state<string | null>(null);
 	let showSettings = $state(false);
 	let showFavouritesOrder = $state(false);
+	let previousListId = $state<string | null>(null);
 	let showCommitsModal = $state(false);
 
 	let cursorMemory = $state<Record<string, string>>(
@@ -462,7 +463,7 @@
 	let favouriteItems = $derived.by(() => {
 		const folders = favouriteFolders.map((f) => ({ type: 'folder' as const, item: f, order: f.favouriteOrder ?? f.order ?? 0 }));
 		const lists = favouriteLists.map((l) => ({ type: 'list' as const, item: l, order: l.favouriteOrder ?? l.order ?? 0 }));
-		return [...folders, ...lists].sort((a, b) => a.order - b.order);
+		return [...folders, ...lists].sort((a, b) => (a.order !== b.order ? a.order - b.order : a.type === 'folder' && b.type === 'list' ? -1 : a.type === 'list' && b.type === 'folder' ? 1 : 0));
 	});
 
 	// ── Tags ──────────────────────────────────────────────────────────────────────
@@ -1157,7 +1158,7 @@ ${bodyHtml}
 {#if openSheetId}
 	<SpreadsheetScreen sheetId={openSheetId} onBack={() => openSheetId = null} />
 {:else if openListId}
-	<ListScreen listId={openListId} highlightItemId={openItemId} orderedLists={navOrderedLists} onHome={() => { openListId = null; openItemId = null; breadcrumb = [null]; }} onOpenList={(id) => (openListId = id)} onOpenFavouritesOrder={() => { openListId = null; showFavouritesOrder = true; }} savedSearch={savedSearch} onRestoreSearch={() => { openListId = null; openItemId = null; breadcrumb = [null]; restoreSearch(); }} onTagClick={(tag) => { openListId = null; openItemId = null; breadcrumb = [null]; activeTagFilter = null; showSearch = true; searchQuery = '#' + tag; savedSearch = '#' + tag; tick().then(() => searchInputEl?.focus()); }} onNavigateTo={(folderId) => {
+	<ListScreen listId={openListId} highlightItemId={openItemId} orderedLists={navOrderedLists} onHome={() => { openListId = null; openItemId = null; breadcrumb = [null]; }} onOpenList={(id) => (openListId = id)} onOpenFavouritesOrder={() => { previousListId = openListId; openListId = null; showFavouritesOrder = true; }} savedSearch={savedSearch} onRestoreSearch={() => { openListId = null; openItemId = null; breadcrumb = [null]; restoreSearch(); }} onTagClick={(tag) => { openListId = null; openItemId = null; breadcrumb = [null]; activeTagFilter = null; showSearch = true; searchQuery = '#' + tag; savedSearch = '#' + tag; tick().then(() => searchInputEl?.focus()); }} onNavigateTo={(folderId) => {
 		openListId = null;
 		// Reconstruct the full ancestor path to folderId so the breadcrumb is correct
 		// regardless of which folder the user was in when they opened the list.
@@ -1176,9 +1177,16 @@ ${bodyHtml}
 	}} />
 {:else if showFavouritesOrder}
 	<FavouritesOrderScreen
-		onBack={() => (showFavouritesOrder = false)}
+		onBack={() => {
+			showFavouritesOrder = false;
+			if (previousListId) {
+				openListId = previousListId;
+				previousListId = null;
+			}
+		}}
 		onNavigateFolder={(folderId) => {
 			showFavouritesOrder = false;
+			previousListId = null;
 			const trail: (string | null)[] = [null];
 			const visited = new Set<string>();
 			let fid: string | null = folderId;
@@ -1194,6 +1202,7 @@ ${bodyHtml}
 		}}
 		onNavigateList={(listId) => {
 			showFavouritesOrder = false;
+			previousListId = null;
 			openListId = listId;
 		}}
 	/>

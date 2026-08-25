@@ -55,12 +55,19 @@
 		const combined = [
 			...rawFolders.map((f) => ({ id: f.id, type: 'folder' as const, order: f.favouriteOrder ?? f.order ?? 0 })),
 			...rawLists.map((l) => ({ id: l.id, type: 'list' as const, order: l.favouriteOrder ?? l.order ?? 0 }))
-		].sort((a, b) => a.order - b.order);
+		].sort((a, b) => (a.order !== b.order ? a.order - b.order : a.type === 'folder' && b.type === 'list' ? -1 : a.type === 'list' && b.type === 'folder' ? 1 : 0));
 
 		return combined.map(({ id, type }) => ({ id, type }));
 	}
 
 	let entries = $state<FavEntry[]>(getInitialFavourites());
+
+	// Filter out items that have been deleted entirely from Yjs
+	let validEntries = $derived(
+		entries.filter((entry) =>
+			entry.type === 'folder' ? allFolders.some((f) => f.id === entry.id) : allLists.some((l) => l.id === entry.id)
+		)
+	);
 
 	function folderPath(folder: Folder): string {
 		const parts: string[] = [];
@@ -136,9 +143,10 @@
 	}
 
 	function moveItem(index: number, direction: 'up' | 'down') {
+		if (commitState.isHistorical) return;
 		const targetIndex = direction === 'up' ? index - 1 : index + 1;
-		if (targetIndex < 0 || targetIndex >= entries.length) return;
-		const next = [...entries];
+		if (targetIndex < 0 || targetIndex >= validEntries.length) return;
+		const next = [...validEntries];
 		const [moved] = next.splice(index, 1);
 		next.splice(targetIndex, 0, moved);
 		entries = next;
@@ -150,6 +158,7 @@
 	let touchDragOver = $state<number | null>(null);
 
 	function startDrag(e: PointerEvent, index: number) {
+		if (commitState.isHistorical) return;
 		e.stopPropagation();
 		touchDragFrom = index;
 		touchDragOver = index;
@@ -166,10 +175,10 @@
 			}
 		}
 		function onEnd() {
-			if (touchDragFrom !== null && touchDragOver !== null && touchDragFrom !== touchDragOver) {
+			if (!commitState.isHistorical && touchDragFrom !== null && touchDragOver !== null && touchDragFrom !== touchDragOver) {
 				const from = touchDragFrom;
 				const to = touchDragOver;
-				const next = [...entries];
+				const next = [...validEntries];
 				const [moved] = next.splice(from, 1);
 				next.splice(to, 0, moved);
 				entries = next;
@@ -199,15 +208,22 @@
 
 <div class="screen">
 	<header>
-		<button class="back-btn" onclick={onBack} aria-label="Back">← Back</button>
-		<div class="title-wrap">
-			<span class="title">Rearrange Favourites</span>
-			<span class="subtitle">Drag to change order • Tap ★ to add/remove</span>
+		{#if commitState.isHistorical}
+			<div class="historical-banner">
+				<span class="historical-label">Viewing Historical Commit (Read Only)</span>
+			</div>
+		{/if}
+		<div class="header-main">
+			<button class="back-btn" onclick={onBack} aria-label="Back">← Back</button>
+			<div class="title-wrap">
+				<span class="title">Rearrange Favourites</span>
+				<span class="subtitle">{commitState.isHistorical ? 'Read-only mode' : 'Drag to change order • Tap ★ to add/remove'}</span>
+			</div>
 		</div>
 	</header>
 
 	<div class="content">
-		{#if entries.length === 0}
+		{#if validEntries.length === 0}
 			<div class="empty-state">
 				<span class="empty-icon">⭐</span>
 				<p>No favourites yet.</p>
@@ -215,7 +231,7 @@
 			</div>
 		{:else}
 			<div class="fav-list">
-				{#each entries as entry, i (entry.type + ':' + entry.id)}
+				{#each validEntries as entry, i (entry.type + ':' + entry.id)}
 					{@const data = getItemData(entry)}
 					<div
 						class="fav-row"
@@ -224,68 +240,62 @@
 						class:drag-above={touchDragOver === i && touchDragFrom !== null && touchDragFrom > i}
 						class:drag-below={touchDragOver === i && touchDragFrom !== null && touchDragFrom < i}
 						data-drag-fav-index={i}
+						style="--row-color: {data.color}"
 					>
-						<button
-							class="drag-handle"
-							aria-label="Drag to reorder"
-							onpointerdown={(e) => startDrag(e, i)}
-						>☰</button>
-
-						<div class="step-buttons">
+						{#if !commitState.isHistorical}
 							<button
-								class="step-btn"
-								disabled={i === 0}
-								onclick={() => moveItem(i, 'up')}
-								aria-label="Move up"
-								title="Move up"
-							>▲</button>
-							<button
-								class="step-btn"
-								disabled={i === entries.length - 1}
-								onclick={() => moveItem(i, 'down')}
-								aria-label="Move down"
-								title="Move down"
-							>▼</button>
-						</div>
+								class="drag-handle"
+								aria-label="Drag to reorder"
+								onpointerdown={(e) => startDrag(e, i)}
+							>☰</button>
 
-						<div class="fav-item-main">
-							<div class="fav-item-header">
-								<span class="fav-type-badge" style="--badge-color: {data.color}">
-									<span class="fav-icon">{data.icon}</span>
-									<span class="fav-type-text">{data.typeLabel}</span>
-								</span>
-								{#if !data.favourite}
-									<span class="unmarked-pill">Unmarked</span>
-								{/if}
-							</div>
-							<div class="fav-name-row">
+							<div class="step-buttons">
 								<button
-									class="fav-name-btn"
-									title={data.path}
-									onclick={() => {
-										if (entry.type === 'folder' && onNavigateFolder) {
-											onNavigateFolder(entry.id);
-										} else if (entry.type === 'list' && onNavigateList) {
-											onNavigateList(entry.id);
-										}
-									}}
-								>
-									{data.path}
-								</button>
+									class="step-btn"
+									disabled={i === 0}
+									onclick={() => moveItem(i, 'up')}
+									aria-label="Move up"
+									title="Move up"
+								>▲</button>
+								<button
+									class="step-btn"
+									disabled={i === validEntries.length - 1}
+									onclick={() => moveItem(i, 'down')}
+									aria-label="Move down"
+									title="Move down"
+								>▼</button>
 							</div>
-						</div>
+						{/if}
 
-						<div class="fav-row-actions">
-							<button
-								class="star-btn"
-								class:active={data.favourite}
-								onclick={() => toggleFavourite(entry)}
-								aria-label={data.favourite ? 'Remove from favourites' : 'Add to favourites'}
-								title={data.favourite ? 'Remove from favourites' : 'Add to favourites'}
-							>
-								{data.favourite ? '★' : '☆'}
-							</button>
-						</div>
+						<span class="fav-icon" title={data.typeLabel}>{data.icon}</span>
+
+						<button
+							class="fav-name-btn"
+							title={data.path}
+							onclick={() => {
+								if (entry.type === 'folder' && onNavigateFolder) {
+									onNavigateFolder(entry.id);
+								} else if (entry.type === 'list' && onNavigateList) {
+									onNavigateList(entry.id);
+								}
+							}}
+						>
+							<span class="fav-path-text">{data.path}</span>
+						</button>
+
+						{#if !data.favourite}
+							<span class="unmarked-pill">Unmarked</span>
+						{/if}
+
+						<button
+							class="star-btn"
+							class:active={data.favourite}
+							onclick={() => toggleFavourite(entry)}
+							aria-label={data.favourite ? 'Remove from favourites' : 'Add to favourites'}
+							title={data.favourite ? 'Remove from favourites' : 'Add to favourites'}
+						>
+							{data.favourite ? '★' : '☆'}
+						</button>
 					</div>
 				{/each}
 			</div>
@@ -303,12 +313,26 @@
 	}
 	header {
 		display: flex;
-		align-items: center;
-		padding: 0.65rem 1rem;
+		flex-direction: column;
 		border-bottom: 1px solid var(--border);
 		background: var(--bg2);
-		gap: 0.75rem;
 		flex-shrink: 0;
+	}
+	.header-main {
+		display: flex;
+		align-items: center;
+		padding: 0.65rem 1rem;
+		gap: 0.75rem;
+	}
+	.historical-banner {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.35rem 1rem;
+		background: #dc2626;
+		color: #fff;
+		font-size: 0.82rem;
+		font-weight: 600;
 	}
 	.back-btn {
 		background: none;
@@ -344,7 +368,7 @@
 	.content {
 		flex: 1;
 		overflow-y: auto;
-		padding: 1rem;
+		padding: 0;
 		max-width: 650px;
 		width: 100%;
 		margin: 0 auto;
@@ -377,24 +401,38 @@
 	.fav-list {
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: 0;
 	}
 	.fav-row {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		padding: 0.6rem 0.75rem;
-		background: var(--bg2);
-		border: 1px solid var(--border);
-		border-radius: 8px;
+		padding: 0.35rem 0.75rem 0.35rem 1.1rem;
+		background: transparent;
+		border: none;
+		border-bottom: 1px solid var(--border);
 		touch-action: pan-y;
-		transition: background 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+		position: relative;
+		transition: background 0.15s ease, opacity 0.15s ease;
 		user-select: none;
 	}
+	.fav-row::before {
+		content: '';
+		position: absolute;
+		left: 0;
+		top: 0;
+		bottom: 0;
+		width: 4px;
+		background: var(--row-color, transparent);
+	}
+	.fav-row:hover {
+		background: var(--bg2);
+	}
 	.fav-row.unmarked {
-		opacity: 0.6;
-		background: var(--bg);
-		border-style: dashed;
+		opacity: 0.5;
+	}
+	.fav-row.unmarked .fav-path-text {
+		text-decoration: line-through;
 	}
 	.fav-row.drag-source {
 		opacity: 0.35;
@@ -411,9 +449,9 @@
 		background: none;
 		border: none;
 		color: var(--text2);
-		font-size: 1.15rem;
+		font-size: 1.1rem;
 		cursor: grab;
-		padding: 0.3rem 0.2rem;
+		padding: 0.15rem 0.2rem;
 		line-height: 1;
 		flex-shrink: 0;
 		touch-action: none;
@@ -425,18 +463,18 @@
 	.step-buttons {
 		display: flex;
 		flex-direction: column;
-		gap: 0.1rem;
+		gap: 1px;
 		flex-shrink: 0;
 	}
 	.step-btn {
 		background: none;
 		border: none;
 		color: var(--text2);
-		font-size: 0.55rem;
+		font-size: 0.52rem;
 		cursor: pointer;
-		padding: 0.15rem 0.25rem;
+		padding: 0.1rem 0.2rem;
 		line-height: 1;
-		border-radius: 3px;
+		border-radius: 2px;
 	}
 	.step-btn:hover:not(:disabled) {
 		background: var(--bg3);
@@ -446,42 +484,16 @@
 		opacity: 0.2;
 		cursor: default;
 	}
-	.fav-item-main {
+	.fav-icon {
+		font-size: 0.95rem;
+		flex-shrink: 0;
+		line-height: 1;
+	}
+	.fav-name-btn {
 		flex: 1;
 		min-width: 0;
 		display: flex;
-		flex-direction: column;
-		gap: 0.2rem;
-	}
-	.fav-item-header {
-		display: flex;
 		align-items: center;
-		gap: 0.4rem;
-	}
-	.fav-type-badge {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.25rem;
-		font-size: 0.72rem;
-		color: var(--badge-color, var(--accent));
-		font-weight: 600;
-	}
-	.fav-icon {
-		font-size: 0.85rem;
-	}
-	.unmarked-pill {
-		font-size: 0.68rem;
-		padding: 0.05rem 0.4rem;
-		border-radius: 999px;
-		background: #ef4444;
-		color: #fff;
-		font-weight: 600;
-	}
-	.fav-name-row {
-		display: flex;
-		align-items: center;
-	}
-	.fav-name-btn {
 		background: none;
 		border: none;
 		padding: 0;
@@ -490,27 +502,34 @@
 		font-weight: 500;
 		text-align: left;
 		cursor: pointer;
-		white-space: nowrap;
+		overflow: hidden;
+	}
+	.fav-path-text {
 		overflow: hidden;
 		text-overflow: ellipsis;
-		max-width: 100%;
+		white-space: nowrap;
 	}
-	.fav-name-btn:hover {
+	.fav-name-btn:hover .fav-path-text {
 		text-decoration: underline;
 	}
-	.fav-row-actions {
-		display: flex;
-		align-items: center;
+	.unmarked-pill {
+		font-size: 0.68rem;
+		padding: 0.05rem 0.4rem;
+		border-radius: 999px;
+		background: #ef4444;
+		color: #fff;
+		font-weight: 600;
 		flex-shrink: 0;
 	}
 	.star-btn {
 		background: none;
 		border: none;
-		font-size: 1.35rem;
+		font-size: 1.25rem;
 		cursor: pointer;
-		padding: 0.2rem;
+		padding: 0.15rem 0.25rem;
 		line-height: 1;
 		color: var(--text2);
+		flex-shrink: 0;
 		transition: color 0.15s ease, transform 0.1s ease;
 	}
 	.star-btn.active {

@@ -136,7 +136,7 @@
 	let favouriteItems = $derived.by(() => {
 		const folders = favouriteFolders.map((f) => ({ type: 'folder' as const, item: f, order: f.favouriteOrder ?? f.order ?? 0 }));
 		const lists = favouriteLists.map((l) => ({ type: 'list' as const, item: l, order: l.favouriteOrder ?? l.order ?? 0 }));
-		return [...folders, ...lists].sort((a, b) => a.order - b.order);
+		return [...folders, ...lists].sort((a, b) => (a.order !== b.order ? a.order - b.order : a.type === 'folder' && b.type === 'list' ? -1 : a.type === 'list' && b.type === 'folder' ? 1 : 0));
 	});
 	let allItemsAll = $derived.by(() => {
 		void docState.version;
