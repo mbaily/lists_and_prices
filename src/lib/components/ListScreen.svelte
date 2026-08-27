@@ -1538,6 +1538,7 @@
 					<span class="note-icon">📝</span>
 					<button
 						class="item-name note-name"
+						class:fullscreen-note={item.fullScreen}
 						class:editing={editingId === item.id}
 						onclick={() => {
 							if (selectionMode) {
@@ -1584,6 +1585,7 @@
 							class="item-name"
 							class:strikethrough={isDone(item)}
 							class:editing={editingId === item.id}
+							class:fullscreen-note={item.fullScreen}
 							onclick={() => selectionMode ? toggleSelectionItem(item.id) : startEditName(item)}
 							onpointerdown={(e) => { if (!selectionMode) onPointerDown(e, item.id); }}
 							onpointermove={cancelLongPress}
@@ -1627,6 +1629,7 @@
 						class="item-name"
 						class:strikethrough={isDone(item)}
 						class:editing={editingId === item.id}
+						class:fullscreen-note={item.fullScreen}
 						onclick={() => selectionMode ? toggleSelectionItem(item.id) : startEditName(item)}
 						onpointerdown={(e) => { if (!selectionMode) onPointerDown(e, item.id); }}
 						onpointermove={cancelLongPress}
@@ -2360,6 +2363,14 @@
 	}
 	.item-name.strikethrough { text-decoration: line-through; color: var(--text2); }
 	.item-name.editing { color: var(--accent); font-style: italic; }
+	.item-name.fullscreen-note {
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
 	.item-url {
 		color: var(--accent);
 		text-decoration: underline;
