@@ -43,6 +43,7 @@
 		"workbox-window": "^7.4.1",
 		"ws": "^8.21.1",
 		"y-indexeddb": "^9.0.12",
+		"y-quill": "^1.0.0",
 		"y-websocket": "^1.5.4",
 		"yjs": "^13.6.31"
 	}

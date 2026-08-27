@@ -86,6 +86,10 @@ export function getDoc(): Y.Doc {
 	return _doc;
 }
 
+export function getWsProvider(): WebsocketProvider | null {
+	return _wsProvider;
+}
+
 export function getUndoManager(): Y.UndoManager {
 	if (!_undoManager) throw new Error('UndoManager not initialised');
 	return _undoManager;

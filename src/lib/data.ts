@@ -489,6 +489,18 @@ export function createItem(listId: string, name: string, price: number | null = 
 	return id;
 }
 
+export function getItemYText(doc: Y.Doc, itemId: string, fallbackText = ''): Y.Text {
+	const yText = doc.getText(`note_text_${itemId}`);
+	if (yText.length === 0 && fallbackText) {
+		doc.transact(() => {
+			if (yText.length === 0) {
+				yText.insert(0, fallbackText);
+			}
+		});
+	}
+	return yText;
+}
+
 export function updateItem(id: string, patch: Partial<Omit<Item, 'id' | 'listId' | 'createdAt' | 'updatedAt' | 'checks'>>) {
 	const doc = getDoc();
 	doc.transact(() => {
@@ -497,6 +509,13 @@ export function updateItem(id: string, patch: Partial<Omit<Item, 'id' | 'listId'
 		for (const [k, v] of Object.entries(patch)) m.set(k, v);
 		const keys = Object.keys(patch);
 		if (!(keys.length === 1 && keys[0] === 'order')) m.set('updatedAt', new Date().toISOString());
+		if (patch.name !== undefined) {
+			const yText = doc.getText(`note_text_${id}`);
+			if (yText.length > 0 && yText.toString() !== patch.name) {
+				yText.delete(0, yText.length);
+				yText.insert(0, patch.name);
+			}
+		}
 	});
 }
 

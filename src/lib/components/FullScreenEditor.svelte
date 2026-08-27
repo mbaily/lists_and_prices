@@ -1,17 +1,22 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import Quill from 'quill';
 	import 'quill/dist/quill.snow.css';
+	import { QuillBinding } from 'y-quill';
+	import { getDoc, getWsProvider } from '$lib/yjsStore.svelte';
+	import { getItemYText } from '$lib/data';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 
 	let {
+		itemId,
 		initialContent,
 		onSave,
 		onClose
-	}: { initialContent: string; onSave: (content: string) => void; onClose: () => void } = $props();
+	}: { itemId: string; initialContent: string; onSave: (content: string) => void; onClose: () => void } = $props();
 
 	let editorContainer: HTMLDivElement | null = null;
 	let quill: Quill | null = null;
+	let binding: QuillBinding | null = null;
 	let showConfirmCancel = $state(false);
 	let showConfirmClose = $state(false);
 	let viewportHeight = $state('100vh');
@@ -59,43 +64,58 @@
 				}
 			});
 			
-			if (initialContent.includes('<') && initialContent.includes('>')) {
-				quill.root.innerHTML = initialContent;
-			} else {
-				quill.setText(initialContent);
-			}
-			
-			normalizedInitial = quill.getText().replace(/\n$/, '');
+			const doc = getDoc();
+			const wsProvider = getWsProvider();
+			const yText = getItemYText(doc, itemId, initialContent);
+
+			binding = new QuillBinding(yText, quill, wsProvider ? wsProvider.awareness : undefined);
+			normalizedInitial = yText.toString().replace(/\n$/, '');
 			quill.focus();
 		}
 	});
 
+	onDestroy(() => {
+		binding?.destroy();
+	});
+
 	function handleSave() {
-		if (quill) {
-			let text = quill.getText().replace(/\n$/, '');
-			onSave(text);
-			normalizedInitial = text;
-		}
+		const doc = getDoc();
+		const yText = getItemYText(doc, itemId);
+		const text = yText.toString().replace(/\n$/, '');
+		onSave(text);
+		normalizedInitial = text;
 	}
 
 	function requestCancel() {
-		if (quill) {
-			let currentText = quill.getText().replace(/\n$/, '');
-			if (currentText !== normalizedInitial) {
-				showConfirmCancel = true;
-				return;
-			}
+		const doc = getDoc();
+		const yText = getItemYText(doc, itemId);
+		const currentText = yText.toString().replace(/\n$/, '');
+		if (currentText !== normalizedInitial) {
+			showConfirmCancel = true;
+			return;
 		}
 		onClose();
 	}
 
+	function discardChanges() {
+		const doc = getDoc();
+		const yText = getItemYText(doc, itemId);
+		doc.transact(() => {
+			yText.delete(0, yText.length);
+			yText.insert(0, normalizedInitial);
+		});
+		handleSave();
+		showConfirmCancel = false;
+		onClose();
+	}
+
 	function requestClose() {
-		if (quill) {
-			let currentText = quill.getText().replace(/\n$/, '');
-			if (currentText !== normalizedInitial) {
-				showConfirmClose = true;
-				return;
-			}
+		const doc = getDoc();
+		const yText = getItemYText(doc, itemId);
+		const currentText = yText.toString().replace(/\n$/, '');
+		if (currentText !== normalizedInitial) {
+			showConfirmClose = true;
+			return;
 		}
 		onClose();
 	}
@@ -120,7 +140,7 @@
 			confirmLabel="Discard"
 			cancelLabel="Keep Editing"
 			isDanger={true}
-			onConfirm={() => { showConfirmCancel = false; onClose(); }}
+			onConfirm={discardChanges}
 			onCancel={() => showConfirmCancel = false}
 		/>
 	{/if}
@@ -132,7 +152,7 @@
 			altLabel="Save"
 			cancelLabel="Cancel"
 			isDanger={true}
-			onConfirm={() => { showConfirmClose = false; onClose(); }}
+			onConfirm={discardChanges}
 			onAlt={() => { showConfirmClose = false; handleSave(); onClose(); }}
 			onCancel={() => showConfirmClose = false}
 		/>

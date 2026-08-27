@@ -1730,6 +1730,7 @@
 	<!-- Info dialog -->
 	{#if fullScreenNoteItem}
 		<FullScreenEditor
+			itemId={fullScreenNoteItem.id}
 			initialContent={fullScreenNoteItem.name}
 			onSave={(newContent) => {
 				if (fullScreenNoteItem) {
