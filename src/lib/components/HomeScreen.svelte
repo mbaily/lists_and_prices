@@ -138,7 +138,9 @@
 
 		if (combo === settings.keybindings?.['upOneLevel']) {
 			e.preventDefault();
-			if (openSheetId) {
+			if (showQuickAdd) {
+				showQuickAdd = false;
+			} else if (openSheetId) {
 				openSheetId = null;
 			} else if (openListId) {
 				openListId = null;
@@ -902,6 +904,7 @@
 	}
 
 	function submitQuickAdd() {
+		if (commitState.isHistorical) return;
 		const text = quickAddValue.trim();
 		if (!text) return;
 
@@ -1401,9 +1404,11 @@ ${bodyHtml}
 				<button class="icon-btn search-btn" class:search-active={showSearch} onclick={toggleSearch} aria-label={showSearch ? 'Close search' : 'Search'}>
 					🔍
 				</button>
-				<button class="icon-btn quick-add-btn" class:quick-add-active={showQuickAdd} onclick={toggleQuickAdd} aria-label={showQuickAdd ? 'Close quick add' : 'Quick add'} title="Quick add">
-					⚡
-				</button>
+				{#if !commitState.isHistorical}
+					<button class="icon-btn quick-add-btn" class:quick-add-active={showQuickAdd} onclick={toggleQuickAdd} aria-label={showQuickAdd ? 'Close quick add' : 'Quick add'} title="Quick add">
+						⚡
+					</button>
+				{/if}
 				{#if savedSearch && !showSearch}
 					<button class="crumb search-crumb" onclick={restoreSearch} title="Back to search results">"{savedSearch}"</button>
 				{/if}
@@ -1471,7 +1476,7 @@ ${bodyHtml}
 			</div>
 		</header>
 
-		{#if showQuickAdd}
+		{#if showQuickAdd && !commitState.isHistorical}
 			<div class="universal-bar quick-add-bar">
 				<form
 					class="universal-row"
