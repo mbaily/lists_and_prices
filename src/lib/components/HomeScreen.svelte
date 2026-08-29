@@ -495,6 +495,18 @@
 		} catch { /* ignore */ }
 		return [...set].sort();
 	});
+
+	// Global tags from all items, lists, and folders (used for Quick Add autocomplete)
+	let allGlobalTags = $derived.by(() => {
+		void docState.version;
+		const set = new Set<string>();
+		try {
+			for (const item of allItemsAll) extractTags(item.name).forEach((t) => set.add(t));
+			for (const list of allLists) extractTags(list.name).forEach((t) => set.add(t));
+			for (const folder of allFolders) extractTags(folder.name).forEach((t) => set.add(t));
+		} catch { /* ignore */ }
+		return [...set].sort();
+	});
 	let activeTagFilter = $state<string | null>(null);
 
 	function listPath(list: ListMeta): string {
@@ -851,6 +863,11 @@
 		quickAddInputEl.style.height = quickAddInputEl.scrollHeight + 'px';
 	}
 
+	$effect(() => {
+		void quickAddValue;
+		tick().then(resizeQuickAdd);
+	});
+
 	function focusQuickAddInput() {
 		tick().then(() => quickAddInputEl?.focus());
 	}
@@ -862,7 +879,7 @@
 		const m = before.match(/#(\w*)$/);
 		if (m) {
 			const prefix = m[1].toLowerCase();
-			quickAddTagSuggestions = allTags.filter((t) => t.startsWith(prefix) && t !== prefix).slice(0, 6);
+			quickAddTagSuggestions = allGlobalTags.filter((t) => t.startsWith(prefix) && t !== prefix).slice(0, 6);
 		} else {
 			quickAddTagSuggestions = [];
 		}

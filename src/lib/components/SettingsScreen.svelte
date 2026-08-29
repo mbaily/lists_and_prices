@@ -3,6 +3,7 @@
 	import { exportBackup, importBackup, readFolders, type BackupFile } from '$lib/data';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import KeyboardSettingsScreen from './KeyboardSettingsScreen.svelte';
+	import { docState } from '$lib/yjsStore.svelte';
 	import { auth } from '$lib/auth.svelte';
 
 	let { onBack, onLogout }: { onBack: () => void; onLogout: () => void } = $props();
@@ -12,6 +13,7 @@
 	let showKeyboardSettings = $state(false);
 
 	let topLevelFolders = $derived.by(() => {
+		void docState.version;
 		try {
 			return readFolders().filter((f) => f.parentId === null && !f.archived).sort((a, b) => a.order - b.order);
 		} catch {
