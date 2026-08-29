@@ -6,6 +6,7 @@
 		readAllItems,
 		createFolder,
 		createList,
+		createItem,
 		deleteFolder,
 		deleteList,
 		updateFolder,
@@ -183,6 +184,15 @@
 	let searchUncheckedOnly = $state(false);
 	let searchInputEl = $state<HTMLInputElement | null>(null);
 	let savedSearch = $state<string | null>(null); // persists after navigating to a result
+
+	// ── Quick Add ────────────────────────────────────────────────────────────────
+	let showQuickAdd = $state(false);
+	let quickAddValue = $state('');
+	let quickAddIsNote = $state(false);
+	let quickAddInputEl = $state<HTMLTextAreaElement | null>(null);
+	let quickAddTagSuggestions = $state<string[]>([]);
+	let quickAddToast = $state<{ message: string; isError?: boolean } | null>(null);
+	let quickAddToastTimer: ReturnType<typeof setTimeout> | null = null;
 
 	// ── Live data (re-read on every Yjs change) ─────────────────────────────────
 	let snapFolders = $state<Folder[] | null>(null);
@@ -818,6 +828,134 @@
 	// ── First-launch guard ───────────────────────────────────────────────────────
 	let showFirstLaunch = $derived(idbSynced.done && allFolders.length === 0 && !showNewFolder);
 
+	// ── Quick Add actions ─────────────────────────────────────────────────────────
+	function toggleQuickAdd() {
+		if (!showQuickAdd) {
+			showQuickAdd = true;
+			showSearch = false;
+			quickAddValue = '';
+			quickAddIsNote = false;
+			tick().then(() => {
+				resizeQuickAdd();
+				quickAddInputEl?.focus();
+			});
+		} else {
+			showQuickAdd = false;
+			quickAddTagSuggestions = [];
+		}
+	}
+
+	function resizeQuickAdd() {
+		if (!quickAddInputEl) return;
+		quickAddInputEl.style.height = 'auto';
+		quickAddInputEl.style.height = quickAddInputEl.scrollHeight + 'px';
+	}
+
+	function focusQuickAddInput() {
+		tick().then(() => quickAddInputEl?.focus());
+	}
+
+	function updateQuickAddTagSuggestions() {
+		if (!quickAddInputEl) { quickAddTagSuggestions = []; return; }
+		const pos = quickAddInputEl.selectionStart ?? 0;
+		const before = quickAddValue.slice(0, pos);
+		const m = before.match(/#(\w*)$/);
+		if (m) {
+			const prefix = m[1].toLowerCase();
+			quickAddTagSuggestions = allTags.filter((t) => t.startsWith(prefix) && t !== prefix).slice(0, 6);
+		} else {
+			quickAddTagSuggestions = [];
+		}
+	}
+
+	function applyQuickAddTagSuggestion(tag: string) {
+		if (!quickAddInputEl) return;
+		const pos = quickAddInputEl.selectionStart ?? quickAddValue.length;
+		const before = quickAddValue.slice(0, pos);
+		const after = quickAddValue.slice(pos);
+		const newBefore = before.replace(/#\w*$/, '#' + tag);
+		quickAddValue = newBefore + after;
+		quickAddTagSuggestions = [];
+		tick().then(() => {
+			if (quickAddInputEl) {
+				quickAddInputEl.selectionStart = quickAddInputEl.selectionEnd = newBefore.length;
+				quickAddInputEl.focus();
+			}
+		});
+	}
+
+	function submitQuickAdd() {
+		const text = quickAddValue.trim();
+		if (!text) return;
+
+		// 1. Determine target folder
+		const topLevelFolders = allFolders.filter(f => f.parentId === null && !f.archived).sort((a, b) => a.order - b.order);
+		let targetFolder = topLevelFolders.find(f => f.id === settings.quickListFolderId);
+
+		// If user hasn't set one or it was deleted, fall back to first top-level folder
+		if (!targetFolder && topLevelFolders.length > 0) {
+			targetFolder = topLevelFolders[0];
+			updateSettings({ quickListFolderId: targetFolder.id });
+		}
+
+		// If no top-level folders exist at all, create a default top-level folder
+		if (!targetFolder) {
+			const newFolderId = createFolder('General', null, '#6366f1', settings.addListPosition);
+			updateSettings({ quickListFolderId: newFolderId });
+			const now = new Date().toISOString();
+			targetFolder = {
+				id: newFolderId,
+				name: 'General',
+				color: '#6366f1',
+				parentId: null,
+				order: 0,
+				done: false,
+				favourite: false,
+				archived: false,
+				archivedPrevId: null,
+				archivedNextId: null,
+				createdAt: now,
+				updatedAt: now,
+				foldersFirst: true,
+				localNav: false
+			};
+		}
+
+		// 2. Determine target list name
+		const listName = (settings.quickListName || '').trim() || 'Quick List';
+
+		// 3. Find or create list in target folder
+		let targetList = allLists.find(
+			l => l.folderId === targetFolder.id &&
+				!l.archived &&
+				l.type !== 'divider' &&
+				l.name.trim().toLowerCase() === listName.toLowerCase()
+		);
+
+		let listId: string;
+		if (targetList) {
+			listId = targetList.id;
+		} else {
+			listId = createList(listName, targetFolder.id, 'plain', targetFolder.color || '#6366f1', settings.addListPosition);
+		}
+
+		// 4. Create item in the quick list
+		createItem(listId, text, null, null, quickAddIsNote, settings.addItemPosition);
+
+		// 5. Reset input
+		quickAddValue = '';
+		quickAddIsNote = false;
+		quickAddTagSuggestions = [];
+		tick().then(resizeQuickAdd);
+
+		// 6. Feedback toast
+		if (quickAddToastTimer) clearTimeout(quickAddToastTimer);
+		quickAddToast = { message: `Added to "${listName}" in "${targetFolder.name}"` };
+		quickAddToastTimer = setTimeout(() => {
+			quickAddToast = null;
+		}, 3000);
+	}
+
 	// ── Search actions ────────────────────────────────────────────────────────────
 	function toggleSearch() {
 		if (!showSearch) {
@@ -825,6 +963,7 @@
 			savedSearch = null;
 			activeTagFilter = null;
 			showSearch = true;
+			showQuickAdd = false;
 			tick().then(() => searchInputEl?.focus());
 		} else {
 			showSearch = false;
@@ -838,6 +977,7 @@
 		searchQuery = savedSearch;
 		savedSearch = null;
 		showSearch = true;
+		showQuickAdd = false;
 		tick().then(() => searchInputEl?.focus());
 	}
 
@@ -1244,6 +1384,9 @@ ${bodyHtml}
 				<button class="icon-btn search-btn" class:search-active={showSearch} onclick={toggleSearch} aria-label={showSearch ? 'Close search' : 'Search'}>
 					🔍
 				</button>
+				<button class="icon-btn quick-add-btn" class:quick-add-active={showQuickAdd} onclick={toggleQuickAdd} aria-label={showQuickAdd ? 'Close quick add' : 'Quick add'} title="Quick add">
+					⚡
+				</button>
 				{#if savedSearch && !showSearch}
 					<button class="crumb search-crumb" onclick={restoreSearch} title="Back to search results">"{savedSearch}"</button>
 				{/if}
@@ -1310,6 +1453,66 @@ ${bodyHtml}
 				</div>
 			</div>
 		</header>
+
+		{#if showQuickAdd}
+			<div class="universal-bar quick-add-bar">
+				<form
+					class="universal-row"
+					onsubmit={(e) => { e.preventDefault(); submitQuickAdd(); }}
+				>
+					<div class="input-wrap">
+						<textarea
+							bind:this={quickAddInputEl}
+							class="universal-input has-toggle"
+							placeholder={quickAddIsNote ? 'Add note to quick list…' : 'Add item to quick list…'}
+							bind:value={quickAddValue}
+							rows="1"
+							enterkeyhint="done"
+							oninput={() => { resizeQuickAdd(); updateQuickAddTagSuggestions(); }}
+							onkeydown={(e) => {
+								if (e.key === 'Escape') {
+									if (quickAddTagSuggestions.length) {
+										quickAddTagSuggestions = [];
+										e.preventDefault();
+										return;
+									}
+									showQuickAdd = false;
+								}
+								if (e.key === 'Enter' && !e.shiftKey) {
+									e.preventDefault();
+									submitQuickAdd();
+									quickAddTagSuggestions = [];
+								}
+							}}
+							onblur={() => setTimeout(() => { quickAddTagSuggestions = []; }, 150)}
+						></textarea>
+						<button
+							type="button"
+							class="type-toggle-btn"
+							class:is-note={quickAddIsNote}
+							onpointerdown={(e) => {
+								e.preventDefault();
+								quickAddIsNote = !quickAddIsNote;
+								focusQuickAddInput();
+							}}
+							aria-label="Toggle note/todo"
+						>{quickAddIsNote ? '📝' : '☑'}</button>
+					</div>
+				</form>
+				{#if quickAddTagSuggestions.length > 0}
+					<div class="tag-autocomplete">
+						{#each quickAddTagSuggestions as tag}
+							<button class="tag-ac-item" onpointerdown={(e) => { e.preventDefault(); applyQuickAddTagSuggestion(tag); }}>#{tag}</button>
+						{/each}
+					</div>
+				{/if}
+				{#if quickAddToast}
+					<div class="quick-add-toast">
+						{quickAddToast.message}
+					</div>
+				{/if}
+			</div>
+		{/if}
 
 		{#if showSearch}
 			<div class="search-bar">
@@ -2740,5 +2943,86 @@ ${bodyHtml}
 		margin-left: 0.25rem;
 		padding: 2px;
 		background: transparent;
+	}
+
+	/* ── Quick Add & Universal input bar ──────────────────────────── */
+	.icon-btn.quick-add-active { color: var(--accent); }
+	.quick-add-btn { flex-shrink: 0; }
+	.universal-bar {
+		padding: 0.5rem 0.75rem 0.4rem;
+		border-bottom: 1px solid var(--border);
+		background: var(--bg2);
+		flex-shrink: 0;
+	}
+	.universal-row {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+	.input-wrap {
+		position: relative;
+		flex: 1;
+		min-width: 0;
+	}
+	.universal-input {
+		width: 100%;
+		padding: 0.6rem 2.2rem 0.6rem 0.8rem;
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		font-size: 1rem;
+		background: var(--bg);
+		color: var(--text);
+		outline: none;
+		box-sizing: border-box;
+		resize: none;
+		overflow: hidden;
+		min-height: 2.5rem;
+		line-height: 1.4;
+		font-family: inherit;
+	}
+	.universal-input:focus { border-color: var(--accent); }
+	.universal-input.has-toggle { padding-right: 2.8rem; }
+	.type-toggle-btn {
+		position: absolute;
+		right: 0.3rem;
+		top: 0.35rem;
+		background: var(--bg2);
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		color: var(--text2);
+		font-size: 1.1rem;
+		cursor: pointer;
+		padding: 0.2rem 0.4rem;
+		line-height: 1.2;
+		white-space: nowrap;
+	}
+	.type-toggle-btn.is-note {
+		color: var(--accent);
+		border-color: var(--accent);
+		background: transparent;
+	}
+	.tag-autocomplete {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.3rem;
+		padding: 0.4rem 0.2rem 0.2rem;
+	}
+	.tag-ac-item {
+		background: var(--accent-subtle, rgba(99, 102, 241, 0.1));
+		color: var(--accent);
+		border: 1px solid var(--accent);
+		border-radius: 12px;
+		padding: 0.15rem 0.55rem;
+		font-size: 0.8rem;
+		font-weight: 500;
+		cursor: pointer;
+	}
+	.quick-add-toast {
+		font-size: 0.82rem;
+		color: var(--accent);
+		padding: 0.25rem 0.3rem 0.1rem;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 </style>

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { settings, updateSettings } from '$lib/settings.svelte';
-	import { exportBackup, importBackup, type BackupFile } from '$lib/data';
+	import { exportBackup, importBackup, readFolders, type BackupFile } from '$lib/data';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import KeyboardSettingsScreen from './KeyboardSettingsScreen.svelte';
 	import { auth } from '$lib/auth.svelte';
@@ -10,6 +10,14 @@
 	const APP_VERSION = __APP_VERSION__;
 
 	let showKeyboardSettings = $state(false);
+
+	let topLevelFolders = $derived.by(() => {
+		try {
+			return readFolders().filter((f) => f.parentId === null && !f.archived).sort((a, b) => a.order - b.order);
+		} catch {
+			return [];
+		}
+	});
 
 	// ── Backup ──────────────────────────────────────────────────────────────────
 	function downloadBackup() {
@@ -97,6 +105,35 @@
 		<section>
 			<h2>Keyboard Shortcuts</h2>
 			<button class="action-btn" onclick={() => (showKeyboardSettings = true)}>⌨ Configure Shortcuts</button>
+		</section>
+
+		<section>
+			<h2>Quick Add</h2>
+			<div class="field-group">
+				<label class="field-label" for="quick-list-folder">Top Level Folder</label>
+				<select
+					id="quick-list-folder"
+					class="setting-select"
+					value={settings.quickListFolderId ?? ''}
+					onchange={(e) => updateSettings({ quickListFolderId: (e.target as HTMLSelectElement).value || null })}
+				>
+					<option value="">Select a folder…</option>
+					{#each topLevelFolders as f}
+						<option value={f.id}>{f.name}</option>
+					{/each}
+				</select>
+			</div>
+			<div class="field-group">
+				<label class="field-label" for="quick-list-name">Quick List Name</label>
+				<input
+					id="quick-list-name"
+					type="text"
+					class="setting-text-input"
+					placeholder="Quick List"
+					value={settings.quickListName ?? ''}
+					oninput={(e) => updateSettings({ quickListName: (e.target as HTMLInputElement).value })}
+				/>
+			</div>
 		</section>
 
 		<section>
@@ -414,4 +451,30 @@
 		cursor: pointer;
 	}
 	.spacing-value { color: var(--text2); font-size: 0.95rem; min-width: 2.5rem; text-align: right; }
+	.field-group {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.field-label {
+		font-size: 0.85rem;
+		color: var(--text2);
+	}
+	.setting-select,
+	.setting-text-input {
+		width: 100%;
+		padding: 0.6rem 0.8rem;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--bg2);
+		color: var(--text);
+		font-size: 0.95rem;
+		box-sizing: border-box;
+		outline: none;
+		font-family: inherit;
+	}
+	.setting-select:focus,
+	.setting-text-input:focus {
+		border-color: var(--accent);
+	}
 </style>
