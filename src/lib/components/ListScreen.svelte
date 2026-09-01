@@ -461,8 +461,7 @@
 		universalValue = '';
 		newItemParentId = null;
 		newItemIsNote = listMeta?.defaultIsNote ?? false;
-		// Blur dismisses the iOS keyboard and hides the confirm FAB
-		universalInputEl?.blur();
+		focusInput();
 	}
 
 	// ── Clipboard import ───────────────────────────────────────────────────

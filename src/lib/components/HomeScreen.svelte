@@ -967,6 +967,7 @@
 		quickAddIsNote = false;
 		quickAddTagSuggestions = [];
 		tick().then(resizeQuickAdd);
+		focusQuickAddInput();
 
 		// 6. Feedback toast
 		if (quickAddToastTimer) clearTimeout(quickAddToastTimer);
