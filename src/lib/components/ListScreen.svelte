@@ -1515,10 +1515,13 @@
 			>
 				{#if item.heading}
 					<!-- Heading: full-width bold label, no checkbox, no price -->
+					{#if selectionMode}
+						{@render checkControl(item)}
+					{/if}
 					<button
 						class="item-name heading-name"
 						class:editing={editingId === item.id}
-						onclick={() => { if (!selectionMode) startEditName(item); }}
+						onclick={() => { if (!selectionMode) startEditName(item); else toggleSelectionItem(item.id); }}
 					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}</button>
 					{#if !commitState.isHistorical}
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
@@ -1534,7 +1537,11 @@
 					{/if}
 				{:else if item.note}
 					<!-- Note: no checkbox, italic text -->
-					<span class="note-icon">📝</span>
+					{#if selectionMode}
+						{@render checkControl(item)}
+					{:else}
+						<span class="note-icon">📝</span>
+					{/if}
 					<button
 						class="item-name note-name"
 						class:fullscreen-note={item.fullScreen}
@@ -2225,6 +2232,7 @@
 	.check-btn.sel-check { color: var(--text2); }
 	.check-btn.sel-checked { color: var(--list-color, var(--accent)); }
 	/* Selected item row highlight */
+	.item-row.selected,
 	.item-row:has(.sel-checked) { background: color-mix(in srgb, var(--list-color, var(--accent)) 12%, var(--bg)); }
 	/* Selection bar */
 	.summary-bar.selection-bar {
@@ -2444,6 +2452,7 @@
 	}
 	.note-name {
 		font-size: 1rem;
+		font-style: italic;
 	}
 	/* ── Subtask hint bar ────────────────────────────────────────────────── */
 	.subtask-hint {
