@@ -124,10 +124,7 @@ export function updateFolder(id: string, patch: Partial<Omit<Folder, 'id' | 'cre
 		if (!m) return;
 		// Only an explicit user move materializes a recovered tree. Receiving a
 		// partial remote update never writes potentially premature cycle repairs.
-		for (const folder of currentTree) {
-			const record = findYMap(getFolders(doc), folder.id);
-			if (record && (record.get('parentId') ?? null) !== folder.parentId) record.set('parentId', folder.parentId);
-		}
+		materializeCycles(getFolders(doc), currentTree);
 		for (const [k, v] of Object.entries(patch)) {
 			if (k === 'checkboxes') replaceFolderCheckboxes(m, patch.checkboxes ?? []);
 			else m.set(k, v);
@@ -775,6 +772,7 @@ export function reparentItems(listId: string, ids: string[], targetId: string | 
 	let order = items.filter((item) => item.parentId === targetId)
 		.reduce((max, item) => Math.max(max, item.order), -1) + 1;
 	doc.transact(() => {
+		materializeCycles(getItems(doc), items);
 		for (const id of roots) updateItem(id, { parentId: targetId, order: order++ });
 	});
 	return true;
@@ -1000,6 +998,18 @@ export function readListsInTreeOrder(folders?: Folder[], lists?: ListMeta[]): Li
 
 // ─── Internal utilities ───────────────────────────────────────────────────────
 
+function materializeCycles(arr: Y.Array<Y.Map<unknown>>, tree: { id: string; parentId: string | null }[]) {
+	const ids = new Set(tree.map((node) => node.id));
+	const records = new Map(arr.toArray().map((record) => [record.get('id'), record]));
+	for (const node of tree) {
+		const record = records.get(node.id);
+		const parent = record?.get('parentId') as string | undefined;
+		// Missing parents may simply not have synced yet. Only persist cycle
+		// breaks, never orphan recovery, during an explicit user move.
+		if (record && parent && ids.has(parent) && parent !== node.parentId) record.set('parentId', node.parentId);
+	}
+}
+
 function findYMap(arr: Y.Array<Y.Map<unknown>>, id: string): Y.Map<unknown> | null {
 	for (const m of arr.toArray() as Y.Map<unknown>[]) {
 		if (m.get('id') === id) return m;
@@ -1078,6 +1088,12 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 	const lArr = getLists(doc);
 	const iArr = getItems(doc);
 	const sArr = getSpreadsheets(doc);
+
+	// Undo needs an authoritative pre-import baseline even for legacy notes
+	// that have never been opened. Migration itself is not an undo action.
+	for (const item of backup.items) {
+		if (findYMap(iArr, item.id)) getItemText(doc, item.id);
+	}
 
 	doc.transact(() => {
 		if (mode === 'replace') {
