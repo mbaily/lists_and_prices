@@ -32,18 +32,19 @@ export async function login(
 	return { ok: false, error: body.error ?? 'Login failed' };
 }
 
-export async function logout() {
+/** Only discard the working session after the server confirms revocation. */
+export async function logout(): Promise<boolean> {
 	try {
-		await fetch('/api/logout', { method: 'POST' });
+		const response = await fetch('/api/logout', { method: 'POST' });
+		if (!response.ok && response.status !== 401) return false;
 	} catch {
-		// Genuine network failure (fetch threw) — if we appear to be online,
-		// don't force-logout (the session is probably still valid on the server).
-		if (typeof navigator !== 'undefined' && navigator.onLine) return;
+		// Keep the local document usable and let the user retry. Clearing only
+		// local state would leave the HttpOnly server session active anyway.
+		return false;
 	}
-	// Always clear local state after a deliberate logout attempt,
-	// even if the server returned a non-OK status.
 	auth.username = null;
 	localStorage.removeItem(AUTH_KEY);
+	return true;
 }
 
 export async function checkSession(): Promise<boolean> {

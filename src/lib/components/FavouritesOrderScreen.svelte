@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { docState, commitState } from '$lib/yjsStore.svelte';
 	import {
 		readFolders,
@@ -143,22 +144,33 @@
 	}
 
 	function moveItem(index: number, direction: 'up' | 'down') {
-		if (commitState.isHistorical) return;
+		if (commitState.isHistorical || index < 0 || index >= validEntries.length) return;
 		const targetIndex = direction === 'up' ? index - 1 : index + 1;
 		if (targetIndex < 0 || targetIndex >= validEntries.length) return;
 		const next = [...validEntries];
 		const [moved] = next.splice(index, 1);
 		next.splice(targetIndex, 0, moved);
+		saveFavouritesOrder(next);
 		entries = next;
-		saveFavouritesOrder(entries);
 	}
 
 	// ── Touch & pointer drag reorder ─────────────────────────────────────────────
 	let touchDragFrom = $state<number | null>(null);
 	let touchDragOver = $state<number | null>(null);
 
+	$effect.pre(() => {
+		void commitState.isHistorical;
+		void commitState.commitId;
+		untrack(() => {
+			touchDragFrom = null;
+			touchDragOver = null;
+			// Retain unmarked entries within a view, but never carry live entries into history.
+			entries = getInitialFavourites();
+		});
+	});
+
 	function startDrag(e: PointerEvent, index: number) {
-		if (commitState.isHistorical) return;
+		if (commitState.isHistorical || index < 0 || index >= validEntries.length) return;
 		e.stopPropagation();
 		touchDragFrom = index;
 		touchDragOver = index;
@@ -166,7 +178,9 @@
 
 	$effect(() => {
 		if (touchDragFrom === null) return;
+		const sourceEntries = untrack(() => validEntries);
 		function onMove(e: PointerEvent) {
+			if (commitState.isHistorical) return;
 			e.preventDefault();
 			const el = document.elementFromPoint(e.clientX, e.clientY);
 			const row = el?.closest('[data-drag-fav-index]') as HTMLElement | null;
@@ -175,25 +189,30 @@
 			}
 		}
 		function onEnd() {
-			if (!commitState.isHistorical && touchDragFrom !== null && touchDragOver !== null && touchDragFrom !== touchDragOver) {
+			const unchanged = sourceEntries.length === validEntries.length && sourceEntries.every((entry, i) =>
+				entry.id === validEntries[i].id && entry.type === validEntries[i].type);
+			if (!commitState.isHistorical && unchanged && touchDragFrom !== null && touchDragOver !== null && touchDragFrom !== touchDragOver && touchDragFrom >= 0 && touchDragFrom < validEntries.length && touchDragOver >= 0 && touchDragOver < validEntries.length) {
 				const from = touchDragFrom;
 				const to = touchDragOver;
 				const next = [...validEntries];
 				const [moved] = next.splice(from, 1);
 				next.splice(to, 0, moved);
+				saveFavouritesOrder(next);
 				entries = next;
-				saveFavouritesOrder(entries);
 			}
+			onCancel();
+		}
+		function onCancel() {
 			touchDragFrom = null;
 			touchDragOver = null;
 		}
 		document.addEventListener('pointermove', onMove, { passive: false });
 		document.addEventListener('pointerup', onEnd, { once: true });
-		document.addEventListener('pointercancel', onEnd, { once: true });
+		document.addEventListener('pointercancel', onCancel, { once: true });
 		return () => {
 			document.removeEventListener('pointermove', onMove);
 			document.removeEventListener('pointerup', onEnd);
-			document.removeEventListener('pointercancel', onEnd);
+			document.removeEventListener('pointercancel', onCancel);
 		};
 	});
 
@@ -290,6 +309,7 @@
 						<button
 							class="star-btn"
 							class:active={data.favourite}
+							disabled={commitState.isHistorical}
 							onclick={() => toggleFavourite(entry)}
 							aria-label={data.favourite ? 'Remove from favourites' : 'Add to favourites'}
 							title={data.favourite ? 'Remove from favourites' : 'Add to favourites'}
@@ -535,7 +555,8 @@
 	.star-btn.active {
 		color: #f59e0b;
 	}
-	.star-btn:hover {
+	.star-btn:disabled { cursor: default; opacity: 0.6; }
+	.star-btn:hover:not(:disabled) {
 		transform: scale(1.15);
 	}
 </style>

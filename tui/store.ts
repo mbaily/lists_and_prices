@@ -9,7 +9,8 @@ export let wsProvider: WebsocketProvider | null = null;
 export function initYjs(username: string, wsUrl: string, cookieStr: string, insecure: boolean, onUpdate: () => void) {
 	if (doc) destroyYjs();
 
-	doc = new Y.Doc();
+	// Every replica must retain deleted structs used by saved snapshots.
+	doc = new Y.Doc({ gc: false });
 
 	class CookieWebSocket extends WebSocket {
 		constructor(url: string | URL) {

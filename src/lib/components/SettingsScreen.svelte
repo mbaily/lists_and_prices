@@ -1,9 +1,10 @@
 <script lang="ts">
+	import { onDestroy, untrack } from 'svelte';
 	import { settings, updateSettings } from '$lib/settings.svelte';
 	import { exportBackup, importBackup, readFolders, type BackupFile } from '$lib/data';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import KeyboardSettingsScreen from './KeyboardSettingsScreen.svelte';
-	import { docState } from '$lib/yjsStore.svelte';
+	import { docState, commitState, exitCommitView } from '$lib/yjsStore.svelte';
 	import { auth } from '$lib/auth.svelte';
 
 	let { onBack, onLogout }: { onBack: () => void; onLogout: () => void } = $props();
@@ -43,13 +44,44 @@
 	let restoreStatus = $state<string | null>(null);
 	let restoreError = $state<string | null>(null);
 	let pendingBackup = $state<BackupFile | null>(null);
+	let activeRestoreReader: FileReader | null = null;
+	let restoreContextVersion = 0;
+	let isActive = true;
+
+	function cancelPendingRestore() {
+		restoreContextVersion++;
+		pendingBackup = null;
+		if (activeRestoreReader && activeRestoreReader.readyState === FileReader.LOADING) activeRestoreReader.abort();
+		activeRestoreReader = null;
+		if (restoreFileInput) restoreFileInput.value = '';
+	}
+
+	$effect.pre(() => {
+		void commitState.isHistorical;
+		void commitState.commitId;
+		untrack(cancelPendingRestore);
+	});
+
+	onDestroy(() => {
+		isActive = false;
+		cancelPendingRestore();
+	});
 
 	function onFileSelected(e: Event) {
-		const file = (e.target as HTMLInputElement).files?.[0];
+		const input = e.target as HTMLInputElement;
+		if (commitState.isHistorical || !isActive) { input.value = ''; return; }
+		const file = input.files?.[0];
 		if (!file) return;
+		cancelPendingRestore();
+		restoreStatus = null;
+		restoreError = null;
+		const contextVersion = restoreContextVersion;
 		const reader = new FileReader();
+		activeRestoreReader = reader;
+		const isCurrent = () => isActive && !commitState.isHistorical && contextVersion === restoreContextVersion && activeRestoreReader === reader;
 		reader.onload = () => {
 			try {
+				if (!isCurrent()) return;
 				const backup = JSON.parse(reader.result as string) as BackupFile;
 				if (backup.version !== 1 || !Array.isArray(backup.folders) || !Array.isArray(backup.lists) || !Array.isArray(backup.items)) {
 					restoreError = 'Invalid backup file.';
@@ -62,14 +94,24 @@
 				restoreError = `Failed to parse backup: ${err}`;
 				restoreStatus = null;
 			} finally {
-				if (restoreFileInput) restoreFileInput.value = '';
+				if (activeRestoreReader === reader) {
+					activeRestoreReader = null;
+					input.value = '';
+				}
 			}
+		};
+		reader.onerror = () => {
+			if (!isCurrent()) return;
+			restoreError = 'Could not read the backup file. Please select it again.';
+			restoreStatus = null;
+			activeRestoreReader = null;
+			input.value = '';
 		};
 		reader.readAsText(file);
 	}
 
 	function confirmRestore() {
-		if (!pendingBackup) return;
+		if (commitState.isHistorical || !isActive || !pendingBackup) return;
 		try {
 			importBackup(pendingBackup, restoreMode);
 			restoreStatus = `Restored ${pendingBackup.folders.length} folders, ${pendingBackup.lists.length} lists, ${pendingBackup.items.length} items${pendingBackup.sheets?.length ? `, ${pendingBackup.sheets.length} spreadsheets (names only — cell content is not included in backups)` : ''}.`;
@@ -79,6 +121,15 @@
 			restoreStatus = null;
 		}
 		pendingBackup = null;
+	}
+
+	function deleteLocalStorage() {
+		if (commitState.isHistorical || !isActive) return;
+		const username = auth.username;
+		if (confirm('WARNING: This will completely delete your local database. Any unsynced offline changes will be PERMANENTLY LOST. Only do this if you are fully synced with the server and want to clear a fragmented local database. Continue?') && !commitState.isHistorical && isActive && auth.username === username) {
+			indexedDB.deleteDatabase(`pnl-${username}`);
+			location.reload();
+		}
 	}
 
 	const currencies = [
@@ -102,6 +153,12 @@
 		<button class="back-btn" onclick={onBack}>← Back</button>
 		<span class="title">Settings</span>
 	</header>
+	{#if commitState.isHistorical}
+		<div class="historical-banner">
+			<span>Historical view — restore and local data deletion are disabled.</span>
+			<button onclick={exitCommitView}>Exit</button>
+		</div>
+	{/if}
 
 	<div class="content">
 		<section>
@@ -260,12 +317,7 @@
 
 		<section>
 			<h2>Danger Zone</h2>
-			<button class="logout-btn" onclick={() => {
-				if (confirm('WARNING: This will completely delete your local database. Any unsynced offline changes will be PERMANENTLY LOST. Only do this if you are fully synced with the server and want to clear a fragmented local database. Continue?')) {
-					indexedDB.deleteDatabase(`pnl-${auth.username}`);
-					location.reload();
-				}
-			}}>Delete Local Storage</button>
+			<button class="logout-btn" disabled={commitState.isHistorical} onclick={deleteLocalStorage}>Delete Local Storage</button>
 			<p class="restore-err" style="margin-top: 0.25rem;">Don't use offline, use while able to connect to server: this wipes your local data to force a fresh sync and defragment the local storage. Use when loading the app is taking 2-3 seconds.</p>
 		</section>
 
@@ -282,11 +334,11 @@
 
 			<div class="restore-modes">
 				<label class="mode-label">
-					<input type="radio" name="restoreMode" value="merge" bind:group={restoreMode} />
+					<input type="radio" name="restoreMode" value="merge" bind:group={restoreMode} disabled={commitState.isHistorical} />
 					Merge — overwrite matching IDs, keep everything else
 				</label>
 				<label class="mode-label">
-					<input type="radio" name="restoreMode" value="replace" bind:group={restoreMode} />
+					<input type="radio" name="restoreMode" value="replace" bind:group={restoreMode} disabled={commitState.isHistorical} />
 					Replace all — delete existing data, restore from file
 				</label>
 			</div>
@@ -297,9 +349,10 @@
 				type="file"
 				accept=".json,application/json"
 				style="display:none"
+				disabled={commitState.isHistorical}
 				onchange={onFileSelected}
 			/>
-			<button class="action-btn restore-btn" onclick={() => restoreFileInput?.click()}>⬆ Restore from file</button>
+			<button class="action-btn restore-btn" disabled={commitState.isHistorical} onclick={() => { if (!commitState.isHistorical) restoreFileInput?.click(); }}>⬆ Restore from file</button>
 
 			{#if restoreStatus}
 				<p class="restore-ok">{restoreStatus}</p>
@@ -315,7 +368,7 @@
 	</div>
 </div>
 
-{#if pendingBackup}
+{#if pendingBackup && !commitState.isHistorical}
 	{@const modeLabel = restoreMode === 'replace' ? 'REPLACE ALL data with' : 'merge in'}
 	<ConfirmDialog
 		message={`Restore and ${modeLabel} ${pendingBackup.folders.length} folders, ${pendingBackup.lists.length} lists, ${pendingBackup.items.length} items${pendingBackup.sheets?.length ? `, ${pendingBackup.sheets.length} spreadsheets (cell content not included)` : ''}? This cannot be undone.`}
@@ -342,6 +395,26 @@
 		background: var(--bg2);
 		border-bottom: 1px solid var(--border);
 	}
+	.historical-banner {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		padding: 0.4rem 1rem;
+		background: #dc2626;
+		color: #fff;
+		font-size: 0.82rem;
+		flex-shrink: 0;
+	}
+	.historical-banner button {
+		background: transparent;
+		border: 1px solid currentColor;
+		border-radius: 4px;
+		color: inherit;
+		padding: 0.15rem 0.5rem;
+		cursor: pointer;
+	}
+	button:disabled { cursor: default; opacity: 0.6; }
 	.back-btn {
 		background: none;
 		border: none;

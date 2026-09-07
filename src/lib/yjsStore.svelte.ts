@@ -6,6 +6,8 @@
 import * as Y from 'yjs';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import { WebsocketProvider } from 'y-websocket';
+import { observeNoteNames } from './noteText';
+import { encodeCommitState } from './commitSnapshot';
 
 export type ItemType = 'plain' | 'priced';
 export type SyncStatus = 'offline' | 'connecting' | 'synced';
@@ -22,7 +24,8 @@ let _idbProvider: IndexeddbPersistence | null = null;
 
 let _historicalDoc: Y.Doc | null = null;
 let _undoManager: Y.UndoManager | null = null;
-
+let _stopNoteNames: (() => void) | null = null;
+const COMMIT_ORIGIN = Symbol('commit-management');
 
 export const syncState = $state<{ status: SyncStatus }>({ status: 'offline' });
 export const commitState = $state<{ isHistorical: boolean, commitId: string | null }>({ isHistorical: false, commitId: null });
@@ -41,17 +44,20 @@ export function initYjs(username: string, wsUrl: string) {
 	const doc = new Y.Doc({ gc: false });
 	_doc = doc;
 
-	_undoManager = new Y.UndoManager([
-		getFolders(doc),
-		getLists(doc),
-		getItems(doc),
-		getSpreadsheets(doc)
-	]);
+	// Root-level note texts, report memberships and cell maps are part of the
+	// same action as their metadata. Provider/migration/cache origins are not
+	// tracked, nor are remote updates applied with a null origin.
+	_undoManager = new Y.UndoManager(doc, {
+		captureTimeout: 0,
+		captureTransaction: (transaction) => transaction.local && transaction.changed.size > 0
+	});
+	_stopNoteNames = observeNoteNames(doc);
 
 	idbSynced.done = false;
 	const tIdbStart = performance.now();
 	_idbProvider = new IndexeddbPersistence(`pnl-${username}`, doc);
 	_idbProvider.on('synced', () => {
+		if (_doc !== doc) return;
 		const tIdbEnd = performance.now();
 		console.log(`[Perf] IndexedDB synced in ${Math.round(tIdbEnd - tIdbStart)}ms`);
 		idbSynced.done = true;
@@ -65,14 +71,18 @@ export function initYjs(username: string, wsUrl: string) {
 
 	syncState.status = 'connecting';
 
-	doc.on('update', () => { docState.version++; });
+	doc.on('update', () => { if (_doc === doc) docState.version++; });
 
 	_wsProvider.on('status', ({ status }: { status: string }) => {
+		if (_doc !== doc) return;
 		const tWsStatus = performance.now();
 		console.log(`[Perf] WebSocket status changed to '${status}' at ${Math.round(tWsStatus - tWsStart)}ms`);
-		if (status === 'connected') syncState.status = 'synced';
+		if (status === 'connected') syncState.status = _wsProvider?.synced ? 'synced' : 'connecting';
 		else if (status === 'connecting') syncState.status = 'connecting';
 		else syncState.status = 'offline';
+	});
+	_wsProvider.on('sync', (synced: boolean) => {
+		if (_doc === doc && synced) syncState.status = 'synced';
 	});
 
 	const tEnd = performance.now();
@@ -86,31 +96,48 @@ export function getDoc(): Y.Doc {
 	return _doc;
 }
 
+/** All application mutations must explicitly target a writable live document. */
+export function getMutableDoc(): Y.Doc {
+	if (_historicalDoc) throw new Error('Historical commits are read-only. Exit history to make changes.');
+	if (!_doc) throw new Error('Yjs not initialised');
+	return _doc;
+}
+
 export function getWsProvider(): WebsocketProvider | null {
-	return _wsProvider;
+	return _historicalDoc ? null : _wsProvider;
 }
 
 export function getUndoManager(): Y.UndoManager {
+	getMutableDoc();
 	if (!_undoManager) throw new Error('UndoManager not initialised');
 	return _undoManager;
 }
 
 export function canUndo(): boolean {
-	if (!_undoManager) return false;
+	if (_historicalDoc || !_undoManager) return false;
 	return _undoManager.undoStack.length > 0;
 }
 
 export function getUndoCount(): number {
-	if (!_undoManager) return 0;
+	if (_historicalDoc || !_undoManager) return 0;
 	return _undoManager.undoStack.length;
 }
 
+export function undoLastAction(): boolean {
+	if (!canUndo()) return false;
+	const changed = _undoManager!.undo() !== null;
+	docState.version++;
+	return changed;
+}
+
 export function destroyYjs() {
+	_stopNoteNames?.();
+	_stopNoteNames = null;
+	_undoManager?.destroy();
 	_wsProvider?.destroy();
 	_idbProvider?.destroy();
 	_doc?.destroy();
 	_historicalDoc?.destroy();
-	_undoManager?.destroy();
 	_doc = null;
 	_historicalDoc = null;
 	_undoManager = null;
@@ -137,10 +164,11 @@ export interface Commit {
 	name: string;
 	createdAt: string;
 	snapshot: Uint8Array;
+	state?: Uint8Array;
 }
 
 export function createCommit(name: string) {
-	if (!_doc) return;
+	if (!_doc || _historicalDoc) return;
 	const snapshot = Y.snapshot(_doc);
 	const snapshotBytes = Y.encodeSnapshot(snapshot);
 
@@ -150,8 +178,9 @@ export function createCommit(name: string) {
 	commitObj.set('name', name);
 	commitObj.set('createdAt', new Date().toISOString());
 	commitObj.set('snapshot', snapshotBytes);
+	commitObj.set('state', encodeCommitState(_doc));
 
-	commits.insert(0, [commitObj]); // Add to front
+	_doc.transact(() => commits.insert(0, [commitObj]), COMMIT_ORIGIN);
 	docState.version++; // Trigger re-render
 }
 
@@ -161,16 +190,17 @@ export function readCommits(): Commit[] {
 		id: m.get('id'),
 		name: m.get('name'),
 		createdAt: m.get('createdAt'),
-		snapshot: m.get('snapshot')
+		snapshot: m.get('snapshot'),
+		state: m.get('state')
 	}));
 }
 
 export function deleteCommit(commitId: string) {
-	if (!_doc) return;
+	if (!_doc || _historicalDoc) return;
 	const commits = _doc.getArray('commits');
 	const idx = commits.toArray().findIndex((m: any) => m.get('id') === commitId);
 	if (idx !== -1) {
-		commits.delete(idx, 1);
+		_doc.transact(() => commits.delete(idx, 1), COMMIT_ORIGIN);
 		docState.version++;
 	}
 }
@@ -181,8 +211,16 @@ export function viewCommit(commitId: string) {
 	const commit = commits.find(c => c.id === commitId);
 	if (!commit) return;
 
-	const snap = Y.decodeSnapshot(commit.snapshot);
-	_historicalDoc = Y.createDocFromSnapshot(_doc, snap);
+	const historicalDoc = new Y.Doc({ gc: false });
+	try {
+		if (commit.state) Y.applyUpdate(historicalDoc, commit.state);
+		else Y.createDocFromSnapshot(_doc, Y.decodeSnapshot(commit.snapshot), historicalDoc);
+	} catch (error) {
+		historicalDoc.destroy();
+		throw error;
+	}
+	_historicalDoc?.destroy();
+	_historicalDoc = historicalDoc;
 	commitState.isHistorical = true;
 	commitState.commitId = commitId;
 	docState.version++;

@@ -3,8 +3,14 @@
  * All mutations operate on the shared Y.Doc.
  */
 import * as Y from 'yjs';
-import { getFolders, getLists, getItems, getDoc, getSpreadsheets, getSheetCells } from './yjsStore.svelte';
+import { getFolders, getLists, getItems, getDoc, getMutableDoc, getSpreadsheets, getSheetCells } from './yjsStore.svelte';
 import { removeFromAllReports } from './smartFolders.svelte';
+import { readFolderCheckboxes, addCheckbox, renameCheckbox, removeCheckbox, orderCheckboxes, replaceFolderCheckboxes, type FolderCheckbox } from './folderCheckboxes';
+import { resolveParentLinks, compareOrder, canReparentItems, selectedRoots } from './hierarchy';
+import { readItemName, getItemText, initializeItemText, replaceItemText } from './noteText';
+import { readReportAssignments, restoreReportAssignments } from './reportAssignments';
+
+export type { FolderCheckbox } from './folderCheckboxes';
 
 function uid(): string {
 	return crypto.randomUUID();
@@ -37,15 +43,10 @@ export interface Folder {
 	checkboxes?: FolderCheckbox[];
 }
 
-export interface FolderCheckbox {
-	id: string;
-	name: string;
-}
-
 export const MAX_FOLDER_CHECKBOXES = 8;
 
 export function readFolders(): Folder[] {
-	return (getFolders(getDoc()).toArray() as Y.Map<unknown>[]).map(yMapToFolder);
+	return resolveParentLinks(getFolders(getDoc()).toArray().map(yMapToFolder));
 }
 
 function yMapToFolder(m: Y.Map<unknown>): Folder {
@@ -66,7 +67,7 @@ function yMapToFolder(m: Y.Map<unknown>): Folder {
 		foldersFirst: (m.get('foldersFirst') as boolean) ?? true,
 		localNav: (m.get('localNav') as boolean) ?? false,
 		filterView: (m.get('filterView') as 'all' | 'unchecked' | 'checked') ?? 'all',
-		checkboxes: (m.get('checkboxes') as FolderCheckbox[] | undefined) ?? undefined
+		checkboxes: readFolderCheckboxes(m)
 	};
 }
 
@@ -86,7 +87,7 @@ export function getSharedOrderExtremes(doc: Y.Doc, parentId: string | null) {
 }
 
 export function createFolder(name: string, parentId: string | null, color = '#6366f1', addPosition: 'top' | 'bottom' = 'bottom'): string {
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	const id = uid();
 	const now = new Date().toISOString();
 	doc.transact(() => {
@@ -113,11 +114,24 @@ export function createFolder(name: string, parentId: string | null, color = '#63
 }
 
 export function updateFolder(id: string, patch: Partial<Omit<Folder, 'id' | 'createdAt' | 'updatedAt'>>) {
-	const doc = getDoc();
+	const doc = getMutableDoc();
+	const currentTree = patch.parentId !== undefined ? readFolders() : [];
+	if (patch.parentId !== undefined && patch.parentId !== null) {
+		if (!readFolders().some((folder) => folder.id === patch.parentId) || isDescendant(id, patch.parentId)) return;
+	}
 	doc.transact(() => {
 		const m = findYMap(getFolders(doc), id);
 		if (!m) return;
-		for (const [k, v] of Object.entries(patch)) m.set(k, v);
+		// Only an explicit user move materializes a recovered tree. Receiving a
+		// partial remote update never writes potentially premature cycle repairs.
+		for (const folder of currentTree) {
+			const record = findYMap(getFolders(doc), folder.id);
+			if (record && (record.get('parentId') ?? null) !== folder.parentId) record.set('parentId', folder.parentId);
+		}
+		for (const [k, v] of Object.entries(patch)) {
+			if (k === 'checkboxes') replaceFolderCheckboxes(m, patch.checkboxes ?? []);
+			else m.set(k, v);
+		}
 		const keys = Object.keys(patch);
 		if (!(keys.length === 1 && keys[0] === 'order')) m.set('updatedAt', new Date().toISOString());
 	});
@@ -139,17 +153,16 @@ function sanitizeCheckboxName(name: string): string {
 export function addFolderCheckbox(folderId: string, name: string): string | null {
 	const trimmed = sanitizeCheckboxName(name);
 	if (!trimmed) return null;
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	let newId: string | null = null;
 	doc.transact(() => {
 		const m = findYMap(getFolders(doc), folderId);
 		if (!m) return;
-		const current = ((m.get('checkboxes') as FolderCheckbox[] | undefined) ?? []).slice();
+		const current = readFolderCheckboxes(m);
 		if (current.length >= MAX_FOLDER_CHECKBOXES) return;
 		if (current.some((c) => c.name.toLowerCase() === trimmed.toLowerCase())) return;
 		newId = uid();
-		current.push({ id: newId, name: trimmed });
-		m.set('checkboxes', current);
+		addCheckbox(m, { id: newId, name: trimmed });
 		m.set('updatedAt', new Date().toISOString());
 	});
 	return newId;
@@ -158,18 +171,17 @@ export function addFolderCheckbox(folderId: string, name: string): string | null
 export function renameFolderCheckbox(folderId: string, checkboxId: string, name: string): boolean {
 	const trimmed = sanitizeCheckboxName(name);
 	if (!trimmed) return false;
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	let ok = false;
 	doc.transact(() => {
 		const m = findYMap(getFolders(doc), folderId);
 		if (!m) return;
-		const current = ((m.get('checkboxes') as FolderCheckbox[] | undefined) ?? []).slice();
+		const current = readFolderCheckboxes(m);
 		const idx = current.findIndex((c) => c.id === checkboxId);
 		if (idx === -1) return;
 		// Reject if another checkbox already has this name (case-insensitive).
 		if (current.some((c, i) => i !== idx && c.name.toLowerCase() === trimmed.toLowerCase())) return;
-		current[idx] = { ...current[idx], name: trimmed };
-		m.set('checkboxes', current);
+		renameCheckbox(m, checkboxId, trimmed);
 		m.set('updatedAt', new Date().toISOString());
 		ok = true;
 	});
@@ -181,46 +193,46 @@ export function renameFolderCheckbox(folderId: string, checkboxId: string, name:
  *  id is no longer configured. Removing the last remaining name reverts the
  *  folder's lists back to the legacy single-checkbox mode. */
 export function removeFolderCheckbox(folderId: string, checkboxId: string): void {
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	doc.transact(() => {
 		const m = findYMap(getFolders(doc), folderId);
 		if (!m) return;
-		const current = ((m.get('checkboxes') as FolderCheckbox[] | undefined) ?? []).slice();
-		const next = current.filter((c) => c.id !== checkboxId);
-		m.set('checkboxes', next);
+		removeCheckbox(m, checkboxId);
 		m.set('updatedAt', new Date().toISOString());
 	});
 }
 
 export function moveFolderCheckbox(folderId: string, checkboxId: string, direction: 'up' | 'down'): void {
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	doc.transact(() => {
 		const m = findYMap(getFolders(doc), folderId);
 		if (!m) return;
-		const current = ((m.get('checkboxes') as FolderCheckbox[] | undefined) ?? []).slice();
+		const current = readFolderCheckboxes(m);
 		const idx = current.findIndex((c) => c.id === checkboxId);
 		if (idx === -1) return;
 		const swapWith = direction === 'up' ? idx - 1 : idx + 1;
 		if (swapWith < 0 || swapWith >= current.length) return;
 		[current[idx], current[swapWith]] = [current[swapWith], current[idx]];
-		m.set('checkboxes', current);
+		orderCheckboxes(m, current);
 		m.set('updatedAt', new Date().toISOString());
 	});
 }
 
 export function deleteFolder(id: string) {
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	doc.transact(() => _deleteFolderInner(id));
 }
 
-function _deleteFolderInner(id: string) {
+function _deleteFolderInner(id: string, visited = new Set<string>()) {
 	// Cascade: delete child folders recursively, then lists/items
-	const doc = getDoc();
-	const allFolders = getFolders(doc).toArray() as Y.Map<unknown>[];
+	if (visited.has(id)) return;
+	visited.add(id);
+	const doc = getMutableDoc();
+	const allFolders = readFolders();
 	const childIds = allFolders
-		.filter((f) => f.get('parentId') === id)
-		.map((f) => f.get('id') as string);
-	for (const cid of childIds) _deleteFolderInner(cid);
+		.filter((f) => f.parentId === id)
+		.map((f) => f.id);
+	for (const cid of childIds) _deleteFolderInner(cid, visited);
 
 	// Delete lists in this folder
 	const allLists = getLists(doc).toArray() as Y.Map<unknown>[];
@@ -238,9 +250,7 @@ export function isDescendant(folderId: string, targetId: string, _visited = new 
 	if (folderId === targetId) return true;
 	if (_visited.has(folderId)) return false; // Cycle detected
 	_visited.add(folderId);
-	const doc = getDoc();
-	const all = getFolders(doc).toArray() as Y.Map<unknown>[];
-	const children = all.filter((f) => f.get('parentId') === folderId).map((f) => f.get('id') as string);
+	const children = readFolders().filter((f) => f.parentId === folderId).map((f) => f.id);
 	return children.some((cid) => isDescendant(cid, targetId, _visited));
 }
 
@@ -317,7 +327,7 @@ export function createList(
 	addPosition: 'top' | 'bottom' = 'bottom',
 	isFutureList = false
 ): string {
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	const id = uid();
 	const now = new Date().toISOString();
 	doc.transact(() => {
@@ -370,7 +380,7 @@ export function createList(
 }
 
 export function updateList(id: string, patch: Partial<Omit<ListMeta, 'id' | 'createdAt' | 'updatedAt'>>) {
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	doc.transact(() => {
 		const m = findYMap(getLists(doc), id);
 		if (!m) return;
@@ -381,7 +391,7 @@ export function updateList(id: string, patch: Partial<Omit<ListMeta, 'id' | 'cre
 }
 
 function _deleteListInner(id: string) {
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	// Delete all items in this list
 	const allItems = getItems(doc).toArray() as Y.Map<unknown>[];
 	const itemIds = allItems
@@ -392,7 +402,7 @@ function _deleteListInner(id: string) {
 }
 
 export function deleteList(id: string) {
-	getDoc().transact(() => {
+	getMutableDoc().transact(() => {
 		_deleteListInner(id);
 		removeFromAllReports(id);
 	});
@@ -421,25 +431,35 @@ export interface Item {
 }
 
 export function readItems(listId: string): Item[] {
-	return (getItems(getDoc()).toArray() as Y.Map<unknown>[])
+	return resolveParentLinks(getItems(getDoc()).toArray()
 		.filter((m) => m.get('listId') === listId)
-		.map(yMapToItem)
-		.sort((a, b) => a.order - b.order);
+		.map(yMapToItem)).sort(compareOrder);
 }
 
 export function readAllItems(): Item[] {
-	return (getItems(getDoc()).toArray() as Y.Map<unknown>[]).map(yMapToItem);
+	const byList = new Map<string, Item[]>();
+	for (const item of getItems(getDoc()).toArray().map(yMapToItem)) {
+		const items = byList.get(item.listId) ?? [];
+		items.push(item);
+		byList.set(item.listId, items);
+	}
+	return [...byList.values()].flatMap(resolveParentLinks);
 }
 
 function yMapToItem(m: Y.Map<unknown>): Item {
 	const checks: Record<string, boolean> = {};
+	// Also recover backups restored by older versions into the wrong key.
+	const legacyChecks = m.get('checks');
+	if (legacyChecks && typeof legacyChecks === 'object' && !Array.isArray(legacyChecks)) {
+		for (const [id, value] of Object.entries(legacyChecks)) checks[id] = value === true;
+	}
 	m.forEach((value, key) => {
 		if (key.startsWith('chk_')) checks[key.slice(4)] = value === true;
 	});
 	return {
 		id: m.get('id') as string,
 		listId: m.get('listId') as string,
-		name: m.get('name') as string,
+		name: readItemName(m.doc!, m),
 		price: (m.get('price') as number | null) ?? null,
 		qty: (m.get('qty') as number | null) ?? null,
 		checked: (m.get('checked') as boolean) ?? false,
@@ -456,7 +476,8 @@ function yMapToItem(m: Y.Map<unknown>): Item {
 }
 
 export function createItem(listId: string, name: string, price: number | null = null, parentId: string | null = null, note = false, addPosition: 'top' | 'bottom' = 'bottom', explicitOrder?: number): string {
-	const doc = getDoc();
+	const doc = getMutableDoc();
+	if (!findYMap(getLists(doc), listId)) throw new Error('The destination list no longer exists.');
 	const id = uid();
 	const now = new Date().toISOString();
 	doc.transact(() => {
@@ -468,10 +489,10 @@ export function createItem(listId: string, name: string, price: number | null = 
 			);
 			// Order within siblings (same parentId)
 			const siblings = existing.filter((i) => (i.get('parentId') ?? null) === parentId);
-			newOrder = addPosition === 'top' ? -1 : siblings.length;
-			if (addPosition === 'top') {
-				for (const sib of siblings) sib.set('order', (sib.get('order') as number ?? 0) + 1);
-			}
+			const orders = siblings.map((sib) => (sib.get('order') as number) ?? 0);
+			newOrder = orders.length === 0 ? 0 : addPosition === 'top'
+				? orders.reduce((min, order) => Math.min(min, order), Infinity) - 1
+				: orders.reduce((max, order) => Math.max(max, order), -Infinity) + 1;
 		}
 		const m = new Y.Map<unknown>();
 		m.set('id', id);
@@ -485,37 +506,32 @@ export function createItem(listId: string, name: string, price: number | null = 
 		if (parentId !== null) m.set('parentId', parentId);
 		if (note) m.set('note', note);
 		items.push([m]);
+		initializeItemText(doc, id, name);
 	});
 	return id;
 }
 
-export function getItemYText(doc: Y.Doc, itemId: string, fallbackText = ''): Y.Text {
-	const yText = doc.getText(`note_text_${itemId}`);
-	if (yText.length === 0 && fallbackText) {
-		doc.transact(() => {
-			if (yText.length === 0) {
-				yText.insert(0, fallbackText);
-			}
-		});
-	}
-	return yText;
+export function getItemYText(doc: Y.Doc, itemId: string, _fallbackText = ''): Y.Text {
+	if (doc !== getMutableDoc()) throw new Error('The note is not in the active document.');
+	return getItemText(doc, itemId);
 }
 
 export function updateItem(id: string, patch: Partial<Omit<Item, 'id' | 'listId' | 'createdAt' | 'updatedAt' | 'checks'>>) {
-	const doc = getDoc();
+	const doc = getMutableDoc();
+	const m = findYMap(getItems(doc), id);
+	if (!m) return;
+	const changes = Object.entries(patch).filter(([key, value]) =>
+		key === 'name' ? readItemName(doc, m) !== value : m.get(key) !== value);
+	if (changes.length === 0) return;
+	// Bootstrap legacy text separately so undoing the edit never removes its base.
+	if (changes.some(([key]) => key === 'name')) getItemText(doc, id);
 	doc.transact(() => {
-		const m = findYMap(getItems(doc), id);
-		if (!m) return;
-		for (const [k, v] of Object.entries(patch)) m.set(k, v);
-		const keys = Object.keys(patch);
-		if (!(keys.length === 1 && keys[0] === 'order')) m.set('updatedAt', new Date().toISOString());
-		if (patch.name !== undefined) {
-			const yText = doc.getText(`note_text_${id}`);
-			if (yText.length > 0 && yText.toString() !== patch.name) {
-				yText.delete(0, yText.length);
-				yText.insert(0, patch.name);
-			}
+		for (const [k, v] of changes) {
+			m.set(k, v);
+			if (k === 'name') replaceItemText(doc, id, v as string);
 		}
+		const keys = changes.map(([key]) => key);
+		if (!(keys.length === 1 && keys[0] === 'order')) m.set('updatedAt', new Date().toISOString());
 	});
 }
 
@@ -523,7 +539,7 @@ export function updateItem(id: string, patch: Partial<Omit<Item, 'id' | 'listId'
  *  (`chk_<checkboxId>`) rather than a merged blob so concurrent offline edits
  *  to different checkboxes on the same item don't clobber each other. */
 export function setItemCheckboxState(itemId: string, checkboxId: string, value: boolean): void {
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	doc.transact(() => {
 		const m = findYMap(getItems(doc), itemId);
 		if (!m) return;
@@ -535,7 +551,7 @@ export function setItemCheckboxState(itemId: string, checkboxId: string, value: 
 /** Clears (sets false) the given named checkboxes across a batch of items —
  *  used for bulk "uncheck" actions on lists using named checkboxes. */
 export function clearItemCheckboxes(itemIds: string[], checkboxIds: string[]): void {
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	doc.transact(() => {
 		for (const itemId of itemIds) {
 			const m = findYMap(getItems(doc), itemId);
@@ -558,45 +574,42 @@ export function isItemDone(item: Item, folder: Folder | null | undefined): boole
 }
 
 export function deleteItem(id: string) {
-	removeYMap(getItems(getDoc()), id);
+	removeYMap(getItems(getMutableDoc()), id);
 }
 
-function _deleteItemCascadeInner(id: string) {
-	const doc = getDoc();
+function _deleteItemCascadeInner(id: string, visited = new Set<string>()) {
+	if (visited.has(id)) return;
+	visited.add(id);
+	const doc = getMutableDoc();
 	const children = (getItems(doc).toArray() as Y.Map<unknown>[])
 		.filter((m) => m.get('parentId') === id)
 		.map((m) => m.get('id') as string);
-	for (const cid of children) _deleteItemCascadeInner(cid);
+	for (const cid of children) _deleteItemCascadeInner(cid, visited);
 	removeYMap(getItems(doc), id);
 }
 
 export function deleteItemCascade(id: string) {
-	getDoc().transact(() => _deleteItemCascadeInner(id));
+	getMutableDoc().transact(() => _deleteItemCascadeInner(id));
 }
 
 export function deleteItemsBatch(ids: string[]): void {
-	getDoc().transact(() => { for (const id of ids) _deleteItemCascadeInner(id); });
+	getMutableDoc().transact(() => { for (const id of ids) _deleteItemCascadeInner(id); });
 }
 
 export function setItemsChecked(ids: string[], checked: boolean): void {
-	getDoc().transact(() => { for (const id of ids) updateItem(id, { checked }); });
+	getMutableDoc().transact(() => { for (const id of ids) updateItem(id, { checked }); });
 }
 
 export function createItemsBatch(listId: string, names: string[], addPosition: 'top' | 'bottom' = 'bottom'): void {
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	doc.transact(() => {
 		const existing = getItems(doc).toArray().filter(i => i.get('listId') === listId && (i.get('parentId') ?? null) === null);
 		
-		if (addPosition === 'top') {
-			for (const e of existing) {
-				const current = e.get('order') as number ?? 0;
-				e.set('order', current + names.length);
-			}
-			names.forEach((name, i) => createItem(listId, name, null, null, false, 'bottom', i));
-		} else {
-			const baseOrder = existing.length;
-			names.forEach((name, i) => createItem(listId, name, null, null, false, 'bottom', baseOrder + i));
-		}
+		const orders = existing.map((item) => (item.get('order') as number) ?? 0);
+		const baseOrder = orders.length === 0 ? 0 : addPosition === 'top'
+			? orders.reduce((min, order) => Math.min(min, order), Infinity) - names.length
+			: orders.reduce((max, order) => Math.max(max, order), -Infinity) + 1;
+		names.forEach((name, i) => createItem(listId, name, null, null, false, 'bottom', baseOrder + i));
 	});
 }
 
@@ -620,7 +633,8 @@ export interface ExportedItem {
 /** Import items from a JSON export, preserving all attributes and hierarchy.
  *  Items must be in tree order (parents before their children). */
 export function createItemsFromExport(listId: string, exportedItems: ExportedItem[]): void {
-	const doc = getDoc();
+	const doc = getMutableDoc();
+	validateRecords(exportedItems, 'items');
 	const idMap = new Map<string, string>(); // old id → new id
 	const list = readLists().find((l) => l.id === listId);
 	const folder = list ? readFolders().find((f) => f.id === list.folderId) : undefined;
@@ -675,7 +689,7 @@ function computeInsertIndex(visible: { id: string }[], prevId: string | null, ne
 }
 
 export function archiveList(id: string) {
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	doc.transact(() => {
 		const list = readLists().find((l) => l.id === id);
 		if (!list) return;
@@ -692,7 +706,7 @@ export function archiveList(id: string) {
 }
 
 export function unarchiveList(id: string) {
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	const list = readLists().find((l) => l.id === id);
 	if (!list) return;
 	const visible = readLists()
@@ -713,7 +727,7 @@ export function unarchiveList(id: string) {
 }
 
 export function archiveFolder(id: string) {
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	doc.transact(() => {
 		const allFolders = readFolders();
 		const folder = allFolders.find((f) => f.id === id);
@@ -731,7 +745,7 @@ export function archiveFolder(id: string) {
 }
 
 export function unarchiveFolder(id: string) {
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	const folder = readFolders().find((f) => f.id === id);
 	if (!folder) return;
 	const visible = readFolders()
@@ -753,26 +767,41 @@ export function unarchiveFolder(id: string) {
 
 // ─── Reorder helpers ──────────────────────────────────────────────────────────
 
-export function reorderItems(listId: string, fromIndex: number, toIndex: number) {
-	const doc = getDoc();
+export function reparentItems(listId: string, ids: string[], targetId: string | null): boolean {
+	const doc = getMutableDoc();
 	const items = readItems(listId);
+	if (!canReparentItems(items, ids, targetId)) return false;
+	const roots = selectedRoots(items, ids);
+	let order = items.filter((item) => item.parentId === targetId)
+		.reduce((max, item) => Math.max(max, item.order), -1) + 1;
+	doc.transact(() => {
+		for (const id of roots) updateItem(id, { parentId: targetId, order: order++ });
+	});
+	return true;
+}
+
+export function reorderItems(listId: string, fromIndex: number, toIndex: number) {
+	const doc = getMutableDoc();
+	const items = readItems(listId);
+	if (fromIndex < 0 || fromIndex >= items.length || toIndex < 0 || toIndex >= items.length) return;
 	const [moved] = items.splice(fromIndex, 1);
 	items.splice(toIndex, 0, moved);
 	doc.transact(() => items.forEach((item, idx) => updateItem(item.id, { order: idx })));
 }
 
 export function reorderSiblings(listId: string, parentId: string | null, fromIdx: number, toIdx: number) {
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	const siblings = readItems(listId)
 		.filter((i) => i.parentId === parentId)
-		.sort((a, b) => a.order - b.order);
+		.sort(compareOrder);
+	if (fromIdx < 0 || fromIdx >= siblings.length || toIdx < 0 || toIdx >= siblings.length) return;
 	const [moved] = siblings.splice(fromIdx, 1);
 	siblings.splice(toIdx, 0, moved);
 	doc.transact(() => siblings.forEach((item, idx) => updateItem(item.id, { order: idx })));
 }
 
 export function reorderFolders(parentId: string | null, fromIndex: number, toIndex: number, visibleIds?: string[]) {
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	const all = readFolders().filter((f) => f.parentId === parentId).sort((a, b) => a.order - b.order);
 
 	if (visibleIds && visibleIds.length > 0) {
@@ -808,7 +837,7 @@ export function reorderFolders(parentId: string | null, fromIndex: number, toInd
 }
 
 export function reorderMixedItems(parentId: string | null, fromIndex: number, toIndex: number, visibleItems?: {id: string, type: string}[]) {
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	const folders = readFolders().filter((f) => f.parentId === parentId).map((f) => ({ ...f, _type: 'folder' }));
 	const lists = readLists().filter((l) => l.folderId === parentId).map((l) => ({ ...l, _type: 'list' }));
 	const all = [...folders, ...lists].sort((a, b) => a.order - b.order);
@@ -854,7 +883,7 @@ export function reorderMixedItems(parentId: string | null, fromIndex: number, to
 }
 
 export function reorderLists(folderId: string, fromIndex: number, toIndex: number, visibleIds?: string[]) {
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	const all = readLists().filter((l) => l.folderId === folderId).sort((a, b) => a.order - b.order);
 
 	if (visibleIds && visibleIds.length > 0) {
@@ -905,7 +934,7 @@ export function getMaxFavouriteOrder(): number {
 }
 
 export function saveFavouritesOrder(items: { id: string; type: 'folder' | 'list' }[]) {
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	doc.transact(() => {
 		items.forEach((item, idx) => {
 			if (item.type === 'folder') {
@@ -918,7 +947,7 @@ export function saveFavouritesOrder(items: { id: string; type: 'folder' | 'list'
 }
 
 export function reorderFavourites(items: { id: string; type: 'folder' | 'list' }[], fromIndex: number, toIndex: number) {
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	const reordered = [...items];
 	const [moved] = reordered.splice(fromIndex, 1);
 	reordered.splice(toIndex, 0, moved);
@@ -939,7 +968,7 @@ export function reorderFavourites(items: { id: string; type: 'folder' | 'list' }
  * by navigating the folder tree depth-first (respecting each folder's foldersFirst setting).
  */
 export function readListsInTreeOrder(folders?: Folder[], lists?: ListMeta[]): ListMeta[] {
-	const allFolders = folders ?? readFolders();
+	const allFolders = resolveParentLinks(folders ?? readFolders());
 	const allLists = lists ?? readLists();
 	const result: ListMeta[] = [];
 
@@ -960,7 +989,7 @@ export function readListsInTreeOrder(folders?: Folder[], lists?: ListMeta[]): Li
 			.map((l) => ({ ...l, _type: 'list' }));
 		const mixed = [...childFolders, ...childLists].sort((a, b) => a.order - b.order);
 		for (const item of mixed) {
-			if (item._type === 'folder') visit(item.id);
+			if (item._type === 'folder') visit(item.id, visited);
 			else result.push(item as unknown as ListMeta);
 		}
 	}
@@ -991,22 +1020,9 @@ export interface BackupFile {
 	exported: string; // ISO timestamp
 	folders: Folder[];
 	lists: ListMeta[];
-	items: ReturnType<typeof _readAllItems>;
+	items: Item[];
 	sheets?: SheetMeta[];
 	smartFolders?: Record<string, string[]>;
-}
-
-function _readAllItems() {
-	return (getItems(getDoc()).toArray() as Y.Map<unknown>[]).map(yMapToItem);
-}
-
-function _readSmartFolders(): Record<string, string[]> {
-	try {
-		const m = getDoc().getMap<string>('smart-folders');
-		const out: Record<string, string[]> = {};
-		m.forEach((val, key) => { try { out[key] = JSON.parse(val); } catch { /* skip */ } });
-		return out;
-	} catch { return {}; }
 }
 
 /** Serialise the entire doc to a plain JS object ready to JSON.stringify. */
@@ -1016,10 +1032,30 @@ export function exportBackup(): BackupFile {
 		exported: new Date().toISOString(),
 		folders: readFolders(),
 		lists: readLists(),
-		items: _readAllItems(),
+		items: readAllItems(),
 		sheets: readSheets(),
-		smartFolders: _readSmartFolders()
+		smartFolders: readReportAssignments(getDoc())
 	};
+}
+
+/** Yjs transactions do not roll back on an exception. Validate the entire
+ * import before clearing or inserting anything, including optional sections. */
+function validateRecords(records: unknown, kind: string): asserts records is Record<string, unknown>[] {
+	if (!Array.isArray(records)) throw new Error(`Invalid ${kind} in import.`);
+	const ids = new Set<string>();
+	for (const record of records) {
+		if (!record || typeof record !== 'object' || Array.isArray(record) || typeof record.id !== 'string' || !record.id || typeof record.name !== 'string' || ids.has(record.id)) {
+			throw new Error(`Invalid or duplicate ${kind} record.`);
+		}
+		ids.add(record.id);
+		if (record.parentId != null && typeof record.parentId !== 'string') throw new Error('Invalid parent id.');
+		if (record.checks !== undefined && (!record.checks || typeof record.checks !== 'object' || Array.isArray(record.checks) || Object.values(record.checks).some((value) => typeof value !== 'boolean'))) throw new Error('Invalid checkbox states.');
+		if (record.checkboxes !== undefined && (!Array.isArray(record.checkboxes) || record.checkboxes.some((box: FolderCheckbox) => !box || typeof box.id !== 'string' || typeof box.name !== 'string'))) throw new Error('Invalid checkbox definitions.');
+		if (record.checkedNames !== undefined && (!Array.isArray(record.checkedNames) || record.checkedNames.some((name: unknown) => typeof name !== 'string'))) throw new Error('Invalid checkbox names.');
+		for (const key of ['price', 'qty', 'order', 'favouriteOrder']) {
+			if (record[key] != null && (typeof record[key] !== 'number' || !Number.isFinite(record[key]))) throw new Error(`Invalid ${key}.`);
+		}
+	}
 }
 
 /**
@@ -1028,85 +1064,60 @@ export function exportBackup(): BackupFile {
  * mode='merge'   — upsert by ID: update matching records, insert new ones; nothing is deleted.
  */
 export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): void {
-	const doc = getDoc();
+	const doc = getMutableDoc();
+	if (!backup || backup.version !== 1 || (mode !== 'merge' && mode !== 'replace')) throw new Error('Invalid backup.');
+	validateRecords(backup.folders, 'folders');
+	validateRecords(backup.lists, 'lists');
+	validateRecords(backup.items, 'items');
+	validateRecords(backup.sheets ?? [], 'sheets');
+	if (backup.smartFolders != null && (typeof backup.smartFolders !== 'object' || Array.isArray(backup.smartFolders))) throw new Error('Invalid reports.');
+	for (const ids of Object.values(backup.smartFolders ?? {})) {
+		if (!Array.isArray(ids) || ids.some((id) => typeof id !== 'string')) throw new Error('Invalid report assignments.');
+	}
 	const fArr = getFolders(doc);
 	const lArr = getLists(doc);
 	const iArr = getItems(doc);
 	const sArr = getSpreadsheets(doc);
-	const sfMap = doc.getMap<string>('smart-folders');
 
 	doc.transact(() => {
 		if (mode === 'replace') {
-			// Clear all arrays and the smart-folders map
 			if (fArr.length) fArr.delete(0, fArr.length);
 			if (lArr.length) lArr.delete(0, lArr.length);
 			if (iArr.length) iArr.delete(0, iArr.length);
-			// Clear cell data for every existing sheet before wiping the metadata array
-			for (let i = 0; i < sArr.length; i++) {
-				const m = sArr.get(i) as Y.Map<unknown>;
-				const id = m?.get('id') as string | undefined;
-				if (id) getSheetCells(doc, id).clear();
-			}
-			if (sArr.length) sArr.delete(0, sArr.length);
-			sfMap.forEach((_, key) => sfMap.delete(key));
-
-			// Insert folders
-			for (const f of backup.folders) {
-				if (typeof f !== 'object' || f === null) continue;
-				const m = new Y.Map<unknown>();
-				for (const [k, v] of Object.entries(f)) m.set(k, v);
-				fArr.push([m]);
-			}
-			// Insert lists
-			for (const l of backup.lists) {
-				if (typeof l !== 'object' || l === null) continue;
-				const m = new Y.Map<unknown>();
-				for (const [k, v] of Object.entries(l)) m.set(k, v);
-				lArr.push([m]);
-			}
-			// Insert items
-			for (const i of backup.items) {
-				if (typeof i !== 'object' || i === null) continue;
-				const m = new Y.Map<unknown>();
-				for (const [k, v] of Object.entries(i)) m.set(k, v);
-				iArr.push([m]);
-			}
-			// Insert sheets (metadata only — cell data is not backed up)
-			for (const s of (backup.sheets ?? [])) {
-				if (typeof s !== 'object' || s === null) continue;
-				const m = new Y.Map<unknown>();
-				for (const [k, v] of Object.entries(s)) m.set(k, v);
-				sArr.push([m]);
-			}
-			// Restore smart folder report assignments
-			for (const [name, ids] of Object.entries(backup.smartFolders ?? {})) {
-				sfMap.set(name, JSON.stringify(ids));
-			}
-		} else {
-			// Merge: upsert each record by id
-			function upsert(arr: Y.Array<Y.Map<unknown>>, record: Record<string, unknown>) {
-				if (typeof record !== 'object' || record === null) return;
-				const existing = findYMap(arr, record.id as string);
-				if (existing) {
-					for (const [k, v] of Object.entries(record)) existing.set(k, v);
-				} else {
-					const m = new Y.Map<unknown>();
-					for (const [k, v] of Object.entries(record)) m.set(k, v);
-					arr.push([m]);
+			for (const key of doc.share.keys()) {
+				if (key.startsWith('note_text_')) {
+					const text = doc.getText(key);
+					text.delete(0, text.length);
 				}
+				if (key.startsWith('sheet-cells-')) doc.getMap(key).clear();
 			}
-			for (const f of backup.folders) upsert(fArr, f as unknown as Record<string, unknown>);
-			for (const l of backup.lists) upsert(lArr, l as unknown as Record<string, unknown>);
-			for (const i of backup.items) upsert(iArr, i as unknown as Record<string, unknown>);
-			for (const s of (backup.sheets ?? [])) upsert(sArr, s as unknown as Record<string, unknown>);
-			// Merge smart folder report assignments (union of existing + backup)
-			for (const [name, ids] of Object.entries(backup.smartFolders ?? {})) {
-				if (!Array.isArray(ids)) continue;
-				const existing: string[] = (() => { try { return JSON.parse(sfMap.get(name) ?? '[]'); } catch { return []; } })();
-				const merged = [...new Set([...existing, ...ids])];
-				sfMap.set(name, JSON.stringify(merged));
+			doc.getMap('note-text-initialized').clear();
+			if (sArr.length) sArr.delete(0, sArr.length);
+		}
+		function upsert(arr: Y.Array<Y.Map<unknown>>, record: Record<string, unknown>, kind: 'folder' | 'item' | 'other') {
+			let m = findYMap(arr, record.id as string);
+			if (!m) {
+				m = new Y.Map<unknown>();
+				arr.push([m]);
+			}
+			for (const [key, value] of Object.entries(record)) {
+				if (key !== 'checks' && key !== 'checkboxes') m.set(key, value);
+			}
+			if (kind === 'folder' && record.checkboxes !== undefined) replaceFolderCheckboxes(m, record.checkboxes as FolderCheckbox[]);
+			if (kind === 'item') {
+				if (record.checks !== undefined) {
+					m.delete('checks');
+					for (const key of [...m.keys()]) if (key.startsWith('chk_')) m.delete(key);
+					for (const [id, value] of Object.entries(record.checks as Record<string, boolean>)) m.set(`chk_${id}`, value);
+				}
+				replaceItemText(doc, record.id as string, record.name as string);
 			}
 		}
+		for (const record of backup.folders) upsert(fArr, record as unknown as Record<string, unknown>, 'folder');
+		for (const record of backup.lists) upsert(lArr, record as unknown as Record<string, unknown>, 'other');
+		for (const record of backup.items) upsert(iArr, record as unknown as Record<string, unknown>, 'item');
+		for (const record of backup.sheets ?? []) upsert(sArr, record as unknown as Record<string, unknown>, 'other');
+		restoreReportAssignments(doc, backup.smartFolders ?? {}, mode === 'replace');
 	});
 }
 // ─── Spreadsheets ─────────────────────────────────────────────────────────────
@@ -1137,7 +1148,7 @@ function yMapToSheet(m: Y.Map<unknown>): SheetMeta {
 }
 
 export function createSheet(name: string, folderId: string | null): string {
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	const sheets = getSpreadsheets(doc);
 	const existing = (sheets.toArray() as Y.Map<unknown>[]).filter((s) => s.get('folderId') === folderId);
 	const m = new Y.Map<unknown>();
@@ -1154,7 +1165,7 @@ export function createSheet(name: string, folderId: string | null): string {
 }
 
 export function updateSheet(id: string, patch: Partial<Omit<SheetMeta, 'id' | 'createdAt' | 'updatedAt'>>) {
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	doc.transact(() => {
 		const m = findYMap(getSpreadsheets(doc), id);
 		if (!m) return;
@@ -1165,7 +1176,7 @@ export function updateSheet(id: string, patch: Partial<Omit<SheetMeta, 'id' | 'c
 }
 
 export function deleteSheet(id: string) {
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	doc.transact(() => {
 		// Delete cell data for this sheet
 		const cells = getSheetCells(doc, id);
@@ -1184,7 +1195,7 @@ export function readCells(sheetId: string): Record<string, string> {
 
 /** Set a single cell value.  key = "R,C" (0-based). Empty string clears the cell. */
 export function setCell(sheetId: string, row: number, col: number, value: string) {
-	const doc = getDoc();
+	const doc = getMutableDoc();
 	const cells = getSheetCells(doc, sheetId);
 	const key = `${row},${col}`;
 	doc.transact(() => {

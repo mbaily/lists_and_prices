@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { docState, commitState, getUndoManager, canUndo, getUndoCount } from '$lib/yjsStore.svelte';
+	import { docState, commitState, undoLastAction, canUndo, getUndoCount, exitCommitView } from '$lib/yjsStore.svelte';
 	import { onDestroy, tick, untrack } from 'svelte';
+	import { buildItemTreeOrder, canReparentItems } from '$lib/hierarchy';
 	import {
 		readItems,
 		readAllItems,
@@ -18,6 +19,7 @@
 		isItemDone,
 		updateList,
 		reorderSiblings,
+		reparentItems,
 		isListEffectivelyArchived,
 		isFolderEffectivelyArchived,
 		getMaxFavouriteOrder,
@@ -70,6 +72,8 @@
 		void docState.version;
 		try { return readLists().find((l) => l.id === listId) ?? null; } catch { return null; }
 	});
+	const listExists = $derived(listMeta !== null);
+	const canEditList = $derived(listExists && !commitState.isHistorical);
 
 	let allLists = $derived.by(() => {
 		void docState.version;
@@ -86,6 +90,7 @@
 		return !!item.checks[checkboxId];
 	}
 	function toggleItemCheckbox(item: Item, checkboxId: string) {
+		if (!canEditList) return;
 		setItemCheckboxState(item.id, checkboxId, !isChecked(item, checkboxId));
 	}
 	function chipLabel(name: string): string {
@@ -109,6 +114,7 @@
 	 *  (e.g. the pinned-items bar) — toggles the last (done-determining) named
 	 *  checkbox, or the legacy checked flag if the folder has none configured. */
 	function toggleDone(item: Item) {
+		if (!canEditList) return;
 		if (folderCheckboxes.length > 0) {
 			toggleItemCheckbox(item, folderCheckboxes[folderCheckboxes.length - 1].id);
 		} else {
@@ -119,6 +125,8 @@
 	 *  any named-checkbox state — so it doesn't silently reappear if the item
 	 *  is later turned back into a regular item. */
 	function makeHeading(item: Item) {
+		if (!canEditList) return;
+		// The shared tree renderer retains descendants when their parent becomes a heading.
 		if (folderCheckboxes.length > 0) {
 			clearItemCheckboxes([item.id], folderCheckboxes.map((c) => c.id));
 		}
@@ -236,7 +244,7 @@
 	let journalMode = $derived(listMeta?.journalMode ?? false);
 
 	function toggleJournalMode() {
-		if (listMeta) {
+		if (canEditList && listMeta) {
 			updateList(listId, { journalMode: !(listMeta.journalMode ?? false) });
 		}
 	}
@@ -253,7 +261,6 @@
 	});
 
 	let activeCursorId = $derived(cursorMemory[listId] || null);
-	let activeCursorIndex = $derived(activeCursorId ? filteredTreeItems.findIndex(i => i.item.id === activeCursorId) : -1);
 
 	function handleGlobalKeydown(e: KeyboardEvent) {
 		// Do not trigger global shortcuts if the user is typing in an input
@@ -298,7 +305,8 @@
 			if (activeCursorIndex >= 0 && activeCursorIndex < filteredTreeItems.length) {
 				e.preventDefault();
 				const item = filteredTreeItems[activeCursorIndex].item;
-				startEditName(item);
+				if (item.note && (item.fullScreen || commitState.isHistorical)) fullScreenNoteId = item.id;
+				else startEditName(item);
 			}
 		}
 	}
@@ -357,37 +365,7 @@
 	}
 
 	// ── Tree order (subtasks / subnotes) ──────────────────────────────────────────
-	type TreeItem = { item: Item; level: number; tlIdx: number; rootTlIdx: number; sibIdx: number };
-	function buildTreeOrder(allItems: Item[]): TreeItem[] {
-		const result: TreeItem[] = [];
-		const validIds = new Set(allItems.map((i) => i.id));
-		const rendered = new Set<string>();
-		function addSubtree(item: Item, level: number, rootTlIdx: number) {
-			const children = allItems
-				.filter((i) => i.parentId === item.id)
-				.sort((a, b) => a.order - b.order);
-			children.forEach((child, sibIdx) => {
-				result.push({ item: child, level, tlIdx: -1, rootTlIdx, sibIdx });
-				rendered.add(child.id);
-				if (level < 2) addSubtree(child, level + 1, rootTlIdx);
-			});
-		}
-		const topLevel = allItems.filter((i) => i.parentId === null).sort((a, b) => a.order - b.order);
-		topLevel.forEach((item, idx) => {
-			result.push({ item, level: 0, tlIdx: idx, rootTlIdx: idx, sibIdx: idx });
-			rendered.add(item.id);
-			if (!item.heading) addSubtree(item, 1, idx);
-		});
-		// Append orphaned items
-		const orphans = allItems.filter((i) => i.parentId !== null && !validIds.has(i.parentId) && !rendered.has(i.id));
-		orphans.forEach((item, idx) => {
-			result.push({ item, level: 0, tlIdx: topLevel.length + idx, rootTlIdx: topLevel.length + idx, sibIdx: topLevel.length + idx });
-			rendered.add(item.id);
-			if (!item.heading) addSubtree(item, 1, topLevel.length + idx);
-		});
-		return result;
-	}
-	const treeItems = $derived(buildTreeOrder(items));
+	const treeItems = $derived(buildItemTreeOrder(items));
 	const filterView = $derived<FilterView>(listMeta?.filterView ?? 'all');
 	const filteredTreeItems = $derived(
 		filterView === 'all'
@@ -407,6 +385,7 @@
 				return treeItems.filter(({ item }) => visibleIds.has(item.id));
 			})()
 	);
+	let activeCursorIndex = $derived(activeCursorId ? filteredTreeItems.findIndex(i => i.item.id === activeCursorId) : -1);
 	let selectionMode = $state(false);
 	let selectedIds = $state<Set<string>>(new Set());
 
@@ -454,7 +433,7 @@
 	}
 
 	function addItem() {
-		if (!universalValue.trim()) return;
+		if (!canEditList || !universalValue.trim()) return;
 		// Only apply addPosition for top-level items; subtasks/subnotes always append
 		const pos = newItemParentId ? 'bottom' : settings.addItemPosition;
 		createItem(listId, universalValue.trim(), null, newItemParentId, newItemIsNote, pos);
@@ -500,44 +479,68 @@
 		showHeaderMenu = false;
 	}
 
-	let isPasting = false;
+	let isPasting = $state(false);
+	let isActive = true;
+	let listContextVersion = 0;
+	let importFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
 
 	async function importFromClipboard() {
-		if (isPasting) return;
+		if (isPasting || !canEditList) return;
+		const targetListId = listId;
+		const contextVersion = listContextVersion;
+		const addPosition = settings.addItemPosition;
+		const isCurrent = () => isActive && listId === targetListId &&
+			listContextVersion === contextVersion && !commitState.isHistorical;
 		isPasting = true;
-		let text: string;
 		try {
-			text = await navigator.clipboard.readText();
-		} catch {
-			alert('Could not read clipboard. Make sure you have granted clipboard permission.');
-			return;
-		}
-
-		// Try JSON export format first
-		const trimmed = text.trim();
-		if (trimmed.startsWith('{')) {
+			let text: string;
 			try {
-				const data = JSON.parse(trimmed);
-				if (data.__list_app__ === true && Array.isArray(data.items) && data.items.length > 0) {
-					createItemsFromExport(listId, data.items as ExportedItem[]);
+				text = await navigator.clipboard.readText();
+			} catch {
+				if (isCurrent()) alert('Could not read clipboard. Make sure you have granted clipboard permission.');
+				return;
+			}
+
+			// A completed clipboard read must never write into another list or document view.
+			if (!isCurrent() || !readLists().some((list) => list.id === targetListId)) return;
+
+			let parsed: unknown;
+			const trimmed = text.trim();
+			if (trimmed.startsWith('{')) {
+				try {
+					parsed = JSON.parse(trimmed);
+				} catch {
+					// Only parsing failures fall back to plain text, never mutation failures.
+				}
+			}
+
+			let importedCount: number;
+			if (typeof parsed === 'object' && parsed !== null && '__list_app__' in parsed && parsed.__list_app__ === true) {
+				if (!('items' in parsed) || !Array.isArray(parsed.items) || parsed.items.length === 0) {
+					alert('No valid items found in clipboard export.');
 					return;
 				}
-			} catch {
-				// Not valid JSON — fall through to plain-text import
+				createItemsFromExport(targetListId, parsed.items as ExportedItem[]);
+				importedCount = parsed.items.length;
+			} else {
+				// Plain text: one item per line, excluding blank lines and lines without letters.
+				const lines = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => /\p{L}/u.test(line));
+				if (lines.length === 0) {
+					alert('No valid items found in clipboard.');
+					return;
+				}
+				createItemsBatch(targetListId, lines, addPosition);
+				importedCount = lines.length;
 			}
+			copyMessage = `✓ Imported ${importedCount} item${importedCount === 1 ? '' : 's'}.`;
+			copyStatus = 'copied';
+			if (importFeedbackTimer) clearTimeout(importFeedbackTimer);
+			importFeedbackTimer = setTimeout(() => { copyStatus = 'idle'; importFeedbackTimer = null; }, 2500);
+		} catch (error) {
+			if (isCurrent()) alert(`Import failed: ${error instanceof Error ? error.message : String(error)}`);
+		} finally {
+			isPasting = false;
 		}
-
-		// Plain text: one item per line
-		const lines = text
-			.split(/\r?\n/)
-			.map((l) => l.trim())
-			.filter((l) => l.length > 0)        // strip blank / whitespace-only lines
-			.filter((l) => /\p{L}/u.test(l));   // strip lines with no letter in any script
-		if (lines.length === 0) {
-			alert('No valid items found in clipboard.');
-			return;
-		}
-		createItemsBatch(listId, lines, settings.addItemPosition);
 	}
 
 	// ── Edit item name via universal input ────────────────────────────────────────
@@ -552,7 +555,7 @@
 	let qtyBuffer = $state('');
 
 	function startEditName(item: Item) {
-		if (commitState.isHistorical) return;
+		if (!canEditList) return;
 		editingId = item.id;
 		inputMode = 'edit';
 		universalValue = item.name;
@@ -564,7 +567,7 @@
 	}
 
 	function submitEditName() {
-		if (!editingId) return;
+		if (!canEditList || !editingId) return;
 		const trimmed = universalValue.trim();
 		if (trimmed) updateItem(editingId, { name: trimmed });
 		universalInputEl?.blur();
@@ -581,6 +584,7 @@
 	}
 
 	function startEditPrice(item: Item) {
+		if (!canEditList) return;
 		cancelLongPress(); // prevent long-press selection firing after price editor opens
 		pricingItemId = item.id;
 		qtyItemId = null;
@@ -592,6 +596,7 @@
 	}
 
 	function startEditQty(item: Item) {
+		if (!canEditList) return;
 		cancelLongPress();
 		qtyItemId = item.id;
 		pricingItemId = null;
@@ -600,6 +605,7 @@
 	}
 
 	function handleKeypadInput(key: string) {
+		if (!canEditList) return;
 		if (qtyItemId) {
 			// Quantity mode — integers only, no decimal, no negative
 			if (key === 'enter') {
@@ -634,7 +640,7 @@
 	}
 
 	function commitPrice() {
-		if (!pricingItemId) return;
+		if (!canEditList || !pricingItemId) return;
 		const val = parseFloat(priceBuffer);
 		updateItem(pricingItemId, { price: isNaN(val) ? null : Math.round(val * 100) / 100 });
 		pricingItemId = null;
@@ -642,7 +648,7 @@
 	}
 
 	function commitQty() {
-		if (!qtyItemId) return;
+		if (!canEditList || !qtyItemId) return;
 		const val = parseInt(qtyBuffer, 10);
 		updateItem(qtyItemId, { qty: isNaN(val) || val <= 0 ? null : val });
 		qtyItemId = null;
@@ -701,6 +707,7 @@
 
 	// ── Check-off ────────────────────────────────────────────────────────────────
 	function toggleCheck(item: Item) {
+		if (!canEditList) return;
 		updateItem(item.id, { checked: !item.checked });
 	}
 
@@ -711,6 +718,7 @@
 	let showSelectionPanel = $state(false);
 
 	function enterSelectionMode() {
+		if (!canEditList) return;
 		selectedIds = new Set();
 		selectionMode = true;
 		showSelectionPanel = false;
@@ -728,6 +736,7 @@
 	}
 
 	function toggleSelectionItem(id: string) {
+		if (!canEditList) return;
 		const next = new Set(selectedIds);
 		if (next.has(id)) next.delete(id); else next.add(id);
 		selectedIds = next;
@@ -738,40 +747,23 @@
 	);
 
 	function deleteSelected() {
+		if (!canEditList) return;
 		const ids = [...selectedIds];
 		deleteItemsBatch(ids);
 		exitSelectionMode();
 	}
 
-	function isInvalidReparentTarget(targetId: string): boolean {
-		if (selectedIds.has(targetId)) return true;
-		let curr = targetId;
-		while (curr) {
-			const item = items.find(i => i.id === curr);
-			if (!item) break;
-			if (item.parentId && selectedIds.has(item.parentId)) return true;
-			curr = item.parentId || '';
+	function reparentSelectedTo(targetId: string | null) {
+		if (!canEditList || selectedIds.size === 0) return;
+		if (reparentItems(listId, [...selectedIds], targetId)) {
+			exitSelectionMode();
+		} else {
+			alert('Cannot move these items here. The destination may have changed, or the move would create an invalid hierarchy.');
 		}
-		return false;
-	}
-
-	function reparentSelectedTo(targetId: string) {
-		if (isInvalidReparentTarget(targetId)) return;
-		for (const id of selectedIds) {
-			updateItem(id, { parentId: targetId });
-		}
-		exitSelectionMode();
-	}
-
-	function reparentSelectedToRoot() {
-		for (const id of selectedIds) {
-			updateItem(id, { parentId: null });
-		}
-		exitSelectionMode();
 	}
 
 	function getReparentMenuItem(targetId: string) {
-		if (selectionMode && selectedIds.size > 0 && !isInvalidReparentTarget(targetId)) {
+		if (canEditList && selectionMode && selectedIds.size > 0 && canReparentItems(items, selectedIds, targetId)) {
 			return [{ label: '↳ Reparent selected here', action: () => reparentSelectedTo(targetId) }];
 		}
 		return [];
@@ -779,11 +771,13 @@
 
 
 	function cycleFilter() {
+		if (!canEditList) return;
 		const next: FilterView = filterView === 'all' ? 'unchecked' : filterView === 'unchecked' ? 'checked' : 'all';
 		updateList(listId, { filterView: next });
 	}
 
 	function bulkUncheck() {
+		if (!canEditList) return;
 		const ids = selectedIds.size > 0
 			? [...selectedIds].filter((id) => { const it = items.find((i) => i.id === id); return it && !it.heading && !it.note; })
 			: items.filter((i) => !i.heading && !i.note).map((i) => i.id);
@@ -796,6 +790,7 @@
 	}
 
 	function bulkDeleteChecked() {
+		if (!canEditList) return;
 		const targets =
 			selectedIds.size > 0
 				? items.filter((i) => selectedIds.has(i.id) && isDone(i)).map((i) => i.id)
@@ -809,12 +804,17 @@
 	let longPressTimer: ReturnType<typeof setTimeout> | null = null;
 
 	function onPointerDown(e: PointerEvent, id: string) {
+		if (!canEditList) return;
 		// Only fire on primary button / single touch
 		if (e.button !== 0 && e.pointerType !== 'touch') return;
+		cancelLongPress();
+		const sourceListId = listId;
+		const contextVersion = listContextVersion;
 		longPressTimer = setTimeout(() => {
+			longPressTimer = null;
+			if (!canEditList || sourceListId !== listId || contextVersion !== listContextVersion || !items.some((item) => item.id === id)) return;
 			if (!selectionMode) enterSelectionMode();
 			toggleSelectionItem(id);
-			longPressTimer = null;
 		}, 500);
 	}
 
@@ -822,7 +822,12 @@
 		if (longPressTimer !== null) { clearTimeout(longPressTimer); longPressTimer = null; }
 	}
 
-	onDestroy(() => cancelLongPress());
+	onDestroy(() => {
+		isActive = false;
+		listContextVersion++;
+		cancelLongPress();
+		if (importFeedbackTimer) clearTimeout(importFeedbackTimer);
+	});
 
 	// ── Drag reorder (pointer events — works on both touch and mouse) ──────────────
 	let touchDragFrom = $state<number | null>(null);
@@ -830,6 +835,7 @@
 	let touchDragParentKey = $state<string | null>(null); // item.parentId ?? '__top__'
 
 	function startItemDrag(e: PointerEvent, sibIdx: number, parentKey: string) {
+		if (!canEditList) return;
 		e.stopPropagation();
 		cancelLongPress();
 		touchDragFrom = sibIdx;
@@ -839,6 +845,8 @@
 
 	$effect(() => {
 		if (touchDragFrom === null) return;
+		const sourceListId = listId;
+		const contextVersion = listContextVersion;
 		function onMove(e: PointerEvent) {
 			e.preventDefault();
 			const el = document.elementFromPoint(e.clientX, e.clientY);
@@ -847,32 +855,33 @@
 				touchDragOver = parseInt(row.dataset.siblingIndex, 10);
 			}
 		}
-		let dragging = true;
 		function onEnd() {
-			dragging = false;
-			if (touchDragFrom !== null && touchDragOver !== null && touchDragFrom !== touchDragOver && touchDragParentKey !== null) {
+			if (canEditList && sourceListId === listId && contextVersion === listContextVersion && touchDragFrom !== null && touchDragOver !== null && touchDragFrom !== touchDragOver && touchDragParentKey !== null) {
 				const parentId = touchDragParentKey === '__top__' ? null : touchDragParentKey;
-				reorderSiblings(listId, parentId, touchDragFrom, touchDragOver);
+				reorderSiblings(sourceListId, parentId, touchDragFrom, touchDragOver);
 			}
+			onCancel();
+		}
+		function onCancel() {
 			touchDragFrom = null;
 			touchDragOver = null;
 			touchDragParentKey = null;
 		}
 		document.addEventListener('pointermove', onMove, { passive: false });
 		document.addEventListener('pointerup', onEnd, { once: true });
-		document.addEventListener('pointercancel', onEnd, { once: true });
+		document.addEventListener('pointercancel', onCancel, { once: true });
 		return () => {
 			// Always remove listeners regardless of drag state — if the effect
 			// re-runs while a drag is in flight the old listeners must be cleaned up.
 			document.removeEventListener('pointermove', onMove);
 			document.removeEventListener('pointerup', onEnd);
-			document.removeEventListener('pointercancel', onEnd);
+			document.removeEventListener('pointercancel', onCancel);
 		};
 	});
 
 	// ── Type conversion ───────────────────────────────────────────────────────────
 	function toggleType() {
-		if (!listMeta) return;
+		if (!canEditList || !listMeta) return;
 		// Dismiss any open keypad before switching type
 		pricingItemId = null; priceBuffer = '';
 		qtyItemId = null; qtyBuffer = '';
@@ -1040,39 +1049,14 @@
 			if (infoItem !== null && !ids.has(infoItem.id)) {
 				infoItem = null;
 			}
+			if (fullScreenNoteId !== null && !ids.has(fullScreenNoteId)) fullScreenNoteId = null;
+			if (copyLinksItemId !== null && !ids.has(copyLinksItemId)) copyLinksItemId = null;
+			if (newItemParentId !== null && !ids.has(newItemParentId)) newItemParentId = null;
 			// Also clear any selected IDs that no longer exist
 			if (selectedIds.size > 0) {
 				const next = new Set([...selectedIds].filter((id) => ids.has(id)));
 				if (next.size !== selectedIds.size) selectedIds = next;
 			}
-		});
-	});
-
-	// Reset all transient editing/drag state when navigating to a different list
-	$effect(() => {
-		void listId; // track prop change
-		untrack(() => {
-			editingId = null;
-			inputMode = 'add';
-			universalValue = '';
-			newItemParentId = null;
-			newItemIsNote = listMeta?.defaultIsNote ?? false;
-			pricingItemId = null;
-			priceBuffer = '';
-			qtyItemId = null;
-			qtyBuffer = '';
-			selectedIds = new Set();
-			selectionMode = false;
-			showSelectionPanel = false;
-			touchDragFrom = null;
-			touchDragOver = null;
-			touchDragParentKey = null;
-			confirmAction = null;
-			infoItem = null;
-			showHeaderMenu = false;
-			// Reset scroll-shrink when switching lists — set scrollTop to 0;
-			// the scroll listener will fire and restore max-height to fullHeight automatically.
-			if (itemListEl) itemListEl.scrollTop = 0;
 		});
 	});
 
@@ -1091,17 +1075,24 @@
 	}
 
 	function askDelete(msg: string, action: () => void, label = 'Delete') {
+		if (!canEditList) return;
+		const sourceListId = listId;
+		const contextVersion = listContextVersion;
 		confirmMsg = msg;
 		confirmLabel = label;
-		confirmAction = () => action();
+		confirmAction = () => {
+			if (canEditList && sourceListId === listId && contextVersion === listContextVersion) action();
+		};
 	}
 
 	// ── Info dialog ───────────────────────────────────────────────────────────
 	let infoItem = $state<Item | null>(null);
-	let fullScreenNoteItem = $state<Item | null>(null);
+	let fullScreenNoteId = $state<string | null>(null);
+	const fullScreenNoteItem = $derived(items.find((item) => item.id === fullScreenNoteId) ?? null);
 
 	// ── Copy-link dialog ─────────────────────────────────────────────────────
-	let copyLinksItem = $state<Item | null>(null);
+	let copyLinksItemId = $state<string | null>(null);
+	const copyLinksItem = $derived(items.find((item) => item.id === copyLinksItemId) ?? null);
 
 	function copyItemLinks(links: string[]) {
 		if (links.length === 1) {
@@ -1159,6 +1150,46 @@
 			hour: '2-digit', minute: '2-digit'
 		});
 	}
+
+	// Pre-effects can run during initialization; keep this below all referenced state.
+	// Invalidate asynchronous work and stale editors before changing list/document views.
+	$effect.pre(() => {
+		void listId; // track prop change
+		void listExists;
+		void commitState.isHistorical;
+		void commitState.commitId;
+		untrack(() => {
+			listContextVersion++;
+			cancelLongPress();
+			if (importFeedbackTimer) clearTimeout(importFeedbackTimer);
+			importFeedbackTimer = null;
+			copyStatus = 'idle';
+			editingId = null;
+			inputMode = 'add';
+			universalValue = '';
+			newItemParentId = null;
+			newItemIsNote = listMeta?.defaultIsNote ?? false;
+			pricingItemId = null;
+			priceBuffer = '';
+			qtyItemId = null;
+			qtyBuffer = '';
+			selectedIds = new Set();
+			selectionMode = false;
+			showSelectionPanel = false;
+			touchDragFrom = null;
+			touchDragOver = null;
+			touchDragParentKey = null;
+			confirmAction = null;
+			showUndoConfirm = false;
+			infoItem = null;
+			fullScreenNoteId = null;
+			copyLinksItemId = null;
+			showHeaderMenu = false;
+			// Reset scroll-shrink when switching lists — set scrollTop to 0;
+			// the scroll listener will fire and restore max-height to fullHeight automatically.
+			if (itemListEl) itemListEl.scrollTop = 0;
+		});
+	});
 
 	// ── Scroll anchor: compensate when summary bar grows/shrinks ─────────────────
 	// Svelte 5 $effect runs AFTER the DOM update, so both before/after would be
@@ -1221,6 +1252,7 @@
 			}}
 			aria-label={listMeta?.favourite ? 'Unfavourite list' : 'Favourite list'}
 			title={listMeta?.favourite ? 'Unfavourite list' : 'Favourite list'}
+			disabled={!canEditList}
 			style={commitState.isHistorical ? 'cursor: default' : ''}
 		>★</button>
 		<button
@@ -1228,6 +1260,7 @@
 			onclick={() => { if (listMeta && !commitState.isHistorical) updateList(listId, { done: !listMeta.done }); }}
 			aria-label={listMeta?.done ? 'Mark list incomplete' : 'Mark list complete'}
 			title={listMeta?.done ? 'Mark list incomplete' : 'Mark list complete'}
+			disabled={!canEditList}
 			style={commitState.isHistorical ? 'cursor: default; opacity: 0.7' : ''}
 		>{listMeta?.done ? '☑' : '☐'}</button>
 		<div class="header-menu-wrap">
@@ -1255,6 +1288,13 @@
 		</div>
 		</div>
 	</header>
+
+	{#if commitState.isHistorical}
+		<div class="historical-banner">
+			<span>Viewing historical commit (read-only)</span>
+			<button onclick={exitCommitView}>Exit</button>
+		</div>
+	{/if}
 
 	{#if copyStatus !== 'idle'}
 		<div class="copy-toast" class:error={copyStatus === 'error'}>
@@ -1291,6 +1331,7 @@
 						<button type="button" class="input-clear" onclick={cancelEdit} aria-label="Cancel edit">✕</button>
 					{:else}
 						<button type="button" class="type-toggle-btn" class:is-note={newItemIsNote} onpointerdown={(e) => { 
+							if (!canEditList) return;
 							e.preventDefault(); 
 							newItemIsNote = !newItemIsNote; 
 							if (newItemParentId === null) {
@@ -1321,7 +1362,7 @@
 	{/if}
 
 	<!-- Summary bar / Selection bar -->
-	{#if selectionMode}
+	{#if selectionMode && !commitState.isHistorical}
 		<div class="summary-bar selection-bar">
 			<span class="sel-count">{selectedIds.size} selected</span>
 			<button class="bulk-btn sel-view-btn" onclick={() => showSelectionPanel = !showSelectionPanel}>
@@ -1355,6 +1396,7 @@
 				class="bulk-btn filter-btn"
 				class:filter-active={filterView !== 'all'}
 				onclick={cycleFilter}
+				disabled={!canEditList}
 				title="Filter: show all, unchecked only, or checked only"
 			>{filterView === 'all' ? 'All' : filterView === 'unchecked' ? '✗ only' : '✓ only'}</button>
 		{/if}
@@ -1362,7 +1404,7 @@
 	{/if}
 
 	<!-- Selection panel (shown when selectionMode && showSelectionPanel) -->
-	{#if selectionMode && showSelectionPanel}
+	{#if selectionMode && showSelectionPanel && !commitState.isHistorical}
 		<div class="selection-panel">
 			{#if selectedItems.length === 0}
 				<p class="sel-empty">No items selected yet. Tap the ◇ next to each item to select it.</p>
@@ -1406,6 +1448,7 @@
 						>📍</button
 						>{/if}<button
 							class="pin-chip-label"
+							disabled={commitState.isHistorical && inThisList && !pItem.heading && !pItem.note}
 							onclick={() => {
 								if (inThisList && !pItem.heading && !pItem.note) toggleDone(pItem);
 								else onOpenList(pItem.listId);
@@ -1424,7 +1467,7 @@
 					aria-label={settings.favouritesCollapsed ? 'Expand favourites' : 'Collapse favourites'}
 					title={settings.favouritesCollapsed ? 'Expand favourites' : 'Collapse favourites'}
 				>★</button>
-				{#if onOpenFavouritesOrder}
+				{#if onOpenFavouritesOrder && !commitState.isHistorical}
 					<button
 						class="fav-reorder-btn"
 						onclick={onOpenFavouritesOrder}
@@ -1527,10 +1570,10 @@
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoItem = item },
-						{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => updateItem(item.id, { pinned: !item.pinned }) },
-						{ label: '📌 Unheading', action: () => updateItem(item.id, { heading: false }) },
+						{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => { if (canEditList) updateItem(item.id, { pinned: !item.pinned }); } },
+						{ label: '📌 Unheading', action: () => { if (canEditList) updateItem(item.id, { heading: false }); } },
 						{ label: '🔗 Tag as Link', action: () => copyRefToClipboard(item.id) },
-						...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItem = item) }] : []),
+						...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItemId = item.id) }] : []),
 						...getReparentMenuItem(item.id),
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${tName(item.name)}"?`, () => deleteItemCascade(item.id)) }
 					]} />
@@ -1549,8 +1592,8 @@
 						onclick={() => {
 							if (selectionMode) {
 								toggleSelectionItem(item.id);
-							} else if (item.fullScreen) {
-								fullScreenNoteItem = item;
+							} else if (item.fullScreen || commitState.isHistorical) {
+								fullScreenNoteId = item.id;
 							} else {
 								startEditName(item);
 							}
@@ -1564,21 +1607,22 @@
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
 						{ label: item.fullScreen ? '📉 Not FS' : '📝 Full Screen', action: () => {
+							if (!canEditList) return;
 							if (item.fullScreen) {
 								updateItem(item.id, { fullScreen: false });
 							} else {
 								updateItem(item.id, { fullScreen: true });
-								fullScreenNoteItem = item;
+								fullScreenNoteId = item.id;
 							}
 						}},
 						{ label: 'ℹ️ Info', action: () => infoItem = item },
-						{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => updateItem(item.id, { pinned: !item.pinned }) },
+						{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => { if (canEditList) updateItem(item.id, { pinned: !item.pinned }); } },
 						...(canAddChildren ? [
 							{ label: '➕ Add Subtask', action: () => { newItemParentId = item.id; newItemIsNote = false; focusInput(); } },
 							{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
 						] : []),
 						{ label: '🔗 Tag as Link', action: () => copyRefToClipboard(item.id) },
-						...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItem = item) }] : []),
+						...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItemId = item.id) }] : []),
 						...getReparentMenuItem(item.id),
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${tName(item.name)}"?`, () => deleteItemCascade(item.id)) }
 					]} />
@@ -1603,11 +1647,13 @@
 						<button
 							class="price-btn"
 							class:editing={pricingItemId === item.id}
+							disabled={!canEditList || selectionMode}
 							onclick={() => { if (!selectionMode) { pricingItemId === item.id ? commitPrice() : startEditPrice(item); } }}
 						>{pricingItemId === item.id ? (priceBuffer || '0') : formatPrice(item.price)}</button>
 						<button
 							class="qty-btn"
 							class:editing={qtyItemId === item.id}
+							disabled={!canEditList || selectionMode}
 							onclick={() => { if (!selectionMode) { qtyItemId === item.id ? commitQty() : startEditQty(item); } }}
 							title="Quantity"
 						>×{qtyItemId === item.id ? (qtyBuffer || '1') : (item.qty ?? 1)}</button>
@@ -1615,14 +1661,14 @@
 						<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 						<RowMenu items={[
 							{ label: 'ℹ️ Info', action: () => infoItem = item },
-							{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => updateItem(item.id, { pinned: !item.pinned }) },
+							{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => { if (canEditList) updateItem(item.id, { pinned: !item.pinned }); } },
 							...(canAddChildren ? [
 								{ label: '➕ Add Subtask', action: () => { newItemParentId = item.id; newItemIsNote = false; focusInput(); } },
 								{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
 							] : []),
 							...(level === 0 ? [{ label: '📌 Make Heading', action: () => makeHeading(item) }] : []),
 							{ label: '🔗 Tag as Link', action: () => copyRefToClipboard(item.id) },
-							...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItem = item) }] : []),
+							...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItemId = item.id) }] : []),
 							...getReparentMenuItem(item.id),
 							{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${tName(item.name)}"?`, () => deleteItemCascade(item.id)) }
 						]} />
@@ -1646,14 +1692,14 @@
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoItem = item },
-						{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => updateItem(item.id, { pinned: !item.pinned }) },
+						{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => { if (canEditList) updateItem(item.id, { pinned: !item.pinned }); } },
 						...(canAddChildren ? [
 							{ label: '➕ Add Subtask', action: () => { newItemParentId = item.id; newItemIsNote = false; focusInput(); } },
 							{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
 						] : []),
 						...(level === 0 ? [{ label: '📌 Make Heading', action: () => makeHeading(item) }] : []),
 						{ label: '🔗 Tag as Link', action: () => copyRefToClipboard(item.id) },
-						...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItem = item) }] : []),
+						...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItemId = item.id) }] : []),
 						...getReparentMenuItem(item.id),
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${tName(item.name)}"?`, () => deleteItemCascade(item.id)) }
 					]} />
@@ -1708,7 +1754,7 @@
 	{/if}
 
 	<!-- Numeric keypad -->
-	{#if isPriced && (pricingItemId || qtyItemId)}
+	{#if !commitState.isHistorical && isPriced && (pricingItemId || qtyItemId)}
 		<div class="keypad-area">
 			<div class="keypad-header">
 				{#if qtyItemId}
@@ -1724,7 +1770,7 @@
 	{/if}
 
 	<!-- Delete confirmation dialog -->
-	{#if confirmAction}
+	{#if confirmAction && !commitState.isHistorical}
 		<ConfirmDialog
 			message={confirmMsg}
 			confirmLabel={confirmLabel}
@@ -1735,16 +1781,20 @@
 
 	<!-- Info dialog -->
 	{#if fullScreenNoteItem}
-		<FullScreenEditor
-			itemId={fullScreenNoteItem.id}
-			initialContent={fullScreenNoteItem.name}
-			onSave={(newContent) => {
-				if (fullScreenNoteItem) {
-					updateItem(fullScreenNoteItem.id, { name: newContent });
-				}
-			}}
-			onClose={() => fullScreenNoteItem = null}
-		/>
+		{@const note = fullScreenNoteItem}
+		{#key note.id + ':' + (commitState.commitId ?? 'live')}
+			<FullScreenEditor
+				itemId={note.id}
+				initialContent={note.name}
+				readOnly={commitState.isHistorical}
+				onSave={(newContent) => {
+					if (canEditList && note.listId === listId && fullScreenNoteId === note.id && items.some((item) => item.id === note.id)) {
+						updateItem(note.id, { name: newContent });
+					}
+				}}
+				onClose={() => fullScreenNoteId = null}
+			/>
+		{/key}
 	{/if}
 
 	{#if infoItem}
@@ -1765,7 +1815,7 @@
 		{@const cl = copyLinksItem}
 		<CopyLinkDialog
 			links={parseNameParts(cl.name).filter(p => p.type === 'url').map(p => p.value)}
-			onClose={() => copyLinksItem = null}
+			onClose={() => copyLinksItemId = null}
 		/>
 	{/if}
 
@@ -1774,33 +1824,33 @@
 		<div class="header-menu" role="menu" style={menuStyle}>
 			{#if !commitState.isHistorical}
 			{#if selectionMode && selectedIds.size > 0}
-			<button role="menuitem" onclick={() => { showHeaderMenu = false; reparentSelectedToRoot(); }}>↳ Move selected to root</button>
+			<button role="menuitem" disabled={!canEditList || !canReparentItems(items, selectedIds, null)} onclick={() => { showHeaderMenu = false; reparentSelectedTo(null); }}>↳ Move selected to root</button>
 			{:else}
 			<button role="menuitem" onclick={enterSelectionMode}>☑ Select items</button>
 			{/if}
 			{/if}
 			<button role="menuitem" onclick={() => { showHeaderMenu = false; exportToClipboard(); }}>📤 Export to clipboard (JSON)</button>
 			{#if !commitState.isHistorical}
-			<button role="menuitem" onclick={() => { showHeaderMenu = false; importFromClipboard(); }}>📥 Import from clipboard</button>
+			<button role="menuitem" disabled={isPasting || !canEditList} onclick={() => { showHeaderMenu = false; importFromClipboard(); }}>{isPasting ? '📥 Reading clipboard…' : '📥 Import from clipboard'}</button>
 			{/if}
 			<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsTSV(); }}>📋 Copy as spreadsheet</button>
 			<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsJournal(); }}>📓 Copy as journal</button>
-			<button role="menuitem" onclick={() => { showHeaderMenu = false; toggleJournalMode(); }}>{journalMode ? '🗓 Hide dates (journal mode)' : '🗓 Show dates (journal mode)'}</button>
+			<button role="menuitem" disabled={!canEditList} onclick={() => { showHeaderMenu = false; toggleJournalMode(); }}>{journalMode ? '🗓 Hide dates (journal mode)' : '🗓 Show dates (journal mode)'}</button>
 			{#if !commitState.isHistorical}
 			<button role="menuitem" onclick={() => { showHeaderMenu = false; toggleType(); }}>{isPriced ? '📋 Switch to plain list' : '💰 Switch to priced list'}</button>
+			<button role="menuitem" onclick={() => { if (!commitState.isHistorical) { showHeaderMenu = false; showUndoConfirm = true; } }}>↩️ Undo last action</button>
 			{/if}
-			<button role="menuitem" onclick={() => { showHeaderMenu = false; showUndoConfirm = true; }}>↩️ Undo last action</button>
 		</div>
 	{/if}
 </div>
 
-{#if showUndoConfirm}
+{#if showUndoConfirm && !commitState.isHistorical}
 	{#if canUndo()}
 		<ConfirmDialog
 			message={`Are you sure you want to undo your last action? (${getUndoCount()} action${getUndoCount() === 1 ? '' : 's'} left)`}
 			confirmLabel="Yes, undo"
 			onConfirm={() => {
-				getUndoManager().undo();
+				if (!commitState.isHistorical) undoLastAction();
 				showUndoConfirm = false;
 			}}
 			onCancel={() => {
@@ -1834,6 +1884,26 @@
 		inset: 0;
 		background: var(--bg);
 	}
+	.historical-banner {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		padding: 0.4rem 0.75rem;
+		background: #dc2626;
+		color: #fff;
+		font-size: 0.82rem;
+		flex-shrink: 0;
+	}
+	.historical-banner button {
+		background: transparent;
+		border: 1px solid currentColor;
+		border-radius: 4px;
+		color: inherit;
+		padding: 0.15rem 0.5rem;
+		cursor: pointer;
+	}
+	button:disabled { cursor: default; opacity: 0.6; }
 	header {
 		display: flex;
 		align-items: center;

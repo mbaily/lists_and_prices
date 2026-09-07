@@ -50,8 +50,11 @@
 	});
 
 	async function handleLogout() {
-		destroyYjs(); // tear down Yjs before clearing auth to avoid stale updates
-		await logout(); // clears auth.username → triggers re-render to LoginScreen
+		if (await logout()) {
+			destroyYjs();
+		} else {
+			alert('Could not sign out. Your local data is still available. Check your connection and try again.');
+		}
 	}
 </script>
 

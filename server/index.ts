@@ -18,14 +18,16 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import readline from 'node:readline';
 import { createRequire } from 'node:module';
+import { randomUUID } from 'node:crypto';
+import { Writable } from 'node:stream';
 
 import express from 'express';
-import cookieParser from 'cookie-parser';
-import { WebSocketServer } from 'ws';
 import { setupWSConnection } from 'y-websocket/bin/utils';
 import forge from 'node-forge';
 import bcrypt from 'bcryptjs';
-import cookieSignature from 'cookie-signature';
+import { SessionStore, isValidUsername, isValidPassword, readHtpasswdHash, sessionTtlMs } from './auth.ts';
+import { createAuthRouter } from './auth-http.ts';
+import { attachYjsServer } from './auth-websocket.ts';
 
 // better-sqlite3 is a CJS module; use createRequire to import it from ESM.
 const require = createRequire(import.meta.url);
@@ -39,7 +41,7 @@ const HTPASSWD_FILE = path.join(__dirname, '.htpasswd');
 const DB_FILE = path.join(__dirname, 'server.db');
 
 // ── SQLite ──────────────────────────────────────────────────────────────
-// One DB for server-side persistence (session secret, future session table, etc.)
+// One DB for the persistent session secret and revocable, expiring sessions.
 const db = new Database(DB_FILE) as import('better-sqlite3').Database;
 db.exec(`
   CREATE TABLE IF NOT EXISTS kv (
@@ -66,8 +68,12 @@ function getOrCreateSecret(): string {
 }
 
 const SESSION_SECRET = process.env.SESSION_SECRET ?? getOrCreateSecret();
-const SESSION_EXPIRY_DAYS = parseInt(process.env.SESSION_EXPIRY_DAYS ?? '30', 10);
-const COOKIE_NAME = 'prices_n_lists_session';
+const sessions = new SessionStore(db, {
+	secret: SESSION_SECRET,
+	ttlMs: sessionTtlMs(process.env.SESSION_EXPIRY_DAYS),
+	// Read current credentials on every verification, including established sockets.
+	readPasswordHash: (username) => readHtpasswdHash(fs.readFileSync(HTPASSWD_FILE, 'utf-8'), username)
+});
 
 // ── Parse CLI args ────────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
@@ -79,11 +85,13 @@ if (args.includes('--create-cert')) {
 }
 if (args.includes('--add-user')) {
 	await cliAddUser();
-	process.exit(0);
+	db.close();
+	process.exit(process.exitCode ?? 0);
 }
 if (args.includes('--remove-user')) {
 	await cliRemoveUser();
-	process.exit(0);
+	db.close();
+	process.exit(process.exitCode ?? 0);
 }
 
 // ── Self-signed cert generation ───────────────────────────────────────────────
@@ -106,98 +114,96 @@ async function generateCert() {
 }
 
 // ── .htpasswd management ──────────────────────────────────────────────────────
-function prompt(question: string): Promise<string> {
+function prompt(question: string, hideInput = false): Promise<string> {
 	return new Promise((resolve) => {
-		const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-		rl.question(question, (answer) => { rl.close(); resolve(answer); });
+		let muted = false;
+		const output = new Writable({
+			write(chunk, _encoding, done) {
+				if (!muted) process.stdout.write(chunk);
+				done();
+			}
+		});
+		const rl = readline.createInterface({
+			input: process.stdin, output, terminal: Boolean(process.stdin.isTTY && process.stdout.isTTY)
+		});
+		rl.question(question, (answer) => {
+			rl.close();
+			output.end();
+			if (hideInput && process.stdin.isTTY) process.stdout.write('\n');
+			resolve(answer);
+		});
+		muted = hideInput;
 	});
+}
+
+function writeHtpasswd(contents: string): void {
+	// Atomic replacement avoids transient empty/partial files revoking unrelated users.
+	const exists = fs.existsSync(HTPASSWD_FILE);
+	const target = exists ? fs.realpathSync(HTPASSWD_FILE) : HTPASSWD_FILE;
+	const mode = exists ? fs.statSync(target).mode & 0o777 : 0o600;
+	const temporary = `${target}.${randomUUID()}.tmp`;
+	const fd = fs.openSync(temporary, 'wx', 0o600);
+	try {
+		try {
+			fs.writeFileSync(fd, contents);
+			fs.fchmodSync(fd, mode);
+		} finally {
+			fs.closeSync(fd);
+		}
+		fs.renameSync(temporary, target);
+	} finally {
+		fs.rmSync(temporary, { force: true });
+	}
 }
 
 async function cliAddUser() {
 	const username = (await prompt('Username: ')).trim();
-	const password = (await prompt('Password: ')).trim();
-	if (!username || !password) { console.error('Username and password required.'); return; }
+	if (!isValidUsername(username)) {
+		console.error('Username must be 1–128 characters: letters, numbers, or . _ ~ @ + -');
+		process.exitCode = 1;
+		return;
+	}
+	const password = await prompt('Password: ', true);
+	if (!isValidPassword(password)) {
+		console.error('Password must be 1–72 UTF-8 bytes (bcrypt must not truncate it).');
+		process.exitCode = 1;
+		return;
+	}
 	const hash = await bcrypt.hash(password, 10);
 	let lines: string[] = [];
 	if (fs.existsSync(HTPASSWD_FILE)) {
 		lines = fs.readFileSync(HTPASSWD_FILE, 'utf-8').split('\n').filter(Boolean);
 	}
-	const idx = lines.findIndex((l) => l.startsWith(username + ':'));
-	if (idx !== -1) lines[idx] = `${username}:${hash}`;
-	else lines.push(`${username}:${hash}`);
-	fs.writeFileSync(HTPASSWD_FILE, lines.join('\n') + '\n');
+	// Replace all matching entries so duplicate legacy records cannot remain ambiguous.
+	lines = lines.filter((l) => !l.startsWith(username + ':'));
+	lines.push(`${username}:${hash}`);
+	writeHtpasswd(lines.join('\n') + '\n');
+	sessions.revokeUser(username);
 	console.log(`User "${username}" added/updated.`);
 }
 
 async function cliRemoveUser() {
 	const username = (await prompt('Username to remove: ')).trim();
-	if (!username) { console.error('Username required.'); return; }
-	if (!fs.existsSync(HTPASSWD_FILE)) { console.error('.htpasswd not found.'); return; }
+	if (!isValidUsername(username)) {
+		console.error('Invalid username.');
+		process.exitCode = 1;
+		return;
+	}
+	// Revoke even if the credentials file is already missing.
+	sessions.revokeUser(username);
+	if (!fs.existsSync(HTPASSWD_FILE)) { console.error('.htpasswd not found.'); process.exitCode = 1; return; }
 	const lines = fs.readFileSync(HTPASSWD_FILE, 'utf-8').split('\n').filter(Boolean);
 	const filtered = lines.filter((l) => !l.startsWith(username + ':'));
-	fs.writeFileSync(HTPASSWD_FILE, filtered.join('\n') + (filtered.length ? '\n' : ''));
+	writeHtpasswd(filtered.join('\n') + (filtered.length ? '\n' : ''));
+	// Also catch a login that completed while the CLI was updating the file.
+	sessions.revokeUser(username);
 	console.log(`User "${username}" removed.`);
 }
 
-// ── Auth helpers ──────────────────────────────────────────────────────────────
-async function verifyHtpasswd(username: string, password: string): Promise<boolean> {
-	if (!fs.existsSync(HTPASSWD_FILE)) return false;
-	const lines = fs.readFileSync(HTPASSWD_FILE, 'utf-8').split('\n').filter(Boolean);
-	const line = lines.find((l) => l.startsWith(username + ':'));
-	if (!line) return false;
-	const hash = line.slice(username.length + 1).trim();
-	return bcrypt.compare(password, hash);
-}
-
-function signSession(username: string): string {
-	return cookieSignature.sign(username, SESSION_SECRET);
-}
-
-function verifySession(signed: string): string | false {
-	return cookieSignature.unsign(signed, SESSION_SECRET);
-}
-
 // ── Express app ───────────────────────────────────────────────────────────────
+const useTls = fs.existsSync(CERT_FILE) && fs.existsSync(KEY_FILE);
 const app = express();
-app.use(express.json());
-app.use(cookieParser());
-
-// Auth middleware for API routes (not login)
-function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
-	const raw = req.cookies[COOKIE_NAME];
-	if (!raw) return res.status(401).json({ error: 'Unauthorised' });
-	const username = verifySession(raw);
-	if (!username) return res.status(401).json({ error: 'Invalid session' });
-	(req as express.Request & { user: string }).user = username as string;
-	next();
-}
-
-// POST /api/login
-app.post('/api/login', async (req, res) => {
-	const { username, password } = req.body ?? {};
-	if (!username || !password) return res.status(400).json({ error: 'Missing credentials' });
-	const ok = await verifyHtpasswd(username, password);
-	if (!ok) return res.status(401).json({ error: 'Invalid username or password' });
-	const signed = signSession(username);
-	res.cookie(COOKIE_NAME, signed, {
-		httpOnly: true,
-		secure: useTls,
-		sameSite: 'strict',
-		maxAge: SESSION_EXPIRY_DAYS * 24 * 60 * 60 * 1000
-	});
-	res.json({ ok: true });
-});
-
-// POST /api/logout
-app.post('/api/logout', (_req, res) => {
-	res.clearCookie(COOKIE_NAME);
-	res.json({ ok: true });
-});
-
-// GET /api/session
-app.get('/api/session', requireAuth, (req, res) => {
-	res.json({ username: (req as express.Request & { user: string }).user });
-});
+app.use('/api', createAuthRouter(sessions, useTls));
 
 // Serve built SPA
 app.use(express.static(BUILD_DIR));
@@ -209,40 +215,12 @@ app.get('/{*path}', (req, res) => {
 });
 
 // ── HTTP/S server ─────────────────────────────────────────────────────────────
-const useTls = fs.existsSync(CERT_FILE) && fs.existsSync(KEY_FILE);
 const server = useTls
 	? https.createServer({ cert: fs.readFileSync(CERT_FILE), key: fs.readFileSync(KEY_FILE) }, app)
 	: http.createServer(app);
 
 // ── y-websocket ───────────────────────────────────────────────────────────────
-const wss = new WebSocketServer({ noServer: true });
-wss.on('connection', (ws, req) => {
-	setupWSConnection(ws, req, { gc: true });
-});
-
-server.on('upgrade', (req, socket, head) => {
-	if (req.url?.startsWith('/yjs')) {
-		// Verify session cookie before allowing WS upgrade.
-		// cookie package URL-encodes values; decode before verifying signature.
-		const cookies = Object.fromEntries(
-			(req.headers.cookie ?? '').split(';').map((c) => {
-				const [k, ...v] = c.trim().split('=');
-				let val = v.join('=');
-				try { val = decodeURIComponent(val); } catch { /* leave as-is */ }
-				return [k.trim(), val];
-			})
-		);
-		const raw = cookies[COOKIE_NAME];
-		if (!raw || !verifySession(raw)) {
-			socket.write('HTTP/1.1 401 Unauthorised\r\n\r\n');
-			socket.destroy();
-			return;
-		}
-		wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
-	} else {
-		socket.destroy();
-	}
-});
+attachYjsServer(server, sessions, setupWSConnection);
 
 server.listen(portArg, () => {
 	console.log(`Lists & Prices server running on ${useTls ? 'https' : 'http'}://localhost:${portArg}`);

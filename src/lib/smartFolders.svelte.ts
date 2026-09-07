@@ -2,28 +2,19 @@
  * Smart folder (report) configuration — stored in the shared Y.Doc so it
  * syncs across devices just like folders, lists and items.
  *
- * Yjs structure: Y.Map<string> keyed 'smart-folders', where each entry is
- *   reportName → JSON-encoded string[] of folder IDs
+ * Legacy JSON assignments are a read-only baseline. New writes use one CRDT
+ * key per report/folder membership, so independent offline changes merge.
  *
  * The exported `smartFolders` is a plain reactive $state mirror that
  * HomeScreen components read directly; it is re-derived on every docState
  * tick so it stays live.
  */
-import * as Y from 'yjs';
-import { getDoc, docState } from './yjsStore.svelte';
-
-function getYMap(): Y.Map<string> {
-	return getDoc().getMap('smart-folders');
-}
+import { getDoc, getMutableDoc, docState } from './yjsStore.svelte';
+import { readReportAssignments, setReportMembership } from './reportAssignments';
 
 function readAll(): Record<string, string[]> {
 	try {
-		const m = getYMap();
-		const out: Record<string, string[]> = {};
-		m.forEach((val, key) => {
-			try { out[key] = JSON.parse(val); } catch { /* skip corrupt entry */ }
-		});
-		return out;
+		return readReportAssignments(getDoc());
 	} catch {
 		return {};
 	}
@@ -39,47 +30,29 @@ const _smartFolders: SmartFolderMap = $derived.by(() => {
 export function getSmartFolders(): SmartFolderMap { return _smartFolders; }
 
 export function assignToReport(folderId: string, reportName: string) {
-	getDoc().transact(() => {
-		const m = getYMap();
-		const current: string[] = (() => { try { return JSON.parse(m.get(reportName) ?? '[]'); } catch { return []; } })();
-		if (!current.includes(folderId)) {
-			m.set(reportName, JSON.stringify([...current, folderId]));
-		}
-	});
+	const doc = getMutableDoc();
+	doc.transact(() => setReportMembership(doc, reportName, folderId, true));
 }
 
 export function removeFromReport(folderId: string, reportName: string) {
-	getDoc().transact(() => {
-		const m = getYMap();
-		const current: string[] = (() => { try { return JSON.parse(m.get(reportName) ?? '[]'); } catch { return []; } })();
-		const next = current.filter((id) => id !== folderId);
-		if (next.length === 0) {
-			m.delete(reportName);
-		} else {
-			m.set(reportName, JSON.stringify(next));
-		}
-	});
+	const doc = getMutableDoc();
+	doc.transact(() => setReportMembership(doc, reportName, folderId, false));
 }
 
 export function deleteReport(reportName: string) {
-	getDoc().transact(() => {
-		getYMap().delete(reportName);
+	const doc = getMutableDoc();
+	doc.transact(() => {
+		for (const id of readReportAssignments(doc)[reportName] ?? []) setReportMembership(doc, reportName, id, false);
+		doc.getMap('smart-folders').delete(reportName);
 	});
 }
 
 /** Called by deleteFolder to purge a folder ID from all reports. */
 export function removeFromAllReports(folderId: string) {
-	getDoc().transact(() => {
-		const m = getYMap();
-		m.forEach((val, reportName) => {
-			try {
-				const ids: string[] = JSON.parse(val);
-				if (ids.includes(folderId)) {
-					const next = ids.filter((id) => id !== folderId);
-					if (next.length === 0) m.delete(reportName);
-					else m.set(reportName, JSON.stringify(next));
-				}
-			} catch { /* skip corrupt entry */ }
-		});
+	const doc = getMutableDoc();
+	doc.transact(() => {
+		for (const [name, ids] of Object.entries(readReportAssignments(doc))) {
+			if (ids.includes(folderId)) setReportMembership(doc, name, folderId, false);
+		}
 	});
 }

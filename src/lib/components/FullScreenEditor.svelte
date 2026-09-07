@@ -1,30 +1,32 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import Quill from 'quill';
+	import type Quill from 'quill';
 	import 'quill/dist/quill.snow.css';
 	import { QuillBinding } from 'y-quill';
-	import { getDoc, getWsProvider } from '$lib/yjsStore.svelte';
+	import { getMutableDoc, getWsProvider, getUndoManager, docState, commitState } from '$lib/yjsStore.svelte';
 	import { getItemYText } from '$lib/data';
+	import { NoteEditSession } from '$lib/noteEditing';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 
 	let {
 		itemId,
 		initialContent,
+		readOnly = false,
 		onSave,
 		onClose
-	}: { itemId: string; initialContent: string; onSave: (content: string) => void; onClose: () => void } = $props();
+	}: { itemId: string; initialContent: string; readOnly?: boolean; onSave: (content: string) => void; onClose: () => void } = $props();
 
 	let editorContainer: HTMLDivElement | null = null;
 	let quill: Quill | null = null;
 	let binding: QuillBinding | null = null;
+	let editSession: NoteEditSession | null = null;
+	let editorError = $state<string | null>(null);
+	let editorReady = $state(false);
 	let showConfirmCancel = $state(false);
 	let showConfirmClose = $state(false);
 	let viewportHeight = $state('100vh');
 	let viewportTop = $state('0px');
 	
-	// We keep a normalized version of initialContent to compare against later
-	let normalizedInitial = '';
-
 	$effect(() => {
 		const updateHeight = () => {
 			if (window.visualViewport) {
@@ -56,41 +58,61 @@
 	});
 
 	onMount(() => {
-		if (editorContainer) {
-			quill = new Quill(editorContainer, {
-				theme: 'snow',
-				modules: {
-					toolbar: false
+		let cancelled = false;
+		async function initialize() {
+			try {
+				// Quill touches document at module load, so it must not be imported
+				// during SvelteKit SSR. Also do not finish loading an unmounted note.
+				const { default: Quill } = await import('quill');
+				if (cancelled || !editorContainer) return;
+				quill = new Quill(editorContainer, {
+					theme: 'snow', readOnly,
+					modules: {
+						toolbar: false,
+						history: { userOnly: true },
+						keyboard: { bindings: {
+							undo: { key: 'z', shortKey: true, shiftKey: false, handler: () => { editSession?.undoManager.undo(); return false; } },
+							redo: { key: 'z', shortKey: true, shiftKey: true, handler: () => { editSession?.undoManager.redo(); return false; } },
+							redoY: { key: 'y', shortKey: true, handler: () => { editSession?.undoManager.redo(); return false; } }
+						} }
+					}
+				});
+				if (readOnly) {
+					quill.setText(initialContent);
+					editorReady = true;
+					return;
 				}
-			});
-			
-			const doc = getDoc();
-			const wsProvider = getWsProvider();
-			const yText = getItemYText(doc, itemId, initialContent);
-
-			binding = new QuillBinding(yText, quill, wsProvider ? wsProvider.awareness : undefined);
-			normalizedInitial = yText.toString().replace(/\n$/, '');
-			quill.focus();
+				const doc = getMutableDoc();
+				const yText = getItemYText(doc, itemId);
+				binding = new QuillBinding(yText, quill, getWsProvider()?.awareness);
+				editSession = new NoteEditSession(yText, binding, getUndoManager());
+				editorReady = true;
+				quill.focus();
+			} catch (error) {
+				if (cancelled) return;
+				editorError = error instanceof Error ? error.message : 'Could not open the note.';
+				quill?.disable();
+			}
 		}
+		void initialize();
+		return () => { cancelled = true; };
 	});
 
 	onDestroy(() => {
 		binding?.destroy();
+		editSession?.destroy();
 	});
 
 	function handleSave() {
-		const doc = getDoc();
-		const yText = getItemYText(doc, itemId);
-		const text = yText.toString().replace(/\n$/, '');
+		if (readOnly || commitState.isHistorical || !binding || !editSession) return;
+		const text = binding.type.toString().replace(/\n$/, '');
 		onSave(text);
-		normalizedInitial = text;
+		editSession.commit();
+		docState.version++;
 	}
 
 	function requestCancel() {
-		const doc = getDoc();
-		const yText = getItemYText(doc, itemId);
-		const currentText = yText.toString().replace(/\n$/, '');
-		if (currentText !== normalizedInitial) {
+		if (!readOnly && editSession?.hasChanges) {
 			showConfirmCancel = true;
 			return;
 		}
@@ -98,22 +120,15 @@
 	}
 
 	function discardChanges() {
-		const doc = getDoc();
-		const yText = getItemYText(doc, itemId);
-		doc.transact(() => {
-			yText.delete(0, yText.length);
-			yText.insert(0, normalizedInitial);
-		});
-		handleSave();
+		if (readOnly || commitState.isHistorical) return;
+		editSession?.discard();
+		docState.version++;
 		showConfirmCancel = false;
 		onClose();
 	}
 
 	function requestClose() {
-		const doc = getDoc();
-		const yText = getItemYText(doc, itemId);
-		const currentText = yText.toString().replace(/\n$/, '');
-		if (currentText !== normalizedInitial) {
+		if (!readOnly && editSession?.hasChanges) {
 			showConfirmClose = true;
 			return;
 		}
@@ -124,10 +139,13 @@
 <div class="fullscreen-editor-overlay">
 	<div class="visual-viewport-container" style="height: {viewportHeight}; top: {viewportTop};">
 		<div class="header">
+			{#if !readOnly}
 			<button class="close-btn" onclick={requestCancel}>Cancel</button>
+			{/if}
 			<button class="close-btn" onclick={requestClose}>Close</button>
-			<button class="save-btn" onclick={handleSave}>Save</button>
+			{#if !readOnly}<button class="save-btn" onclick={handleSave} disabled={!editorReady || !!editorError}>Save</button>{/if}
 		</div>
+		{#if editorError}<p role="alert">{editorError}</p>{/if}
 		
 		<div class="editor-wrapper">
 			<div bind:this={editorContainer}></div>

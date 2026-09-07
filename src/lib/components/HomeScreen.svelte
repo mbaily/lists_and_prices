@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import {
 		readFolders,
 		readLists,
@@ -32,7 +32,7 @@
 		type SheetMeta,
 		type Item
 	} from '$lib/data';
-	import { syncState, docState, idbSynced, commitState, readCommits, viewCommit, createCommit, exitCommitView, type Commit, getUndoManager, canUndo, getUndoCount } from '$lib/yjsStore.svelte';
+	import { syncState, docState, idbSynced, commitState, exitCommitView, undoLastAction, canUndo, getUndoCount } from '$lib/yjsStore.svelte';
 	import { auth } from '$lib/auth.svelte';
 	import { settings, updateSettings } from '$lib/settings.svelte';
 	import { getSmartFolders, assignToReport, removeFromReport, deleteReport } from '$lib/smartFolders.svelte';
@@ -171,7 +171,7 @@
 				const item = viewableItems[activeCursorIndex];
 				if (item.type === 'folder') {
 					breadcrumb = [...breadcrumb, item.id];
-				} else if (item.type === 'list' && ('type' in item.original) && item.original.type !== 'divider') {
+				} else if (item.type === 'list' && item.original.type !== 'divider') {
 					openListId = item.id;
 				} else if (item.type === 'sheet') {
 					openSheetId = item.id;
@@ -231,7 +231,7 @@
 	});
 
 	$effect(() => {
-		if (idbSynced.done && auth.username) {
+		if (idbSynced.done && auth.username && !commitState.isHistorical) {
 			if (allFolders.length > 0) localStorage.setItem(`pnl-snap-f-${auth.username}`, JSON.stringify(allFolders));
 			if (allLists.length > 0) localStorage.setItem(`pnl-snap-l-${auth.username}`, JSON.stringify(allLists));
 		}
@@ -306,6 +306,7 @@
 	);
 
 	function cycleFilter() {
+		if (commitState.isHistorical) return;
 		const next = filterView === 'all' ? 'unchecked' : filterView === 'unchecked' ? 'checked' : 'all';
 		if (currentFolderId && currentFolderId !== ARCHIVE_ID) {
 			updateFolder(currentFolderId, { filterView: next });
@@ -454,15 +455,17 @@
 	);
 
 	let currentFolderData = $derived(currentFolderId ? allFolders.find(f => f.id === currentFolderId) : null);
-	
-	let viewableItems = $derived.by(() => {
-		const folders = childFolders.map(f => ({ type: 'folder', id: f.id, original: f }));
-		const lists = childLists.map(l => ({ type: 'list', id: l.id, original: l }));
-		const sheets = childSheets.map(s => ({ type: 'sheet', id: s.id, original: s }));
-		
-		let items = [...folders, ...lists].sort((a, b) => a.original.order - b.original.order);
-		items = [...items, ...sheets];
-		return items;
+
+	type ViewableItem =
+		| { type: 'folder'; id: string; original: Folder }
+		| { type: 'list'; id: string; original: ListMeta }
+		| { type: 'sheet'; id: string; original: SheetMeta };
+	let viewableItems = $derived.by((): ViewableItem[] => {
+		const folders = childFolders.map(f => ({ type: 'folder' as const, id: f.id, original: f }));
+		const lists = childLists.map(l => ({ type: 'list' as const, id: l.id, original: l }));
+		const sheets = childSheets.map(s => ({ type: 'sheet' as const, id: s.id, original: s }));
+		const mixedItems = [...folders, ...lists].sort((a, b) => a.original.order - b.original.order);
+		return [...mixedItems, ...sheets];
 	});
 
 	let activeCursorId = $derived(cursorMemory[currentFolderId || 'root'] || null);
@@ -592,11 +595,12 @@
 		}
 		// Clear rename state if the target was deleted by a peer
 		if (renamingId !== null) {
-			const allIds = new Set([
-				...allFolders.map((f) => f.id),
-				...allLists.map((l) => l.id)
-			]);
-			if (!allIds.has(renamingId)) renamingId = null;
+			const exists = renameTarget === 'folder'
+				? allFolders.some((folder) => folder.id === renamingId)
+				: renameTarget === 'list'
+				? allLists.some((list) => list.id === renamingId)
+				: allSheets.some((sheet) => sheet.id === renamingId);
+			if (!exists) renamingId = null;
 		}
 		// Clear info dialog if the target was deleted by a peer
 		if (infoTarget !== null) {
@@ -623,7 +627,7 @@
 	let showNewFolder = $state(false);
 
 	function submitNewFolder() {
-		if (!newFolderName.trim()) return;
+		if (commitState.isHistorical || !newFolderName.trim()) return;
 		createFolder(newFolderName.trim(), currentFolderId, newFolderColor, settings.addListPosition);
 		newFolderName = '';
 		newFolderColor = '#6366f1';
@@ -648,6 +652,7 @@
 	}
 
 	function openNewList() {
+		if (commitState.isHistorical) return;
 		newListColor = currentFolderColor;
 		newListType = 'plain';
 		resetNewListDate();
@@ -655,6 +660,7 @@
 	}
 
 	function submitNewList() {
+		if (commitState.isHistorical) return;
 		let isFutureList = false;
 		if (newListDateMode === 'offset' && newListDateOffset > 0) isFutureList = true;
 		if (newListDateMode === 'custom' && newListCustomDate) {
@@ -701,8 +707,9 @@
 	let confirmAction = $state<(() => void) | null>(null);
 
 	function askDelete(msg: string, action: () => void) {
+		if (commitState.isHistorical) return;
 		confirmMsg = msg;
-		confirmAction = () => action();
+		confirmAction = () => { if (!commitState.isHistorical) action(); };
 	}
 
 	// ── Info dialog ────────────────────────────────────────────────────────────
@@ -724,6 +731,7 @@
 	let renameTarget = $state<'folder' | 'list' | 'sheet'>('folder');
 
 	function startRename(id: string, current: string, target: 'folder' | 'list' | 'sheet', color = '#6366f1') {
+		if (commitState.isHistorical) return;
 		renamingId = id;
 		renameValue = current;
 		renameColor = color;
@@ -731,6 +739,7 @@
 	}
 
 	function submitRename() {
+		if (commitState.isHistorical) return;
 		if (renamingId && renameValue.trim()) {
 			if (renameTarget === 'folder') updateFolder(renamingId, { name: renameValue.trim(), color: renameColor });
 			else if (renameTarget === 'list') updateList(renamingId, { name: renameValue.trim(), color: renameColor });
@@ -746,8 +755,8 @@
 	let taggedFolderId = $state<string | null>(null);
 	let hasTag = $derived(taggedListId !== null || taggedFolderId !== null);
 
-	function tagFolder(id: string) { taggedFolderId = id; taggedListId = null; }
-	function tagList(id: string) { taggedListId = id; taggedFolderId = null; }
+	function tagFolder(id: string) { if (!commitState.isHistorical) { taggedFolderId = id; taggedListId = null; } }
+	function tagList(id: string) { if (!commitState.isHistorical) { taggedListId = id; taggedFolderId = null; } }
 	function clearTag() { taggedFolderId = null; taggedListId = null; }
 
 	function writeClipboard(text: string) {
@@ -763,6 +772,7 @@
 	}
 
 	function moveTaggedTo(targetFolderId: string | null) {
+		if (commitState.isHistorical) return;
 		if (taggedFolderId) {
 			if (targetFolderId !== null && isDescendant(taggedFolderId, targetFolderId)) {
 				alert('Cannot move a folder into one of its own sub-folders.');
@@ -786,13 +796,14 @@
 
 	// ── Touch drag reorder ────────────────────────────────────────────────────────
 	// HTML5 drag doesn't work on iOS — use touch events instead.
-	// 'mixed' (folders/lists) or 'sheet' drag, tracked independently.
-	type DragKind = 'mixed' | 'sheet';
+	// Only mixed folder/list rows have drag handles; sheets are not draggable.
+	type DragKind = 'mixed';
 	let touchDragKind = $state<DragKind | null>(null);
 	let touchDragFrom = $state<number | null>(null);
 	let touchDragOver = $state<number | null>(null);
 
-	function startDrag(e: PointerEvent, kind: 'mixed' | 'sheet', index: number) {
+	function startDrag(e: PointerEvent, kind: DragKind, index: number) {
+		if (commitState.isHistorical || currentFolderId === ARCHIVE_ID) return;
 		e.stopPropagation();
 		// Close any open tag so drag and move can't conflict
 		clearTag();
@@ -804,6 +815,7 @@
 	$effect(() => {
 		if (touchDragFrom === null) return;
 		const kind = touchDragKind;
+		const sourceFolderId = currentFolderId;
 		function onMove(e: PointerEvent) {
 			e.preventDefault();
 			const el = document.elementFromPoint(e.clientX, e.clientY);
@@ -813,37 +825,35 @@
 			}
 		}
 		function onEnd() {
-			if (touchDragFrom !== null && touchDragOver !== null && touchDragFrom !== touchDragOver) {
-				if (kind === 'mixed') {
-					if (currentFolderId !== ARCHIVE_ID) {
-						const mixedItems = viewableItems
-							.filter(i => i.type === 'folder' || i.type === 'list')
-							.map(i => ({ id: i.id, type: i.type }));
-						reorderMixedItems(currentFolderId, touchDragFrom, touchDragOver, mixedItems);
-					}
-				} else if (kind === 'sheet') {
-					reorderSheets(currentFolderId, touchDragFrom, touchDragOver, childSheets.map((s) => s.id));
-				}
+			if (!commitState.isHistorical && sourceFolderId === currentFolderId && currentFolderId !== ARCHIVE_ID && kind === 'mixed' && touchDragFrom !== null && touchDragOver !== null && touchDragFrom !== touchDragOver) {
+				const mixedItems = viewableItems
+					.filter(i => i.type === 'folder' || i.type === 'list')
+					.map(i => ({ id: i.id, type: i.type }));
+				reorderMixedItems(sourceFolderId, touchDragFrom, touchDragOver, mixedItems);
 			}
+			onCancel();
+		}
+		function onCancel() {
 			touchDragKind = null;
 			touchDragFrom = null;
 			touchDragOver = null;
 		}
 		document.addEventListener('pointermove', onMove, { passive: false });
 		document.addEventListener('pointerup', onEnd, { once: true });
-		document.addEventListener('pointercancel', onEnd, { once: true });
+		document.addEventListener('pointercancel', onCancel, { once: true });
 		return () => {
 			document.removeEventListener('pointermove', onMove);
 			document.removeEventListener('pointerup', onEnd);
-			document.removeEventListener('pointercancel', onEnd);
+			document.removeEventListener('pointercancel', onCancel);
 		};
 	});
 
 	// ── First-launch guard ───────────────────────────────────────────────────────
-	let showFirstLaunch = $derived(idbSynced.done && allFolders.length === 0 && !showNewFolder);
+	let showFirstLaunch = $derived(idbSynced.done && allFolders.length === 0 && !showNewFolder && !commitState.isHistorical);
 
 	// ── Quick Add actions ─────────────────────────────────────────────────────────
 	function toggleQuickAdd() {
+		if (commitState.isHistorical) return;
 		if (!showQuickAdd) {
 			showQuickAdd = true;
 			showSearch = false;
@@ -1027,25 +1037,6 @@
 			openItemId = result.data.id;
 		}
 	}
-
-	$effect(() => {
-		void currentFolderId; // track navigation
-		// Always cancel any in-progress rename when navigating — don't auto-submit,
-		// as calling submitRename() inside this effect can cause a secondary effect
-		// cycle when it mutates renamingId.
-		renamingId = null;
-		infoTarget = null;
-		activeTagFilter = null;
-		// Close create forms so they don't linger in the wrong folder context
-		showNewFolder = false;
-		showNewList = false;
-		newFolderName = '';
-		newFolderColor = '#6366f1';
-		newListName = '';
-		newListType = 'plain';
-		newListColor = '#6366f1';
-		// Do NOT clear the tag — the user navigates specifically to find the move target
-	});
 
 	// ── Smart folders (reports) ──────────────────────────────────────────────────
 	let sfDialogFolder = $state<Folder | null>(null);
@@ -1312,6 +1303,52 @@ ${bodyHtml}
 			window.removeEventListener('hashchange', onPopState);
 		};
 	});
+
+	// Pre-effects can run during initialization; keep these below all referenced state.
+	$effect.pre(() => {
+		void currentFolderId; // track navigation
+		// Always cancel any in-progress rename when navigating — don't auto-submit,
+		// as calling submitRename() inside this effect can cause a secondary effect
+		// cycle when it mutates renamingId.
+		renamingId = null;
+		infoTarget = null;
+		activeTagFilter = null;
+		// Close create forms so they don't linger in the wrong folder context
+		showNewFolder = false;
+		showNewList = false;
+		newFolderName = '';
+		newFolderColor = '#6366f1';
+		newListName = '';
+		newListType = 'plain';
+		newListColor = '#6366f1';
+		touchDragKind = null;
+		touchDragFrom = null;
+		touchDragOver = null;
+		confirmAction = null;
+		// Do NOT clear the tag — the user navigates specifically to find the move target
+	});
+
+	// Pending live actions must not survive a switch into or out of a historical document.
+	$effect.pre(() => {
+		void commitState.isHistorical;
+		void commitState.commitId;
+		untrack(() => {
+			showUndoConfirm = false;
+			confirmAction = null;
+			renamingId = null;
+			showNewFolder = false;
+			showNewList = false;
+			showQuickAdd = false;
+			quickAddValue = '';
+			quickAddTagSuggestions = [];
+			sfDialogFolder = null;
+			checkboxesFolder = null;
+			touchDragKind = null;
+			touchDragFrom = null;
+			touchDragOver = null;
+			clearTag();
+		});
+	});
 </script>
 
 <svelte:window onkeydown={handleGlobalKeydown} />
@@ -1319,7 +1356,7 @@ ${bodyHtml}
 {#if openSheetId}
 	<SpreadsheetScreen sheetId={openSheetId} onBack={() => openSheetId = null} />
 {:else if openListId}
-	<ListScreen listId={openListId} highlightItemId={openItemId} orderedLists={navOrderedLists} onHome={() => { openListId = null; openItemId = null; breadcrumb = [null]; }} onOpenList={(id) => (openListId = id)} onOpenFavouritesOrder={() => { previousListId = openListId; openListId = null; showFavouritesOrder = true; }} savedSearch={savedSearch} onRestoreSearch={() => { openListId = null; openItemId = null; breadcrumb = [null]; restoreSearch(); }} onTagClick={(tag) => { openListId = null; openItemId = null; breadcrumb = [null]; activeTagFilter = null; showSearch = true; searchQuery = '#' + tag; savedSearch = '#' + tag; tick().then(() => searchInputEl?.focus()); }} onNavigateTo={(folderId) => {
+	<ListScreen listId={openListId} highlightItemId={openItemId} orderedLists={navOrderedLists} onHome={() => { openListId = null; openItemId = null; breadcrumb = [null]; }} onOpenList={(id) => (openListId = id)} onOpenFavouritesOrder={() => { if (commitState.isHistorical) return; previousListId = openListId; openListId = null; showFavouritesOrder = true; }} savedSearch={savedSearch} onRestoreSearch={() => { openListId = null; openItemId = null; breadcrumb = [null]; restoreSearch(); }} onTagClick={(tag) => { openListId = null; openItemId = null; breadcrumb = [null]; activeTagFilter = null; showSearch = true; searchQuery = '#' + tag; savedSearch = '#' + tag; tick().then(() => searchInputEl?.focus()); }} onNavigateTo={(folderId) => {
 		openListId = null;
 		// Reconstruct the full ancestor path to folderId so the breadcrumb is correct
 		// regardless of which folder the user was in when they opened the list.
@@ -1425,7 +1462,9 @@ ${bodyHtml}
 					</button>
 				{/if}
 				<div class="reports-wrap">
-					<button class="icon-btn" onclick={() => showUndoConfirm = true} aria-label="Undo last action" title="Undo last action">↩️</button>
+					{#if !commitState.isHistorical}
+						<button class="icon-btn" onclick={() => { if (!commitState.isHistorical) showUndoConfirm = true; }} aria-label="Undo last action" title="Undo last action">↩️</button>
+					{/if}
 					<button class="icon-btn" onclick={() => showReportsMenu = !showReportsMenu} aria-label="Smart Folder Reports">📋</button>
 					{#if showReportsMenu}
 						<div class="reports-menu">
@@ -1588,12 +1627,14 @@ ${bodyHtml}
 					aria-label={settings.favouritesCollapsed ? 'Expand favourites' : 'Collapse favourites'}
 					title={settings.favouritesCollapsed ? 'Expand favourites' : 'Collapse favourites'}
 				>★</button>
-				<button
-					class="fav-reorder-btn"
-					onclick={() => (showFavouritesOrder = true)}
-					aria-label="Rearrange favourites"
-					title="Rearrange favourites"
-				>⇅</button>
+				{#if !commitState.isHistorical}
+					<button
+						class="fav-reorder-btn"
+						onclick={() => { if (!commitState.isHistorical) showFavouritesOrder = true; }}
+						aria-label="Rearrange favourites"
+						title="Rearrange favourites"
+					>⇅</button>
+				{/if}
 				{#each favouriteItems as fav (fav.type + ':' + fav.item.id)}
 					{#if fav.type === 'folder'}
 						<button
@@ -1629,7 +1670,7 @@ ${bodyHtml}
 		{/if}
 
 		<!-- Tag indicator strip (outside .content so it stays visible while scrolling) -->
-		{#if hasTag}
+		{#if hasTag && !commitState.isHistorical}
 			<div class="tag-strip">
 				<span>🏷 {taggedFolderId ? '📁 ' + (allFolders.find(f => f.id === taggedFolderId)?.name ?? '…') : '📋 ' + (allLists.find(l => l.id === taggedListId)?.name ?? '…')} tagged — navigate to destination and tap ⋮ → Move Tagged Here</span>
 				{#if taggedFolderId}
@@ -1717,7 +1758,7 @@ ${bodyHtml}
 		{/if}
 
 		<!-- Mixed Folders and Lists -->
-		{#snippet folderRow(folder, i)}
+		{#snippet folderRow(folder: Folder, i: number)}
 			{@const isPathThrough = isInArchiveView && pathThroughFolderIds.has(folder.id) && !folder.archived}
 			<div
 				id="row-{folder.id}"
@@ -1733,11 +1774,11 @@ ${bodyHtml}
 				style="--row-color:{folder.color}"
 			>
 				{#if !isPathThrough}
-					<button class="check-circle" onclick={() => { if (!commitState.isHistorical) updateFolder(folder.id, { done: !folder.done }); }} aria-label={folder.done ? 'Unmark complete' : 'Mark complete'} style={commitState.isHistorical ? 'cursor: default; opacity: 0.7' : ''}>
+					<button class="check-circle" disabled={commitState.isHistorical} onclick={() => { if (!commitState.isHistorical) updateFolder(folder.id, { done: !folder.done }); }} aria-label={folder.done ? 'Unmark complete' : 'Mark complete'} style={commitState.isHistorical ? 'cursor: default; opacity: 0.7' : ''}>
 						{folder.done ? '☑' : '☐'}
 					</button>
 				{/if}
-				{#if renamingId === folder.id}
+				{#if renamingId === folder.id && !commitState.isHistorical}
 					<div class="rename-wrap">
 						<input
 							class="rename-input"
@@ -1770,6 +1811,7 @@ ${bodyHtml}
 							}
 						}}
 						aria-label={folder.favourite ? 'Unfavourite' : 'Favourite'}
+						disabled={commitState.isHistorical}
 						style={commitState.isHistorical ? 'cursor: default' : ''}
 					>★</button>
 					{#if !commitState.isHistorical}
@@ -1778,11 +1820,11 @@ ${bodyHtml}
 						{ label: '⚙ Folder settings', submenu: [
 							{ label: 'ℹ️ Info', action: () => infoTarget = { kind: 'folder', data: folder } },
 							{ label: '✏ Rename', action: () => startRename(folder.id, folder.name, 'folder', folder.color) },
-							{ label: '☑ Checkboxes', action: () => checkboxesFolder = folder },
-							{ label: folder.localNav ? '🌐 Global navigation' : '📂 Local navigation', action: () => updateFolder(folder.id, { localNav: !folder.localNav }) },
+							{ label: '☑ Checkboxes', action: () => { if (!commitState.isHistorical) checkboxesFolder = folder; } },
+							{ label: folder.localNav ? '🌐 Global navigation' : '📂 Local navigation', action: () => { if (!commitState.isHistorical) updateFolder(folder.id, { localNav: !folder.localNav }); } },
 						]},
-						{ label: '📋 Smart Folder', action: () => { sfDialogFolder = folder; sfNewName = ''; } },
-						{ label: folder.archived ? '📤 Unarchive' : '📥 Archive', action: () => folder.archived ? unarchiveFolder(folder.id) : archiveFolder(folder.id) },
+						{ label: '📋 Smart Folder', action: () => { if (!commitState.isHistorical) { sfDialogFolder = folder; sfNewName = ''; } } },
+						{ label: folder.archived ? '📤 Unarchive' : '📥 Archive', action: () => { if (!commitState.isHistorical) { folder.archived ? unarchiveFolder(folder.id) : archiveFolder(folder.id); } } },
 						{ label: '🔗 Tag as Link', action: () => writeClipboard(`[[folder:${folder.id}]]`) },
 						...(hasTag && taggedFolderId !== folder.id
 							? [{ label: '📂 Move Tagged Here', action: () => moveTaggedTo(folder.id) }]
@@ -1797,7 +1839,7 @@ ${bodyHtml}
 			</div>
 		{/snippet}
 
-		{#snippet listRow(list, i)}
+		{#snippet listRow(list: ListMeta, i: number)}
 			<div
 				id="row-{list.id}"
 				class="row list-row"
@@ -1822,10 +1864,10 @@ ${bodyHtml}
 					]} />
 					{/if}
 				{:else}
-					<button class="check-circle" onclick={() => { if (!commitState.isHistorical) updateList(list.id, { done: !list.done }); }} aria-label={list.done ? 'Unmark complete' : 'Mark complete'} style={commitState.isHistorical ? 'cursor: default; opacity: 0.7' : ''}>
+					<button class="check-circle" disabled={commitState.isHistorical} onclick={() => { if (!commitState.isHistorical) updateList(list.id, { done: !list.done }); }} aria-label={list.done ? 'Unmark complete' : 'Mark complete'} style={commitState.isHistorical ? 'cursor: default; opacity: 0.7' : ''}>
 						{list.done ? '☑' : '☐'}
 					</button>
-					{#if renamingId === list.id}
+					{#if renamingId === list.id && !commitState.isHistorical}
 						<div class="rename-wrap">
 							<input
 								class="rename-input"
@@ -1854,6 +1896,7 @@ ${bodyHtml}
 							}
 						}}
 						aria-label={list.favourite ? 'Unfavourite' : 'Favourite'}
+						disabled={commitState.isHistorical}
 						style={commitState.isHistorical ? 'cursor: default' : ''}
 					>★</button>
 					{#if !commitState.isHistorical}
@@ -1861,7 +1904,7 @@ ${bodyHtml}
 					<RowMenu items={[
 						{ label: 'ℹ️ Info', action: () => infoTarget = { kind: 'list', data: list } },
 						{ label: '✏ Rename', action: () => startRename(list.id, list.name, 'list', list.color) },
-						{ label: list.archived ? '📤 Unarchive' : '📥 Archive', action: () => list.archived ? unarchiveList(list.id) : archiveList(list.id) },
+						{ label: list.archived ? '📤 Unarchive' : '📥 Archive', action: () => { if (!commitState.isHistorical) { list.archived ? unarchiveList(list.id) : archiveList(list.id); } } },
 						{ label: '🔗 Tag as Link', action: () => writeClipboard(`[[list:${list.id}]]`) },
 						...(hasTag
 							? [{ label: '✕ Clear Tag', action: clearTag }]
@@ -1889,7 +1932,22 @@ ${bodyHtml}
 				class:cursored={activeCursorId === sheet.id}
 			>
 				<span class="sheet-icon">📊</span>
-				<button class="row-name" onclick={() => openSheetId = sheet.id}>{sheet.name}</button>
+				{#if renamingId === sheet.id && !commitState.isHistorical}
+					<div class="rename-wrap">
+						<input
+							class="rename-input"
+							aria-label="Spreadsheet name"
+							bind:value={renameValue}
+							onkeydown={(e) => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') renamingId = null; }}
+						/>
+						<div class="rename-actions">
+							<button class="rename-ok" onclick={submitRename}>✓</button>
+							<button class="rename-cancel" onclick={() => renamingId = null}>✕</button>
+						</div>
+					</div>
+				{:else}
+					<button class="row-name" onclick={() => openSheetId = sheet.id}>{sheet.name}</button>
+				{/if}
 				{#if !commitState.isHistorical}
 				<RowMenu items={[
 					{ label: 'ℹ️ Info', action: () => infoTarget = { kind: 'sheet', data: sheet } },
@@ -1906,7 +1964,7 @@ ${bodyHtml}
 
 
 		<!-- Confirm dialog -->
-		{#if confirmAction}
+		{#if confirmAction && !commitState.isHistorical}
 			<ConfirmDialog
 				message={confirmMsg}
 				onConfirm={() => { confirmAction?.(); confirmAction = null; }}
@@ -1915,7 +1973,7 @@ ${bodyHtml}
 		{/if}
 
 		<!-- Smart folder assign dialog -->
-		{#if sfDialogFolder !== null}
+		{#if sfDialogFolder !== null && !commitState.isHistorical}
 			{@const fid = sfDialogFolder.id}
 			<div class="sf-backdrop" role="dialog" aria-modal="true"
 				onclick={(e) => { if (e.target === e.currentTarget) sfDialogFolder = null; }}>
@@ -1931,9 +1989,9 @@ ${bodyHtml}
 									<button
 										class="sf-opt"
 										class:sf-opt-active={assigned}
-										onclick={() => assigned ? removeFromReport(fid, rname) : assignToReport(fid, rname)}
+										onclick={() => { if (!commitState.isHistorical) { assigned ? removeFromReport(fid, rname) : assignToReport(fid, rname); } }}
 									>{assigned ? '☑' : '☐'} {rname}</button>
-									<button class="sf-del-btn" onclick={() => deleteReport(rname)} aria-label="Delete report">🗑</button>
+									<button class="sf-del-btn" onclick={() => { if (!commitState.isHistorical) deleteReport(rname); }} aria-label="Delete report">🗑</button>
 								</div>
 							{/each}
 						</div>
@@ -1944,11 +2002,11 @@ ${bodyHtml}
 							class="sf-input"
 							bind:value={sfNewName}
 							placeholder="Report name…"
-							onkeydown={(e) => { if (e.key === 'Enter' && sfNewName.trim()) { assignToReport(fid, sfNewName.trim()); sfNewName = ''; } }}
+							onkeydown={(e) => { if (!commitState.isHistorical && e.key === 'Enter' && sfNewName.trim()) { assignToReport(fid, sfNewName.trim()); sfNewName = ''; } }}
 						/>
 						<button
 							class="sf-add-btn"
-							onclick={() => { if (sfNewName.trim()) { assignToReport(fid, sfNewName.trim()); sfNewName = ''; } }}
+							onclick={() => { if (!commitState.isHistorical && sfNewName.trim()) { assignToReport(fid, sfNewName.trim()); sfNewName = ''; } }}
 							disabled={!sfNewName.trim()}
 						>Add</button>
 					</div>
@@ -1958,7 +2016,7 @@ ${bodyHtml}
 		{/if}
 
 		<!-- Named checkboxes dialog -->
-		{#if checkboxesFolder !== null}
+		{#if checkboxesFolder !== null && !commitState.isHistorical}
 			<FolderCheckboxesDialog folder={checkboxesFolder} onClose={() => checkboxesFolder = null} />
 		{/if}
 
@@ -1991,7 +2049,7 @@ ${bodyHtml}
 		</div><!-- end .content -->
 
 		<!-- New folder form (outside .content to avoid iOS fixed-position clipping) -->
-		{#if showNewFolder}
+		{#if showNewFolder && !commitState.isHistorical}
 			<div class="modal-backdrop">
 				<div class="modal">
 					<h2>New Folder</h2>
@@ -2011,7 +2069,7 @@ ${bodyHtml}
 		{/if}
 
 		<!-- New list form (outside .content to avoid iOS fixed-position clipping) -->
-		{#if showNewList}
+		{#if showNewList && !commitState.isHistorical}
 			<div class="modal-backdrop">
 				<div class="modal">
 					<h2>New List</h2>
@@ -2076,13 +2134,13 @@ ${bodyHtml}
 	</div>
 {/if}
 
-{#if showUndoConfirm}
+{#if showUndoConfirm && !commitState.isHistorical}
 	{#if canUndo()}
 		<ConfirmDialog
 			message={`Are you sure you want to undo your last action? (${getUndoCount()} action${getUndoCount() === 1 ? '' : 's'} left)`}
 			confirmLabel="Yes, undo"
 			onConfirm={() => {
-				getUndoManager().undo();
+				if (!commitState.isHistorical) undoLastAction();
 				showUndoConfirm = false;
 			}}
 			onCancel={() => {
