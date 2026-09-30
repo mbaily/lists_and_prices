@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
-	type SWStatus = 'unsupported' | 'installing' | 'active';
+	type SWStatus = 'unsupported' | 'unregistered' | 'installing' | 'active';
 	let swStatus = $state<SWStatus>('unsupported');
 
 	onMount(() => {
@@ -10,12 +10,16 @@
 			return;
 		}
 
-		swStatus = 'installing';
+		swStatus = 'unregistered';
+		let disposed = false;
 
 		const check = async () => {
 			const reg = await navigator.serviceWorker.getRegistration();
+			if (disposed) return;
 			if (reg?.active || navigator.serviceWorker.controller) {
 				swStatus = 'active';
+			} else {
+				swStatus = reg?.installing || reg?.waiting ? 'installing' : 'unregistered';
 			}
 		};
 
@@ -23,20 +27,24 @@
 		const interval = setInterval(check, 1000);
 
 		navigator.serviceWorker.ready.then(() => {
+			if (disposed) return;
 			swStatus = 'active';
 			clearInterval(interval);
 		});
 
-		navigator.serviceWorker.addEventListener('controllerchange', () => {
-			swStatus = 'active';
-			clearInterval(interval);
-		});
+		const onControllerChange = () => { void check(); };
+		navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
 
-		return () => clearInterval(interval);
+		return () => {
+			disposed = true;
+			clearInterval(interval);
+			navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+		};
 	});
 
 	const color: Record<SWStatus, string> = {
 		unsupported: '#ef4444',
+		unregistered: '#ef4444',
 		installing: '#f97316',
 		active: '#22c55e'
 	};

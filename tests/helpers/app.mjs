@@ -36,12 +36,16 @@ export function createApp(options = {}) {
 		const module = { exports: {} };
 		cache.set(absolute, module);
 		let code = readFileSync(absolute, 'utf8');
+		if (absolute.endsWith('.json')) {
+			module.exports = JSON.parse(code);
+			return module.exports;
+		}
 		if (absolute.endsWith('.svelte.ts')) {
 			code = compileModule(transpile(code, ts.ModuleKind.ESNext), { filename: absolute, generate: 'client' }).js.code;
 		}
 		const localRequire = (specifier) => {
-			if (specifier === 'y-indexeddb') return { IndexeddbPersistence: Provider };
-			if (specifier === 'y-websocket') return { WebsocketProvider: Provider };
+			if (specifier === 'y-indexeddb') return { IndexeddbPersistence: options.IndexeddbPersistence ?? Provider };
+			if (specifier === 'y-websocket') return { WebsocketProvider: options.WebsocketProvider ?? Provider };
 			if (specifier.startsWith('.')) {
 				const target = path.resolve(path.dirname(absolute), specifier);
 				const resolved = [target, target + '.ts', target + '.js'].find(existsSync);

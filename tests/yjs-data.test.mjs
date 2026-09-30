@@ -1,7 +1,7 @@
 // @ts-nocheck -- Fixtures intentionally exercise legacy/malformed shapes too.
 import assert from 'node:assert/strict';
 import { test, afterEach } from 'node:test';
-import { createApp, Y, merge } from './helpers/app.mjs';
+import { createApp, Y, merge, Provider } from './helpers/app.mjs';
 
 const apps = [];
 function app() { const result = createApp(); apps.push(result); return result; }
@@ -19,6 +19,54 @@ function legacyNote(c, name = 'Original note') {
 	return { folder, list, item, id: 'legacy-note' };
 }
 function replicate(from, to) { Y.applyUpdate(to.doc, Y.encodeStateAsUpdate(from.doc), 'peer'); }
+
+test('network handshake waits for local restoration and stale providers cannot connect a later session', () => {
+	const idbs = [], sockets = [];
+	class Local extends Provider { constructor() { super(); idbs.push(this); } }
+	class Socket extends Provider {
+		connects = 0;
+		constructor(url, room, doc, options) { super(); this.options = options; sockets.push(this); }
+		connect() { this.connects++; }
+	}
+	const c = createApp({ IndexeddbPersistence: Local, WebsocketProvider: Socket });
+	try {
+		assert.equal(sockets[0].options.connect, false);
+		c.store.reconnectYjs();
+		assert.equal(sockets[0].connects, 0);
+		idbs[0].emit('synced');
+		assert.equal(c.store.idbSynced.done, true);
+		assert.equal(sockets[0].connects, 1);
+		c.store.initYjs('different-user', 'ws://unused');
+		idbs[0].emit('synced');
+		assert.equal(c.store.idbSynced.done, false);
+		assert.equal(sockets[1].connects, 0);
+		idbs[1].emit('synced');
+		assert.equal(sockets[1].connects, 1);
+	} finally { c.dispose(); }
+});
+
+test('a batch of restored note texts mirrors names and leaves already correct names untouched', () => {
+	const remote = new Y.Doc({ gc: false });
+	const c = app();
+	try {
+		remote.transact(() => {
+			for (let i = 0; i < 200; i++) {
+				const item = new Y.Map();
+				item.set('id', 'batch-' + i);
+				item.set('name', i % 2 ? 'Stale' : 'Text ' + i);
+				item.set('updatedAt', 'original');
+				remote.getArray('items').push([item]);
+				remote.getText('note_text_batch-' + i).insert(0, 'Text ' + i);
+			}
+		});
+		Y.applyUpdate(c.doc, Y.encodeStateAsUpdate(remote), 'persisted');
+		for (const [i, item] of c.doc.getArray('items').toArray().entries()) {
+			assert.equal(item.get('name'), 'Text ' + i);
+			assert.equal(item.get('updatedAt') === 'original', i % 2 === 0);
+		}
+		assert.equal(c.store.getUndoCount(), 0);
+	} finally { remote.destroy(); }
+});
 
 for (const mode of ['merge', 'replace']) {
 	test(`${mode} restore undo preserves a legacy note that has never been opened`, () => {

@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { registerSW } from 'virtual:pwa-register';
 	import { applyTheme, applyItemSpacing } from '$lib/settings.svelte';
 	import '../app.css';
 
 	let { children } = $props();
 
 	onMount(() => {
+		registerSW({ immediate: true });
 		applyTheme();
 		applyItemSpacing();
 		// @ts-expect-error injected by Vite
@@ -24,5 +26,4 @@
 </svelte:head>
 
 {@render children()}
-
 

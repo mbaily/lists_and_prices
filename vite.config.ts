@@ -6,7 +6,7 @@ import { VERSION as SVELTE_VERSION } from 'svelte/compiler';
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
 	define: {
 		__APP_VERSION__: JSON.stringify(pkg.version),
 		__SVELTE_VERSION__: JSON.stringify(SVELTE_VERSION),
@@ -28,10 +28,10 @@ export default defineConfig({
 	plugins: [
 		sveltekit(),
 		SvelteKitPWA({
-			// Force the registration script to be injected as a plain <script> tag.
-			// 'autoUpdate' alone can silently fail with adapter-static post-processing.
 			registerType: 'autoUpdate',
-			injectRegister: 'script',
+			// Register from the layout so SvelteKit uses the correct dev/build worker URL.
+			injectRegister: false,
+			devOptions: { enabled: true },
 			manifest: {
 				name: 'Lists & Prices',
 				short_name: 'Lists',
@@ -53,6 +53,8 @@ export default defineConfig({
 				]
 			},
 			workbox: {
+				// The offline retail/suburb catalogues make the main app chunk exceed 2 MiB.
+				maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
 				// Precache handled automatically by SvelteKitPWA plugin
 				// Force cache the root HTML so iOS can launch from homescreen offline.
 				additionalManifestEntries: [
@@ -61,7 +63,7 @@ export default defineConfig({
 				// Immediately activate new SW without waiting for old tabs to close.
 				skipWaiting: true,
 				clientsClaim: true,
-				navigateFallback: 'index.html',
+				navigateFallback: command === 'serve' ? undefined : 'index.html',
 				// Don't let the SW intercept non-GET API calls — let them go to network.
 				runtimeCaching: [
 					{
@@ -76,4 +78,4 @@ export default defineConfig({
 			}
 		})
 	]
-});
+}));

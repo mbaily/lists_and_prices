@@ -9,6 +9,9 @@ import { readFolderCheckboxes, addCheckbox, renameCheckbox, removeCheckbox, orde
 import { resolveParentLinks, compareOrder, canReparentItems, selectedRoots } from './hierarchy';
 import { readItemName, getItemText, initializeItemText, replaceItemText } from './noteText';
 import { readReportAssignments, restoreReportAssignments } from './reportAssignments';
+import { validateLocations, normalizeLocationTag, type RetailLocation } from './retailLocations';
+import { isStartingLocation, type StartingLocation } from './startingLocation';
+import { checklistFingerprint, isNearbyChecklistState, NEARBY_CHECKLIST_MEMBERSHIP_ORIGIN, type NearbyChecklistState } from './nearbyChecklist';
 
 export type { FolderCheckbox } from './folderCheckboxes';
 
@@ -1033,6 +1036,9 @@ export interface BackupFile {
 	items: Item[];
 	sheets?: SheetMeta[];
 	smartFolders?: Record<string, string[]>;
+	customLocations?: RetailLocation[];
+	startingLocation?: StartingLocation | null;
+	nearbyChecklist?: Record<string, NearbyChecklistState>;
 }
 
 /** Serialise the entire doc to a plain JS object ready to JSON.stringify. */
@@ -1044,7 +1050,10 @@ export function exportBackup(): BackupFile {
 		lists: readLists(),
 		items: readAllItems(),
 		sheets: readSheets(),
-		smartFolders: readReportAssignments(getDoc())
+		smartFolders: readReportAssignments(getDoc()),
+		customLocations: readCustomLocations(),
+		startingLocation: readStartingLocation(),
+		nearbyChecklist: readNearbyChecklist()
 	};
 }
 
@@ -1080,6 +1089,10 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 	validateRecords(backup.lists, 'lists');
 	validateRecords(backup.items, 'items');
 	validateRecords(backup.sheets ?? [], 'sheets');
+	validateLocations(backup.customLocations ?? []);
+	if (backup.startingLocation != null && !isStartingLocation(backup.startingLocation)) throw new Error('Invalid starting location.');
+	if (backup.nearbyChecklist !== undefined && (!backup.nearbyChecklist || typeof backup.nearbyChecklist !== 'object' || Array.isArray(backup.nearbyChecklist) || Object.entries(backup.nearbyChecklist).some(([id, state]) => !id || !isNearbyChecklistState(state)))) throw new Error('Invalid nearby checklist.');
+	if (backup.customLocations?.some(location => !location.id.startsWith('custom-'))) throw new Error('Custom location ids must start with custom-.');
 	if (backup.smartFolders != null && (typeof backup.smartFolders !== 'object' || Array.isArray(backup.smartFolders))) throw new Error('Invalid reports.');
 	for (const ids of Object.values(backup.smartFolders ?? {})) {
 		if (!Array.isArray(ids) || ids.some((id) => typeof id !== 'string')) throw new Error('Invalid report assignments.');
@@ -1134,7 +1147,92 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 		for (const record of backup.items) upsert(iArr, record as unknown as Record<string, unknown>, 'item');
 		for (const record of backup.sheets ?? []) upsert(sArr, record as unknown as Record<string, unknown>, 'other');
 		restoreReportAssignments(doc, backup.smartFolders ?? {}, mode === 'replace');
+		const locations = doc.getMap<RetailLocation>('custom-locations');
+		if (mode === 'replace') locations.clear();
+		for (const location of backup.customLocations ?? []) locations.set(location.id, { ...location, tags: [...location.tags] });
+		const preferences = doc.getMap('nearby-preferences');
+		if (backup.startingLocation != null) preferences.set('starting-location', { ...backup.startingLocation });
+		else if (mode === 'replace' || backup.startingLocation === null) preferences.delete('starting-location');
+		const checklist = doc.getMap<NearbyChecklistState>('nearby-checklist');
+		if (mode === 'replace') checklist.clear();
+		for (const [id, state] of Object.entries(backup.nearbyChecklist ?? {})) checklist.set(id, { ...state });
 	});
+}
+
+export function readNearbyChecklist(): Record<string, NearbyChecklistState> {
+	return Object.fromEntries([...getDoc().getMap<NearbyChecklistState>('nearby-checklist')].filter(([, state]) => isNearbyChecklistState(state)).map(([id, state]) => [id, { ...state }]));
+}
+
+/** Content, metadata, inherited tags and rich-text formatting all count as changes. */
+export function nearbyItemFingerprint(item: Item, list: ListMeta, folder: Folder | undefined): string {
+	const text = getDoc().share.get(`note_text_${item.id}`);
+	const { order: _order, ...content } = item;
+	return checklistFingerprint({ item: content, listName: list.name, done: !item.note && isItemDone(item, folder), text: text instanceof Y.Text ? text.toDelta() : item.name });
+}
+
+export function rememberNearbyChecklist(entries: { id: string; fingerprint: string }[]): void {
+	const doc = getMutableDoc();
+	const checklist = doc.getMap<NearbyChecklistState>('nearby-checklist');
+	const newEntries = entries.filter(entry => {
+		const state = checklist.get(entry.id);
+		return !state || (state.dismissed && state.fingerprint !== entry.fingerprint);
+	});
+	if (!newEntries.length) return;
+	doc.transact(() => {
+		for (const entry of newEntries) checklist.set(entry.id, { fingerprint: entry.fingerprint, dismissed: false });
+	}, NEARBY_CHECKLIST_MEMBERSHIP_ORIGIN);
+}
+
+export function dismissNearbyChecklist(entries: { id: string; fingerprint: string }[]): void {
+	const doc = getMutableDoc();
+	doc.transact(() => {
+		const checklist = doc.getMap<NearbyChecklistState>('nearby-checklist');
+		for (const entry of entries) checklist.set(entry.id, { fingerprint: entry.fingerprint, dismissed: true });
+	});
+}
+
+/** Match ListScreen's quick completion toggle, including named folder checkboxes. */
+export function setNearbyTodoDone(id: string, done: boolean): void {
+	getMutableDoc();
+	const item = readAllItems().find(item => item.id === id);
+	if (!item || item.note || item.heading) return;
+	const list = readLists().find(list => list.id === item.listId);
+	const folder = readFolders().find(folder => folder.id === list?.folderId);
+	if (list && !isItemDone(item, folder)) rememberNearbyChecklist([{ id, fingerprint: nearbyItemFingerprint(item, list, folder) }]);
+	const boxes = folder?.checkboxes ?? [];
+	if (boxes.length) setItemCheckboxState(id, boxes[boxes.length - 1].id, done);
+	else updateItem(id, { checked: done });
+}
+
+export function readCustomLocations(): RetailLocation[] {
+	return [...getDoc().getMap<RetailLocation>('custom-locations').values()].map(location => ({ ...location, tags: [...location.tags] }));
+}
+
+export function saveCustomLocation(location: RetailLocation): void {
+	validateLocations([location]);
+	if (!location.id.startsWith('custom-')) throw new Error('Custom location ids must start with custom-.');
+	getMutableDoc().getMap<RetailLocation>('custom-locations').set(location.id, {
+		...location, name: location.name.trim(), tags: [...new Set(location.tags.map(normalizeLocationTag))]
+	});
+}
+
+export function deleteCustomLocation(id: string): void {
+	getMutableDoc().getMap('custom-locations').delete(id);
+}
+
+export function readStartingLocation(): StartingLocation | null {
+	const location = getDoc().getMap('nearby-preferences').get('starting-location');
+	return isStartingLocation(location) ? location : null;
+}
+
+export function saveStartingLocation(location: StartingLocation): void {
+	if (!isStartingLocation(location)) throw new Error('Invalid starting location.');
+	// A single value keeps coordinates and metadata together when devices update concurrently.
+	getMutableDoc().getMap('nearby-preferences').set('starting-location', { ...location });
+}
+
+export function clearStartingLocation(): void {
+	getMutableDoc().getMap('nearby-preferences').delete('starting-location');
 }
 // ─── Spreadsheets ─────────────────────────────────────────────────────────────
 

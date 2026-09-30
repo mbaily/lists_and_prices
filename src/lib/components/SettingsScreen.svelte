@@ -4,8 +4,7 @@
 	import { exportBackup, importBackup, readFolders, type BackupFile } from '$lib/data';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import KeyboardSettingsScreen from './KeyboardSettingsScreen.svelte';
-	import { docState, commitState, exitCommitView } from '$lib/yjsStore.svelte';
-	import { auth } from '$lib/auth.svelte';
+	import { docState, commitState, exitCommitView, cacheState, idbSynced, compactLocalCache } from '$lib/yjsStore.svelte';
 
 	let { onBack, onLogout }: { onBack: () => void; onLogout: () => void } = $props();
 
@@ -123,13 +122,9 @@
 		pendingBackup = null;
 	}
 
-	function deleteLocalStorage() {
+	async function tidyLocalCache() {
 		if (commitState.isHistorical || !isActive) return;
-		const username = auth.username;
-		if (confirm('WARNING: This will completely delete your local database. Any unsynced offline changes will be PERMANENTLY LOST. Only do this if you are fully synced with the server and want to clear a fragmented local database. Continue?') && !commitState.isHistorical && isActive && auth.username === username) {
-			indexedDB.deleteDatabase(`pnl-${username}`);
-			location.reload();
-		}
+		try { await compactLocalCache(); } catch { /* Error is displayed through cacheState. */ }
 	}
 
 	const currencies = [
@@ -316,9 +311,12 @@
 		</section>
 
 		<section>
-			<h2>Danger Zone</h2>
-			<button class="logout-btn" disabled={commitState.isHistorical} onclick={deleteLocalStorage}>Delete Local Storage</button>
-			<p class="restore-err" style="margin-top: 0.25rem;">Don't use offline, use while able to connect to server: this wipes your local data to force a fresh sync and defragment the local storage. Use when loading the app is taking 2-3 seconds.</p>
+			<h2>Local cache</h2>
+			<p class="hint">Your local cache is tidied automatically. You can also tidy it now; offline changes and saved history are kept.</p>
+			<button disabled={commitState.isHistorical || !idbSynced.done || cacheState.compacting} onclick={tidyLocalCache}>{cacheState.compacting ? 'Tidying…' : 'Tidy local cache'}</button>
+			{#if cacheState.loadMs !== null}<p class="hint">Local data loaded in {cacheState.loadMs} ms.</p>{/if}
+			{#if cacheState.lastCompaction}<p class="hint" role="status">Cache tidied: {cacheState.lastCompaction.recordsBefore} stored updates → {cacheState.lastCompaction.recordsAfter}.</p>{/if}
+			{#if cacheState.error}<p class="restore-err" role="alert">{cacheState.error}</p>{/if}
 		</section>
 
 

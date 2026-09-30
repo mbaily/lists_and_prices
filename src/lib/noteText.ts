@@ -112,9 +112,13 @@ export function observeNoteNames(doc: Y.Doc): () => void {
 			if (key.startsWith(PREFIX) && transaction.changed.has(type)) changed.push(key.slice(PREFIX.length));
 		}
 		if (changed.length === 0) return;
+		// A persisted update can contain thousands of texts. Index items once
+		// instead of traversing the full Y.Array again for every changed note.
+		const itemsById = new Map(doc.getArray<Y.Map<unknown>>('items').toArray()
+			.map(item => [item.get('id') as string, item]));
 		doc.transact(() => {
 			for (const id of changed) {
-				const item = findItem(doc, id);
+				const item = itemsById.get(id);
 				if (!item) continue;
 				const name = readItemName(doc, item);
 				if (item.get('name') !== name) {

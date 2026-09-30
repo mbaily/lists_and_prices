@@ -49,6 +49,7 @@
 	import FolderCheckboxesDialog from './FolderCheckboxesDialog.svelte';
 	import CommitsScreen from './CommitsScreen.svelte';
 	import FavouritesOrderScreen from './FavouritesOrderScreen.svelte';
+	import NearbyErrandsScreen from './NearbyErrandsScreen.svelte';
 
 	let { onLogout }: { onLogout: () => void } = $props();
 	let showUndoConfirm = $state(false);
@@ -57,16 +58,18 @@
 	// Format: #f/id1/id2  (folder path, skipping the implicit null root)
 	//         #l/listId   (open list)
 	//         #           (root / home)
-	function buildHash(crumbs: (string | null)[], listId: string | null): string {
+	function buildHash(crumbs: (string | null)[], listId: string | null, nearby = false): string {
+		if (nearby) return '#nearby';
 		if (listId) return `#l/${listId}`;
 		// crumbs[0] is always null (root) — skip it
 		const ids = crumbs.slice(1).filter((id): id is string => id !== null);
 		return ids.length ? `#f/${ids.join('/')}` : '#';
 	}
 
-	function parseHash(): { breadcrumb: (string | null)[], openListId: string | null } {
+	function parseHash(): { breadcrumb: (string | null)[], openListId: string | null, nearby?: boolean } {
 		if (typeof window === 'undefined') return { breadcrumb: [null], openListId: null };
 		const hash = window.location.hash.slice(1); // strip '#'
+		if (hash === 'nearby') return { breadcrumb: [null], openListId: null, nearby: true };
 		if (hash.startsWith('l/')) {
 			return { breadcrumb: [null], openListId: hash.slice(2) || null };
 		}
@@ -91,6 +94,7 @@
 	let openListId = $state<string | null>(_init.openListId);
 	let openItemId = $state<string | null>(null);
 	let showSettings = $state(false);
+	let showNearby = $state(_init.nearby ?? false);
 	let showFavouritesOrder = $state(false);
 	let previousListId = $state<string | null>(null);
 	let showCommitsModal = $state(false);
@@ -110,6 +114,10 @@
 
 
 	function handleGlobalKeydown(e: KeyboardEvent) {
+		if (showNearby) {
+			if (e.key === 'Escape' && !document.querySelector('.backdrop') && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement) && !(e.target instanceof HTMLSelectElement)) { e.preventDefault(); showNearby = false; }
+			return;
+		}
 		// Do not trigger global shortcuts if the user is typing in an input
 		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || (e.target instanceof HTMLElement && e.target.isContentEditable)) return;
 		
@@ -1280,7 +1288,7 @@ ${bodyHtml}
 	// Use pushState so the browser back button works between navigations.
 	let _lastHash = typeof window !== 'undefined' ? window.location.hash : '';
 	$effect(() => {
-		const hash = buildHash(breadcrumb, openListId);
+		const hash = buildHash(breadcrumb, openListId, showNearby);
 		if (hash !== _lastHash) {
 			history.pushState(null, '', hash || '#');
 			_lastHash = hash;
@@ -1291,7 +1299,8 @@ ${bodyHtml}
 	$effect(() => {
 		if (typeof window === 'undefined') return;
 		function onPopState() {
-			const { breadcrumb: crumbs, openListId: listId } = parseHash();
+			const { breadcrumb: crumbs, openListId: listId, nearby } = parseHash();
+			showNearby = nearby ?? false;
 			breadcrumb = crumbs;
 			openListId = listId;
 			_lastHash = window.location.hash;
@@ -1353,7 +1362,9 @@ ${bodyHtml}
 
 <svelte:window onkeydown={handleGlobalKeydown} />
 
-{#if openSheetId}
+{#if showNearby}
+	<NearbyErrandsScreen onBack={() => showNearby = false} onOpenItem={(listId, itemId) => { showNearby = false; openListId = listId; openItemId = itemId; }} />
+{:else if openSheetId}
 	<SpreadsheetScreen sheetId={openSheetId} onBack={() => openSheetId = null} />
 {:else if openListId}
 	<ListScreen listId={openListId} highlightItemId={openItemId} orderedLists={navOrderedLists} onHome={() => { openListId = null; openItemId = null; breadcrumb = [null]; }} onOpenList={(id) => (openListId = id)} onOpenFavouritesOrder={() => { if (commitState.isHistorical) return; previousListId = openListId; openListId = null; showFavouritesOrder = true; }} savedSearch={savedSearch} onRestoreSearch={() => { openListId = null; openItemId = null; breadcrumb = [null]; restoreSearch(); }} onTagClick={(tag) => { openListId = null; openItemId = null; breadcrumb = [null]; activeTagFilter = null; showSearch = true; searchQuery = '#' + tag; savedSearch = '#' + tag; tick().then(() => searchInputEl?.focus()); }} onNavigateTo={(folderId) => {
@@ -1456,6 +1467,7 @@ ${bodyHtml}
 			<!-- {#if !isInArchiveView && currentFolderId !== ARCHIVE_ID} -->
 
 			<div class="header-actions">
+				<button class="icon-btn" onclick={() => { showReportsMenu = false; showNearby = true; }} aria-label="Nearby errands" title="Nearby errands">📍</button>
 				{#if currentFolderId === null && hasArchived}
 					<button class="icon-btn" onclick={() => (breadcrumb = [...breadcrumb, ARCHIVE_ID])} aria-label="Archived">
 						📦

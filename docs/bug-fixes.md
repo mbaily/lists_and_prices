@@ -13,6 +13,22 @@
 - New items append after the maximum sibling order rather than the sibling count.
 - Independent report memberships and checkbox definition changes use separate CRDT keys rather than replacing entire arrays.
 - Svelte type errors, obsolete spreadsheet drag handling, Quill SSR loading, and pre-effect initialization-order crashes are fixed.
+- Local startup indexes items once when restoring note names, avoiding a full item-list scan for every note. The WebSocket handshake waits for IndexedDB restoration.
+- The local Yjs update log compacts automatically after loading and once a minute while edits arrive. Compaction merges persisted updates in an atomic IndexedDB transaction, retaining offline changes, other tabs' writes, missing-dependency updates and historical structs. Settings offers **Tidy local cache** and displays load time; the destructive reset has been removed.
+
+### Local cache verification (2026-09-30)
+
+A disposable Chrome profile with 10,000 synthetic notes and 30 duplicate saved
+updates loaded in 3,531 ms with the previous note observer, 1,568 ms with the
+indexed observer, and 372 ms after compaction. The log shrank from 35,111,496 bytes
+across 33 records to 1,170,383 bytes in one record. An offline edit survived reload.
+These are synthetic measurements, not timings from a user's database.
+
+Compaction removes duplicate storage and update replay overhead. It deliberately
+retains CRDT history needed by old snapshots and offline peers, so growth of the
+actual document/history is separate from redundant IndexedDB records. The first
+load of an existing bloated cache still reads that cache; subsequent loads use
+the compacted log. Transaction failures leave the original updates intact.
 
 ## Deploying
 

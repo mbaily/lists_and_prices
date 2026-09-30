@@ -8,6 +8,8 @@ import { IndexeddbPersistence } from 'y-indexeddb';
 import { WebsocketProvider } from 'y-websocket';
 import { observeNoteNames } from './noteText';
 import { encodeCommitState } from './commitSnapshot';
+import { NEARBY_CHECKLIST_MEMBERSHIP_ORIGIN } from './nearbyChecklist';
+import { compactCache, maintainCache, type CacheCompaction } from './localCache';
 
 export type ItemType = 'plain' | 'priced';
 export type SyncStatus = 'offline' | 'connecting' | 'synced';
@@ -25,6 +27,11 @@ let _idbProvider: IndexeddbPersistence | null = null;
 let _historicalDoc: Y.Doc | null = null;
 let _undoManager: Y.UndoManager | null = null;
 let _stopNoteNames: (() => void) | null = null;
+let _stopCacheMaintenance: (() => void) | null = null;
+let _compaction: Promise<CacheCompaction> | null = null;
+export const cacheState = $state<{ loadMs: number | null; compacting: boolean; lastCompaction: CacheCompaction | null; error: string | null }>({
+	loadMs: null, compacting: false, lastCompaction: null, error: null
+});
 const COMMIT_ORIGIN = Symbol('commit-management');
 
 export const syncState = $state<{ status: SyncStatus }>({ status: 'offline' });
@@ -49,7 +56,7 @@ export function initYjs(username: string, wsUrl: string) {
 	// tracked, nor are remote updates applied with a null origin.
 	_undoManager = new Y.UndoManager(doc, {
 		captureTimeout: 0,
-		captureTransaction: (transaction) => transaction.local && transaction.changed.size > 0
+		captureTransaction: (transaction) => transaction.local && transaction.changed.size > 0 && transaction.origin !== NEARBY_CHECKLIST_MEMBERSHIP_ORIGIN
 	});
 	_stopNoteNames = observeNoteNames(doc);
 
@@ -60,13 +67,20 @@ export function initYjs(username: string, wsUrl: string) {
 		if (_doc !== doc) return;
 		const tIdbEnd = performance.now();
 		console.log(`[Perf] IndexedDB synced in ${Math.round(tIdbEnd - tIdbStart)}ms`);
+		cacheState.loadMs = Math.round(tIdbEnd - tIdbStart);
 		idbSynced.done = true;
 		docState.version++;
+		_stopCacheMaintenance = maintainCache(doc, compactLocalCache, error => {
+			if (_doc === doc) console.warn('Local cache compaction failed; stored data retained.', error);
+		});
+		_wsProvider?.connect();
 	});
 
 	const tWsStart = performance.now();
 	_wsProvider = new WebsocketProvider(wsUrl, `pnl-${username}`, doc, {
-		connect: true
+		// Load offline state first, so the initial handshake requests only missing
+		// data and a server snapshot cannot race the IndexedDB startup snapshot.
+		connect: false
 	});
 
 	syncState.status = 'connecting';
@@ -131,6 +145,13 @@ export function undoLastAction(): boolean {
 }
 
 export function destroyYjs() {
+	_stopCacheMaintenance?.();
+	_stopCacheMaintenance = null;
+	_compaction = null;
+	cacheState.loadMs = null;
+	cacheState.compacting = false;
+	cacheState.lastCompaction = null;
+	cacheState.error = null;
 	_stopNoteNames?.();
 	_stopNoteNames = null;
 	_undoManager?.destroy();
@@ -153,8 +174,32 @@ export function destroyYjs() {
 export function reconnectYjs() {
 	// Force the WebSocket provider to reconnect. Useful for iOS Safari when
 	// returning from background/offline where the connection drops.
+	if (!idbSynced.done) return;
 	_wsProvider?.disconnect();
 	_wsProvider?.connect();
+}
+
+/** Safe online or offline; never deletes the database or downloads replacements. */
+export function compactLocalCache(): Promise<CacheCompaction> {
+	if (_compaction) return _compaction;
+	const doc = _doc;
+	const db = _idbProvider?.db;
+	if (!doc || !db || !idbSynced.done) return Promise.reject(new Error('Local data is still loading.'));
+	cacheState.compacting = true;
+	cacheState.error = null;
+	_compaction = compactCache(db).then(result => {
+		if (_doc === doc) {
+			cacheState.lastCompaction = result;
+			console.log(`[Perf] Local cache: ${result.recordsBefore} → ${result.recordsAfter} records, ${result.bytesBefore} → ${result.bytesAfter} bytes in ${Math.round(result.durationMs)}ms`);
+		}
+		return result;
+	}).catch(error => {
+		if (_doc === doc) cacheState.error = error instanceof Error ? error.message : 'Could not compact local cache.';
+		throw error;
+	}).finally(() => {
+		if (_doc === doc) { cacheState.compacting = false; _compaction = null; }
+	});
+	return _compaction;
 }
 
 // ─── Commits / Snapshots ────────────────────────────────────────────────────────
