@@ -13,3 +13,4 @@ Recommended for personal todos and quick notes on the go for across desktop or l
 
 See [bug-fix and upgrade notes](docs/bug-fixes.md) before deploying the authentication and shared-data changes.
 
+See [safe deployment instructions](docs/deployment.md) for backups, dry runs and rollback.
