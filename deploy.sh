@@ -25,7 +25,7 @@ BACKUP_ROOT=$(realpath -m -- "$BACKUP_ROOT")
 }
 # Lock held by this shell; closed automatically on exit. Use a protected directory
 # so another user cannot redirect the lock through a symlink.
-sudo -v
+sudo -n true 2>/dev/null || sudo -v
 sudo install -d -m 700 "$BACKUP_ROOT"
 sudo touch "$BACKUP_ROOT/deploy.lock"
 # Keep flock running until this shell closes its pipe on exit.
