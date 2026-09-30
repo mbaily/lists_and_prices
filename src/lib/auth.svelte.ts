@@ -63,19 +63,20 @@ export async function checkSession(): Promise<boolean> {
 		return auth.username !== null;
 	}
 
-	if (res.ok) {
-		const body = await res.json();
-		if (typeof body.username === 'string' && body.username) {
-			auth.username = body.username;
-			localStorage.setItem(AUTH_KEY, body.username);
-			return true;
+	// Only an explicit authentication rejection should discard offline access.
+	// Gateway/server errors and malformed responses do not prove session expiry.
+	if (res.status !== 401 && res.status !== 403) {
+		if (res.ok) {
+			try {
+				const body = await res.json();
+				if (typeof body.username === 'string' && body.username) {
+					auth.username = body.username;
+					localStorage.setItem(AUTH_KEY, body.username);
+					return true;
+				}
+			} catch { /* Keep cached access when the response is unavailable. */ }
 		}
-	}
-
-	// Non-ok response while we believe we're online — treat as genuine auth failure.
-	// But if we have no network indicator and a saved username, keep the user logged in.
-	if (auth.username !== null && typeof navigator !== 'undefined' && !navigator.onLine) {
-		return true;
+		return auth.username !== null;
 	}
 
 	auth.username = null;

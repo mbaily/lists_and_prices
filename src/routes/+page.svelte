@@ -2,6 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { auth, checkSession, logout } from '$lib/auth.svelte';
 	import { initYjs, destroyYjs, reconnectYjs } from '$lib/yjsStore.svelte';
+	import { reconcileSessionDocument } from '$lib/sessionDocument';
 	import { reloadSettings } from '$lib/settings.svelte';
 	import LoginScreen from '$lib/components/LoginScreen.svelte';
 	import HomeScreen from '$lib/components/HomeScreen.svelte';
@@ -14,6 +15,7 @@
 	}
 
 	onMount(() => {
+		const loadedUsername = auth.username;
 		// Optimistically load the app from local storage immediately so there's no delay
 		if (auth.username) {
 			reloadSettings();
@@ -22,17 +24,9 @@
 		}
 
 		checkSession().then((ok) => {
-			if (!ready) {
-				// We didn't optimistically load, so handle the login based on checkSession
-				if (ok && auth.username) {
-					reloadSettings();
-					initYjs(auth.username, getWsUrl());
-				}
-				ready = true;
-			} else if (!ok) {
-				// We optimistically loaded, but the session is actually invalid
-				destroyYjs();
-			}
+			const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+			reconcileSessionDocument(loadedUsername, ok, `${wsProto}//${location.host}/yjs`);
+			ready = true;
 		});
 
 		// When the device comes back online (e.g. iPhone rejoins Wi-Fi after being
@@ -69,7 +63,9 @@
 		}}
 	/>
 {:else}
-	<HomeScreen onLogout={handleLogout} />
+	{#key auth.username}
+		<HomeScreen onLogout={handleLogout} />
+	{/key}
 {/if}
 
 <style>

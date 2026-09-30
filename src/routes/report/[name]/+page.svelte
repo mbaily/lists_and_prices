@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { auth, checkSession } from '$lib/auth.svelte';
 	import { initYjs, destroyYjs } from '$lib/yjsStore.svelte';
+	import { reconcileSessionDocument } from '$lib/sessionDocument';
 	import { reloadSettings } from '$lib/settings.svelte';
 	import SmartFolderReportScreen from '$lib/components/SmartFolderReportScreen.svelte';
 
@@ -12,6 +13,7 @@
 	let authed = $state(false);
 
 	onMount(() => {
+		const loadedUsername = auth.username;
 		if (auth.username) {
 			reloadSettings();
 			const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -21,18 +23,10 @@
 		}
 
 		checkSession().then((ok) => {
-			if (!ready) {
-				if (ok && auth.username) {
-					reloadSettings();
-					const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-					initYjs(auth.username, `${wsProto}//${location.host}/yjs`);
-					authed = true;
-				}
-				ready = true;
-			} else if (!ok) {
-				authed = false;
-				destroyYjs();
-			}
+			const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+			const signedIn = reconcileSessionDocument(loadedUsername, ok, `${wsProto}//${location.host}/yjs`);
+			authed = signedIn;
+			ready = true;
 		});
 	});
 
@@ -53,7 +47,9 @@
 {:else if !authed}
 	<div class="splash">Not signed in — please open the app and sign in first.</div>
 {:else}
+	{#key auth.username}
 	<SmartFolderReportScreen {reportName} onBack={() => window.close()} />
+	{/key}
 {/if}
 
 <style>
