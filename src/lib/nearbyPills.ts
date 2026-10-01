@@ -1,7 +1,7 @@
 import type { Errand, NearbyStop } from './nearbyErrands';
 import { locationOptionalTag } from './nearbyErrands';
 import { matchingLocationTags } from './retailLocations';
-import { errandPreview, groupErrandsByList } from './errandGroups';
+import { errandPreview, errandGroupId, groupErrands } from './errandGroups';
 
 /** One pill per task, labelled with its first matching tag at the nearest stop. */
 export function nearbyTaskPills(stops: readonly NearbyStop[], errands: readonly Errand[] = []): { errand: Errand; name: string; tag: string }[] {
@@ -24,19 +24,21 @@ export function nearbyTaskPills(stops: readonly NearbyStop[], errands: readonly 
     return [...pills.values()];
 }
 
-/** A nearby list is one errand, with a preview of its active todos and notes. */
+/** Inherited tags share a pill; explicitly tagged tasks each have their own. */
 export function nearbyListPills(stops: readonly NearbyStop[], errands: readonly Errand[], limit: number) {
     const matches = nearbyTaskPills(stops, errands);
-    const tagsByList = new Map<string, Set<string>>();
+    const tagsByGroup = new Map<string, Set<string>>();
     for (const match of matches) {
-        if (!tagsByList.has(match.errand.list.id)) tagsByList.set(match.errand.list.id, new Set());
-        tagsByList.get(match.errand.list.id)!.add(match.tag);
+        const id = errandGroupId(match.errand);
+        if (!tagsByGroup.has(id)) tagsByGroup.set(id, new Set());
+        tagsByGroup.get(id)!.add(match.tag);
     }
-    return groupErrandsByList(errands.filter(errand => tagsByList.has(errand.list.id)).map(errand => ({ errand })))
+    return groupErrands(errands.filter(errand => tagsByGroup.has(errandGroupId(errand))).map(errand => ({ errand })))
         .map(group => ({
+            id: group.id,
             list: group.list,
             errands: group.rows.map(row => row.errand),
             name: errandPreview(group.rows.map(row => row.errand), limit),
-            tags: [...tagsByList.get(group.list.id)!]
+            tags: [...tagsByGroup.get(group.id)!]
         }));
 }

@@ -4,7 +4,7 @@
     import suburbCatalogue from '$lib/locations/melbourne-suburbs.json';
     import { suburbLocations } from '$lib/suburbLocations';
     import { nearbyTaskPills, nearbyListPills } from '$lib/nearbyPills';
-    import { groupErrandsByList, errandPreview } from '$lib/errandGroups';
+    import { groupErrands, errandPreview } from '$lib/errandGroups';
     import { docState, commitState } from '$lib/yjsStore.svelte';
     import { readFolders, readLists, readAllItems, readCustomLocations, saveCustomLocation, deleteCustomLocation, readStartingLocation, saveStartingLocation, readHotSuburbIds, saveHotSuburbIds, readNearbyPreviewLimit, saveNearbyPreviewLimit, isItemDone, readNearbyChecklist, nearbyItemFingerprint, rememberNearbyChecklist, dismissNearbyChecklist, setNearbyTodoDone, readPausedErrandTags, setErrandTagPaused, readPausedErrandItemIds, setErrandItemPaused } from '$lib/data';
     import { collectErrands, nearbyStops, suggestStops, isErrandPaused, isLocationOptionalErrand, locationOptionalTag, LOCATION_OPTIONAL_TAGS, type NearbyStop } from '$lib/nearbyErrands';
@@ -101,9 +101,9 @@
     const supportedErrands = $derived(errands.filter(errand => locations.some(location => matchingLocationTags(errand.tags, location).length > 0)));
     const supportedIds = $derived(new Set(supportedErrands.map(errand => errand.item.id)));
     const checklist = $derived(candidates.filter(row => !row.hidden && !row.paused && (row.done ? !!row.state : supportedIds.has(row.errand.item.id) || isLocationOptionalErrand(row.errand) || !!row.state)).sort((a, b) => Number(nearbyIds.has(b.errand.item.id)) - Number(nearbyIds.has(a.errand.item.id))));
-    const checklistGroups = $derived(groupErrandsByList(checklist));
+    const checklistGroups = $derived(groupErrands(checklist));
     const pausedErrands = $derived(candidates.filter(row => !row.done && !row.hidden && row.paused));
-    const pausedGroups = $derived(groupErrandsByList(pausedErrands));
+    const pausedGroups = $derived(groupErrands(pausedErrands));
     function pauseTag(tag: string, paused: boolean) {
         if (!commitState.isHistorical) setErrandTagPaused(tag, paused);
     }
@@ -117,7 +117,7 @@
     const locationIds = $derived(new Set(stops.flatMap(stop => stop.errands.map(errand => errand.item.id))));
     const locationErrands = $derived(errands.filter(errand => !isLocationOptionalErrand(errand) || locationIds.has(errand.item.id)));
     const plan = $derived(suggestStops(stops, locationErrands));
-    const locationGroups = $derived(groupErrandsByList(locationErrands.map(errand => ({ errand }))));
+    const locationGroups = $derived(groupErrands(locationErrands.map(errand => ({ errand }))));
     const coveredCount = $derived(locationGroups.filter(group => group.rows.every(row => locationIds.has(row.errand.item.id))).length);
 
     $effect(() => {
@@ -207,8 +207,8 @@
 {#snippet stopCard(stop: NearbyStop)}
                 <article class="stop">
                     <div class="stop-heading"><div><h2>{stop.location.name}</h2><p>{distanceLabel(stop.distanceKm)} away{stop.location.address ? ' · ' + stop.location.address : ''}</p>{#if stop.location.coordinateAccuracy === 'shopping-centre'}<HelpText label="Help with shopping centre coordinates"><p>Distance and directions use the shopping centre location.</p></HelpText>{:else if stop.location.coordinateAccuracy === 'suburb'}<HelpText label="Help with approximate suburb coordinates"><p>Approximate suburb location. Check the destination before travelling.</p></HelpText>{/if}</div><a href={directions(stop.location)} target="_blank" rel="noopener noreferrer">Directions ↗</a></div>
-                    <p class="match-count">{groupErrandsByList(stop.errands.map(errand => ({ errand }))).length} errands · {stop.errands.length} tasks</p>
-                    <ul class="errand-groups">{#each groupErrandsByList(stop.errands.map(errand => ({ errand }))) as group (group.list.id)}
+                    <p class="match-count">{groupErrands(stop.errands.map(errand => ({ errand }))).length} errands · {stop.errands.length} tasks</p>
+                    <ul class="errand-groups">{#each groupErrands(stop.errands.map(errand => ({ errand }))) as group (group.id)}
                         <li><details class="errand-group"><summary><strong>{group.list.name}</strong><span>{errandPreview(group.rows.map(row => row.errand), previewLimit)}</span></summary>
                             <ul>{#each group.rows as row (row.errand.item.id)}<li><button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span></button></li>{/each}</ul>
                         </details></li>
@@ -231,7 +231,7 @@
         <section class="nearby-strip" aria-labelledby="nearby-strip-heading">
             <h2 id="nearby-strip-heading"><button class="nearby-heading" title="Go to matched tasks" onclick={scrollToMatchedTasks}>Nearby</button></h2>
             <select class="preview-limit" aria-label="Items per pill" title="Items per pill" value={previewLimit} onchange={setPreviewLimit} disabled={commitState.isHistorical}>{#each [1, 2, 3, 4, 5, 6, 7, 8, 9] as count}<option value={count}>{count}</option>{/each}</select>
-            {#each nearbyPills as pill (pill.list.id)}
+            {#each nearbyPills as pill (pill.id)}
                 <button class="nearby-pill" title={`${pill.list.name}: ${pill.name} ${pill.tags.map(tag => '#' + tag).join(' ')}`}
                     onclick={() => onOpenItem(pill.list.id, pill.errands[0].item.id)}>
                     <span class="nearby-pill-name">{pill.name}</span><span class="nearby-pill-tag">{pill.tags.map(tag => '#' + tag).join(' ')}</span>
@@ -300,7 +300,7 @@
                     <summary>Paused errands ({pausedGroups.length})</summary>
                     <HelpText label="Help with paused errands"><p class="hint">Resume individual errands below. Hashtag pauses apply to all tasks using that tag. Original tasks stay unchanged, and pauses sync across devices.</p></HelpText>
                     <div class="pause-actions">{#each pausedTags as tag (tag)}<button disabled={commitState.isHistorical} onclick={() => pauseTag(tag, false)}>Resume all #{tag} errands</button>{/each}</div>
-                    <ul class="errand-groups">{#each pausedGroups as group (group.list.id)}
+                    <ul class="errand-groups">{#each pausedGroups as group (group.id)}
                         <li><details class="errand-group"><summary><strong>{group.list.name}</strong><span>{errandPreview(group.rows.map(row => row.errand), previewLimit)}</span></summary>
                             <ul>{#each group.rows as row (row.errand.item.id)}<li class="checklist-row"><button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}</small>{#if isErrandPaused(row.errand, pausedTags)}<small>Paused by hashtag: {row.errand.tags.map(normalizeLocationTag).filter(tag => pausedTags.includes(tag)).map(tag => '#' + tag).join(', ')}</small>{/if}</button>{#if row.itemPaused}<button class="resume-task" disabled={commitState.isHistorical} onclick={() => pauseItem(row.errand.item.id, false)} aria-label={`Resume ${row.errand.item.name}`} title="Resume this errand"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l14-8z" /></svg></button>{/if}</li>{/each}</ul>
                         </details></li>
@@ -309,8 +309,8 @@
             {/if}
             <section class="task-checklist" bind:this={matchedTasksSection} aria-labelledby="matched-tasks-heading">
                 <div class="checklist-heading"><h2 id="matched-tasks-heading">Matched tasks ({checklistGroups.length})</h2>{#if completedChecklist.length}<button disabled={commitState.isHistorical} onclick={clearCompletedTasks}>Clear completed</button>{/if}</div>
-                <HelpText label="Help with matched tasks"><p class="hint">Ticks update the original todos. Completed tasks stay until cleared. Dismissed notes and unchecked tasks return when edited; checked todos stay completed. Expand an errand to manage its individual tasks. The count is the number of parent lists. This checklist syncs across devices. Use #bank for banking or #errand for general errands with no set location.</p></HelpText>
-                <ul class="errand-groups">{#each checklistGroups as group (group.list.id)}
+                <HelpText label="Help with matched tasks"><p class="hint">Ticks update the original todos. Completed tasks stay until cleared. Dismissed notes and unchecked tasks return when edited; checked todos stay completed. Expand an errand to manage its individual tasks. Tasks using inherited hashtags share an errand; tasks with their own hashtags stay separate. The count is the number of errands. This checklist syncs across devices. Use #bank for banking or #errand for general errands with no set location.</p></HelpText>
+                <ul class="errand-groups">{#each checklistGroups as group (group.id)}
                     <li><details class="errand-group"><summary><strong>{group.list.name}</strong><span>{errandPreview(group.rows.map(row => row.errand), previewLimit)}</span></summary>
                         <ul>{#each group.rows as row (row.errand.item.id)}
                             <li class="checklist-row" class:completed={row.done}>
@@ -330,13 +330,13 @@
                 <section class="suggestions" aria-labelledby="suggested-stops-heading">
                     <h2 id="suggested-stops-heading">Suggested stops</h2>
                     <p class="coverage" aria-live="polite">{coveredCount} of {locationGroups.length} errand{locationGroups.length === 1 ? '' : 's'} fully covered by {plan.suggested.length} stop{plan.suggested.length === 1 ? '' : 's'} within {radius} km.</p>
-                    <HelpText label="Help with suggested stops"><p class="hint">A short set of shops covering all nearby matches, shown nearest first. Tasks are grouped by their parent list. An errand is fully covered when every active task has a nearby match. Distances are straight-line distances.</p></HelpText>
+                    <HelpText label="Help with suggested stops"><p class="hint">A short set of shops covering all nearby matches, shown nearest first. Tasks using inherited hashtags are grouped by their parent list; tasks with their own hashtags stay separate. An errand is fully covered when every active task has a nearby match. Distances are straight-line distances.</p></HelpText>
                     {#if errands.length === 0}<p class="empty">{pausedErrands.length ? 'Your remaining errands are paused.' : 'Add location hashtags to an unchecked todo, note or list name to find places to go.'}</p>{/if}
                     {#each plan.suggested as stop (stop.location.id)}{@render stopCard(stop)}{/each}
                     {#if plan.unavailable.length}
                         <div class="unavailable">
-                            <h3>Items without a nearby match ({groupErrandsByList(plan.unavailable.map(errand => ({ errand }))).length})</h3>
-                            <ul class="errand-groups">{#each groupErrandsByList(plan.unavailable.map(errand => ({ errand }))) as group (group.list.id)}
+                            <h3>Items without a nearby match ({groupErrands(plan.unavailable.map(errand => ({ errand }))).length})</h3>
+                            <ul class="errand-groups">{#each groupErrands(plan.unavailable.map(errand => ({ errand }))) as group (group.id)}
                                 <li><details class="errand-group"><summary><strong>{group.list.name}</strong><span>{errandPreview(group.rows.map(row => row.errand), previewLimit)}</span></summary>
                                     <ul>{#each group.rows as { errand } (errand.item.id)}<li>
                                 <button class="errand" onclick={() => onOpenItem(errand.list.id, errand.item.id)}><span>{errand.item.name}</span><small>{errand.list.name}{errand.item.note ? ' · Note' : ''}</small><small>{supportedIds.has(errand.item.id) ? `No match within ${radius} km. Try a larger radius.` : 'No matching location in the database. Add a place in Locations.'}</small></button>

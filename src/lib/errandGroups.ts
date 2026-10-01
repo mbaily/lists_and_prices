@@ -1,13 +1,20 @@
 import type { Errand } from './nearbyErrands';
 import type { ListMeta } from './data';
+import { extractTags } from './tags';
 
-export function groupErrandsByList<T extends { errand: Errand }>(rows: readonly T[]): { list: ListMeta; rows: T[] }[] {
-    const groups = new Map<string, { list: ListMeta; rows: T[] }>();
+/** Only tasks using inherited tags share their parent list's errand. */
+export function errandGroupId(errand: Errand): string {
+    return extractTags(errand.item.name).length ? `item:${errand.item.id}` : `list:${errand.list.id}`;
+}
+
+export function groupErrands<T extends { errand: Errand }>(rows: readonly T[]): { id: string; list: ListMeta; rows: T[] }[] {
+    const groups = new Map<string, { id: string; list: ListMeta; rows: T[] }>();
     for (const row of rows) {
-        let group = groups.get(row.errand.list.id);
+        const id = errandGroupId(row.errand);
+        let group = groups.get(id);
         if (!group) {
-            group = { list: row.errand.list, rows: [] };
-            groups.set(group.list.id, group);
+            group = { id, list: row.errand.list, rows: [] };
+            groups.set(id, group);
         }
         group.rows.push(row);
     }
