@@ -29,11 +29,21 @@ Select a hashtag button to browse its matching locations, addresses and directio
 in a scrollable panel. Selecting another hashtag replaces the list; × closes it.
 
 **Matched tasks**, above the radius selector, is a persistent checklist of items
-with a location match in the database, plus previously seen tasks still active.
+with a location match in the database, `#bank` errands, plus previously seen tasks still active.
 Todos have checkboxes linked to their original completion state; notes are plain
 listings. With named folder checkboxes, the nearby checkbox controls the last
 completion checkbox and preserves the other checks. Each item appears once.
 Tasks outside the selected radius remain listed with an explanation.
+
+Use `Withdraw cash #bank` or name a list `Banking #bank` for bank and ATM
+reminders. These appear without a saved location or starting point, labelled
+**Choose a bank or ATM yourself**. Tick, dismiss, pause and resume them like other
+errands. They do not count as missing nearby matches or toward location coverage
+unless a saved matching location is inside the radius. You can optionally save a
+favourite bank with the `bank` tag. `#bank` is always available in the hashtag browser;
+no bank or ATM catalogue is required.
+Bank errands also appear as `#bank` pills in **Nearby**, and sort with nearby
+matches at the top of **Matched tasks**, even without a saved bank or ATM location.
 
 Use the **pause icon** immediately left of a task’s dismiss × to defer occasional
 errands. Its tooltip names the tag being paused (for example #ikea). Any task with a paused effective tag disappears from the checklist,

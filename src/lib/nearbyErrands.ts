@@ -6,6 +6,11 @@ export interface Errand { item: Item; list: ListMeta; tags: string[] }
 export interface NearbyStop { location: RetailLocation; distanceKm: number; errands: Errand[] }
 export interface SuggestedStops { suggested: NearbyStop[]; alternatives: NearbyStop[]; unavailable: Errand[] }
 
+/** Bank errands remain useful reminders without a saved bank or ATM location. */
+export function isLocationOptionalErrand(errand: Errand): boolean {
+    return errand.tags.some(tag => normalizeLocationTag(tag) === 'bank');
+}
+
 /** Pausing any of an item's effective tags defers the entire errand. */
 export function isErrandPaused(errand: Errand, pausedTags: readonly string[]): boolean {
     const paused = new Set(pausedTags.map(normalizeLocationTag));

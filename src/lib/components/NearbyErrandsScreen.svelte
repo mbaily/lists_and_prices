@@ -6,7 +6,7 @@
     import { nearbyTaskPills } from '$lib/nearbyPills';
     import { docState, commitState } from '$lib/yjsStore.svelte';
     import { readFolders, readLists, readAllItems, readCustomLocations, saveCustomLocation, deleteCustomLocation, readStartingLocation, saveStartingLocation, clearStartingLocation, isItemDone, readNearbyChecklist, nearbyItemFingerprint, rememberNearbyChecklist, dismissNearbyChecklist, setNearbyTodoDone, readPausedErrandTags, setErrandTagPaused } from '$lib/data';
-    import { collectErrands, nearbyStops, suggestStops, isErrandPaused, type NearbyStop } from '$lib/nearbyErrands';
+    import { collectErrands, nearbyStops, suggestStops, isErrandPaused, isLocationOptionalErrand, type NearbyStop } from '$lib/nearbyErrands';
     import { availableLocationTags, matchingLocationTags, validCoordinates, normalizeLocationTag, type Coordinates, type RetailLocation } from '$lib/retailLocations';
     import ConfirmDialog from './ConfirmDialog.svelte';
     import SuburbPicker from './SuburbPicker.svelte';
@@ -44,7 +44,11 @@
 
     const customLocations = $derived.by(() => { void docState.version; return readCustomLocations(); });
     const locations = $derived([...catalogue.locations, ...suburbLocations, ...customLocations] as RetailLocation[]);
-    const availableTags = $derived(availableLocationTags(locations));
+    const availableTags = $derived.by(() => {
+        const tags = availableLocationTags(locations);
+        if (!tags.some(entry => entry.tag === 'bank')) tags.push({ tag: 'bank', count: 0 });
+        return tags.sort((a, b) => a.tag.localeCompare(b.tag));
+    });
     let tagQuery = $state('');
     let showAllTags = $state(false);
     let selectedTag = $state<string | null>(null);
@@ -82,7 +86,7 @@
     const errands = $derived(candidates.filter(row => !row.done && !row.hidden && !row.paused).map(row => row.errand));
     const supportedErrands = $derived(errands.filter(errand => locations.some(location => matchingLocationTags(errand.tags, location).length > 0)));
     const supportedIds = $derived(new Set(supportedErrands.map(errand => errand.item.id)));
-    const checklist = $derived(candidates.filter(row => !row.hidden && !row.paused && (row.done ? !!row.state : supportedIds.has(row.errand.item.id) || !!row.state)).sort((a, b) => Number(nearbyIds.has(b.errand.item.id)) - Number(nearbyIds.has(a.errand.item.id))));
+    const checklist = $derived(candidates.filter(row => !row.hidden && !row.paused && (row.done ? !!row.state : supportedIds.has(row.errand.item.id) || isLocationOptionalErrand(row.errand) || !!row.state)).sort((a, b) => Number(nearbyIds.has(b.errand.item.id)) - Number(nearbyIds.has(a.errand.item.id))));
     const pausedErrands = $derived(candidates.filter(row => !row.done && !row.hidden && row.paused));
     function pauseTag(tag: string, paused: boolean) {
         if (!commitState.isHistorical) setErrandTagPaused(tag, paused);
@@ -93,10 +97,12 @@
     }
     const completedChecklist = $derived(checklist.filter(row => row.done));
     const stops = $derived(origin ? nearbyStops(locations, origin, radius, errands) : []);
-    const nearbyPills = $derived(nearbyTaskPills(stops));
-    const plan = $derived(suggestStops(stops, errands));
-    const coveredCount = $derived(errands.length - plan.unavailable.length);
-    const nearbyIds = $derived(new Set(stops.flatMap(stop => stop.errands.map(errand => errand.item.id))));
+    const nearbyPills = $derived(nearbyTaskPills(stops, errands));
+    const nearbyIds = $derived(new Set(nearbyPills.map(pill => pill.errand.item.id)));
+    const locationIds = $derived(new Set(stops.flatMap(stop => stop.errands.map(errand => errand.item.id))));
+    const locationErrands = $derived(errands.filter(errand => !isLocationOptionalErrand(errand) || locationIds.has(errand.item.id)));
+    const plan = $derived(suggestStops(stops, locationErrands));
+    const coveredCount = $derived(locationErrands.length - plan.unavailable.length);
 
     $effect(() => {
         if (commitState.isHistorical) return;
@@ -253,11 +259,11 @@
             {/if}
             <section class="task-checklist" bind:this={matchedTasksSection} aria-labelledby="matched-tasks-heading">
                 <div class="checklist-heading"><h2 id="matched-tasks-heading">Matched tasks ({checklist.length})</h2>{#if completedChecklist.length}<button disabled={commitState.isHistorical} onclick={clearCompletedTasks}>Clear completed</button>{/if}</div>
-                <p class="hint">Ticks update the original todos. Completed tasks stay until cleared. Dismissed notes and unchecked tasks return when edited; checked todos stay completed. This checklist syncs across devices.</p>
+                <p class="hint">Ticks update the original todos. Completed tasks stay until cleared. Dismissed notes and unchecked tasks return when edited; checked todos stay completed. This checklist syncs across devices. Use #bank for bank or ATM errands; choose the location yourself.</p>
                 <ul>{#each checklist as row (row.errand.item.id)}
                     <li class="checklist-row" class:completed={row.done}>
                         {#if row.errand.item.note}<span class="note-mark" aria-label="Note">📝</span>{:else}<input type="checkbox" checked={row.done} disabled={commitState.isHistorical} aria-label={`Completed: ${row.errand.item.name}`} onchange={(event) => setTaskDone(row.errand.item.id, event.currentTarget.checked)} />{/if}
-                        <button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}{row.errand.item.note ? ' · Note' : ''}</small>{#if !row.done && origin && !nearbyIds.has(row.errand.item.id)}<small>{supportedIds.has(row.errand.item.id) ? `No match within ${radius} km.` : 'No matching location in the database.'}</small>{/if}</button>
+                        <button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}{row.errand.item.note ? ' · Note' : ''}</small>{#if !row.done && isLocationOptionalErrand(row.errand) && !locationIds.has(row.errand.item.id)}<small>Choose a bank or ATM yourself · no saved location needed.</small>{:else if !row.done && origin && !nearbyIds.has(row.errand.item.id)}<small>{supportedIds.has(row.errand.item.id) ? `No match within ${radius} km.` : 'No matching location in the database.'}</small>{/if}</button>
                         {#if !row.done}<button class="pause-task" disabled={commitState.isHistorical} onclick={() => pauseTag(taskPauseTag(row.errand.tags), true)} aria-label={`Pause #${taskPauseTag(row.errand.tags)} errands`} title={`Pause #${taskPauseTag(row.errand.tags)} errands`}><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg></button>{/if}
                         <button class="dismiss-task" disabled={commitState.isHistorical} onclick={() => dismissTask(row.errand.item.id)} aria-label={`Dismiss from errands: ${row.errand.item.name}`} title="Dismiss from errands">×</button>
                     </li>
@@ -269,7 +275,7 @@
             {:else}
                 <section class="suggestions" aria-labelledby="suggested-stops-heading">
                     <h2 id="suggested-stops-heading">Suggested stops</h2>
-                    <p class="coverage" aria-live="polite">{coveredCount} of {errands.length} tagged item{errands.length === 1 ? '' : 's'} covered by {plan.suggested.length} stop{plan.suggested.length === 1 ? '' : 's'} within {radius} km.</p>
+                    <p class="coverage" aria-live="polite">{coveredCount} of {locationErrands.length} location-based item{locationErrands.length === 1 ? '' : 's'} covered by {plan.suggested.length} stop{plan.suggested.length === 1 ? '' : 's'} within {radius} km.</p>
                     <p class="hint">A short set of shops covering all nearby matches, shown nearest first. Each item appears once. Distances are straight-line distances.</p>
                     {#if plan.unavailable.length}
                         <div class="unavailable">
@@ -293,7 +299,7 @@
         {/if}
         <details class="available-tags">
             <summary>Available location hashtags</summary>
-            <p class="hint">Add these hashtags to a list name to match its todos and notes, or tag individual items. Item hashtags take precedence over list hashtags. Counts cover all locations in the database, including your saved places. #supermarket matches Coles, Woolworths and Aldi.</p>
+            <p class="hint">Add these hashtags to a list name to match its todos and notes, or tag individual items. Item hashtags take precedence over list hashtags. #bank keeps bank or ATM errands in the checklist without a saved location. Counts cover all locations in the database, including your saved places. #supermarket matches Coles, Woolworths and Aldi.</p>
             <p class="hint">Melbourne suburbs are also available: #brunswick, #richmond or #brunswickeast. Suburb hashtags point to approximate suburb centres; remove spaces from multi-word names.</p>
             <label class="tag-search">Find a location hashtag<input type="search" bind:value={tagQuery} placeholder="e.g. bunnings, brunswick or st kilda" /></label>
             {#if selectedTag}
@@ -303,13 +309,13 @@
                     <ul class="tag-location-list">
                         {#each selectedTagLocations as location (location.id)}
                             <li><div><strong>{location.name}</strong>{#if location.address}<p>{location.address}</p>{/if}</div><a href={directions(location)} target="_blank" rel="noopener noreferrer" aria-label={`Directions to ${location.name}`}>Directions ↗</a></li>
-                        {:else}<li class="hint">No locations for this hashtag.</li>{/each}
+                        {:else}<li class="hint">{selectedTag === 'bank' ? 'Choose a bank or ATM yourself. #bank tasks appear in the checklist without saved locations.' : 'No locations for this hashtag.'}</li>{/each}
                     </ul>
                 </section>
             {/if}
             <ul class="tag-list">
                 {#each visibleTags as entry (entry.tag)}
-                    <li><button class:chosen={selectedTag === entry.tag} aria-pressed={selectedTag === entry.tag} onclick={() => selectTag(entry.tag)}><strong>#{entry.tag}</strong><span>{entry.count} location{entry.count === 1 ? '' : 's'}</span></button></li>
+                    <li><button class:chosen={selectedTag === entry.tag} aria-pressed={selectedTag === entry.tag} onclick={() => selectTag(entry.tag)}><strong>#{entry.tag}</strong><span>{#if entry.tag === 'bank' && entry.count === 0}No location needed{:else}{entry.count} location{entry.count === 1 ? '' : 's'}{/if}</span></button></li>
                 {:else}<li>{availableTags.length ? 'No matching hashtags.' : 'No location hashtags yet. Add a place in Locations.'}</li>{/each}
             </ul>
             {#if !tagQuery.trim() && availableTags.length > 12}<button onclick={() => showAllTags = !showAllTags}>{showAllTags ? 'Show fewer hashtags' : `Show all ${availableTags.length} hashtags`}</button>{/if}

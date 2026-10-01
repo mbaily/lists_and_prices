@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { test } from 'node:test';
-import { createApp, merge } from './helpers/app.mjs';
+import { createApp, merge, root } from './helpers/app.mjs';
 
 function fixture() {
     const app = createApp();
@@ -160,5 +162,45 @@ test('completed candidates can be read without reviving archived, deleted or unt
         app.data.updateList(list, { name: 'Shopping' }); assert.equal(read().length, 0);
         app.data.updateItem(note, { name: 'Voucher #coles' }); assert.equal(read().length, 1);
         app.data.deleteItem(note); assert.equal(read().length, 0);
+    } finally { app.dispose(); }
+});
+
+test('bank reminders enter the checklist without locations and stay out of missing-location counts', () => {
+    const { app, list } = fixture();
+    try {
+        const nearby = app.load('src/lib/nearbyErrands.ts');
+        app.data.updateList(list, { name: 'Banking #BANK' });
+        const bank = app.data.createItem(list, 'Withdraw cash');
+        const other = app.data.createItem(list, 'Collect parcel #postoffice');
+        const errands = nearby.collectErrands(app.data.readAllItems(), app.data.readLists(), app.data.readFolders());
+        const bankErrand = errands.find(errand => errand.item.id === bank);
+        assert.equal(nearby.isLocationOptionalErrand(bankErrand), true);
+        assert.equal(nearby.isLocationOptionalErrand(errands.find(errand => errand.item.id === other)), false);
+        assert.equal(nearby.isErrandPaused(bankErrand, ['bank']), true);
+        // Exercise the screen's eligibility and routing expressions with no catalogue matches.
+        const screen = readFileSync(path.join(root, 'src/lib/components/NearbyErrandsScreen.svelte'), 'utf8');
+        const derive = (name, scope) => {
+            const expression = screen.match(new RegExp(`const ${name} = \\$derived\\((.*)\\);`))[1];
+            return new Function(...Object.keys(scope), `return ${expression}`)(...Object.values(scope));
+        };
+        const candidates = errands.map(errand => ({ errand, done: false, hidden: false, paused: false }));
+        const nearbyIds = new Set(app.load('src/lib/nearbyPills.ts').nearbyTaskPills([], errands).map(pill => pill.errand.item.id));
+        const scope = { candidates, supportedIds: new Set(), nearbyIds, isLocationOptionalErrand: nearby.isLocationOptionalErrand };
+        assert.ok(derive('checklist', scope).some(row => row.errand.item.id === bank));
+        assert.ok(!derive('checklist', scope).some(row => row.errand.item.id === other));
+        const withDistantTask = derive('checklist', { ...scope, supportedIds: new Set([other]) });
+        assert.ok(withDistantTask.findIndex(row => row.errand.item.id === bank) < withDistantTask.findIndex(row => row.errand.item.id === other));
+        assert.equal(nearbyIds.has(bank), true);
+        const locationErrands = derive('locationErrands', { errands, locationIds: new Set(), isLocationOptionalErrand: nearby.isLocationOptionalErrand });
+        assert.ok(!nearby.suggestStops([], locationErrands).unavailable.some(errand => errand.item.id === bank));
+        const matched = derive('locationErrands', { errands, locationIds: new Set([bank]), isLocationOptionalErrand: nearby.isLocationOptionalErrand });
+        assert.ok(matched.some(errand => errand.item.id === bank), 'optional saved bank locations can still be suggested');
+        app.data.rememberNearbyChecklist([entry(app, bank)]);
+        app.data.setNearbyTodoDone(bank, true);
+        assert.equal(hidden(app, bank), false);
+        app.data.dismissNearbyChecklist([entry(app, bank)]);
+        assert.equal(hidden(app, bank), true);
+        app.data.setNearbyTodoDone(bank, false);
+        assert.equal(hidden(app, bank), false);
     } finally { app.dispose(); }
 });
