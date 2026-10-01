@@ -23,6 +23,7 @@
     const accuracy = $derived(savedLocation?.accuracy ?? null);
     let locating = $state(false);
     let locationError = $state('');
+    let showLocationDetails = $state(true);
     let radius = $state(5);
     const previewLimit = $derived.by(() => { void docState.version; return readNearbyPreviewLimit(); });
     function setPreviewLimit(event: Event) {
@@ -253,10 +254,22 @@
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m16 3 5 5-12 12-6 1 1-6zM13 6l5 5" /></svg>
                 </button>
             </div>
-            <HelpText label="Help with starting location"><p class="hint">Tap the location icon for GPS, or a suburb pill to use its centre. Your starting location and hot suburbs sync across your devices.</p></HelpText>
+            <div class="location-details-controls">
+                <HelpText label="Help with starting location"><p class="hint">Tap the location icon for GPS, or a suburb pill to use its centre. Your starting location and hot suburbs sync across your devices.</p></HelpText>
+                {#if savedLocation}
+                    <button class="location-details-toggle" onclick={() => showLocationDetails = !showLocationDetails}
+                        aria-label={showLocationDetails ? 'Hide location details' : 'Show location details'}
+                        title={showLocationDetails ? 'Hide location details' : 'Show location details'}
+                        aria-expanded={showLocationDetails} aria-controls="starting-location-details">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d={showLocationDetails ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6'} /></svg>
+                    </button>
+                {/if}
+            </div>
             {#if locationError}<p role="alert" class="error">{locationError}</p>{/if}
-            {#if origin}<p class="origin">{originLabel}{accuracy !== null ? ` · GPS accuracy approximately ${Math.round(accuracy)} m` : ''}</p>{/if}
-            {#if savedLocation}<p class="hint">Last updated: {new Date(savedLocation.updatedAt).toLocaleString()}</p>{/if}
+            <div id="starting-location-details" hidden={!showLocationDetails}>
+                {#if origin}<p class="origin">{originLabel}{accuracy !== null ? ` · GPS accuracy approximately ${Math.round(accuracy)} m` : ''}</p>{/if}
+                {#if savedLocation}<p class="hint">Last updated: {new Date(savedLocation.updatedAt).toLocaleString()}</p>{/if}
+            </div>
         </section>
 
 
@@ -380,6 +393,9 @@
     main { overflow-y: auto; padding: 1rem; padding-bottom: max(1rem, env(safe-area-inset-bottom)); flex: 1; }
     main > * { max-width: 760px; margin-left: auto; margin-right: auto; }
     .location-shortcuts { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
+    .location-details-controls { position: relative; display: flow-root; }
+    .location-details-toggle { position: absolute; top: .4rem; left: 44px; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border-radius: 50%; background: #000; color: var(--text2); }
+    .location-details-toggle:hover { color: var(--accent); border-color: var(--accent); }
     .location-icon { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; }
     .suburb-shortcut { border-radius: 999px; background: #000; padding: .45rem .75rem; }
     .suburb-shortcut.active { border-color: var(--accent); color: var(--accent); }
