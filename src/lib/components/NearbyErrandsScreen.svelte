@@ -445,7 +445,7 @@
     .group-row { display: flex; align-items: flex-start; gap: .5rem; }
     .group-row .errand-group { flex: 1; min-width: 0; }
     .group-checkbox { width: 22px; height: 22px; flex-shrink: 0; margin: 0; padding: 0; accent-color: var(--accent); cursor: pointer; }
-    .group-row > .group-checkbox { margin-top: .85rem; }
+    .group-row > .group-checkbox { margin: .85rem 8px 0; }
     .errand-group > summary { display: flex; align-items: center; gap: .5rem; min-width: 0; }
     .errand-group > summary::before { content: "▸"; flex-shrink: 0; }
     .errand-group[open] > summary::before { content: "▾"; }
