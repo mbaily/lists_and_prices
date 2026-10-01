@@ -1318,11 +1318,12 @@ function isNearbyPreviewLimit(value: unknown): value is number {
 
 export function readNearbyPreviewLimit(): number {
 	const limit = getDoc().getMap('nearby-preferences').get('preview-limit');
-	return isNearbyPreviewLimit(limit) ? limit : 3;
+	// Preserve support for backups made when the control allowed up to 50 items.
+	return isNearbyPreviewLimit(limit) ? Math.min(limit, 9) : 3;
 }
 
 export function saveNearbyPreviewLimit(limit: number): void {
-	if (!isNearbyPreviewLimit(limit)) throw new Error('Invalid nearby preview limit.');
+	if (!isNearbyPreviewLimit(limit) || limit > 9) throw new Error('Invalid nearby preview limit.');
 	getMutableDoc().getMap('nearby-preferences').set('preview-limit', limit);
 }
 // ─── Spreadsheets ─────────────────────────────────────────────────────────────

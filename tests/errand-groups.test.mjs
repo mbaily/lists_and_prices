@@ -80,6 +80,11 @@ test('preview limit syncs and survives backups, undo and history with validated 
         }
         a.data.importBackup(backup, 'replace');
         assert.equal(a.data.readNearbyPreviewLimit(), 5);
+        assert.throws(() => a.data.saveNearbyPreviewLimit(10), /Invalid nearby preview limit/);
+        a.data.importBackup({ ...backup, nearbyPreviewLimit: 50 }, 'replace');
+        assert.equal(a.data.readNearbyPreviewLimit(), 9);
+        assert.equal(a.data.exportBackup().nearbyPreviewLimit, 9);
+        a.data.importBackup(backup, 'replace');
         const legacy = { ...backup }; delete legacy.nearbyPreviewLimit;
         a.data.importBackup(legacy, 'merge');
         assert.equal(a.data.readNearbyPreviewLimit(), 5);

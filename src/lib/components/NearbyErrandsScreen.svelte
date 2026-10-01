@@ -26,8 +26,8 @@
     let radius = $state(5);
     const previewLimit = $derived.by(() => { void docState.version; return readNearbyPreviewLimit(); });
     function setPreviewLimit(event: Event) {
-        const input = event.currentTarget as HTMLInputElement;
-        if (!commitState.isHistorical && input.validity.valid) saveNearbyPreviewLimit(input.valueAsNumber);
+        const input = event.currentTarget as HTMLSelectElement;
+        if (!commitState.isHistorical) saveNearbyPreviewLimit(Number(input.value));
         input.value = String(previewLimit);
     }
     let showHotSuburbs = $state(false);
@@ -229,6 +229,7 @@
         {#if commitState.isHistorical}<p class="notice">Viewing historical todos and custom locations. Exit history to make changes.</p>{/if}
         <section class="nearby-strip" aria-labelledby="nearby-strip-heading">
             <h2 id="nearby-strip-heading"><button class="nearby-heading" title="Go to matched tasks" onclick={scrollToMatchedTasks}>Nearby</button></h2>
+            <select class="preview-limit" aria-label="Items per pill" title="Items per pill" value={previewLimit} onchange={setPreviewLimit} disabled={commitState.isHistorical}>{#each [1, 2, 3, 4, 5, 6, 7, 8, 9] as count}<option value={count}>{count}</option>{/each}</select>
             {#each nearbyPills as pill (pill.list.id)}
                 <button class="nearby-pill" title={`${pill.list.name}: ${pill.name} ${pill.tags.map(tag => '#' + tag).join(' ')}`}
                     onclick={() => onOpenItem(pill.list.id, pill.errands[0].item.id)}>
@@ -309,7 +310,7 @@
                     </details></li>
                 {:else}<li class="hint">{pausedErrands.length ? 'Your remaining errands are paused. Expand Paused errands to resume them.' : 'No matched tasks. Add location hashtags to a todo, note or list name.'}</li>{/each}</ul>
             </section>
-            <div class="filters"><label>Within <select bind:value={radius}>{#each [1, 2, 5, 10, 25, 50] as km}<option value={km}>{km} km</option>{/each}</select></label><label>Items per pill <input type="number" min="1" max="50" step="1" value={previewLimit} onchange={setPreviewLimit} disabled={commitState.isHistorical} /></label></div>
+            <div class="filters"><label>Within <select bind:value={radius}>{#each [1, 2, 5, 10, 25, 50] as km}<option value={km}>{km} km</option>{/each}</select></label></div>
             {#if !origin}
                 <p class="empty">Use your location or choose a starting suburb to see nearby errands.</p>
             {:else}
@@ -384,6 +385,7 @@
     .suburb-shortcut.active { border-color: var(--accent); color: var(--accent); }
     .nearby-strip { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-bottom: .8rem; padding-bottom: .2rem; }
     .nearby-strip h2 { margin: 0; flex-shrink: 0; }
+    .nearby-strip .preview-limit { width: auto; flex-shrink: 0; padding: .35rem; }
     .nearby-heading { border: 0; background: transparent; padding: 0; font: inherit; color: inherit; }
     .nearby-pill { display: inline-flex; align-items: center; gap: .35rem; max-width: 100%; min-width: 0; background: #000; border-radius: 999px; padding: .35rem .65rem; white-space: nowrap; }
     .nearby-pill-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -396,7 +398,7 @@
     .error { color: #dc2626; } .notice, .empty { padding: 1rem; border-radius: 6px; background: var(--bg2); }
     .filters, .stop-heading, .saved { display: flex; align-items: center; justify-content: space-between; gap: .8rem; }
     .filters { flex-wrap: wrap; }
-    .filters label { flex-direction: row; align-items: center; } .filters select { width: auto; } .filters input { width: 4.5rem; }
+    .filters label { flex-direction: row; align-items: center; } .filters select { width: auto; }
     .errand-group > summary { display: flex; align-items: center; gap: .5rem; min-width: 0; }
     .errand-group > summary::before { content: "▸"; flex-shrink: 0; }
     .errand-group[open] > summary::before { content: "▾"; }
