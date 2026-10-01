@@ -1,0 +1,3340 @@
+{
+  "source": "https://discover.data.vic.gov.au/dataset/vicmap-admin-locality-polygon-aligned-to-property",
+  "boundarySource": "https://services-ap1.arcgis.com/P744lA0wf4LlBZ84/ArcGIS/rest/services/Vicmap_Admin/FeatureServer/9",
+  "localitySource": "https://services-ap1.arcgis.com/P744lA0wf4LlBZ84/ArcGIS/rest/services/Vicmap_Admin/FeatureServer/11",
+  "attribution": "Derived from Vicmap Admin, © State of Victoria (Department of Transport and Planning)",
+  "license": "CC BY 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "retrievedAt": "2026-09-30",
+  "coverage": "Official bounded localities with land inside the 31 metropolitan Melbourne councils.",
+  "coordinates": "Approximate polygon centres; an interior point is used if the centre falls outside the locality.",
+  "councils": [
+    "BANYULE",
+    "BAYSIDE",
+    "BOROONDARA",
+    "BRIMBANK",
+    "CARDINIA",
+    "CASEY",
+    "DAREBIN",
+    "FRANKSTON",
+    "GLEN EIRA",
+    "GREATER DANDENONG",
+    "HOBSONS BAY",
+    "HUME",
+    "KINGSTON",
+    "KNOX",
+    "MANNINGHAM",
+    "MARIBYRNONG",
+    "MAROONDAH",
+    "MELBOURNE",
+    "MELTON",
+    "MERRI-BEK",
+    "MONASH",
+    "MOONEE VALLEY",
+    "MORNINGTON PENINSULA",
+    "NILLUMBIK",
+    "PORT PHILLIP",
+    "STONNINGTON",
+    "WHITEHORSE",
+    "WHITTLESEA",
+    "WYNDHAM",
+    "YARRA",
+    "YARRA RANGES"
+  ],
+  "suburbs": [
+    {
+      "id": "205410311",
+      "name": "Abbotsford",
+      "latitude": -37.804368,
+      "longitude": 144.999707
+    },
+    {
+      "id": "205410324",
+      "name": "Aberfeldie",
+      "latitude": -37.759536,
+      "longitude": 144.897322
+    },
+    {
+      "id": "425652793",
+      "name": "Aintree",
+      "latitude": -37.719817,
+      "longitude": 144.668255
+    },
+    {
+      "id": "205410084",
+      "name": "Airport West",
+      "latitude": -37.723716,
+      "longitude": 144.881905
+    },
+    {
+      "id": "205410303",
+      "name": "Albanvale",
+      "latitude": -37.745934,
+      "longitude": 144.768667
+    },
+    {
+      "id": "205410237",
+      "name": "Albert Park",
+      "latitude": -37.845353,
+      "longitude": 144.951611
+    },
+    {
+      "id": "205410261",
+      "name": "Albion",
+      "latitude": -37.776514,
+      "longitude": 144.816282
+    },
+    {
+      "id": "205410239",
+      "name": "Alphington",
+      "latitude": -37.780408,
+      "longitude": 145.030834
+    },
+    {
+      "id": "205409640",
+      "name": "Altona",
+      "latitude": -37.860168,
+      "longitude": 144.8138
+    },
+    {
+      "id": "205409833",
+      "name": "Altona Meadows",
+      "latitude": -37.880819,
+      "longitude": 144.784264
+    },
+    {
+      "id": "205409706",
+      "name": "Altona North",
+      "latitude": -37.837827,
+      "longitude": 144.83433
+    },
+    {
+      "id": "205410294",
+      "name": "Ardeer",
+      "latitude": -37.776199,
+      "longitude": 144.801518
+    },
+    {
+      "id": "205410284",
+      "name": "Armadale",
+      "latitude": -37.856676,
+      "longitude": 145.020186
+    },
+    {
+      "id": "205409018",
+      "name": "Arthurs Creek",
+      "latitude": -37.564994,
+      "longitude": 145.210106
+    },
+    {
+      "id": "205409911",
+      "name": "Arthurs Seat",
+      "latitude": -38.363262,
+      "longitude": 144.959825
+    },
+    {
+      "id": "205410160",
+      "name": "Ascot Vale",
+      "latitude": -37.776968,
+      "longitude": 144.913703
+    },
+    {
+      "id": "205410231",
+      "name": "Ashburton",
+      "latitude": -37.867286,
+      "longitude": 145.080188
+    },
+    {
+      "id": "205410256",
+      "name": "Ashwood",
+      "latitude": -37.86653,
+      "longitude": 145.102322
+    },
+    {
+      "id": "205410230",
+      "name": "Aspendale",
+      "latitude": -38.021935,
+      "longitude": 145.102552
+    },
+    {
+      "id": "205410206",
+      "name": "Aspendale Gardens",
+      "latitude": -38.02209,
+      "longitude": 145.119828
+    },
+    {
+      "id": "205410086",
+      "name": "Attwood",
+      "latitude": -37.667037,
+      "longitude": 144.884585
+    },
+    {
+      "id": "205410060",
+      "name": "Avondale Heights",
+      "latitude": -37.76154,
+      "longitude": 144.862615
+    },
+    {
+      "id": "205409963",
+      "name": "Avonsleigh",
+      "latitude": -37.911846,
+      "longitude": 145.484338
+    },
+    {
+      "id": "205409806",
+      "name": "Badger Creek",
+      "latitude": -37.690042,
+      "longitude": 145.540071
+    },
+    {
+      "id": "205410372",
+      "name": "Balaclava",
+      "latitude": -37.870349,
+      "longitude": 144.994992
+    },
+    {
+      "id": "205409301",
+      "name": "Balnarring",
+      "latitude": -38.353176,
+      "longitude": 145.121893
+    },
+    {
+      "id": "205410328",
+      "name": "Balnarring Beach",
+      "latitude": -38.39037,
+      "longitude": 145.119872
+    },
+    {
+      "id": "205410069",
+      "name": "Balwyn",
+      "latitude": -37.808991,
+      "longitude": 145.083329
+    },
+    {
+      "id": "205409895",
+      "name": "Balwyn North",
+      "latitude": -37.791746,
+      "longitude": 145.084341
+    },
+    {
+      "id": "205409391",
+      "name": "Bangholme",
+      "latitude": -38.048366,
+      "longitude": 145.17208
+    },
+    {
+      "id": "205409860",
+      "name": "Baxter",
+      "latitude": -38.200936,
+      "longitude": 145.15666
+    },
+    {
+      "id": "205409387",
+      "name": "Bayles",
+      "latitude": -38.17605,
+      "longitude": 145.580535
+    },
+    {
+      "id": "205409951",
+      "name": "Bayswater",
+      "latitude": -37.845178,
+      "longitude": 145.26476
+    },
+    {
+      "id": "205410002",
+      "name": "Bayswater North",
+      "latitude": -37.826885,
+      "longitude": 145.283654
+    },
+    {
+      "id": "205409906",
+      "name": "Beaconsfield",
+      "latitude": -38.040934,
+      "longitude": 145.38298
+    },
+    {
+      "id": "205409240",
+      "name": "Beaconsfield Upper",
+      "latitude": -37.998191,
+      "longitude": 145.423765
+    },
+    {
+      "id": "205410078",
+      "name": "Beaumaris",
+      "latitude": -37.982392,
+      "longitude": 145.038937
+    },
+    {
+      "id": "205409623",
+      "name": "Beenak",
+      "latitude": -37.899019,
+      "longitude": 145.637019
+    },
+    {
+      "id": "205410137",
+      "name": "Belgrave",
+      "latitude": -37.91239,
+      "longitude": 145.355291
+    },
+    {
+      "id": "205410268",
+      "name": "Belgrave Heights",
+      "latitude": -37.926228,
+      "longitude": 145.343714
+    },
+    {
+      "id": "205409749",
+      "name": "Belgrave South",
+      "latitude": -37.942471,
+      "longitude": 145.35732
+    },
+    {
+      "id": "205410364",
+      "name": "Bellfield (Greater Melbourne)",
+      "latitude": -37.753055,
+      "longitude": 145.038451
+    },
+    {
+      "id": "205410016",
+      "name": "Bend Of Islands",
+      "latitude": -37.69768,
+      "longitude": 145.284458
+    },
+    {
+      "id": "205410100",
+      "name": "Bentleigh",
+      "latitude": -37.922641,
+      "longitude": 145.038587
+    },
+    {
+      "id": "205409899",
+      "name": "Bentleigh East",
+      "latitude": -37.922099,
+      "longitude": 145.06705
+    },
+    {
+      "id": "205409098",
+      "name": "Berwick",
+      "latitude": -38.039895,
+      "longitude": 145.348286
+    },
+    {
+      "id": "205407968",
+      "name": "Beveridge",
+      "latitude": -37.476145,
+      "longitude": 144.971917
+    },
+    {
+      "id": "205409811",
+      "name": "Big Pats Creek",
+      "latitude": -37.763684,
+      "longitude": 145.762663
+    },
+    {
+      "id": "205409616",
+      "name": "Bittern",
+      "latitude": -38.336781,
+      "longitude": 145.169246
+    },
+    {
+      "id": "205410208",
+      "name": "Black Rock",
+      "latitude": -37.971124,
+      "longitude": 145.021652
+    },
+    {
+      "id": "205410036",
+      "name": "Blackburn",
+      "latitude": -37.821683,
+      "longitude": 145.152264
+    },
+    {
+      "id": "205410246",
+      "name": "Blackburn North",
+      "latitude": -37.805369,
+      "longitude": 145.154357
+    },
+    {
+      "id": "205410178",
+      "name": "Blackburn South",
+      "latitude": -37.839346,
+      "longitude": 145.146551
+    },
+    {
+      "id": "205410020",
+      "name": "Blairgowrie",
+      "latitude": -38.368525,
+      "longitude": 144.77225
+    },
+    {
+      "id": "205410027",
+      "name": "Blind Bight",
+      "latitude": -38.213869,
+      "longitude": 145.339939
+    },
+    {
+      "id": "205410241",
+      "name": "Bonbeach",
+      "latitude": -38.063095,
+      "longitude": 145.127621
+    },
+    {
+      "id": "205409092",
+      "name": "Boneo",
+      "latitude": -38.409925,
+      "longitude": 144.903591
+    },
+    {
+      "id": "425652792",
+      "name": "Bonnie Brook",
+      "latitude": -37.69608,
+      "longitude": 144.669895
+    },
+    {
+      "id": "205409801",
+      "name": "Boronia",
+      "latitude": -37.856186,
+      "longitude": 145.28602
+    },
+    {
+      "id": "212811750",
+      "name": "Botanic Ridge",
+      "latitude": -38.135935,
+      "longitude": 145.254264
+    },
+    {
+      "id": "205410187",
+      "name": "Box Hill",
+      "latitude": -37.821508,
+      "longitude": 145.126101
+    },
+    {
+      "id": "205410156",
+      "name": "Box Hill North",
+      "latitude": -37.805592,
+      "longitude": 145.129572
+    },
+    {
+      "id": "205410191",
+      "name": "Box Hill South",
+      "latitude": -37.836607,
+      "longitude": 145.123381
+    },
+    {
+      "id": "205409938",
+      "name": "Braeside",
+      "latitude": -38.000465,
+      "longitude": 145.122954
+    },
+    {
+      "id": "205410123",
+      "name": "Braybrook",
+      "latitude": -37.786673,
+      "longitude": 144.854842
+    },
+    {
+      "id": "205410339",
+      "name": "Briar Hill",
+      "latitude": -37.70622,
+      "longitude": 145.121084
+    },
+    {
+      "id": "205409918",
+      "name": "Brighton",
+      "latitude": -37.908414,
+      "longitude": 144.995693
+    },
+    {
+      "id": "205410043",
+      "name": "Brighton East",
+      "latitude": -37.917331,
+      "longitude": 145.016682
+    },
+    {
+      "id": "205409926",
+      "name": "Broadmeadows",
+      "latitude": -37.682556,
+      "longitude": 144.931329
+    },
+    {
+      "id": "205409826",
+      "name": "Brookfield",
+      "latitude": -37.69932,
+      "longitude": 144.541378
+    },
+    {
+      "id": "205410052",
+      "name": "Brooklyn",
+      "latitude": -37.816083,
+      "longitude": 144.841492
+    },
+    {
+      "id": "205410088",
+      "name": "Brunswick",
+      "latitude": -37.766371,
+      "longitude": 144.961286
+    },
+    {
+      "id": "205410278",
+      "name": "Brunswick East",
+      "latitude": -37.768867,
+      "longitude": 144.97743
+    },
+    {
+      "id": "205410211",
+      "name": "Brunswick West",
+      "latitude": -37.763109,
+      "longitude": 144.94285
+    },
+    {
+      "id": "205409055",
+      "name": "Bulla",
+      "latitude": -37.634338,
+      "longitude": 144.7919
+    },
+    {
+      "id": "205410009",
+      "name": "Bulleen",
+      "latitude": -37.76865,
+      "longitude": 145.08697
+    },
+    {
+      "id": "205409609",
+      "name": "Bundoora",
+      "latitude": -37.69857,
+      "longitude": 145.05962
+    },
+    {
+      "id": "205409371",
+      "name": "Bunyip",
+      "latitude": -38.100009,
+      "longitude": 145.718952
+    },
+    {
+      "id": "205409612",
+      "name": "Bunyip North",
+      "latitude": -38.060952,
+      "longitude": 145.725114
+    },
+    {
+      "id": "205410353",
+      "name": "Burnley",
+      "latitude": -37.829601,
+      "longitude": 145.017421
+    },
+    {
+      "id": "205410079",
+      "name": "Burnside",
+      "latitude": -37.749205,
+      "longitude": 144.753047
+    },
+    {
+      "id": "205745570",
+      "name": "Burnside Heights",
+      "latitude": -37.732175,
+      "longitude": 144.755662
+    },
+    {
+      "id": "205410028",
+      "name": "Burwood",
+      "latitude": -37.849593,
+      "longitude": 145.111327
+    },
+    {
+      "id": "205410131",
+      "name": "Burwood East",
+      "latitude": -37.853573,
+      "longitude": 145.150419
+    },
+    {
+      "id": "205410115",
+      "name": "Cairnlea",
+      "latitude": -37.759459,
+      "longitude": 144.787864
+    },
+    {
+      "id": "205410247",
+      "name": "Calder Park",
+      "latitude": -37.676176,
+      "longitude": 144.761023
+    },
+    {
+      "id": "205408876",
+      "name": "Caldermeade",
+      "latitude": -38.243396,
+      "longitude": 145.538902
+    },
+    {
+      "id": "205407469",
+      "name": "Cambarville",
+      "latitude": -37.610506,
+      "longitude": 146.013031
+    },
+    {
+      "id": "205409959",
+      "name": "Camberwell",
+      "latitude": -37.838447,
+      "longitude": 145.073618
+    },
+    {
+      "id": "205409758",
+      "name": "Campbellfield",
+      "latitude": -37.663723,
+      "longitude": 144.959508
+    },
+    {
+      "id": "205409940",
+      "name": "Cannons Creek",
+      "latitude": -38.206313,
+      "longitude": 145.312021
+    },
+    {
+      "id": "205410215",
+      "name": "Canterbury",
+      "latitude": -37.823596,
+      "longitude": 145.075711
+    },
+    {
+      "id": "205409149",
+      "name": "Cape Schanck",
+      "latitude": -38.460272,
+      "longitude": 144.903185
+    },
+    {
+      "id": "205410061",
+      "name": "Capel Sound",
+      "latitude": -38.372287,
+      "longitude": 144.874088
+    },
+    {
+      "id": "205409286",
+      "name": "Cardinia",
+      "latitude": -38.142753,
+      "longitude": 145.418164
+    },
+    {
+      "id": "205410314",
+      "name": "Carlton",
+      "latitude": -37.800437,
+      "longitude": 144.968154
+    },
+    {
+      "id": "205410302",
+      "name": "Carlton North",
+      "latitude": -37.78655,
+      "longitude": 144.968535
+    },
+    {
+      "id": "205410167",
+      "name": "Carnegie",
+      "latitude": -37.893371,
+      "longitude": 145.055601
+    },
+    {
+      "id": "205409955",
+      "name": "Caroline Springs",
+      "latitude": -37.734457,
+      "longitude": 144.737218
+    },
+    {
+      "id": "205410325",
+      "name": "Carrum",
+      "latitude": -38.076654,
+      "longitude": 145.128023
+    },
+    {
+      "id": "205409494",
+      "name": "Carrum Downs",
+      "latitude": -38.092776,
+      "longitude": 145.175953
+    },
+    {
+      "id": "205409110",
+      "name": "Catani",
+      "latitude": -38.194367,
+      "longitude": 145.650012
+    },
+    {
+      "id": "205410332",
+      "name": "Caulfield",
+      "latitude": -37.884051,
+      "longitude": 145.026339
+    },
+    {
+      "id": "205410345",
+      "name": "Caulfield East",
+      "latitude": -37.881213,
+      "longitude": 145.042009
+    },
+    {
+      "id": "205410138",
+      "name": "Caulfield North",
+      "latitude": -37.872035,
+      "longitude": 145.021589
+    },
+    {
+      "id": "205410204",
+      "name": "Caulfield South",
+      "latitude": -37.894655,
+      "longitude": 145.024937
+    },
+    {
+      "id": "205410219",
+      "name": "Chadstone",
+      "latitude": -37.882125,
+      "longitude": 145.100178
+    },
+    {
+      "id": "205410249",
+      "name": "Chelsea",
+      "latitude": -38.049716,
+      "longitude": 145.121403
+    },
+    {
+      "id": "205410220",
+      "name": "Chelsea Heights",
+      "latitude": -38.04082,
+      "longitude": 145.134099
+    },
+    {
+      "id": "205409831",
+      "name": "Cheltenham",
+      "latitude": -37.963563,
+      "longitude": 145.060312
+    },
+    {
+      "id": "205409445",
+      "name": "Chirnside Park",
+      "latitude": -37.73865,
+      "longitude": 145.314189
+    },
+    {
+      "id": "205408716",
+      "name": "Christmas Hills",
+      "latitude": -37.657865,
+      "longitude": 145.314145
+    },
+    {
+      "id": "205409419",
+      "name": "Chum Creek",
+      "latitude": -37.605303,
+      "longitude": 145.487322
+    },
+    {
+      "id": "205410172",
+      "name": "Clarinda",
+      "latitude": -37.94368,
+      "longitude": 145.106089
+    },
+    {
+      "id": "205408164",
+      "name": "Clarkefield",
+      "latitude": -37.486674,
+      "longitude": 144.803607
+    },
+    {
+      "id": "205409950",
+      "name": "Clayton",
+      "latitude": -37.91817,
+      "longitude": 145.130428
+    },
+    {
+      "id": "205409928",
+      "name": "Clayton South",
+      "latitude": -37.943659,
+      "longitude": 145.125191
+    },
+    {
+      "id": "205410306",
+      "name": "Clematis",
+      "latitude": -37.93246,
+      "longitude": 145.419329
+    },
+    {
+      "id": "205410318",
+      "name": "Clifton Hill",
+      "latitude": -37.790201,
+      "longitude": 144.997663
+    },
+    {
+      "id": "205408906",
+      "name": "Clyde",
+      "latitude": -38.148236,
+      "longitude": 145.353841
+    },
+    {
+      "id": "205409219",
+      "name": "Clyde North",
+      "latitude": -38.101893,
+      "longitude": 145.358741
+    },
+    {
+      "id": "425646095",
+      "name": "Cobblebank",
+      "latitude": -37.707309,
+      "longitude": 144.600867
+    },
+    {
+      "id": "205409989",
+      "name": "Coburg",
+      "latitude": -37.744857,
+      "longitude": 144.964306
+    },
+    {
+      "id": "205410093",
+      "name": "Coburg North",
+      "latitude": -37.727018,
+      "longitude": 144.968067
+    },
+    {
+      "id": "205409246",
+      "name": "Cockatoo",
+      "latitude": -37.925934,
+      "longitude": 145.508084
+    },
+    {
+      "id": "205408458",
+      "name": "Cocoroc",
+      "latitude": -37.968653,
+      "longitude": 144.621471
+    },
+    {
+      "id": "205408596",
+      "name": "Coldstream",
+      "latitude": -37.703687,
+      "longitude": 145.408714
+    },
+    {
+      "id": "205410341",
+      "name": "Collingwood",
+      "latitude": -37.801943,
+      "longitude": 144.988171
+    },
+    {
+      "id": "205410225",
+      "name": "Coolaroo",
+      "latitude": -37.656404,
+      "longitude": 144.934935
+    },
+    {
+      "id": "205409403",
+      "name": "Cora Lynn",
+      "latitude": -38.145753,
+      "longitude": 145.617054
+    },
+    {
+      "id": "205409563",
+      "name": "Cottles Bridge",
+      "latitude": -37.607023,
+      "longitude": 145.223305
+    },
+    {
+      "id": "205409046",
+      "name": "Craigieburn",
+      "latitude": -37.586153,
+      "longitude": 144.927363
+    },
+    {
+      "id": "205409735",
+      "name": "Cranbourne",
+      "latitude": -38.112828,
+      "longitude": 145.275253
+    },
+    {
+      "id": "205409728",
+      "name": "Cranbourne East",
+      "latitude": -38.110029,
+      "longitude": 145.305451
+    },
+    {
+      "id": "205409839",
+      "name": "Cranbourne North",
+      "latitude": -38.077509,
+      "longitude": 145.29879
+    },
+    {
+      "id": "205409208",
+      "name": "Cranbourne South",
+      "latitude": -38.154954,
+      "longitude": 145.252159
+    },
+    {
+      "id": "205409778",
+      "name": "Cranbourne West",
+      "latitude": -38.09942,
+      "longitude": 145.249512
+    },
+    {
+      "id": "205410376",
+      "name": "Cremorne",
+      "latitude": -37.829013,
+      "longitude": 144.993053
+    },
+    {
+      "id": "205410008",
+      "name": "Crib Point",
+      "latitude": -38.352503,
+      "longitude": 145.202981
+    },
+    {
+      "id": "205409710",
+      "name": "Croydon",
+      "latitude": -37.794941,
+      "longitude": 145.284048
+    },
+    {
+      "id": "205410270",
+      "name": "Croydon Hills",
+      "latitude": -37.775614,
+      "longitude": 145.266916
+    },
+    {
+      "id": "205410153",
+      "name": "Croydon North",
+      "latitude": -37.771851,
+      "longitude": 145.283923
+    },
+    {
+      "id": "205410255",
+      "name": "Croydon South",
+      "latitude": -37.815167,
+      "longitude": 145.277833
+    },
+    {
+      "id": "205410271",
+      "name": "Dallas",
+      "latitude": -37.670549,
+      "longitude": 144.935287
+    },
+    {
+      "id": "205409587",
+      "name": "Dalmore",
+      "latitude": -38.184128,
+      "longitude": 145.426098
+    },
+    {
+      "id": "205409902",
+      "name": "Dandenong",
+      "latitude": -37.985151,
+      "longitude": 145.211972
+    },
+    {
+      "id": "205409868",
+      "name": "Dandenong North",
+      "latitude": -37.955849,
+      "longitude": 145.214091
+    },
+    {
+      "id": "205409392",
+      "name": "Dandenong South",
+      "latitude": -38.027938,
+      "longitude": 145.220874
+    },
+    {
+      "id": "425658406",
+      "name": "Deanside",
+      "latitude": -37.731926,
+      "longitude": 144.70535
+    },
+    {
+      "id": "214716891",
+      "name": "Deepdene",
+      "latitude": -37.811401,
+      "longitude": 145.065866
+    },
+    {
+      "id": "205409916",
+      "name": "Deer Park",
+      "latitude": -37.769354,
+      "longitude": 144.771705
+    },
+    {
+      "id": "205410183",
+      "name": "Delahey",
+      "latitude": -37.719787,
+      "longitude": 144.777481
+    },
+    {
+      "id": "205409746",
+      "name": "Derrimut",
+      "latitude": -37.799699,
+      "longitude": 144.776056
+    },
+    {
+      "id": "205409399",
+      "name": "Devon Meadows",
+      "latitude": -38.176363,
+      "longitude": 145.309013
+    },
+    {
+      "id": "205409995",
+      "name": "Dewhurst",
+      "latitude": -37.98007,
+      "longitude": 145.466892
+    },
+    {
+      "id": "205409582",
+      "name": "Diamond Creek",
+      "latitude": -37.667931,
+      "longitude": 145.156701
+    },
+    {
+      "id": "205408379",
+      "name": "Diggers Rest",
+      "latitude": -37.620133,
+      "longitude": 144.696241
+    },
+    {
+      "id": "205409949",
+      "name": "Dingley Village",
+      "latitude": -37.976197,
+      "longitude": 145.125911
+    },
+    {
+      "id": "205408805",
+      "name": "Dixons Creek",
+      "latitude": -37.593569,
+      "longitude": 145.427496
+    },
+    {
+      "id": "205410229",
+      "name": "Docklands",
+      "latitude": -37.818462,
+      "longitude": 144.943206
+    },
+    {
+      "id": "205409718",
+      "name": "Don Valley",
+      "latitude": -37.738583,
+      "longitude": 145.591378
+    },
+    {
+      "id": "205409907",
+      "name": "Doncaster",
+      "latitude": -37.784786,
+      "longitude": 145.124089
+    },
+    {
+      "id": "205409820",
+      "name": "Doncaster East",
+      "latitude": -37.778965,
+      "longitude": 145.163914
+    },
+    {
+      "id": "205409361",
+      "name": "Donnybrook",
+      "latitude": -37.540272,
+      "longitude": 144.993994
+    },
+    {
+      "id": "205409786",
+      "name": "Donvale",
+      "latitude": -37.789787,
+      "longitude": 145.191312
+    },
+    {
+      "id": "205409126",
+      "name": "Doreen",
+      "latitude": -37.597042,
+      "longitude": 145.143262
+    },
+    {
+      "id": "205410141",
+      "name": "Doveton",
+      "latitude": -37.988532,
+      "longitude": 145.238499
+    },
+    {
+      "id": "205409172",
+      "name": "Dromana",
+      "latitude": -38.331993,
+      "longitude": 145.009814
+    },
+    {
+      "id": "205410282",
+      "name": "Eaglemont",
+      "latitude": -37.763702,
+      "longitude": 145.063755
+    },
+    {
+      "id": "205410307",
+      "name": "East Melbourne",
+      "latitude": -37.814424,
+      "longitude": 144.982591
+    },
+    {
+      "id": "205407696",
+      "name": "East Warburton",
+      "latitude": -37.704342,
+      "longitude": 145.776753
+    },
+    {
+      "id": "205409373",
+      "name": "Eden Park",
+      "latitude": -37.495466,
+      "longitude": 145.066817
+    },
+    {
+      "id": "205410293",
+      "name": "Edithvale",
+      "latitude": -38.037491,
+      "longitude": 145.11501
+    },
+    {
+      "id": "205407438",
+      "name": "Eildon",
+      "latitude": -37.387947,
+      "longitude": 145.998225
+    },
+    {
+      "id": "205410254",
+      "name": "Elsternwick",
+      "latitude": -37.885839,
+      "longitude": 145.007014
+    },
+    {
+      "id": "205409633",
+      "name": "Eltham",
+      "latitude": -37.717437,
+      "longitude": 145.159095
+    },
+    {
+      "id": "205410146",
+      "name": "Eltham North",
+      "latitude": -37.697867,
+      "longitude": 145.141664
+    },
+    {
+      "id": "205410253",
+      "name": "Elwood",
+      "latitude": -37.88078,
+      "longitude": 144.985487
+    },
+    {
+      "id": "205408694",
+      "name": "Emerald",
+      "latitude": -37.94608,
+      "longitude": 145.436
+    },
+    {
+      "id": "205409664",
+      "name": "Endeavour Hills",
+      "latitude": -37.970205,
+      "longitude": 145.256299
+    },
+    {
+      "id": "205409090",
+      "name": "Epping",
+      "latitude": -37.638761,
+      "longitude": 145.009345
+    },
+    {
+      "id": "205410024",
+      "name": "Essendon",
+      "latitude": -37.74979,
+      "longitude": 144.910926
+    },
+    {
+      "id": "211661436",
+      "name": "Essendon Fields",
+      "latitude": -37.726736,
+      "longitude": 144.901112
+    },
+    {
+      "id": "205410374",
+      "name": "Essendon North",
+      "latitude": -37.738024,
+      "longitude": 144.900835
+    },
+    {
+      "id": "205410357",
+      "name": "Essendon West",
+      "latitude": -37.754066,
+      "longitude": 144.885106
+    },
+    {
+      "id": "205410355",
+      "name": "Eumemmerring",
+      "latitude": -37.99855,
+      "longitude": 145.246855
+    },
+    {
+      "id": "205409824",
+      "name": "Exford",
+      "latitude": -37.730661,
+      "longitude": 144.543058
+    },
+    {
+      "id": "205408523",
+      "name": "Eynesbury",
+      "latitude": -37.788312,
+      "longitude": 144.542909
+    },
+    {
+      "id": "205410189",
+      "name": "Fairfield",
+      "latitude": -37.784599,
+      "longitude": 145.015799
+    },
+    {
+      "id": "205410064",
+      "name": "Fawkner",
+      "latitude": -37.70462,
+      "longitude": 144.969296
+    },
+    {
+      "id": "205408453",
+      "name": "Fernshaw",
+      "latitude": -37.616096,
+      "longitude": 145.638382
+    },
+    {
+      "id": "205409709",
+      "name": "Ferntree Gully",
+      "latitude": -37.884348,
+      "longitude": 145.280439
+    },
+    {
+      "id": "205410114",
+      "name": "Ferny Creek",
+      "latitude": -37.876715,
+      "longitude": 145.335333
+    },
+    {
+      "id": "425658405",
+      "name": "Fieldstone",
+      "latitude": -37.750448,
+      "longitude": 144.649962
+    },
+    {
+      "id": "205409567",
+      "name": "Fingal",
+      "latitude": -38.41665,
+      "longitude": 144.854672
+    },
+    {
+      "id": "205410337",
+      "name": "Fitzroy",
+      "latitude": -37.800896,
+      "longitude": 144.979164
+    },
+    {
+      "id": "205410260",
+      "name": "Fitzroy North",
+      "latitude": -37.783884,
+      "longitude": 144.984299
+    },
+    {
+      "id": "205410236",
+      "name": "Flemington",
+      "latitude": -37.786738,
+      "longitude": 144.919304
+    },
+    {
+      "id": "205408585",
+      "name": "Flinders",
+      "latitude": -38.458789,
+      "longitude": 144.978396
+    },
+    {
+      "id": "205410085",
+      "name": "Footscray",
+      "latitude": -37.798141,
+      "longitude": 144.897201
+    },
+    {
+      "id": "205410147",
+      "name": "Forest Hill",
+      "latitude": -37.839856,
+      "longitude": 145.17106
+    },
+    {
+      "id": "205409512",
+      "name": "Frankston",
+      "latitude": -38.148152,
+      "longitude": 145.145686
+    },
+    {
+      "id": "205410077",
+      "name": "Frankston North",
+      "latitude": -38.123907,
+      "longitude": 145.163863
+    },
+    {
+      "id": "205409690",
+      "name": "Frankston South",
+      "latitude": -38.175985,
+      "longitude": 145.12901
+    },
+    {
+      "id": "425679826",
+      "name": "Fraser Rise",
+      "latitude": -37.704808,
+      "longitude": 144.712627
+    },
+    {
+      "id": "205410393",
+      "name": "Gardenvale",
+      "latitude": -37.898113,
+      "longitude": 145.009135
+    },
+    {
+      "id": "205409306",
+      "name": "Garfield",
+      "latitude": -38.100334,
+      "longitude": 145.66977
+    },
+    {
+      "id": "205409460",
+      "name": "Garfield North",
+      "latitude": -38.04042,
+      "longitude": 145.67918
+    },
+    {
+      "id": "205407628",
+      "name": "Gembrook",
+      "latitude": -37.945012,
+      "longitude": 145.63905
+    },
+    {
+      "id": "205409705",
+      "name": "Gilderoy",
+      "latitude": -37.86349,
+      "longitude": 145.714086
+    },
+    {
+      "id": "205408098",
+      "name": "Gisborne",
+      "latitude": -37.51047,
+      "longitude": 144.569573
+    },
+    {
+      "id": "205410168",
+      "name": "Gladstone Park",
+      "latitude": -37.689989,
+      "longitude": 144.893699
+    },
+    {
+      "id": "205409381",
+      "name": "Gladysdale",
+      "latitude": -37.838992,
+      "longitude": 145.642479
+    },
+    {
+      "id": "205410366",
+      "name": "Glen Huntly",
+      "latitude": -37.89235,
+      "longitude": 145.041364
+    },
+    {
+      "id": "205409942",
+      "name": "Glen Iris",
+      "latitude": -37.855963,
+      "longitude": 145.065003
+    },
+    {
+      "id": "205409628",
+      "name": "Glen Waverley",
+      "latitude": -37.881591,
+      "longitude": 145.168183
+    },
+    {
+      "id": "205409903",
+      "name": "Glenroy",
+      "latitude": -37.70262,
+      "longitude": 144.92729
+    },
+    {
+      "id": "205410340",
+      "name": "Gowanbrae",
+      "latitude": -37.703038,
+      "longitude": 144.897648
+    },
+    {
+      "id": "425650134",
+      "name": "Grangefields",
+      "latitude": -37.70238,
+      "longitude": 144.638702
+    },
+    {
+      "id": "205409848",
+      "name": "Greensborough",
+      "latitude": -37.69891,
+      "longitude": 145.107117
+    },
+    {
+      "id": "205409173",
+      "name": "Greenvale",
+      "latitude": -37.63653,
+      "longitude": 144.879742
+    },
+    {
+      "id": "205408609",
+      "name": "Gruyere",
+      "latitude": -37.730125,
+      "longitude": 145.465512
+    },
+    {
+      "id": "205410173",
+      "name": "Guys Hill",
+      "latitude": -38.013748,
+      "longitude": 145.391668
+    },
+    {
+      "id": "205410217",
+      "name": "Hadfield",
+      "latitude": -37.710144,
+      "longitude": 144.950085
+    },
+    {
+      "id": "205409931",
+      "name": "Hallam",
+      "latitude": -38.00755,
+      "longitude": 145.268922
+    },
+    {
+      "id": "205410134",
+      "name": "Hampton",
+      "latitude": -37.937863,
+      "longitude": 145.009273
+    },
+    {
+      "id": "205410335",
+      "name": "Hampton East",
+      "latitude": -37.938799,
+      "longitude": 145.030633
+    },
+    {
+      "id": "205409729",
+      "name": "Hampton Park",
+      "latitude": -38.038624,
+      "longitude": 145.268668
+    },
+    {
+      "id": "205409747",
+      "name": "Harkaway",
+      "latitude": -37.994183,
+      "longitude": 145.360027
+    },
+    {
+      "id": "425633658",
+      "name": "Harkness",
+      "latitude": -37.653781,
+      "longitude": 144.547196
+    },
+    {
+      "id": "205409304",
+      "name": "Hastings",
+      "latitude": -38.297228,
+      "longitude": 145.185217
+    },
+    {
+      "id": "205410035",
+      "name": "Hawthorn",
+      "latitude": -37.82479,
+      "longitude": 145.032081
+    },
+    {
+      "id": "205410190",
+      "name": "Hawthorn East",
+      "latitude": -37.831185,
+      "longitude": 145.050082
+    },
+    {
+      "id": "205407805",
+      "name": "Healesville",
+      "latitude": -37.660256,
+      "longitude": 145.550933
+    },
+    {
+      "id": "205409261",
+      "name": "Heath Hill",
+      "latitude": -38.243654,
+      "longitude": 145.70864
+    },
+    {
+      "id": "205409987",
+      "name": "Heatherton",
+      "latitude": -37.956019,
+      "longitude": 145.092884
+    },
+    {
+      "id": "205410119",
+      "name": "Heathmont",
+      "latitude": -37.830811,
+      "longitude": 145.244094
+    },
+    {
+      "id": "205410228",
+      "name": "Heidelberg",
+      "latitude": -37.752506,
+      "longitude": 145.069913
+    },
+    {
+      "id": "205410257",
+      "name": "Heidelberg Heights",
+      "latitude": -37.743235,
+      "longitude": 145.053491
+    },
+    {
+      "id": "205410209",
+      "name": "Heidelberg West",
+      "latitude": -37.738147,
+      "longitude": 145.04351
+    },
+    {
+      "id": "205410171",
+      "name": "Highett",
+      "latitude": -37.950364,
+      "longitude": 145.040451
+    },
+    {
+      "id": "205409937",
+      "name": "Hillside (Greater Melbourne)",
+      "latitude": -37.690438,
+      "longitude": 144.741698
+    },
+    {
+      "id": "205409687",
+      "name": "Hmas Cerberus",
+      "latitude": -38.38122,
+      "longitude": 145.198314
+    },
+    {
+      "id": "205408808",
+      "name": "Hoddles Creek",
+      "latitude": -37.850909,
+      "longitude": 145.59395
+    },
+    {
+      "id": "205409591",
+      "name": "Hoppers Crossing",
+      "latitude": -37.866489,
+      "longitude": 144.694673
+    },
+    {
+      "id": "205410295",
+      "name": "Hughesdale",
+      "latitude": -37.899465,
+      "longitude": 145.081143
+    },
+    {
+      "id": "205409031",
+      "name": "Humevale",
+      "latitude": -37.502001,
+      "longitude": 145.185577
+    },
+    {
+      "id": "205410371",
+      "name": "Huntingdale",
+      "latitude": -37.90764,
+      "longitude": 145.108466
+    },
+    {
+      "id": "205409689",
+      "name": "Hurstbridge",
+      "latitude": -37.637793,
+      "longitude": 145.194773
+    },
+    {
+      "id": "205409359",
+      "name": "Iona",
+      "latitude": -38.152307,
+      "longitude": 145.687437
+    },
+    {
+      "id": "205410081",
+      "name": "Ivanhoe",
+      "latitude": -37.767828,
+      "longitude": 145.043691
+    },
+    {
+      "id": "205410288",
+      "name": "Ivanhoe East",
+      "latitude": -37.773464,
+      "longitude": 145.061823
+    },
+    {
+      "id": "205410342",
+      "name": "Jacana",
+      "latitude": -37.687525,
+      "longitude": 144.910083
+    },
+    {
+      "id": "205410336",
+      "name": "Junction Village",
+      "latitude": -38.136012,
+      "longitude": 145.291432
+    },
+    {
+      "id": "205409984",
+      "name": "Kalkallo",
+      "latitude": -37.525915,
+      "longitude": 144.960355
+    },
+    {
+      "id": "205409768",
+      "name": "Kallista",
+      "latitude": -37.900227,
+      "longitude": 145.404225
+    },
+    {
+      "id": "205409952",
+      "name": "Kalorama",
+      "latitude": -37.818124,
+      "longitude": 145.383229
+    },
+    {
+      "id": "205409125",
+      "name": "Kangaroo Ground",
+      "latitude": -37.689358,
+      "longitude": 145.23198
+    },
+    {
+      "id": "205410265",
+      "name": "Kealba",
+      "latitude": -37.737312,
+      "longitude": 144.828145
+    },
+    {
+      "id": "205409845",
+      "name": "Keilor",
+      "latitude": -37.707255,
+      "longitude": 144.827178
+    },
+    {
+      "id": "205410099",
+      "name": "Keilor Downs",
+      "latitude": -37.72059,
+      "longitude": 144.804133
+    },
+    {
+      "id": "205409865",
+      "name": "Keilor East",
+      "latitude": -37.738776,
+      "longitude": 144.856832
+    },
+    {
+      "id": "205410368",
+      "name": "Keilor Lodge",
+      "latitude": -37.698436,
+      "longitude": 144.800169
+    },
+    {
+      "id": "205409968",
+      "name": "Keilor North",
+      "latitude": -37.681612,
+      "longitude": 144.793197
+    },
+    {
+      "id": "205410212",
+      "name": "Keilor Park",
+      "latitude": -37.719101,
+      "longitude": 144.851901
+    },
+    {
+      "id": "205410285",
+      "name": "Kensington",
+      "latitude": -37.794334,
+      "longitude": 144.927074
+    },
+    {
+      "id": "205409835",
+      "name": "Kew",
+      "latitude": -37.803408,
+      "longitude": 145.03318
+    },
+    {
+      "id": "205410149",
+      "name": "Kew East",
+      "latitude": -37.790615,
+      "longitude": 145.052546
+    },
+    {
+      "id": "205409442",
+      "name": "Keysborough",
+      "latitude": -38.005298,
+      "longitude": 145.167355
+    },
+    {
+      "id": "205409877",
+      "name": "Kilsyth",
+      "latitude": -37.814374,
+      "longitude": 145.318496
+    },
+    {
+      "id": "205410199",
+      "name": "Kilsyth South",
+      "latitude": -37.831465,
+      "longitude": 145.310982
+    },
+    {
+      "id": "205407963",
+      "name": "Kinglake",
+      "latitude": -37.510798,
+      "longitude": 145.356874
+    },
+    {
+      "id": "205408456",
+      "name": "Kinglake West",
+      "latitude": -37.478687,
+      "longitude": 145.250121
+    },
+    {
+      "id": "205410258",
+      "name": "Kings Park",
+      "latitude": -37.733707,
+      "longitude": 144.771973
+    },
+    {
+      "id": "205410344",
+      "name": "Kingsbury",
+      "latitude": -37.71618,
+      "longitude": 145.034063
+    },
+    {
+      "id": "205410373",
+      "name": "Kingsville",
+      "latitude": -37.808843,
+      "longitude": 144.879438
+    },
+    {
+      "id": "205410050",
+      "name": "Knoxfield",
+      "latitude": -37.890554,
+      "longitude": 145.249385
+    },
+    {
+      "id": "205408571",
+      "name": "Koo Wee Rup",
+      "latitude": -38.187819,
+      "longitude": 145.487594
+    },
+    {
+      "id": "205410113",
+      "name": "Koo Wee Rup North",
+      "latitude": -38.151182,
+      "longitude": 145.53902
+    },
+    {
+      "id": "205410383",
+      "name": "Kooyong",
+      "latitude": -37.841362,
+      "longitude": 145.035844
+    },
+    {
+      "id": "205409837",
+      "name": "Kurunjang",
+      "latitude": -37.660904,
+      "longitude": 144.591494
+    },
+    {
+      "id": "205409883",
+      "name": "Lalor",
+      "latitude": -37.666785,
+      "longitude": 145.012948
+    },
+    {
+      "id": "205408105",
+      "name": "Lang Lang",
+      "latitude": -38.295378,
+      "longitude": 145.582014
+    },
+    {
+      "id": "205409649",
+      "name": "Lang Lang East",
+      "latitude": -38.271776,
+      "longitude": 145.65699
+    },
+    {
+      "id": "205409232",
+      "name": "Langwarrin",
+      "latitude": -38.154568,
+      "longitude": 145.197394
+    },
+    {
+      "id": "205409910",
+      "name": "Langwarrin South",
+      "latitude": -38.18907,
+      "longitude": 145.191003
+    },
+    {
+      "id": "205409044",
+      "name": "Launching Place",
+      "latitude": -37.778045,
+      "longitude": 145.576174
+    },
+    {
+      "id": "205409979",
+      "name": "Laverton",
+      "latitude": -37.859129,
+      "longitude": 144.767539
+    },
+    {
+      "id": "205409669",
+      "name": "Laverton North",
+      "latitude": -37.830027,
+      "longitude": 144.787013
+    },
+    {
+      "id": "205409221",
+      "name": "Lilydale",
+      "latitude": -37.755651,
+      "longitude": 145.367813
+    },
+    {
+      "id": "205407673",
+      "name": "Little River",
+      "latitude": -37.931959,
+      "longitude": 144.466771
+    },
+    {
+      "id": "205408705",
+      "name": "Longwarry",
+      "latitude": -38.122981,
+      "longitude": 145.771242
+    },
+    {
+      "id": "205409887",
+      "name": "Longwarry North",
+      "latitude": -38.080475,
+      "longitude": 145.781876
+    },
+    {
+      "id": "205409993",
+      "name": "Lower Plenty",
+      "latitude": -37.738807,
+      "longitude": 145.116179
+    },
+    {
+      "id": "205410143",
+      "name": "Lynbrook",
+      "latitude": -38.055815,
+      "longitude": 145.256125
+    },
+    {
+      "id": "205409598",
+      "name": "Lyndhurst",
+      "latitude": -38.06848,
+      "longitude": 145.230703
+    },
+    {
+      "id": "205409160",
+      "name": "Lysterfield",
+      "latitude": -37.935327,
+      "longitude": 145.300829
+    },
+    {
+      "id": "205410109",
+      "name": "Lysterfield South",
+      "latitude": -37.952481,
+      "longitude": 145.266967
+    },
+    {
+      "id": "205409223",
+      "name": "Macclesfield",
+      "latitude": -37.878277,
+      "longitude": 145.48915
+    },
+    {
+      "id": "205410110",
+      "name": "Macleod",
+      "latitude": -37.721202,
+      "longitude": 145.070467
+    },
+    {
+      "id": "205410216",
+      "name": "Maidstone",
+      "latitude": -37.78191,
+      "longitude": 144.874149
+    },
+    {
+      "id": "205409284",
+      "name": "Main Ridge",
+      "latitude": -38.401451,
+      "longitude": 144.96891
+    },
+    {
+      "id": "205410234",
+      "name": "Malvern",
+      "latitude": -37.856809,
+      "longitude": 145.03502
+    },
+    {
+      "id": "205409960",
+      "name": "Malvern East",
+      "latitude": -37.876618,
+      "longitude": 145.06541
+    },
+    {
+      "id": "205409057",
+      "name": "Mambourin",
+      "latitude": -37.899634,
+      "longitude": 144.554101
+    },
+    {
+      "id": "423752265",
+      "name": "Manor Lakes",
+      "latitude": -37.86693,
+      "longitude": 144.58124
+    },
+    {
+      "id": "205410051",
+      "name": "Maribyrnong",
+      "latitude": -37.77268,
+      "longitude": 144.887774
+    },
+    {
+      "id": "205410203",
+      "name": "Maryknoll",
+      "latitude": -38.033884,
+      "longitude": 145.604278
+    },
+    {
+      "id": "205407638",
+      "name": "Marysville",
+      "latitude": -37.51796,
+      "longitude": 145.795132
+    },
+    {
+      "id": "205408406",
+      "name": "Matlock",
+      "latitude": -37.591211,
+      "longitude": 146.248135
+    },
+    {
+      "id": "205410132",
+      "name": "Mccrae",
+      "latitude": -38.355947,
+      "longitude": 144.932533
+    },
+    {
+      "id": "205410326",
+      "name": "Mckinnon",
+      "latitude": -37.91073,
+      "longitude": 145.038663
+    },
+    {
+      "id": "205407698",
+      "name": "Mcmahons Creek",
+      "latitude": -37.700268,
+      "longitude": 145.850169
+    },
+    {
+      "id": "205410098",
+      "name": "Meadow Heights",
+      "latitude": -37.65118,
+      "longitude": 144.918211
+    },
+    {
+      "id": "205410007",
+      "name": "Melbourne",
+      "latitude": -37.825043,
+      "longitude": 144.971515
+    },
+    {
+      "id": "205409285",
+      "name": "Melbourne Airport",
+      "latitude": -37.673756,
+      "longitude": 144.838034
+    },
+    {
+      "id": "205409487",
+      "name": "Melton",
+      "latitude": -37.675634,
+      "longitude": 144.611771
+    },
+    {
+      "id": "205409184",
+      "name": "Melton South",
+      "latitude": -37.706876,
+      "longitude": 144.570773
+    },
+    {
+      "id": "205409311",
+      "name": "Melton West",
+      "latitude": -37.679136,
+      "longitude": 144.541131
+    },
+    {
+      "id": "205410118",
+      "name": "Mentone",
+      "latitude": -37.981574,
+      "longitude": 145.069415
+    },
+    {
+      "id": "205409965",
+      "name": "Menzies Creek",
+      "latitude": -37.923163,
+      "longitude": 145.401183
+    },
+    {
+      "id": "205409426",
+      "name": "Mernda",
+      "latitude": -37.59165,
+      "longitude": 145.08367
+    },
+    {
+      "id": "205409776",
+      "name": "Merricks",
+      "latitude": -38.39108,
+      "longitude": 145.08115
+    },
+    {
+      "id": "205410320",
+      "name": "Merricks Beach",
+      "latitude": -38.393908,
+      "longitude": 145.106999
+    },
+    {
+      "id": "205409342",
+      "name": "Merricks North",
+      "latitude": -38.34513,
+      "longitude": 145.076769
+    },
+    {
+      "id": "205408611",
+      "name": "Mickleham",
+      "latitude": -37.539822,
+      "longitude": 144.900626
+    },
+    {
+      "id": "205410367",
+      "name": "Middle Park",
+      "latitude": -37.85122,
+      "longitude": 144.962337
+    },
+    {
+      "id": "205409743",
+      "name": "Mill Park",
+      "latitude": -37.664189,
+      "longitude": 145.06426
+    },
+    {
+      "id": "205409881",
+      "name": "Millgrove",
+      "latitude": -37.744864,
+      "longitude": 145.650751
+    },
+    {
+      "id": "205410000",
+      "name": "Mitcham",
+      "latitude": -37.818167,
+      "longitude": 145.199009
+    },
+    {
+      "id": "205409210",
+      "name": "Modella",
+      "latitude": -38.177818,
+      "longitude": 145.722371
+    },
+    {
+      "id": "205409489",
+      "name": "Monbulk",
+      "latitude": -37.873991,
+      "longitude": 145.427825
+    },
+    {
+      "id": "205409542",
+      "name": "Monomeith",
+      "latitude": -38.211556,
+      "longitude": 145.53369
+    },
+    {
+      "id": "205410317",
+      "name": "Mont Albert",
+      "latitude": -37.817669,
+      "longitude": 145.107782
+    },
+    {
+      "id": "205410283",
+      "name": "Mont Albert North",
+      "latitude": -37.803309,
+      "longitude": 145.110813
+    },
+    {
+      "id": "205410162",
+      "name": "Montmorency",
+      "latitude": -37.7189,
+      "longitude": 145.125126
+    },
+    {
+      "id": "205409809",
+      "name": "Montrose",
+      "latitude": -37.812492,
+      "longitude": 145.34715
+    },
+    {
+      "id": "205410122",
+      "name": "Moonee Ponds",
+      "latitude": -37.76561,
+      "longitude": 144.921441
+    },
+    {
+      "id": "205410107",
+      "name": "Moorabbin",
+      "latitude": -37.941445,
+      "longitude": 145.057788
+    },
+    {
+      "id": "205410224",
+      "name": "Moorabbin Airport",
+      "latitude": -37.977418,
+      "longitude": 145.099774
+    },
+    {
+      "id": "205408836",
+      "name": "Moorooduc",
+      "latitude": -38.247072,
+      "longitude": 145.11897
+    },
+    {
+      "id": "205409730",
+      "name": "Mooroolbark",
+      "latitude": -37.781254,
+      "longitude": 145.325511
+    },
+    {
+      "id": "205410121",
+      "name": "Mordialloc",
+      "latitude": -37.999381,
+      "longitude": 145.096082
+    },
+    {
+      "id": "205409453",
+      "name": "Mornington",
+      "latitude": -38.230281,
+      "longitude": 145.060077
+    },
+    {
+      "id": "205409846",
+      "name": "Mount Burnett",
+      "latitude": -37.974294,
+      "longitude": 145.508554
+    },
+    {
+      "id": "205408326",
+      "name": "Mount Cottrell",
+      "latitude": -37.78981,
+      "longitude": 144.620524
+    },
+    {
+      "id": "205409946",
+      "name": "Mount Dandenong",
+      "latitude": -37.836261,
+      "longitude": 145.350204
+    },
+    {
+      "id": "205409400",
+      "name": "Mount Eliza",
+      "latitude": -38.195017,
+      "longitude": 145.092713
+    },
+    {
+      "id": "205409607",
+      "name": "Mount Evelyn",
+      "latitude": -37.787448,
+      "longitude": 145.388033
+    },
+    {
+      "id": "205409177",
+      "name": "Mount Martha",
+      "latitude": -38.275474,
+      "longitude": 145.030648
+    },
+    {
+      "id": "205409739",
+      "name": "Mount Toolebewong",
+      "latitude": -37.719889,
+      "longitude": 145.560418
+    },
+    {
+      "id": "205409674",
+      "name": "Mount Waverley",
+      "latitude": -37.878369,
+      "longitude": 145.128504
+    },
+    {
+      "id": "205409825",
+      "name": "Mulgrave",
+      "latitude": -37.925675,
+      "longitude": 145.175989
+    },
+    {
+      "id": "205410248",
+      "name": "Murrumbeena",
+      "latitude": -37.896681,
+      "longitude": 145.070155
+    },
+    {
+      "id": "205410157",
+      "name": "Nangana",
+      "latitude": -37.87761,
+      "longitude": 145.535979
+    },
+    {
+      "id": "205408666",
+      "name": "Nar Nar Goon",
+      "latitude": -38.105953,
+      "longitude": 145.568915
+    },
+    {
+      "id": "205408865",
+      "name": "Nar Nar Goon North",
+      "latitude": -38.035454,
+      "longitude": 145.565188
+    },
+    {
+      "id": "205407739",
+      "name": "Narbethong",
+      "latitude": -37.530413,
+      "longitude": 145.632956
+    },
+    {
+      "id": "205409685",
+      "name": "Narre Warren",
+      "latitude": -38.018705,
+      "longitude": 145.305517
+    },
+    {
+      "id": "205409879",
+      "name": "Narre Warren East",
+      "latitude": -37.963176,
+      "longitude": 145.359477
+    },
+    {
+      "id": "205409458",
+      "name": "Narre Warren North",
+      "latitude": -37.98191,
+      "longitude": 145.313262
+    },
+    {
+      "id": "205409736",
+      "name": "Narre Warren South",
+      "latitude": -38.055299,
+      "longitude": 145.302517
+    },
+    {
+      "id": "205410073",
+      "name": "Newport",
+      "latitude": -37.843576,
+      "longitude": 144.880428
+    },
+    {
+      "id": "205410304",
+      "name": "Niddrie",
+      "latitude": -37.73946,
+      "longitude": 144.884663
+    },
+    {
+      "id": "205409917",
+      "name": "Noble Park",
+      "latitude": -37.969495,
+      "longitude": 145.176906
+    },
+    {
+      "id": "205410175",
+      "name": "Noble Park North",
+      "latitude": -37.951265,
+      "longitude": 145.190596
+    },
+    {
+      "id": "205410266",
+      "name": "North Melbourne",
+      "latitude": -37.79844,
+      "longitude": 144.944823
+    },
+    {
+      "id": "205409893",
+      "name": "North Warrandyte",
+      "latitude": -37.72545,
+      "longitude": 145.21614
+    },
+    {
+      "id": "205410030",
+      "name": "Northcote",
+      "latitude": -37.772515,
+      "longitude": 145.000563
+    },
+    {
+      "id": "205410323",
+      "name": "Notting Hill",
+      "latitude": -37.904742,
+      "longitude": 145.141756
+    },
+    {
+      "id": "205410082",
+      "name": "Nunawading",
+      "latitude": -37.817349,
+      "longitude": 145.176535
+    },
+    {
+      "id": "205409983",
+      "name": "Nutfield",
+      "latitude": -37.602121,
+      "longitude": 145.185521
+    },
+    {
+      "id": "205408256",
+      "name": "Nyora",
+      "latitude": -38.30857,
+      "longitude": 145.683703
+    },
+    {
+      "id": "205410289",
+      "name": "Oak Park",
+      "latitude": -37.717486,
+      "longitude": 144.917016
+    },
+    {
+      "id": "205409045",
+      "name": "Oaklands Junction",
+      "latitude": -37.589319,
+      "longitude": 144.841006
+    },
+    {
+      "id": "205410192",
+      "name": "Oakleigh",
+      "latitude": -37.900665,
+      "longitude": 145.095677
+    },
+    {
+      "id": "205410291",
+      "name": "Oakleigh East",
+      "latitude": -37.903894,
+      "longitude": 145.115333
+    },
+    {
+      "id": "205409999",
+      "name": "Oakleigh South",
+      "latitude": -37.924379,
+      "longitude": 145.094284
+    },
+    {
+      "id": "205409202",
+      "name": "Officer",
+      "latitude": -38.054225,
+      "longitude": 145.41254
+    },
+    {
+      "id": "205409502",
+      "name": "Officer South",
+      "latitude": -38.100938,
+      "longitude": 145.423008
+    },
+    {
+      "id": "205409581",
+      "name": "Olinda",
+      "latitude": -37.852565,
+      "longitude": 145.37987
+    },
+    {
+      "id": "205410292",
+      "name": "Ormond",
+      "latitude": -37.903904,
+      "longitude": 145.04176
+    },
+    {
+      "id": "205408179",
+      "name": "Pakenham",
+      "latitude": -38.073575,
+      "longitude": 145.485161
+    },
+    {
+      "id": "205409415",
+      "name": "Pakenham South",
+      "latitude": -38.13753,
+      "longitude": 145.502047
+    },
+    {
+      "id": "205409135",
+      "name": "Pakenham Upper",
+      "latitude": -38.007796,
+      "longitude": 145.507745
+    },
+    {
+      "id": "205409468",
+      "name": "Panton Hill",
+      "latitude": -37.642795,
+      "longitude": 145.246448
+    },
+    {
+      "id": "205409878",
+      "name": "Park Orchards",
+      "latitude": -37.776989,
+      "longitude": 145.214768
+    },
+    {
+      "id": "205410184",
+      "name": "Parkdale",
+      "latitude": -37.991808,
+      "longitude": 145.081295
+    },
+    {
+      "id": "205410145",
+      "name": "Parkville",
+      "latitude": -37.786834,
+      "longitude": 144.951303
+    },
+    {
+      "id": "205408264",
+      "name": "Parwan",
+      "latitude": -37.742751,
+      "longitude": 144.468528
+    },
+    {
+      "id": "205410091",
+      "name": "Pascoe Vale",
+      "latitude": -37.725002,
+      "longitude": 144.938185
+    },
+    {
+      "id": "205410222",
+      "name": "Pascoe Vale South",
+      "latitude": -37.743127,
+      "longitude": 144.938374
+    },
+    {
+      "id": "205410130",
+      "name": "Patterson Lakes",
+      "latitude": -38.069494,
+      "longitude": 145.143284
+    },
+    {
+      "id": "205409095",
+      "name": "Pearcedale",
+      "latitude": -38.197751,
+      "longitude": 145.247738
+    },
+    {
+      "id": "205409816",
+      "name": "Plenty",
+      "latitude": -37.667407,
+      "longitude": 145.112366
+    },
+    {
+      "id": "205408556",
+      "name": "Plumpton",
+      "latitude": -37.669112,
+      "longitude": 144.689014
+    },
+    {
+      "id": "205408993",
+      "name": "Point Cook",
+      "latitude": -37.905596,
+      "longitude": 144.751617
+    },
+    {
+      "id": "205410207",
+      "name": "Point Leo",
+      "latitude": -38.415472,
+      "longitude": 145.069827
+    },
+    {
+      "id": "205409864",
+      "name": "Port Melbourne",
+      "latitude": -37.832918,
+      "longitude": 144.921869
+    },
+    {
+      "id": "205409803",
+      "name": "Portsea",
+      "latitude": -38.322668,
+      "longitude": 144.700177
+    },
+    {
+      "id": "205408700",
+      "name": "Powelltown",
+      "latitude": -37.857065,
+      "longitude": 145.765839
+    },
+    {
+      "id": "205410305",
+      "name": "Prahran",
+      "latitude": -37.85175,
+      "longitude": 145.000353
+    },
+    {
+      "id": "205409793",
+      "name": "Preston",
+      "latitude": -37.74167,
+      "longitude": 145.008033
+    },
+    {
+      "id": "205410384",
+      "name": "Princes Hill",
+      "latitude": -37.781806,
+      "longitude": 144.966593
+    },
+    {
+      "id": "205408578",
+      "name": "Quandong",
+      "latitude": -37.84385,
+      "longitude": 144.502969
+    },
+    {
+      "id": "205409934",
+      "name": "Ravenhall",
+      "latitude": -37.775476,
+      "longitude": 144.736599
+    },
+    {
+      "id": "205409397",
+      "name": "Red Hill",
+      "latitude": -38.363449,
+      "longitude": 145.016101
+    },
+    {
+      "id": "205409673",
+      "name": "Red Hill South",
+      "latitude": -38.387696,
+      "longitude": 145.039426
+    },
+    {
+      "id": "205407684",
+      "name": "Reefton",
+      "latitude": -37.670868,
+      "longitude": 145.914877
+    },
+    {
+      "id": "205409901",
+      "name": "Research",
+      "latitude": -37.706819,
+      "longitude": 145.187792
+    },
+    {
+      "id": "205409547",
+      "name": "Reservoir",
+      "latitude": -37.712006,
+      "longitude": 145.006909
+    },
+    {
+      "id": "205410117",
+      "name": "Richmond",
+      "latitude": -37.820323,
+      "longitude": 145.002465
+    },
+    {
+      "id": "205409851",
+      "name": "Ringwood",
+      "latitude": -37.811505,
+      "longitude": 145.233409
+    },
+    {
+      "id": "205410103",
+      "name": "Ringwood East",
+      "latitude": -37.813314,
+      "longitude": 145.253562
+    },
+    {
+      "id": "205410068",
+      "name": "Ringwood North",
+      "latitude": -37.793042,
+      "longitude": 145.231199
+    },
+    {
+      "id": "205410390",
+      "name": "Ripponlea",
+      "latitude": -37.87776,
+      "longitude": 144.995285
+    },
+    {
+      "id": "205408959",
+      "name": "Rockbank",
+      "latitude": -37.733883,
+      "longitude": 144.649065
+    },
+    {
+      "id": "205410198",
+      "name": "Rosanna",
+      "latitude": -37.73963,
+      "longitude": 145.069685
+    },
+    {
+      "id": "205409637",
+      "name": "Rosebud",
+      "latitude": -38.373715,
+      "longitude": 144.913593
+    },
+    {
+      "id": "205409438",
+      "name": "Rowville",
+      "latitude": -37.92436,
+      "longitude": 145.243935
+    },
+    {
+      "id": "205409997",
+      "name": "Roxburgh Park",
+      "latitude": -37.625758,
+      "longitude": 144.9254
+    },
+    {
+      "id": "205409588",
+      "name": "Rye",
+      "latitude": -38.385128,
+      "longitude": 144.812271
+    },
+    {
+      "id": "205410151",
+      "name": "Rythdale",
+      "latitude": -38.13954,
+      "longitude": 145.462578
+    },
+    {
+      "id": "205410029",
+      "name": "Safety Beach",
+      "latitude": -38.315367,
+      "longitude": 145.000145
+    },
+    {
+      "id": "206281870",
+      "name": "Sandhurst",
+      "latitude": -38.082083,
+      "longitude": 145.208695
+    },
+    {
+      "id": "205410165",
+      "name": "Sandringham",
+      "latitude": -37.953613,
+      "longitude": 145.014635
+    },
+    {
+      "id": "205410104",
+      "name": "Sassafras",
+      "latitude": -37.863515,
+      "longitude": 145.347675
+    },
+    {
+      "id": "205409885",
+      "name": "Scoresby",
+      "latitude": -37.901736,
+      "longitude": 145.218861
+    },
+    {
+      "id": "205410321",
+      "name": "Seabrook",
+      "latitude": -37.880901,
+      "longitude": 144.758663
+    },
+    {
+      "id": "205409752",
+      "name": "Seaford",
+      "latitude": -38.104682,
+      "longitude": 145.138495
+    },
+    {
+      "id": "205410361",
+      "name": "Seaholme",
+      "latitude": -37.864215,
+      "longitude": 144.844063
+    },
+    {
+      "id": "205410365",
+      "name": "Seddon",
+      "latitude": -37.806626,
+      "longitude": 144.891676
+    },
+    {
+      "id": "205410006",
+      "name": "Selby",
+      "latitude": -37.918549,
+      "longitude": 145.378578
+    },
+    {
+      "id": "205409452",
+      "name": "Seville",
+      "latitude": -37.792631,
+      "longitude": 145.475551
+    },
+    {
+      "id": "205409863",
+      "name": "Seville East",
+      "latitude": -37.77853,
+      "longitude": 145.50321
+    },
+    {
+      "id": "205410001",
+      "name": "Sherbrooke",
+      "latitude": -37.888413,
+      "longitude": 145.359305
+    },
+    {
+      "id": "205409509",
+      "name": "Shoreham",
+      "latitude": -38.421746,
+      "longitude": 145.032712
+    },
+    {
+      "id": "205409183",
+      "name": "Silvan",
+      "latitude": -37.836515,
+      "longitude": 145.433451
+    },
+    {
+      "id": "205409515",
+      "name": "Skye",
+      "latitude": -38.105055,
+      "longitude": 145.216215
+    },
+    {
+      "id": "205409686",
+      "name": "Smiths Gully",
+      "latitude": -37.626989,
+      "longitude": 145.28835
+    },
+    {
+      "id": "205409713",
+      "name": "Somers",
+      "latitude": -38.381388,
+      "longitude": 145.16097
+    },
+    {
+      "id": "205410062",
+      "name": "Somerton",
+      "latitude": -37.634599,
+      "longitude": 144.950733
+    },
+    {
+      "id": "205408956",
+      "name": "Somerville",
+      "latitude": -38.232131,
+      "longitude": 145.200695
+    },
+    {
+      "id": "205409982",
+      "name": "Sorrento",
+      "latitude": -38.344612,
+      "longitude": 144.741971
+    },
+    {
+      "id": "205410375",
+      "name": "South Kingsville",
+      "latitude": -37.830689,
+      "longitude": 144.871438
+    },
+    {
+      "id": "205410281",
+      "name": "South Melbourne",
+      "latitude": -37.833925,
+      "longitude": 144.957476
+    },
+    {
+      "id": "205409471",
+      "name": "South Morang",
+      "latitude": -37.632299,
+      "longitude": 145.084701
+    },
+    {
+      "id": "210768089",
+      "name": "South Wharf",
+      "latitude": -37.825274,
+      "longitude": 144.952081
+    },
+    {
+      "id": "205410181",
+      "name": "South Yarra",
+      "latitude": -37.839219,
+      "longitude": 144.991866
+    },
+    {
+      "id": "205410296",
+      "name": "Southbank",
+      "latitude": -37.825861,
+      "longitude": 144.962279
+    },
+    {
+      "id": "205410226",
+      "name": "Spotswood",
+      "latitude": -37.829601,
+      "longitude": 144.887856
+    },
+    {
+      "id": "205409812",
+      "name": "Springvale",
+      "latitude": -37.945696,
+      "longitude": 145.157968
+    },
+    {
+      "id": "205410112",
+      "name": "Springvale South",
+      "latitude": -37.970757,
+      "longitude": 145.148021
+    },
+    {
+      "id": "205409734",
+      "name": "St Albans",
+      "latitude": -37.745363,
+      "longitude": 144.805286
+    },
+    {
+      "id": "205408917",
+      "name": "St Andrews",
+      "latitude": -37.583308,
+      "longitude": 145.287522
+    },
+    {
+      "id": "205410223",
+      "name": "St Andrews Beach",
+      "latitude": -38.420074,
+      "longitude": 144.831282
+    },
+    {
+      "id": "205410322",
+      "name": "St Helena",
+      "latitude": -37.689486,
+      "longitude": 145.129484
+    },
+    {
+      "id": "205410214",
+      "name": "St Kilda",
+      "latitude": -37.863691,
+      "longitude": 144.981801
+    },
+    {
+      "id": "205410273",
+      "name": "St Kilda East",
+      "latitude": -37.866789,
+      "longitude": 145.002128
+    },
+    {
+      "id": "205410381",
+      "name": "St Kilda West",
+      "latitude": -37.858057,
+      "longitude": 144.971211
+    },
+    {
+      "id": "205409175",
+      "name": "Steels Creek",
+      "latitude": -37.579665,
+      "longitude": 145.381235
+    },
+    {
+      "id": "205409485",
+      "name": "Strathewen",
+      "latitude": -37.538741,
+      "longitude": 145.270168
+    },
+    {
+      "id": "205410059",
+      "name": "Strathmore",
+      "latitude": -37.733231,
+      "longitude": 144.916953
+    },
+    {
+      "id": "205410377",
+      "name": "Strathmore Heights",
+      "latitude": -37.713365,
+      "longitude": 144.896938
+    },
+    {
+      "id": "425646096",
+      "name": "Strathtulloh",
+      "latitude": -37.733969,
+      "longitude": 144.596923
+    },
+    {
+      "id": "205407856",
+      "name": "Sunbury",
+      "latitude": -37.547032,
+      "longitude": 144.715095
+    },
+    {
+      "id": "205410101",
+      "name": "Sunshine",
+      "latitude": -37.789294,
+      "longitude": 144.834345
+    },
+    {
+      "id": "205409948",
+      "name": "Sunshine North",
+      "latitude": -37.763968,
+      "longitude": 144.83642
+    },
+    {
+      "id": "205409873",
+      "name": "Sunshine West",
+      "latitude": -37.79809,
+      "longitude": 144.811088
+    },
+    {
+      "id": "205410120",
+      "name": "Surrey Hills",
+      "latitude": -37.826732,
+      "longitude": 145.098228
+    },
+    {
+      "id": "205410180",
+      "name": "Sydenham",
+      "latitude": -37.699748,
+      "longitude": 144.765336
+    },
+    {
+      "id": "205408965",
+      "name": "Tarneit",
+      "latitude": -37.835469,
+      "longitude": 144.664662
+    },
+    {
+      "id": "205409712",
+      "name": "Tarrawarra",
+      "latitude": -37.655912,
+      "longitude": 145.444208
+    },
+    {
+      "id": "205410111",
+      "name": "Taylors Hill",
+      "latitude": -37.71515,
+      "longitude": 144.752913
+    },
+    {
+      "id": "205409967",
+      "name": "Taylors Lakes",
+      "latitude": -37.698566,
+      "longitude": 144.786397
+    },
+    {
+      "id": "205410308",
+      "name": "Tecoma",
+      "latitude": -37.904586,
+      "longitude": 145.343882
+    },
+    {
+      "id": "205409645",
+      "name": "Templestowe",
+      "latitude": -37.753985,
+      "longitude": 145.148752
+    },
+    {
+      "id": "205410034",
+      "name": "Templestowe Lower",
+      "latitude": -37.763831,
+      "longitude": 145.112197
+    },
+    {
+      "id": "205410075",
+      "name": "The Basin",
+      "latitude": -37.855398,
+      "longitude": 145.319066
+    },
+    {
+      "id": "205410166",
+      "name": "The Patch",
+      "latitude": -37.891412,
+      "longitude": 145.40091
+    },
+    {
+      "id": "205409684",
+      "name": "Thomastown",
+      "latitude": -37.683507,
+      "longitude": 145.007548
+    },
+    {
+      "id": "205410074",
+      "name": "Thornbury",
+      "latitude": -37.758172,
+      "longitude": 145.005796
+    },
+    {
+      "id": "425649319",
+      "name": "Thornhill Park",
+      "latitude": -37.730296,
+      "longitude": 144.624906
+    },
+    {
+      "id": "205409050",
+      "name": "Three Bridges",
+      "latitude": -37.848166,
+      "longitude": 145.690027
+    },
+    {
+      "id": "205408951",
+      "name": "Tonimbuk",
+      "latitude": -38.015027,
+      "longitude": 145.713405
+    },
+    {
+      "id": "205407705",
+      "name": "Toolangi",
+      "latitude": -37.521579,
+      "longitude": 145.500607
+    },
+    {
+      "id": "205408080",
+      "name": "Toolern Vale",
+      "latitude": -37.604695,
+      "longitude": 144.589867
+    },
+    {
+      "id": "205409279",
+      "name": "Tooradin",
+      "latitude": -38.200773,
+      "longitude": 145.383797
+    },
+    {
+      "id": "205410128",
+      "name": "Toorak",
+      "latitude": -37.841546,
+      "longitude": 145.017512
+    },
+    {
+      "id": "205407699",
+      "name": "Toorongo",
+      "latitude": -37.775513,
+      "longitude": 146.086885
+    },
+    {
+      "id": "205410193",
+      "name": "Tootgarook",
+      "latitude": -38.377568,
+      "longitude": 144.850138
+    },
+    {
+      "id": "205410286",
+      "name": "Tottenham",
+      "latitude": -37.80464,
+      "longitude": 144.852905
+    },
+    {
+      "id": "205410387",
+      "name": "Travancore",
+      "latitude": -37.780768,
+      "longitude": 144.935467
+    },
+    {
+      "id": "205410054",
+      "name": "Tremont",
+      "latitude": -37.879098,
+      "longitude": 145.31626
+    },
+    {
+      "id": "205408583",
+      "name": "Truganina",
+      "latitude": -37.799685,
+      "longitude": 144.712028
+    },
+    {
+      "id": "205408940",
+      "name": "Tuerong",
+      "latitude": -38.298716,
+      "longitude": 145.096857
+    },
+    {
+      "id": "205409969",
+      "name": "Tullamarine",
+      "latitude": -37.705408,
+      "longitude": 144.872287
+    },
+    {
+      "id": "205409380",
+      "name": "Tyabb",
+      "latitude": -38.26513,
+      "longitude": 145.184494
+    },
+    {
+      "id": "205409456",
+      "name": "Tynong",
+      "latitude": -38.095299,
+      "longitude": 145.626274
+    },
+    {
+      "id": "205408734",
+      "name": "Tynong North",
+      "latitude": -38.028155,
+      "longitude": 145.627916
+    },
+    {
+      "id": "205410179",
+      "name": "Upper Ferntree Gully",
+      "latitude": -37.898098,
+      "longitude": 145.30926
+    },
+    {
+      "id": "205410019",
+      "name": "Upwey",
+      "latitude": -37.905493,
+      "longitude": 145.329035
+    },
+    {
+      "id": "205410108",
+      "name": "Vermont",
+      "latitude": -37.838446,
+      "longitude": 145.199186
+    },
+    {
+      "id": "205410022",
+      "name": "Vermont South",
+      "latitude": -37.854372,
+      "longitude": 145.187823
+    },
+    {
+      "id": "205409986",
+      "name": "Vervale",
+      "latitude": -38.137802,
+      "longitude": 145.6598
+    },
+    {
+      "id": "205410105",
+      "name": "Viewbank",
+      "latitude": -37.739674,
+      "longitude": 145.093237
+    },
+    {
+      "id": "205409593",
+      "name": "Wandin East",
+      "latitude": -37.812321,
+      "longitude": 145.454881
+    },
+    {
+      "id": "205409939",
+      "name": "Wandin North",
+      "latitude": -37.780887,
+      "longitude": 145.426385
+    },
+    {
+      "id": "205409933",
+      "name": "Wantirna",
+      "latitude": -37.852346,
+      "longitude": 145.22588
+    },
+    {
+      "id": "205409720",
+      "name": "Wantirna South",
+      "latitude": -37.873882,
+      "longitude": 145.221934
+    },
+    {
+      "id": "205407853",
+      "name": "Warburton",
+      "latitude": -37.728299,
+      "longitude": 145.698147
+    },
+    {
+      "id": "205410202",
+      "name": "Warneet",
+      "latitude": -38.225815,
+      "longitude": 145.319575
+    },
+    {
+      "id": "205409597",
+      "name": "Warrandyte",
+      "latitude": -37.747778,
+      "longitude": 145.209592
+    },
+    {
+      "id": "205410125",
+      "name": "Warrandyte South",
+      "latitude": -37.76023,
+      "longitude": 145.244046
+    },
+    {
+      "id": "205410227",
+      "name": "Warranwood",
+      "latitude": -37.772615,
+      "longitude": 145.249786
+    },
+    {
+      "id": "205410290",
+      "name": "Waterways",
+      "latitude": -38.014751,
+      "longitude": 145.130525
+    },
+    {
+      "id": "205410274",
+      "name": "Watsonia",
+      "latitude": -37.710512,
+      "longitude": 145.083564
+    },
+    {
+      "id": "205410334",
+      "name": "Watsonia North",
+      "latitude": -37.695837,
+      "longitude": 145.085151
+    },
+    {
+      "id": "205410309",
+      "name": "Watsons Creek",
+      "latitude": -37.662111,
+      "longitude": 145.261945
+    },
+    {
+      "id": "205409897",
+      "name": "Wattle Glen",
+      "latitude": -37.66732,
+      "longitude": 145.188393
+    },
+    {
+      "id": "425641783",
+      "name": "Weir Views",
+      "latitude": -37.728696,
+      "longitude": 144.56834
+    },
+    {
+      "id": "205408799",
+      "name": "Werribee",
+      "latitude": -37.906799,
+      "longitude": 144.642178
+    },
+    {
+      "id": "205409004",
+      "name": "Werribee South",
+      "latitude": -37.938315,
+      "longitude": 144.697029
+    },
+    {
+      "id": "205408895",
+      "name": "Wesburn",
+      "latitude": -37.774078,
+      "longitude": 145.653587
+    },
+    {
+      "id": "205410163",
+      "name": "West Footscray",
+      "latitude": -37.800516,
+      "longitude": 144.8709
+    },
+    {
+      "id": "205410013",
+      "name": "West Melbourne",
+      "latitude": -37.809506,
+      "longitude": 144.925591
+    },
+    {
+      "id": "205410094",
+      "name": "Westmeadows",
+      "latitude": -37.675244,
+      "longitude": 144.892757
+    },
+    {
+      "id": "205409840",
+      "name": "Wheelers Hill",
+      "latitude": -37.907526,
+      "longitude": 145.187012
+    },
+    {
+      "id": "205408013",
+      "name": "Whittlesea",
+      "latitude": -37.465648,
+      "longitude": 145.131088
+    },
+    {
+      "id": "205408884",
+      "name": "Wildwood",
+      "latitude": -37.558867,
+      "longitude": 144.800215
+    },
+    {
+      "id": "209747025",
+      "name": "Williams Landing",
+      "latitude": -37.861981,
+      "longitude": 144.743024
+    },
+    {
+      "id": "205410046",
+      "name": "Williamstown",
+      "latitude": -37.861292,
+      "longitude": 144.890086
+    },
+    {
+      "id": "205410310",
+      "name": "Williamstown North",
+      "latitude": -37.852631,
+      "longitude": 144.868922
+    },
+    {
+      "id": "205410356",
+      "name": "Windsor",
+      "latitude": -37.854537,
+      "longitude": 144.992668
+    },
+    {
+      "id": "205408619",
+      "name": "Wollert",
+      "latitude": -37.592013,
+      "longitude": 145.005567
+    },
+    {
+      "id": "205409407",
+      "name": "Wonga Park",
+      "latitude": -37.735546,
+      "longitude": 145.269696
+    },
+    {
+      "id": "205409154",
+      "name": "Woodstock",
+      "latitude": -37.545529,
+      "longitude": 145.055339
+    },
+    {
+      "id": "205409287",
+      "name": "Woori Yallock",
+      "latitude": -37.781094,
+      "longitude": 145.535709
+    },
+    {
+      "id": "205408838",
+      "name": "Wyndham Vale",
+      "latitude": -37.859191,
+      "longitude": 144.608172
+    },
+    {
+      "id": "205410238",
+      "name": "Yallambie",
+      "latitude": -37.725043,
+      "longitude": 145.093371
+    },
+    {
+      "id": "205409128",
+      "name": "Yan Yean",
+      "latitude": -37.550611,
+      "longitude": 145.129282
+    },
+    {
+      "id": "205409021",
+      "name": "Yannathan",
+      "latitude": -38.225237,
+      "longitude": 145.643944
+    },
+    {
+      "id": "205409054",
+      "name": "Yarra Glen",
+      "latitude": -37.64678,
+      "longitude": 145.38155
+    },
+    {
+      "id": "205409596",
+      "name": "Yarra Junction",
+      "latitude": -37.793921,
+      "longitude": 145.625388
+    },
+    {
+      "id": "205409667",
+      "name": "Yarrambat",
+      "latitude": -37.637439,
+      "longitude": 145.135036
+    },
+    {
+      "id": "205410047",
+      "name": "Yarraville",
+      "latitude": -37.81793,
+      "longitude": 144.881977
+    },
+    {
+      "id": "205408822",
+      "name": "Yellingbo",
+      "latitude": -37.846352,
+      "longitude": 145.530312
+    },
+    {
+      "id": "205409355",
+      "name": "Yering",
+      "latitude": -37.687245,
+      "longitude": 145.368914
+    },
+    {
+      "id": "205409894",
+      "name": "Yuroke",
+      "latitude": -37.580279,
+      "longitude": 144.864023
+    }
+  ]
+}
