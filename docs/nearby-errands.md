@@ -9,12 +9,15 @@ within the suburb. Find them under **Available location hashtags**.
 
 Open **📍 Nearby errands** from the home header. Add a hashtag to a todo, for
 example `Milk #supermarket`, `Coffee #coles`, `Bread #woolworths` or `Socks #kmart`.
-Press **Use my location** and allow browser location access, or type a Melbourne
-suburb into **Choose a starting location** and select a suggestion. Search accepts
+Press the **location icon** and allow browser location access, or tap a hot suburb
+pill to start at its centre. Use the **edit icon** to open **Hot suburbs**, where
+you can add, remove and reorder suburb shortcuts, then Save (or Cancel to discard).
+The initial shortcuts are Melbourne, Brunswick and Richmond; your saved list syncs
+across devices and is included in backups. Search in the editor accepts
 partial names and spelling mistakes; use the arrow keys and Enter or tap a result.
 Distances start from the suburb's approximate centre. Choose a radius from 1 to 50 km.
-The **Clear** button beside the suburb field clears the text and any saved suburb
-starting point across devices. Clearing search text leaves a saved GPS point intact.
+The **Clear** button beside the editor's suburb field clears the search text.
+Editing shortcuts leaves the current starting location unchanged.
 
 Expand **Available location hashtags**, below the suggestions, to browse hashtags supported by the whole
 retail catalogue and your saved locations, with the number of matching places.

@@ -5,11 +5,12 @@
     import { suburbLocations } from '$lib/suburbLocations';
     import { nearbyTaskPills } from '$lib/nearbyPills';
     import { docState, commitState } from '$lib/yjsStore.svelte';
-    import { readFolders, readLists, readAllItems, readCustomLocations, saveCustomLocation, deleteCustomLocation, readStartingLocation, saveStartingLocation, clearStartingLocation, isItemDone, readNearbyChecklist, nearbyItemFingerprint, rememberNearbyChecklist, dismissNearbyChecklist, setNearbyTodoDone, readPausedErrandTags, setErrandTagPaused } from '$lib/data';
+    import { readFolders, readLists, readAllItems, readCustomLocations, saveCustomLocation, deleteCustomLocation, readStartingLocation, saveStartingLocation, readHotSuburbIds, saveHotSuburbIds, isItemDone, readNearbyChecklist, nearbyItemFingerprint, rememberNearbyChecklist, dismissNearbyChecklist, setNearbyTodoDone, readPausedErrandTags, setErrandTagPaused } from '$lib/data';
     import { collectErrands, nearbyStops, suggestStops, isErrandPaused, isLocationOptionalErrand, locationOptionalTag, LOCATION_OPTIONAL_TAGS, type NearbyStop } from '$lib/nearbyErrands';
     import { availableLocationTags, matchingLocationTags, validCoordinates, normalizeLocationTag, type Coordinates, type RetailLocation } from '$lib/retailLocations';
     import ConfirmDialog from './ConfirmDialog.svelte';
-    import SuburbPicker from './SuburbPicker.svelte';
+    import HotSuburbsScreen from './HotSuburbsScreen.svelte';
+    import { suburbById } from '$lib/hotSuburbs';
     import type { Suburb } from '$lib/suburbSearch';
     import { isChecklistDismissed } from '$lib/nearbyChecklist';
 
@@ -21,7 +22,9 @@
     let locating = $state(false);
     let locationError = $state('');
     let radius = $state(5);
-    let suburbQuery = $state('');
+    let showHotSuburbs = $state(false);
+    const hotSuburbIds = $derived.by(() => { void docState.version; return readHotSuburbIds(); });
+    const hotSuburbs = $derived(hotSuburbIds.flatMap(id => { const suburb = suburbById.get(id); return suburb ? [suburb] : []; }));
     let showLocations = $state(false);
     let name = $state('');
     let address = $state('');
@@ -36,8 +39,7 @@
 
     $effect(() => {
         // Restore local persistence and follow remote updates without writing defaults back to Yjs.
-        const location = savedLocation;
-        suburbQuery = location?.source === 'suburb' ? location.label : '';
+        void savedLocation;
         requestVersion++;
         locating = false;
     });
@@ -152,13 +154,10 @@
             source: 'suburb', label: suburb.name, accuracy: null, updatedAt: new Date().toISOString() });
     }
 
-    function clearSuburb() {
+    function saveHotSuburbs(ids: string[]) {
         if (commitState.isHistorical) return;
-        requestVersion++;
-        locating = false;
-        locationError = '';
-        // Clearing search text must not discard a saved GPS starting point.
-        if (savedLocation?.source === 'suburb') clearStartingLocation();
+        saveHotSuburbIds(ids);
+        showHotSuburbs = false;
     }
 
     function clearForm() {
@@ -202,6 +201,9 @@
                 </article>
 {/snippet}
 
+{#if showHotSuburbs}
+    <HotSuburbsScreen initialIds={hotSuburbIds} onBack={() => showHotSuburbs = false} onSave={saveHotSuburbs} />
+{:else}
 <div class="nearby-screen">
     <header>
         <button class="back" onclick={onBack} aria-label="Back to lists">←</button>
@@ -220,10 +222,23 @@
             {/each}
         </section>
         <section class="position">
-            <button class="primary" onclick={useGps} disabled={locating || commitState.isHistorical}>{locating ? 'Finding your location…' : origin ? 'Update my location' : 'Use my location'}</button>
-            <p class="hint">Your last starting location is remembered and syncs across your devices. GPS updates only when you press this button.</p>
+            <div class="location-shortcuts">
+                <button class="primary location-icon" onclick={useGps} disabled={locating || commitState.isHistorical}
+                    aria-label={locating ? 'Finding your location…' : origin ? 'Update my location' : 'Use my location'}
+                    title={locating ? 'Finding your location…' : origin ? 'Update my location' : 'Use my location'} aria-busy={locating}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2" /><path d="M12 2v3m0 14v3M2 12h3m14 0h3" /></svg>
+                </button>
+                {#each hotSuburbs as suburb (suburb.id)}
+                    <button class="suburb-shortcut" class:active={savedLocation?.source === 'suburb' && savedLocation.label === suburb.name}
+                        aria-pressed={savedLocation?.source === 'suburb' && savedLocation.label === suburb.name}
+                        disabled={commitState.isHistorical} title={`Start near ${suburb.name} centre`} onclick={() => selectSuburb(suburb)}>{suburb.name}</button>
+                {/each}
+                <button class="location-icon" disabled={commitState.isHistorical} onclick={() => showHotSuburbs = true} aria-label="Edit hot suburbs" title="Edit hot suburbs">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m16 3 5 5-12 12-6 1 1-6zM13 6l5 5" /></svg>
+                </button>
+            </div>
+            <p class="hint">Tap the location icon for GPS, or a suburb pill to use its centre. Your starting location and hot suburbs sync across your devices.</p>
             {#if locationError}<p role="alert" class="error">{locationError}</p>{/if}
-            <fieldset disabled={commitState.isHistorical}><SuburbPicker bind:value={suburbQuery} onSelect={selectSuburb} onClear={clearSuburb} /></fieldset>
             {#if origin}<p class="origin">{originLabel}{accuracy !== null ? ` · GPS accuracy approximately ${Math.round(accuracy)} m` : ''}</p>{/if}
             {#if savedLocation}<p class="hint">Last updated: {new Date(savedLocation.updatedAt).toLocaleString()}</p>{/if}
         </section>
@@ -328,12 +343,18 @@
 </div>
 {#if deleteTarget}<ConfirmDialog message={`Delete “${deleteTarget.name}”?`} confirmLabel="Delete" isDanger={true} onConfirm={removeLocation} onCancel={() => deleteTarget = null} />{/if}
 
+{/if}
+
 <style>
     .nearby-screen { position: fixed; inset: 0; display: flex; flex-direction: column; background: var(--bg); color: var(--text); }
     header { display: flex; align-items: center; gap: .75rem; padding: .65rem .8rem; border-bottom: 1px solid var(--border); flex-shrink: 0; }
     h1 { font-size: 1.15rem; margin: 0; flex: 1; } h2 { font-size: 1rem; margin: 0 0 .4rem; }
     main { overflow-y: auto; padding: 1rem; padding-bottom: max(1rem, env(safe-area-inset-bottom)); flex: 1; }
     main > * { max-width: 760px; margin-left: auto; margin-right: auto; }
+    .location-shortcuts { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
+    .location-icon { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; }
+    .suburb-shortcut { border-radius: 999px; background: #000; padding: .45rem .75rem; }
+    .suburb-shortcut.active { border-color: var(--accent); color: var(--accent); }
     .nearby-strip { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-bottom: .8rem; padding-bottom: .2rem; }
     .nearby-strip h2 { margin: 0; flex-shrink: 0; }
     .nearby-heading { border: 0; background: transparent; padding: 0; font: inherit; color: inherit; }

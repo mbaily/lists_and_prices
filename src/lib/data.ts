@@ -11,6 +11,7 @@ import { readItemName, getItemText, initializeItemText, replaceItemText } from '
 import { readReportAssignments, restoreReportAssignments } from './reportAssignments';
 import { validateLocations, normalizeLocationTag, type RetailLocation } from './retailLocations';
 import { isStartingLocation, type StartingLocation } from './startingLocation';
+import { defaultHotSuburbIds, isHotSuburbIds } from './hotSuburbs';
 import { checklistFingerprint, isNearbyChecklistState, NEARBY_CHECKLIST_MEMBERSHIP_ORIGIN, type NearbyChecklistState } from './nearbyChecklist';
 
 export type { FolderCheckbox } from './folderCheckboxes';
@@ -1053,6 +1054,7 @@ export interface BackupFile {
 	smartFolders?: Record<string, string[]>;
 	customLocations?: RetailLocation[];
 	startingLocation?: StartingLocation | null;
+	hotSuburbIds?: string[];
 	nearbyChecklist?: Record<string, NearbyChecklistState>;
 	pausedErrandTags?: string[];
 }
@@ -1069,6 +1071,7 @@ export function exportBackup(): BackupFile {
 		smartFolders: readReportAssignments(getDoc()),
 		customLocations: readCustomLocations(),
 		startingLocation: readStartingLocation(),
+		hotSuburbIds: readHotSuburbIds(),
 		nearbyChecklist: readNearbyChecklist(),
 		pausedErrandTags: readPausedErrandTags()
 	};
@@ -1109,6 +1112,7 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 	validateLocations(backup.customLocations ?? []);
 	if (backup.pausedErrandTags !== undefined && (!Array.isArray(backup.pausedErrandTags) || backup.pausedErrandTags.some(tag => typeof tag !== 'string' || !/^#?\w+$/.test(tag)))) throw new Error('Invalid paused errand tags.');
 	if (backup.startingLocation != null && !isStartingLocation(backup.startingLocation)) throw new Error('Invalid starting location.');
+	if (backup.hotSuburbIds !== undefined && !isHotSuburbIds(backup.hotSuburbIds)) throw new Error('Invalid hot suburbs.');
 	if (backup.nearbyChecklist !== undefined && (!backup.nearbyChecklist || typeof backup.nearbyChecklist !== 'object' || Array.isArray(backup.nearbyChecklist) || Object.entries(backup.nearbyChecklist).some(([id, state]) => !id || !isNearbyChecklistState(state)))) throw new Error('Invalid nearby checklist.');
 	if (backup.customLocations?.some(location => !location.id.startsWith('custom-'))) throw new Error('Custom location ids must start with custom-.');
 	if (backup.smartFolders != null && (typeof backup.smartFolders !== 'object' || Array.isArray(backup.smartFolders))) throw new Error('Invalid reports.');
@@ -1171,6 +1175,8 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 		const preferences = doc.getMap('nearby-preferences');
 		if (backup.startingLocation != null) preferences.set('starting-location', { ...backup.startingLocation });
 		else if (mode === 'replace' || backup.startingLocation === null) preferences.delete('starting-location');
+		if (backup.hotSuburbIds !== undefined) preferences.set('hot-suburbs', [...backup.hotSuburbIds]);
+		else if (mode === 'replace') preferences.delete('hot-suburbs');
 		const checklist = doc.getMap<NearbyChecklistState>('nearby-checklist');
 		if (mode === 'replace') checklist.clear();
 		for (const [id, state] of Object.entries(backup.nearbyChecklist ?? {})) checklist.set(id, { ...state });
@@ -1268,6 +1274,16 @@ export function saveStartingLocation(location: StartingLocation): void {
 
 export function clearStartingLocation(): void {
 	getMutableDoc().getMap('nearby-preferences').delete('starting-location');
+}
+
+export function readHotSuburbIds(): string[] {
+	const ids = getDoc().getMap('nearby-preferences').get('hot-suburbs');
+	return isHotSuburbIds(ids) ? [...ids] : [...defaultHotSuburbIds];
+}
+
+export function saveHotSuburbIds(ids: string[]): void {
+	if (!isHotSuburbIds(ids)) throw new Error('Invalid hot suburbs.');
+	getMutableDoc().getMap('nearby-preferences').set('hot-suburbs', [...ids]);
 }
 // ─── Spreadsheets ─────────────────────────────────────────────────────────────
 

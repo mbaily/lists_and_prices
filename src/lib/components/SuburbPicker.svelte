@@ -2,7 +2,7 @@
     import catalogue from '$lib/locations/melbourne-suburbs.json';
     import { searchSuburbs, type Suburb } from '$lib/suburbSearch';
 
-    let { value = $bindable(''), onSelect, onClear = () => {} }: { value?: string; onSelect: (suburb: Suburb) => void; onClear?: () => void } = $props();
+    let { value = $bindable(''), onSelect, onClear = () => {}, label = 'Or start near a Melbourne suburb' }: { value?: string; onSelect: (suburb: Suburb) => void; onClear?: () => void; label?: string } = $props();
     let input: HTMLInputElement;
     const uid = $props.id();
     let open = $state(false);
@@ -37,7 +37,7 @@
 </script>
 
 <div class="suburb-picker">
-    <label for={uid}>Or start near a Melbourne suburb</label>
+    <label for={uid}>{label}</label>
     <div class="input-row">
     <button class="clear" type="button" aria-label="Clear suburb" title="Clear suburb" disabled={!value} onclick={clear}><span aria-hidden="true">×</span></button>
     <input bind:this={input} id={uid} role="combobox" aria-autocomplete="list" aria-expanded={expanded}
