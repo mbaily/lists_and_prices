@@ -271,7 +271,7 @@
                     <summary>Paused errands ({pausedErrands.length})</summary>
                     <p class="hint">Resume individual errands below. Hashtag pauses apply to all tasks using that tag. Original tasks stay unchanged, and pauses sync across devices.</p>
                     <div class="pause-actions">{#each pausedTags as tag (tag)}<button disabled={commitState.isHistorical} onclick={() => pauseTag(tag, false)}>Resume all #{tag} errands</button>{/each}</div>
-                    <ul>{#each pausedErrands as row (row.errand.item.id)}<li class="checklist-row"><button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}</small>{#if isErrandPaused(row.errand, pausedTags)}<small>Paused by hashtag: {row.errand.tags.map(normalizeLocationTag).filter(tag => pausedTags.includes(tag)).map(tag => '#' + tag).join(', ')}</small>{/if}</button>{#if row.itemPaused}<button disabled={commitState.isHistorical} onclick={() => pauseItem(row.errand.item.id, false)} aria-label={`Resume ${row.errand.item.name}`}>Resume</button>{/if}</li>{:else}<li class="hint">No unfinished paused tasks.</li>{/each}</ul>
+                    <ul>{#each pausedErrands as row (row.errand.item.id)}<li class="checklist-row"><button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}</small>{#if isErrandPaused(row.errand, pausedTags)}<small>Paused by hashtag: {row.errand.tags.map(normalizeLocationTag).filter(tag => pausedTags.includes(tag)).map(tag => '#' + tag).join(', ')}</small>{/if}</button>{#if row.itemPaused}<button class="resume-task" disabled={commitState.isHistorical} onclick={() => pauseItem(row.errand.item.id, false)} aria-label={`Resume ${row.errand.item.name}`} title="Resume this errand"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l14-8z" /></svg></button>{/if}</li>{:else}<li class="hint">No unfinished paused tasks.</li>{/each}</ul>
                 </details>
             {/if}
             <section class="task-checklist" bind:this={matchedTasksSection} aria-labelledby="matched-tasks-heading">
@@ -385,6 +385,7 @@
     .checklist-row input[type="checkbox"] { width: 22px; height: 22px; flex-shrink: 0; margin: 0 8px; accent-color: var(--accent); }
     .note-mark { width: 38px; flex-shrink: 0; text-align: center; }
     .pause-task, .dismiss-task { width: 44px; height: 44px; flex-shrink: 0; font-size: 1.4rem; border: 0; background: transparent; }
+    .resume-task { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; flex-shrink: 0; padding: 0; background: #000; }
     .pause-task { display: flex; align-items: center; justify-content: center; }
     .completed .errand > span { text-decoration: line-through; color: var(--text2); }
     .pause-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
