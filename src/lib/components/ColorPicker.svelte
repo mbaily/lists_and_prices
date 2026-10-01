@@ -1,6 +1,8 @@
 <script lang="ts">
 	/** Colour swatch picker — tapping a swatch sets the value. */
-	let { value = $bindable('#6366f1'), folderColor }: { value: string; folderColor?: string } = $props();
+	let { value = $bindable('#6366f1'), folderColor, colorChildren = $bindable(false), showSetAll = false }: {
+		value: string; folderColor?: string; colorChildren?: boolean; showSetAll?: boolean;
+	} = $props();
 
 	const colours = [
 		'#6366f1', '#8b5cf6', '#ec4899', '#ef4444',
@@ -20,9 +22,23 @@
 		></button>
 	{/each}
 	{#if folderColor}
-		<button type="button" class="folder-color" onclick={() => { if (folderColor) value = folderColor; }}>
-			<span class="folder-swatch" style="background:{folderColor}" aria-hidden="true"></span>
-			Use folder colour
+		<button type="button" class="folder-color" title="Use folder colour" aria-label="Use folder colour" onclick={() => { if (folderColor) value = folderColor; }}>
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+				<path d="M3 7V5h6l2 2h10v13H3z" />
+				<path d="M12 17v-7m-3 3 3-3 3 3" />
+			</svg>
+		</button>
+	{/if}
+	{#if showSetAll}
+		<button type="button" class="folder-color" class:active={colorChildren}
+			title="Set all direct children to this colour when saved" aria-label="Set all direct children to this colour when saved"
+			aria-pressed={colorChildren} onclick={() => (colorChildren = !colorChildren)}>
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+				<path d="M12 3v6M5 14v-5h14v5M12 9v5" />
+				<rect x="2" y="15" width="6" height="6" rx="1" />
+				<rect x="9" y="15" width="6" height="6" rx="1" />
+				<rect x="16" y="15" width="6" height="6" rx="1" />
+			</svg>
 		</button>
 	{/if}
 </div>
@@ -56,10 +72,9 @@
 		font: inherit;
 		cursor: pointer;
 	}
-	.folder-swatch {
-		width: 16px;
-		height: 16px;
-		border-radius: 50%;
-		flex-shrink: 0;
+	.folder-color.active {
+		border-color: var(--accent);
+		background: var(--accent);
+		color: #fff;
 	}
 </style>

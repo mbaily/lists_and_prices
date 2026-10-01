@@ -736,6 +736,7 @@
 	let renamingId = $state<string | null>(null);
 	let renameValue = $state('');
 	let renameColor = $state('#6366f1');
+	let renameColorChildren = $state(false);
 	let renameTarget = $state<'folder' | 'list' | 'sheet'>('folder');
 
 	function startRename(id: string, current: string, target: 'folder' | 'list' | 'sheet', color = '#6366f1') {
@@ -743,13 +744,14 @@
 		renamingId = id;
 		renameValue = current;
 		renameColor = color;
+		renameColorChildren = false;
 		renameTarget = target;
 	}
 
 	function submitRename() {
 		if (commitState.isHistorical) return;
 		if (renamingId && renameValue.trim()) {
-			if (renameTarget === 'folder') updateFolder(renamingId, { name: renameValue.trim(), color: renameColor });
+			if (renameTarget === 'folder') updateFolder(renamingId, { name: renameValue.trim(), color: renameColor }, { colorChildren: renameColorChildren });
 			else if (renameTarget === 'list') updateList(renamingId, { name: renameValue.trim(), color: renameColor });
 			else if (renameTarget === 'sheet') updateSheet(renamingId, { name: renameValue.trim() });
 		}
@@ -1798,7 +1800,7 @@ ${bodyHtml}
 							onkeydown={(e) => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') renamingId = null; }}
 							autofocus
 						/>
-						<ColorPicker bind:value={renameColor} />
+						<ColorPicker bind:value={renameColor} folderColor={allFolders.find((parent) => parent.id === folder.parentId)?.color} showSetAll bind:colorChildren={renameColorChildren} />
 						<div class="rename-actions">
 							<button class="rename-ok" onclick={submitRename}>✓</button>
 							<button class="rename-cancel" onclick={() => renamingId = null}>✕</button>

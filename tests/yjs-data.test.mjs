@@ -20,6 +20,30 @@ function legacyNote(c, name = 'Original note') {
 }
 function replicate(from, to) { Y.applyUpdate(to.doc, Y.encodeStateAsUpdate(from.doc), 'peer'); }
 
+test('folder colour applies only to direct children and undoes as one action', () => {
+	const c = app();
+	const folder = c.data.createFolder('Parent', null, '#ff0000');
+	const child = c.data.createFolder('Child', folder, '#00ff00');
+	const grandchild = c.data.createFolder('Grandchild', child, '#0000ff');
+	const list = c.data.createList('Direct list', folder, 'plain', '#00ff00');
+	const nestedList = c.data.createList('Nested list', child, 'plain', '#0000ff');
+	const unrelated = c.data.createFolder('Unrelated', null, '#0000ff');
+	const colours = () => Object.fromEntries([...c.data.readFolders(), ...c.data.readLists()].map((entry) => [entry.id, entry.color]));
+	const before = colours();
+	c.store.getUndoManager().clear();
+	c.data.updateFolder(folder, { color: '#ec4899' }, { colorChildren: true });
+	assert.deepEqual(colours(), {
+		[folder]: '#ec4899', [child]: '#ec4899', [list]: '#ec4899',
+		[grandchild]: '#0000ff', [nestedList]: '#0000ff', [unrelated]: '#0000ff'
+	});
+	assert.equal(c.store.getUndoCount(), 1);
+	c.store.undoLastAction();
+	assert.deepEqual(colours(), before);
+	c.data.updateFolder(folder, { color: '#ec4899' });
+	assert.equal(colours()[child], '#00ff00');
+	assert.equal(colours()[list], '#00ff00');
+});
+
 test('moving a list inherits its destination colour and undo restores both folder and colour', () => {
 	const c = app();
 	const source = c.data.createFolder('Source', null, '#ff0000');

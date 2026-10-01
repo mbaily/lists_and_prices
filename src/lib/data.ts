@@ -116,7 +116,7 @@ export function createFolder(name: string, parentId: string | null, color = '#63
 	return id;
 }
 
-export function updateFolder(id: string, patch: Partial<Omit<Folder, 'id' | 'createdAt' | 'updatedAt'>>) {
+export function updateFolder(id: string, patch: Partial<Omit<Folder, 'id' | 'createdAt' | 'updatedAt'>>, options: { colorChildren?: boolean } = {}) {
 	const doc = getMutableDoc();
 	const currentTree = patch.parentId !== undefined ? readFolders() : [];
 	if (patch.parentId !== undefined && patch.parentId !== null) {
@@ -134,6 +134,17 @@ export function updateFolder(id: string, patch: Partial<Omit<Folder, 'id' | 'cre
 		}
 		const keys = Object.keys(patch);
 		if (!(keys.length === 1 && keys[0] === 'order')) m.set('updatedAt', new Date().toISOString());
+		if (options.colorChildren && patch.color !== undefined) {
+			const now = new Date().toISOString();
+			const children = [
+				...getFolders(doc).toArray().filter((folder) => folder.get('parentId') === id),
+				...getLists(doc).toArray().filter((list) => list.get('folderId') === id)
+			];
+			for (const child of children) {
+				child.set('color', patch.color);
+				child.set('updatedAt', now);
+			}
+		}
 	});
 }
 
