@@ -370,7 +370,7 @@
     summary { cursor: pointer; padding: .75rem 0; font-weight: 600; }
     .coverage { font-weight: 600; line-height: 1.5; }
     .match-count { color: var(--accent); font-size: .85rem; margin: .6rem 0 0; }
-    .unavailable { border: 1px solid var(--border); border-radius: 8px; background: var(--bg2); padding: .8rem; margin: .8rem 0; }
+    .unavailable { border: 1px solid var(--border); border-radius: 8px; background: #000; padding: .8rem; margin: .8rem 0; }
     .unavailable h3 { font-size: .95rem; margin: 0; }
     .tag-list { display: flex; flex-wrap: wrap; gap: .5rem; }
     .tag-list li { border: 0; }
