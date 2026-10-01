@@ -1,5 +1,12 @@
 # Nearby errands and the location catalogue
 
+Melbourne's 549 suburb centres are available as location hashtags, such as
+`#brunswick`, `#richmond`, `#brunswickeast`, `#stkilda` and `#mountwaverley`.
+Use the suburb name in lowercase without spaces or punctuation. These hashtags
+match approximate suburb centres, and work on lists, todos and notes. Distances
+and directions use the centre rather than a particular address or every store
+within the suburb. Find them under **Available location hashtags**.
+
 Open **📍 Nearby errands** from the home header. Add a hashtag to a todo, for
 example `Milk #supermarket`, `Coffee #coles`, `Bread #woolworths` or `Socks #kmart`.
 Press **Use my location** and allow browser location access, or type a Melbourne

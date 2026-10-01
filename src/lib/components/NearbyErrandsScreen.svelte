@@ -1,6 +1,8 @@
 <script lang="ts">
     import { onDestroy, tick } from 'svelte';
     import catalogue from '$lib/locations/melbourne.json';
+    import suburbCatalogue from '$lib/locations/melbourne-suburbs.json';
+    import { suburbLocations } from '$lib/suburbLocations';
     import { docState, commitState } from '$lib/yjsStore.svelte';
     import { readFolders, readLists, readAllItems, readCustomLocations, saveCustomLocation, deleteCustomLocation, readStartingLocation, saveStartingLocation, clearStartingLocation, isItemDone, readNearbyChecklist, nearbyItemFingerprint, rememberNearbyChecklist, dismissNearbyChecklist, setNearbyTodoDone, readPausedErrandTags, setErrandTagPaused } from '$lib/data';
     import { collectErrands, nearbyStops, suggestStops, isErrandPaused, type NearbyStop } from '$lib/nearbyErrands';
@@ -40,7 +42,7 @@
     });
 
     const customLocations = $derived.by(() => { void docState.version; return readCustomLocations(); });
-    const locations = $derived([...catalogue.locations, ...customLocations] as RetailLocation[]);
+    const locations = $derived([...catalogue.locations, ...suburbLocations, ...customLocations] as RetailLocation[]);
     const availableTags = $derived(availableLocationTags(locations));
     let tagQuery = $state('');
     let showAllTags = $state(false);
@@ -177,7 +179,7 @@
 
 {#snippet stopCard(stop: NearbyStop)}
                 <article class="stop">
-                    <div class="stop-heading"><div><h2>{stop.location.name}</h2><p>{distanceLabel(stop.distanceKm)} away{stop.location.address ? ' · ' + stop.location.address : ''}</p>{#if stop.location.coordinateAccuracy === 'shopping-centre'}<p>Distance and directions use the shopping centre location.</p>{:else if stop.location.coordinateAccuracy === 'suburb'}<p>Approximate suburb location. Check the store address before travelling.</p>{/if}</div><a href={directions(stop.location)} target="_blank" rel="noopener noreferrer">Directions ↗</a></div>
+                    <div class="stop-heading"><div><h2>{stop.location.name}</h2><p>{distanceLabel(stop.distanceKm)} away{stop.location.address ? ' · ' + stop.location.address : ''}</p>{#if stop.location.coordinateAccuracy === 'shopping-centre'}<p>Distance and directions use the shopping centre location.</p>{:else if stop.location.coordinateAccuracy === 'suburb'}<p>Approximate suburb location. Check the destination before travelling.</p>{/if}</div><a href={directions(stop.location)} target="_blank" rel="noopener noreferrer">Directions ↗</a></div>
                     <p class="match-count">{stop.errands.length} matching item{stop.errands.length === 1 ? '' : 's'}</p>
                     <ul>{#each stop.errands as errand (errand.item.id)}<li><button class="errand" onclick={() => onOpenItem(errand.list.id, errand.item.id)}><span>{errand.item.name}</span><small>{errand.list.name}{errand.item.note ? ' · Note' : ''}</small></button></li>{/each}</ul>
                     {#if !customIds.has(stop.location.id) && stop.location.source}<a class="source" href={stop.location.source} target="_blank" rel="noopener noreferrer">Location source ↗</a>{/if}
@@ -275,7 +277,8 @@
         <details class="available-tags">
             <summary>Available location hashtags</summary>
             <p class="hint">Add these hashtags to a list name to match its todos and notes, or tag individual items. Item hashtags take precedence over list hashtags. Counts cover all locations in the database, including your saved places. #supermarket matches Coles, Woolworths and Aldi.</p>
-            <label class="tag-search">Find a location hashtag<input type="search" bind:value={tagQuery} placeholder="e.g. bunnings, jbhifi or northland" /></label>
+            <p class="hint">Melbourne suburbs are also available: #brunswick, #richmond or #brunswickeast. Suburb hashtags point to approximate suburb centres; remove spaces from multi-word names.</p>
+            <label class="tag-search">Find a location hashtag<input type="search" bind:value={tagQuery} placeholder="e.g. bunnings, brunswick or st kilda" /></label>
             {#if selectedTag}
                 <section class="tag-locations" bind:this={tagLocationsPanel} aria-label={`Locations matching #${selectedTag}`}>
                     <div class="checklist-heading"><h2>#{selectedTag} · {selectedTagLocations.length} locations</h2><button aria-label="Close location list" onclick={() => selectedTag = null}>×</button></div>
@@ -295,7 +298,7 @@
             {#if !tagQuery.trim() && availableTags.length > 12}<button onclick={() => showAllTags = !showAllTags}>{showAllTags ? 'Show fewer hashtags' : `Show all ${availableTags.length} hashtags`}</button>{/if}
             <p class="hint">For example: name a list “Shopping #supermarket”, or tag one item “Buy milk #coles”. New location hashtags appear here automatically.</p>
         </details>
-        <footer>{catalogue.locations.length} pre-recorded Melbourne locations · <a href={catalogue.source} target="_blank" rel="noopener noreferrer">{catalogue.attribution}</a> · <a href={catalogue.licenseUrl} target="_blank" rel="noopener noreferrer">{catalogue.license}</a><p>Catalogue retrieved: {catalogue.retrievedAt}. Store openings and closures may need manual updates.</p></footer>
+        <footer>{catalogue.locations.length} pre-recorded Melbourne locations · <a href={catalogue.source} target="_blank" rel="noopener noreferrer">{catalogue.attribution}</a> · <a href={catalogue.licenseUrl} target="_blank" rel="noopener noreferrer">{catalogue.license}</a><p>Catalogue retrieved: {catalogue.retrievedAt}. Store openings and closures may need manual updates.</p><p>{suburbLocations.length} suburb centres · <a href={suburbCatalogue.source} target="_blank" rel="noopener noreferrer">{suburbCatalogue.attribution}</a> · <a href={suburbCatalogue.licenseUrl} target="_blank" rel="noopener noreferrer">{suburbCatalogue.license}</a></p></footer>
     </main>
 </div>
 {#if deleteTarget}<ConfirmDialog message={`Delete “${deleteTarget.name}”?`} confirmLabel="Delete" isDanger={true} onConfirm={removeLocation} onCancel={() => deleteTarget = null} />{/if}
