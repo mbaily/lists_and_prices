@@ -75,7 +75,7 @@
     const errands = $derived(candidates.filter(row => !row.done && !row.hidden && !row.paused).map(row => row.errand));
     const supportedErrands = $derived(errands.filter(errand => locations.some(location => matchingLocationTags(errand.tags, location).length > 0)));
     const supportedIds = $derived(new Set(supportedErrands.map(errand => errand.item.id)));
-    const checklist = $derived(candidates.filter(row => !row.hidden && !row.paused && (row.done ? !!row.state : supportedIds.has(row.errand.item.id) || !!row.state)));
+    const checklist = $derived(candidates.filter(row => !row.hidden && !row.paused && (row.done ? !!row.state : supportedIds.has(row.errand.item.id) || !!row.state)).sort((a, b) => Number(nearbyIds.has(b.errand.item.id)) - Number(nearbyIds.has(a.errand.item.id))));
     const pausedErrands = $derived(candidates.filter(row => !row.done && !row.hidden && row.paused));
     function pauseTag(tag: string, paused: boolean) {
         if (!commitState.isHistorical) setErrandTagPaused(tag, paused);
