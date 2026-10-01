@@ -781,12 +781,13 @@
 		const ids = selectedIds.size > 0
 			? [...selectedIds].filter((id) => { const it = items.find((i) => i.id === id); return it && !it.heading && !it.note; })
 			: items.filter((i) => !i.heading && !i.note).map((i) => i.id);
-		if (folderCheckboxes.length > 0) {
-			clearItemCheckboxes(ids, folderCheckboxes.map((c) => c.id));
-		} else {
-			setItemsChecked(ids, false);
-		}
-		selectedIds = new Set();
+		if (ids.length === 0) return;
+		const checkboxIds = folderCheckboxes.map((c) => c.id);
+		askDelete(selectedIds.size > 0 ? 'Uncheck all selected items?' : 'Uncheck all items in this list?', () => {
+			if (checkboxIds.length > 0) clearItemCheckboxes(ids, checkboxIds);
+			else setItemsChecked(ids, false);
+			selectedIds = new Set();
+		}, selectedIds.size > 0 ? 'Uncheck selected' : 'Uncheck all');
 	}
 
 	function bulkDeleteChecked() {
@@ -1065,7 +1066,7 @@
 	// naturally — no JS listener, no layout feedback loop.
 	let itemListEl: HTMLElement | null = null;
 
-	// ── Delete confirmation ───────────────────────────────────────────────────────
+	// ── Confirmation dialogs ─────────────────────────────────────────────────────
 	let confirmMsg = $state('');
 	let confirmLabel = $state('Delete');
 	let confirmAction = $state<(() => void) | null>(null);
@@ -1769,7 +1770,7 @@
 		</div>
 	{/if}
 
-	<!-- Delete confirmation dialog -->
+	<!-- Confirmation dialog -->
 	{#if confirmAction && !commitState.isHistorical}
 		<ConfirmDialog
 			message={confirmMsg}

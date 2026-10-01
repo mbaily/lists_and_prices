@@ -3,6 +3,56 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createApp, componentFunctions, transpile } from './helpers/app.mjs';
 
+function uncheckProbe(selected = false, named = false) {
+	const calls = [];
+	const state = {
+		canEditList: true, listId: 'list-a', listContextVersion: 0,
+		confirmMsg: '', confirmLabel: '', confirmAction: null,
+		selectedIds: new Set(selected ? ['todo', 'note'] : []),
+		items: [{ id: 'todo' }, { id: 'other' }, { id: 'note', note: true }, { id: 'heading', heading: true }],
+		folderCheckboxes: named ? [{ id: 'done' }, { id: 'packed' }] : [],
+		setItemsChecked: (...args) => calls.push(['plain', ...args]),
+		clearItemCheckboxes: (...args) => calls.push(['named', ...args])
+	};
+	const source = componentFunctions('src/lib/components/ListScreen.svelte', ['bulkUncheck', 'askDelete']);
+	const run = new Function('state', `with(state) { ${transpile(source)}; return bulkUncheck; }`)(state);
+	return { state, calls, run };
+}
+
+test('uncheck all waits for confirmation and excludes notes and headings', () => {
+	const probe = uncheckProbe();
+	probe.run();
+	assert.match(probe.state.confirmMsg, /all items in this list/);
+	assert.equal(probe.state.confirmLabel, 'Uncheck all');
+	assert.deepEqual(probe.calls, []);
+	probe.state.confirmAction();
+	assert.deepEqual(probe.calls, [['plain', ['todo', 'other'], false]]);
+});
+
+test('cancelling uncheck preserves the selection and confirming clears only its named checks', () => {
+	const probe = uncheckProbe(true, true);
+	probe.run();
+	probe.state.confirmAction = null;
+	assert.deepEqual(probe.calls, []);
+	assert.deepEqual([...probe.state.selectedIds], ['todo', 'note']);
+	probe.run();
+	probe.state.confirmAction();
+	assert.deepEqual(probe.calls, [['named', ['todo'], ['done', 'packed']]]);
+	assert.equal(probe.state.selectedIds.size, 0);
+});
+
+for (const transition of ['navigation', 'history', 'round-trip navigation']) {
+	test(`uncheck confirmation cannot mutate after ${transition}`, () => {
+		const probe = uncheckProbe();
+		probe.run();
+		if (transition === 'navigation') probe.state.listId = 'list-b';
+		if (transition === 'history') probe.state.canEditList = false;
+		if (transition === 'round-trip navigation') probe.state.listContextVersion++;
+		probe.state.confirmAction();
+		assert.deepEqual(probe.calls, []);
+	});
+}
+
 function clipboardState(readText) {
 	const calls = [], alerts = [];
 	const state = {
