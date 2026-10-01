@@ -3,6 +3,7 @@
     import catalogue from '$lib/locations/melbourne.json';
     import suburbCatalogue from '$lib/locations/melbourne-suburbs.json';
     import { suburbLocations } from '$lib/suburbLocations';
+    import { nearbyTaskPills } from '$lib/nearbyPills';
     import { docState, commitState } from '$lib/yjsStore.svelte';
     import { readFolders, readLists, readAllItems, readCustomLocations, saveCustomLocation, deleteCustomLocation, readStartingLocation, saveStartingLocation, clearStartingLocation, isItemDone, readNearbyChecklist, nearbyItemFingerprint, rememberNearbyChecklist, dismissNearbyChecklist, setNearbyTodoDone, readPausedErrandTags, setErrandTagPaused } from '$lib/data';
     import { collectErrands, nearbyStops, suggestStops, isErrandPaused, type NearbyStop } from '$lib/nearbyErrands';
@@ -86,6 +87,7 @@
     }
     const completedChecklist = $derived(checklist.filter(row => row.done));
     const stops = $derived(origin ? nearbyStops(locations, origin, radius, errands) : []);
+    const nearbyPills = $derived(nearbyTaskPills(stops));
     const plan = $derived(suggestStops(stops, errands));
     const coveredCount = $derived(errands.length - plan.unavailable.length);
     const nearbyIds = $derived(new Set(stops.flatMap(stop => stop.errands.map(errand => errand.item.id))));
@@ -194,6 +196,15 @@
     </header>
     <main>
         {#if commitState.isHistorical}<p class="notice">Viewing historical todos and custom locations. Exit history to make changes.</p>{/if}
+        <section class="nearby-strip" aria-labelledby="nearby-strip-heading">
+            <h2 id="nearby-strip-heading">Nearby</h2>
+            {#each nearbyPills as pill (pill.errand.item.id)}
+                <button class="nearby-pill" title={`${pill.name} #${pill.tag}`}
+                    onclick={() => onOpenItem(pill.errand.list.id, pill.errand.item.id)}>
+                    <span class="nearby-pill-name">{pill.name}</span><span class="nearby-pill-tag">#{pill.tag}</span>
+                </button>
+            {/each}
+        </section>
         <section class="position">
             <button class="primary" onclick={useGps} disabled={locating || commitState.isHistorical}>{locating ? 'Finding your location…' : origin ? 'Update my location' : 'Use my location'}</button>
             <p class="hint">Your last starting location is remembered and syncs across your devices. GPS updates only when you press this button.</p>
@@ -309,6 +320,11 @@
     h1 { font-size: 1.15rem; margin: 0; flex: 1; } h2 { font-size: 1rem; margin: 0 0 .4rem; }
     main { overflow-y: auto; padding: 1rem; padding-bottom: max(1rem, env(safe-area-inset-bottom)); flex: 1; }
     main > * { max-width: 760px; margin-left: auto; margin-right: auto; }
+    .nearby-strip { display: flex; align-items: center; gap: .4rem; overflow-x: auto; white-space: nowrap; margin-bottom: .8rem; padding-bottom: .2rem; }
+    .nearby-strip h2 { margin: 0; flex-shrink: 0; }
+    .nearby-pill { display: inline-flex; align-items: center; gap: .35rem; flex-shrink: 0; border-radius: 999px; padding: .35rem .65rem; white-space: nowrap; }
+    .nearby-pill-name { max-width: 5cm; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .nearby-pill-tag { color: var(--accent); }
     button, select, input { font: inherit; color: var(--text); border: 1px solid var(--border); background: var(--bg2); border-radius: 6px; padding: .65rem; }
     button, select { cursor: pointer; } button:disabled { opacity: .5; cursor: default; }
     .back { border: 0; font-size: 1.35rem; padding: .3rem .6rem; } .primary { background: var(--accent); color: #fff; border-color: var(--accent); }
