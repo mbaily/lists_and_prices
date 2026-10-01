@@ -320,11 +320,11 @@
     h1 { font-size: 1.15rem; margin: 0; flex: 1; } h2 { font-size: 1rem; margin: 0 0 .4rem; }
     main { overflow-y: auto; padding: 1rem; padding-bottom: max(1rem, env(safe-area-inset-bottom)); flex: 1; }
     main > * { max-width: 760px; margin-left: auto; margin-right: auto; }
-    .nearby-strip { display: flex; align-items: center; gap: .4rem; overflow-x: auto; white-space: nowrap; margin-bottom: .8rem; padding-bottom: .2rem; }
+    .nearby-strip { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-bottom: .8rem; padding-bottom: .2rem; }
     .nearby-strip h2 { margin: 0; flex-shrink: 0; }
-    .nearby-pill { display: inline-flex; align-items: center; gap: .35rem; flex-shrink: 0; border-radius: 999px; padding: .35rem .65rem; white-space: nowrap; }
-    .nearby-pill-name { max-width: 5cm; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .nearby-pill-tag { color: var(--accent); }
+    .nearby-pill { display: inline-flex; align-items: center; gap: .35rem; max-width: 100%; min-width: 0; border-radius: 999px; padding: .35rem .65rem; white-space: nowrap; }
+    .nearby-pill-name { max-width: 5cm; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .nearby-pill-tag { color: var(--accent); flex-shrink: 0; }
     button, select, input { font: inherit; color: var(--text); border: 1px solid var(--border); background: var(--bg2); border-radius: 6px; padding: .65rem; }
     button, select { cursor: pointer; } button:disabled { opacity: .5; cursor: default; }
     .back { border: 0; font-size: 1.35rem; padding: .3rem .6rem; } .primary { background: var(--accent); color: #fff; border-color: var(--accent); }
