@@ -17,8 +17,9 @@ export function isLocationOptionalErrand(errand: Errand): boolean {
     return locationOptionalTag(errand) !== undefined;
 }
 
-/** Pausing any of an item's effective tags defers the entire errand. */
-export function isErrandPaused(errand: Errand, pausedTags: readonly string[]): boolean {
+/** Individual pauses and hashtag-wide pauses are independent. */
+export function isErrandPaused(errand: Errand, pausedTags: readonly string[], pausedItemIds: readonly string[] = []): boolean {
+    if (pausedItemIds.length > 0 && pausedItemIds.includes(errand.item.id)) return true;
     const paused = new Set(pausedTags.map(normalizeLocationTag));
     return errand.tags.some(tag => paused.has(normalizeLocationTag(tag)));
 }

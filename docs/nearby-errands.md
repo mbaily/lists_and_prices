@@ -56,16 +56,18 @@ or a saved destination. You can complete, dismiss or pause it, and it does not
 count as an item missing a nearby match. The pill retains the `#errand` label.
 
 Use the **pause icon** immediately left of a task’s dismiss × to defer occasional
-errands. Its tooltip names the tag being paused (for example #ikea). Any task with a paused effective tag disappears from the checklist,
-suggested stops, alternatives and unmatched-item counts. Its original todo or note
-stays unchanged. For items with multiple tags, pausing any one tag defers the whole
-item. Item tags still take precedence over inherited list tags.
+errands. It pauses only that individual todo or note. Other tasks using the same
+hashtag stay active. The paused task disappears from Nearby pills, Matched tasks,
+suggested stops, alternatives and unmatched-item counts; the original stays unchanged.
 
-Expand **Paused errands** to see deferred tasks and press **Resume #ikea** when
-planning that trip. Pauses remain until resumed, including after edits and reloads,
-and apply to new tasks with that tag. They sync across devices, support undo,
-backups and history. Pause/resume is disabled in historical views. You can also
-pause or resume a tag while browsing its locations under **Available location hashtags**.
+Expand **Paused errands** and press **Resume** beside a task to bring it back.
+Pauses remain until resumed, including after edits and reloads. They sync across
+devices and support undo, backups and history. Pause/resume is disabled in history.
+To defer an entire destination, select its hashtag under **Available location
+hashtags** and choose **Pause all #ikea errands**, or **Resume all** to undo that
+tag pause. Tag pauses also apply to new tasks using that tag. If a task is paused
+both individually and by hashtag, both pauses must be resumed to bring it back.
+Existing hashtag pauses are preserved.
 
 Completing a todo removes it from the suggested stops but leaves its checked row
 in the checklist. **Clear completed** removes these rows without unchecking or

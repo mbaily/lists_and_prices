@@ -5,7 +5,7 @@
     import { suburbLocations } from '$lib/suburbLocations';
     import { nearbyTaskPills } from '$lib/nearbyPills';
     import { docState, commitState } from '$lib/yjsStore.svelte';
-    import { readFolders, readLists, readAllItems, readCustomLocations, saveCustomLocation, deleteCustomLocation, readStartingLocation, saveStartingLocation, readHotSuburbIds, saveHotSuburbIds, isItemDone, readNearbyChecklist, nearbyItemFingerprint, rememberNearbyChecklist, dismissNearbyChecklist, setNearbyTodoDone, readPausedErrandTags, setErrandTagPaused } from '$lib/data';
+    import { readFolders, readLists, readAllItems, readCustomLocations, saveCustomLocation, deleteCustomLocation, readStartingLocation, saveStartingLocation, readHotSuburbIds, saveHotSuburbIds, isItemDone, readNearbyChecklist, nearbyItemFingerprint, rememberNearbyChecklist, dismissNearbyChecklist, setNearbyTodoDone, readPausedErrandTags, setErrandTagPaused, readPausedErrandItemIds, setErrandItemPaused } from '$lib/data';
     import { collectErrands, nearbyStops, suggestStops, isErrandPaused, isLocationOptionalErrand, locationOptionalTag, LOCATION_OPTIONAL_TAGS, type NearbyStop } from '$lib/nearbyErrands';
     import { availableLocationTags, matchingLocationTags, validCoordinates, normalizeLocationTag, type Coordinates, type RetailLocation } from '$lib/retailLocations';
     import ConfirmDialog from './ConfirmDialog.svelte';
@@ -74,6 +74,7 @@
     const matchingTags = $derived(availableTags.filter(entry => entry.tag.includes(normalizeLocationTag(tagQuery).replace(/[^\w]/g, ''))));
     const visibleTags = $derived(tagQuery.trim() || showAllTags ? matchingTags : [...matchingTags].sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag)).slice(0, 12));
     const pausedTags = $derived.by(() => { void docState.version; return readPausedErrandTags(); });
+    const pausedItemIds = $derived.by(() => { void docState.version; return readPausedErrandItemIds(); });
     const checklistStates = $derived.by(() => { void docState.version; return readNearbyChecklist(); });
     const candidates = $derived.by(() => {
         void docState.version;
@@ -84,7 +85,7 @@
             const done = !errand.item.note && isItemDone(errand.item, folder);
             const fingerprint = nearbyItemFingerprint(errand.item, errand.list, folder);
             const state = checklistStates[errand.item.id];
-            return { errand, done, fingerprint, state, paused: isErrandPaused(errand, pausedTags), hidden: isChecklistDismissed(state, fingerprint, done) };
+            return { errand, done, fingerprint, state, itemPaused: pausedItemIds.includes(errand.item.id), paused: isErrandPaused(errand, pausedTags, pausedItemIds), hidden: isChecklistDismissed(state, fingerprint, done) };
         });
     });
     const errands = $derived(candidates.filter(row => !row.done && !row.hidden && !row.paused).map(row => row.errand));
@@ -95,9 +96,8 @@
     function pauseTag(tag: string, paused: boolean) {
         if (!commitState.isHistorical) setErrandTagPaused(tag, paused);
     }
-    function taskPauseTag(tags: string[]): string {
-        const normalized = tags.map(normalizeLocationTag);
-        return normalized.find(tag => availableTags.some(entry => entry.tag === tag)) ?? normalized[0];
+    function pauseItem(id: string, paused: boolean) {
+        if (!commitState.isHistorical) setErrandItemPaused(id, paused);
     }
     const completedChecklist = $derived(checklist.filter(row => row.done));
     const stops = $derived(origin ? nearbyStops(locations, origin, radius, errands) : []);
@@ -266,12 +266,12 @@
                 {:else}<p class="hint">No custom locations yet.</p>{/each}
             </section>
         {:else}
-            {#if pausedTags.length}
+            {#if pausedTags.length || pausedErrands.length}
                 <details class="paused-errands">
                     <summary>Paused errands ({pausedErrands.length})</summary>
-                    <p class="hint">These tasks stay in your original lists. Pauses sync across devices and remain until resumed, even when tasks are edited.</p>
-                    <div class="pause-actions">{#each pausedTags as tag (tag)}<button disabled={commitState.isHistorical} onclick={() => pauseTag(tag, false)}>Resume #{tag}</button>{/each}</div>
-                    <ul>{#each pausedErrands as row (row.errand.item.id)}<li><button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}</small></button></li>{:else}<li class="hint">No unfinished tasks currently use these paused tags.</li>{/each}</ul>
+                    <p class="hint">Resume individual errands below. Hashtag pauses apply to all tasks using that tag. Original tasks stay unchanged, and pauses sync across devices.</p>
+                    <div class="pause-actions">{#each pausedTags as tag (tag)}<button disabled={commitState.isHistorical} onclick={() => pauseTag(tag, false)}>Resume all #{tag} errands</button>{/each}</div>
+                    <ul>{#each pausedErrands as row (row.errand.item.id)}<li class="checklist-row"><button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}</small>{#if isErrandPaused(row.errand, pausedTags)}<small>Paused by hashtag: {row.errand.tags.map(normalizeLocationTag).filter(tag => pausedTags.includes(tag)).map(tag => '#' + tag).join(', ')}</small>{/if}</button>{#if row.itemPaused}<button disabled={commitState.isHistorical} onclick={() => pauseItem(row.errand.item.id, false)} aria-label={`Resume ${row.errand.item.name}`}>Resume</button>{/if}</li>{:else}<li class="hint">No unfinished paused tasks.</li>{/each}</ul>
                 </details>
             {/if}
             <section class="task-checklist" bind:this={matchedTasksSection} aria-labelledby="matched-tasks-heading">
@@ -281,7 +281,7 @@
                     <li class="checklist-row" class:completed={row.done}>
                         {#if row.errand.item.note}<span class="note-mark" aria-label="Note">📝</span>{:else}<input type="checkbox" checked={row.done} disabled={commitState.isHistorical} aria-label={`Completed: ${row.errand.item.name}`} onchange={(event) => setTaskDone(row.errand.item.id, event.currentTarget.checked)} />{/if}
                         <button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}{row.errand.item.note ? ' · Note' : ''}</small>{#if !row.done && isLocationOptionalErrand(row.errand) && !locationIds.has(row.errand.item.id)}<small>{locationOptionalTag(row.errand) === 'bank' ? 'Choose a bank or ATM yourself' : 'Choose a location yourself'} · no saved location needed.</small>{:else if !row.done && origin && !nearbyIds.has(row.errand.item.id)}<small>{supportedIds.has(row.errand.item.id) ? `No match within ${radius} km.` : 'No matching location in the database.'}</small>{/if}</button>
-                        {#if !row.done}<button class="pause-task" disabled={commitState.isHistorical} onclick={() => pauseTag(taskPauseTag(row.errand.tags), true)} aria-label={`Pause #${taskPauseTag(row.errand.tags)} errands`} title={`Pause #${taskPauseTag(row.errand.tags)} errands`}><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg></button>{/if}
+                        {#if !row.done}<button class="pause-task" disabled={commitState.isHistorical} onclick={() => pauseItem(row.errand.item.id, true)} aria-label={`Pause ${row.errand.item.name}`} title="Pause this errand"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg></button>{/if}
                         <button class="dismiss-task" disabled={commitState.isHistorical} onclick={() => dismissTask(row.errand.item.id)} aria-label={`Dismiss from errands: ${row.errand.item.name}`} title="Dismiss from errands">×</button>
                     </li>
                 {:else}<li class="hint">{pausedErrands.length ? 'Your remaining errands are paused. Expand Paused errands to resume them.' : 'No matched tasks. Add location hashtags to a todo, note or list name.'}</li>{/each}</ul>
@@ -322,7 +322,7 @@
             {#if selectedTag}
                 <section class="tag-locations" bind:this={tagLocationsPanel} aria-label={`Locations matching #${selectedTag}`}>
                     <div class="checklist-heading"><h2>#{selectedTag} · {selectedTagLocations.length} locations</h2><button aria-label="Close location list" onclick={() => selectedTag = null}>×</button></div>
-                    <button disabled={commitState.isHistorical} onclick={() => { if (selectedTag) pauseTag(selectedTag, !pausedTags.includes(selectedTag)); }}>{pausedTags.includes(selectedTag) ? 'Resume' : 'Pause'} #{selectedTag}</button>
+                    <button disabled={commitState.isHistorical} onclick={() => { if (selectedTag) pauseTag(selectedTag, !pausedTags.includes(selectedTag)); }}>{pausedTags.includes(selectedTag) ? 'Resume all' : 'Pause all'} #{selectedTag} errands</button>
                     <ul class="tag-location-list">
                         {#each selectedTagLocations as location (location.id)}
                             <li><div><strong>{location.name}</strong>{#if location.address}<p>{location.address}</p>{/if}</div><a href={directions(location)} target="_blank" rel="noopener noreferrer" aria-label={`Directions to ${location.name}`}>Directions ↗</a></li>

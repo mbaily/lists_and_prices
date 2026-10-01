@@ -1057,6 +1057,7 @@ export interface BackupFile {
 	hotSuburbIds?: string[];
 	nearbyChecklist?: Record<string, NearbyChecklistState>;
 	pausedErrandTags?: string[];
+	pausedErrandItemIds?: string[];
 }
 
 /** Serialise the entire doc to a plain JS object ready to JSON.stringify. */
@@ -1073,7 +1074,8 @@ export function exportBackup(): BackupFile {
 		startingLocation: readStartingLocation(),
 		hotSuburbIds: readHotSuburbIds(),
 		nearbyChecklist: readNearbyChecklist(),
-		pausedErrandTags: readPausedErrandTags()
+		pausedErrandTags: readPausedErrandTags(),
+		pausedErrandItemIds: readPausedErrandItemIds()
 	};
 }
 
@@ -1111,6 +1113,7 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 	validateRecords(backup.sheets ?? [], 'sheets');
 	validateLocations(backup.customLocations ?? []);
 	if (backup.pausedErrandTags !== undefined && (!Array.isArray(backup.pausedErrandTags) || backup.pausedErrandTags.some(tag => typeof tag !== 'string' || !/^#?\w+$/.test(tag)))) throw new Error('Invalid paused errand tags.');
+	if (backup.pausedErrandItemIds !== undefined && (!Array.isArray(backup.pausedErrandItemIds) || backup.pausedErrandItemIds.some(id => typeof id !== 'string' || !id.trim()))) throw new Error('Invalid paused errand item ids.');
 	if (backup.startingLocation != null && !isStartingLocation(backup.startingLocation)) throw new Error('Invalid starting location.');
 	if (backup.hotSuburbIds !== undefined && !isHotSuburbIds(backup.hotSuburbIds)) throw new Error('Invalid hot suburbs.');
 	if (backup.nearbyChecklist !== undefined && (!backup.nearbyChecklist || typeof backup.nearbyChecklist !== 'object' || Array.isArray(backup.nearbyChecklist) || Object.entries(backup.nearbyChecklist).some(([id, state]) => !id || !isNearbyChecklistState(state)))) throw new Error('Invalid nearby checklist.');
@@ -1183,6 +1186,9 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 		const pausedTags = doc.getMap<boolean>('paused-errand-tags');
 		if (mode === 'replace') pausedTags.clear();
 		for (const tag of backup.pausedErrandTags ?? []) pausedTags.set(normalizeLocationTag(tag), true);
+		const pausedItems = doc.getMap<boolean>('paused-errand-items');
+		if (mode === 'replace') pausedItems.clear();
+		for (const id of backup.pausedErrandItemIds ?? []) pausedItems.set(id, true);
 	});
 }
 
@@ -1198,6 +1204,21 @@ export function setErrandTagPaused(tag: string, paused: boolean): void {
 	const tags = getMutableDoc().getMap<boolean>('paused-errand-tags');
 	if (paused) tags.set(normalized, true);
 	else tags.delete(normalized);
+}
+
+export function readPausedErrandItemIds(): string[] {
+	return [...getDoc().getMap<boolean>('paused-errand-items')]
+		.filter(([id, paused]) => paused === true && !!id.trim())
+		.map(([id]) => id).sort();
+}
+
+export function setErrandItemPaused(id: string, paused: boolean): void {
+	if (!id.trim()) throw new Error('Invalid errand item id.');
+	const doc = getMutableDoc();
+	if (paused && !findYMap(getItems(doc), id)) return;
+	const items = doc.getMap<boolean>('paused-errand-items');
+	if (paused) items.set(id, true);
+	else items.delete(id);
 }
 
 export function readNearbyChecklist(): Record<string, NearbyChecklistState> {
