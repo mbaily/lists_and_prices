@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onDestroy, tick } from 'svelte';
+    import { onDestroy, tick, type Snippet } from 'svelte';
     import catalogue from '$lib/locations/melbourne.json';
     import suburbCatalogue from '$lib/locations/melbourne-suburbs.json';
     import { suburbLocations } from '$lib/suburbLocations';
@@ -7,7 +7,7 @@
     import { groupErrands, errandPreview } from '$lib/errandGroups';
     import { docState, commitState } from '$lib/yjsStore.svelte';
     import { readFolders, readLists, readAllItems, readCustomLocations, saveCustomLocation, deleteCustomLocation, readStartingLocation, saveStartingLocation, readHotSuburbIds, saveHotSuburbIds, readNearbyPreviewLimit, saveNearbyPreviewLimit, isItemDone, readNearbyChecklist, nearbyItemFingerprint, rememberNearbyChecklist, dismissNearbyChecklist, setNearbyTodoDone, readPausedErrandTags, setErrandTagPaused, readPausedErrandItemIds, setErrandItemPaused } from '$lib/data';
-    import { collectErrands, nearbyStops, suggestStops, isErrandPaused, isLocationOptionalErrand, locationOptionalTag, LOCATION_OPTIONAL_TAGS, type NearbyStop } from '$lib/nearbyErrands';
+    import { collectErrands, nearbyStops, suggestStops, isErrandPaused, isLocationOptionalErrand, locationOptionalTag, LOCATION_OPTIONAL_TAGS, type NearbyStop, type Errand } from '$lib/nearbyErrands';
     import { availableLocationTags, matchingLocationTags, validCoordinates, normalizeLocationTag, type Coordinates, type RetailLocation } from '$lib/retailLocations';
     import ConfirmDialog from './ConfirmDialog.svelte';
     import HelpText from './HelpText.svelte';
@@ -204,14 +204,25 @@
     function distanceLabel(km: number) { return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`; }
 </script>
 
+{#snippet errandGroup(group: { id: string; list: { name: string }; rows: { errand: Errand }[] }, children: Snippet)}
+    {#if group.id.startsWith('list:') && group.rows.length > 1}
+        <li><details class="errand-group"><summary><strong>{group.list.name}</strong><span>{errandPreview(group.rows.map(row => row.errand), previewLimit)}</span></summary>
+            <ul>{@render children()}</ul>
+        </details></li>
+    {:else}
+        {@render children()}
+    {/if}
+{/snippet}
+
 {#snippet stopCard(stop: NearbyStop)}
                 <article class="stop">
                     <div class="stop-heading"><div><h2>{stop.location.name}</h2><p>{distanceLabel(stop.distanceKm)} away{stop.location.address ? ' · ' + stop.location.address : ''}</p>{#if stop.location.coordinateAccuracy === 'shopping-centre'}<HelpText label="Help with shopping centre coordinates"><p>Distance and directions use the shopping centre location.</p></HelpText>{:else if stop.location.coordinateAccuracy === 'suburb'}<HelpText label="Help with approximate suburb coordinates"><p>Approximate suburb location. Check the destination before travelling.</p></HelpText>{/if}</div><a href={directions(stop.location)} target="_blank" rel="noopener noreferrer">Directions ↗</a></div>
                     <p class="match-count">{groupErrands(stop.errands.map(errand => ({ errand }))).length} errands · {stop.errands.length} tasks</p>
                     <ul class="errand-groups">{#each groupErrands(stop.errands.map(errand => ({ errand }))) as group (group.id)}
-                        <li><details class="errand-group"><summary><strong>{group.list.name}</strong><span>{errandPreview(group.rows.map(row => row.errand), previewLimit)}</span></summary>
-                            <ul>{#each group.rows as row (row.errand.item.id)}<li><button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span></button></li>{/each}</ul>
-                        </details></li>
+                        {#snippet errandRows()}
+                            {#each group.rows as row (row.errand.item.id)}<li><button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span></button></li>{/each}
+                        {/snippet}
+                        {@render errandGroup(group, errandRows)}
                     {/each}</ul>
                     {#if !customIds.has(stop.location.id) && stop.location.source}<a class="source" href={stop.location.source} target="_blank" rel="noopener noreferrer">Location source ↗</a>{/if}
                 </article>
@@ -301,26 +312,28 @@
                     <HelpText label="Help with paused errands"><p class="hint">Resume individual errands below. Hashtag pauses apply to all tasks using that tag. Original tasks stay unchanged, and pauses sync across devices.</p></HelpText>
                     <div class="pause-actions">{#each pausedTags as tag (tag)}<button disabled={commitState.isHistorical} onclick={() => pauseTag(tag, false)}>Resume all #{tag} errands</button>{/each}</div>
                     <ul class="errand-groups">{#each pausedGroups as group (group.id)}
-                        <li><details class="errand-group"><summary><strong>{group.list.name}</strong><span>{errandPreview(group.rows.map(row => row.errand), previewLimit)}</span></summary>
-                            <ul>{#each group.rows as row (row.errand.item.id)}<li class="checklist-row"><button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}</small>{#if isErrandPaused(row.errand, pausedTags)}<small>Paused by hashtag: {row.errand.tags.map(normalizeLocationTag).filter(tag => pausedTags.includes(tag)).map(tag => '#' + tag).join(', ')}</small>{/if}</button>{#if row.itemPaused}<button class="resume-task" disabled={commitState.isHistorical} onclick={() => pauseItem(row.errand.item.id, false)} aria-label={`Resume ${row.errand.item.name}`} title="Resume this errand"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l14-8z" /></svg></button>{/if}</li>{/each}</ul>
-                        </details></li>
+                        {#snippet errandRows()}
+                            {#each group.rows as row (row.errand.item.id)}<li class="checklist-row"><button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}</small>{#if isErrandPaused(row.errand, pausedTags)}<small>Paused by hashtag: {row.errand.tags.map(normalizeLocationTag).filter(tag => pausedTags.includes(tag)).map(tag => '#' + tag).join(', ')}</small>{/if}</button>{#if row.itemPaused}<button class="resume-task" disabled={commitState.isHistorical} onclick={() => pauseItem(row.errand.item.id, false)} aria-label={`Resume ${row.errand.item.name}`} title="Resume this errand"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l14-8z" /></svg></button>{/if}</li>{/each}
+                        {/snippet}
+                        {@render errandGroup(group, errandRows)}
                     {:else}<li class="hint">No unfinished paused tasks.</li>{/each}</ul>
                 </details>
             {/if}
             <section class="task-checklist" bind:this={matchedTasksSection} aria-labelledby="matched-tasks-heading">
                 <div class="checklist-heading"><h2 id="matched-tasks-heading">Matched tasks ({checklistGroups.length})</h2>{#if completedChecklist.length}<button disabled={commitState.isHistorical} onclick={clearCompletedTasks}>Clear completed</button>{/if}</div>
-                <HelpText label="Help with matched tasks"><p class="hint">Ticks update the original todos. Completed tasks stay until cleared. Dismissed notes and unchecked tasks return when edited; checked todos stay completed. Expand an errand to manage its individual tasks. Tasks using inherited hashtags share an errand; tasks with their own hashtags stay separate. The count is the number of errands. This checklist syncs across devices. Use #bank for banking or #errand for general errands with no set location.</p></HelpText>
+                <HelpText label="Help with matched tasks"><p class="hint">Ticks update the original todos. Completed tasks stay until cleared. Dismissed notes and unchecked tasks return when edited; checked todos stay completed. Expand a grouped errand to manage its individual tasks. Tasks using inherited hashtags share an errand; tasks with their own hashtags stay separate. The count is the number of errands. This checklist syncs across devices. Use #bank for banking or #errand for general errands with no set location.</p></HelpText>
                 <ul class="errand-groups">{#each checklistGroups as group (group.id)}
-                    <li><details class="errand-group"><summary><strong>{group.list.name}</strong><span>{errandPreview(group.rows.map(row => row.errand), previewLimit)}</span></summary>
-                        <ul>{#each group.rows as row (row.errand.item.id)}
+                    {#snippet errandRows()}
+                        {#each group.rows as row (row.errand.item.id)}
                             <li class="checklist-row" class:completed={row.done}>
                                 {#if row.errand.item.note}<span class="note-mark" aria-label="Note">📝</span>{:else}<input type="checkbox" checked={row.done} disabled={commitState.isHistorical} aria-label={`Completed: ${row.errand.item.name}`} onchange={(event) => setTaskDone(row.errand.item.id, event.currentTarget.checked)} />{/if}
                                 <button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}{row.errand.item.note ? ' · Note' : ''}</small>{#if !row.done && isLocationOptionalErrand(row.errand) && !locationIds.has(row.errand.item.id)}<small>{locationOptionalTag(row.errand) === 'bank' ? 'Choose a bank or ATM yourself' : 'Choose a location yourself'} · no saved location needed.</small>{:else if !row.done && origin && !nearbyIds.has(row.errand.item.id)}<small>{supportedIds.has(row.errand.item.id) ? `No match within ${radius} km.` : 'No matching location in the database.'}</small>{/if}</button>
                                 {#if !row.done}<button class="pause-task" disabled={commitState.isHistorical} onclick={() => pauseItem(row.errand.item.id, true)} aria-label={`Pause ${row.errand.item.name}`} title="Pause this errand"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg></button>{/if}
                                 <button class="dismiss-task" disabled={commitState.isHistorical} onclick={() => dismissTask(row.errand.item.id)} aria-label={`Dismiss from errands: ${row.errand.item.name}`} title="Dismiss from errands">×</button>
                             </li>
-                        {/each}</ul>
-                    </details></li>
+                        {/each}
+                    {/snippet}
+                    {@render errandGroup(group, errandRows)}
                 {:else}<li class="hint">{pausedErrands.length ? 'Your remaining errands are paused. Expand Paused errands to resume them.' : 'No matched tasks. Add location hashtags to a todo, note or list name.'}</li>{/each}</ul>
             </section>
             <div class="filters"><label>Within <select bind:value={radius}>{#each [1, 2, 5, 10, 25, 50] as km}<option value={km}>{km} km</option>{/each}</select></label></div>
@@ -337,11 +350,12 @@
                         <div class="unavailable">
                             <h3>Items without a nearby match ({groupErrands(plan.unavailable.map(errand => ({ errand }))).length})</h3>
                             <ul class="errand-groups">{#each groupErrands(plan.unavailable.map(errand => ({ errand }))) as group (group.id)}
-                                <li><details class="errand-group"><summary><strong>{group.list.name}</strong><span>{errandPreview(group.rows.map(row => row.errand), previewLimit)}</span></summary>
-                                    <ul>{#each group.rows as { errand } (errand.item.id)}<li>
-                                <button class="errand" onclick={() => onOpenItem(errand.list.id, errand.item.id)}><span>{errand.item.name}</span><small>{errand.list.name}{errand.item.note ? ' · Note' : ''}</small><small>{supportedIds.has(errand.item.id) ? `No match within ${radius} km. Try a larger radius.` : 'No matching location in the database. Add a place in Locations.'}</small></button>
-                                    </li>{/each}</ul>
-                                </details></li>
+                                {#snippet errandRows()}
+                                    {#each group.rows as { errand } (errand.item.id)}<li>
+                                        <button class="errand" onclick={() => onOpenItem(errand.list.id, errand.item.id)}><span>{errand.item.name}</span><small>{errand.list.name}{errand.item.note ? ' · Note' : ''}</small><small>{supportedIds.has(errand.item.id) ? `No match within ${radius} km. Try a larger radius.` : 'No matching location in the database. Add a place in Locations.'}</small></button>
+                                    </li>{/each}
+                                {/snippet}
+                                {@render errandGroup(group, errandRows)}
                             {/each}</ul>
                         </div>
                     {/if}
