@@ -75,10 +75,12 @@
     const supportedIds = $derived(new Set(supportedErrands.map(errand => errand.item.id)));
     const checklist = $derived(candidates.filter(row => !row.hidden && !row.paused && (row.done ? !!row.state : supportedIds.has(row.errand.item.id) || !!row.state)));
     const pausedErrands = $derived(candidates.filter(row => !row.done && !row.hidden && row.paused));
-    const pausableTags = $derived([...new Set(candidates.filter(row => !row.done && !row.hidden && !row.paused)
-        .flatMap(row => row.errand.tags.map(normalizeLocationTag)))].filter(tag => availableTags.some(entry => entry.tag === tag)).sort());
     function pauseTag(tag: string, paused: boolean) {
         if (!commitState.isHistorical) setErrandTagPaused(tag, paused);
+    }
+    function taskPauseTag(tags: string[]): string {
+        const normalized = tags.map(normalizeLocationTag);
+        return normalized.find(tag => availableTags.some(entry => entry.tag === tag)) ?? normalized[0];
     }
     const completedChecklist = $derived(checklist.filter(row => row.done));
     const stops = $derived(origin ? nearbyStops(locations, origin, radius, errands) : []);
@@ -222,12 +224,6 @@
                 {:else}<p class="hint">No custom locations yet.</p>{/each}
             </section>
         {:else}
-            {#if pausableTags.length}
-                <section class="errand-pauses" aria-label="Pause occasional errands">
-                    <p class="hint">Save occasional errands for later. Pausing a tag hides its tasks here until you resume it.</p>
-                    <div class="pause-actions">{#each pausableTags as tag (tag)}<button disabled={commitState.isHistorical} onclick={() => pauseTag(tag, true)}>Pause #{tag}</button>{/each}</div>
-                </section>
-            {/if}
             {#if pausedTags.length}
                 <details class="paused-errands">
                     <summary>Paused errands ({pausedErrands.length})</summary>
@@ -243,6 +239,7 @@
                     <li class="checklist-row" class:completed={row.done}>
                         {#if row.errand.item.note}<span class="note-mark" aria-label="Note">📝</span>{:else}<input type="checkbox" checked={row.done} disabled={commitState.isHistorical} aria-label={`Completed: ${row.errand.item.name}`} onchange={(event) => setTaskDone(row.errand.item.id, event.currentTarget.checked)} />{/if}
                         <button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}{row.errand.item.note ? ' · Note' : ''}</small>{#if !row.done && origin && !nearbyIds.has(row.errand.item.id)}<small>{supportedIds.has(row.errand.item.id) ? `No match within ${radius} km.` : 'No matching location in the database.'}</small>{/if}</button>
+                        {#if !row.done}<button class="pause-task" disabled={commitState.isHistorical} onclick={() => pauseTag(taskPauseTag(row.errand.tags), true)} aria-label={`Pause #${taskPauseTag(row.errand.tags)} errands`} title={`Pause #${taskPauseTag(row.errand.tags)} errands`}><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg></button>{/if}
                         <button class="dismiss-task" disabled={commitState.isHistorical} onclick={() => dismissTask(row.errand.item.id)} aria-label={`Dismiss from errands: ${row.errand.item.name}`} title="Dismiss from errands">×</button>
                     </li>
                 {:else}<li class="hint">{pausedErrands.length ? 'Your remaining errands are paused. Expand Paused errands to resume them.' : 'No matched tasks. Add location hashtags to a todo, note or list name.'}</li>{/each}</ul>
@@ -332,7 +329,8 @@
     .checklist-row .errand { flex: 1; min-width: 0; }
     .checklist-row input[type="checkbox"] { width: 22px; height: 22px; flex-shrink: 0; margin: 0 8px; accent-color: var(--accent); }
     .note-mark { width: 38px; flex-shrink: 0; text-align: center; }
-    .dismiss-task { width: 44px; height: 44px; flex-shrink: 0; font-size: 1.4rem; border: 0; background: transparent; }
+    .pause-task, .dismiss-task { width: 44px; height: 44px; flex-shrink: 0; font-size: 1.4rem; border: 0; background: transparent; }
+    .pause-task { display: flex; align-items: center; justify-content: center; }
     .completed .errand > span { text-decoration: line-through; color: var(--text2); }
     .pause-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
     .paused-errands { margin: 1rem auto; border: 1px solid var(--border); border-radius: 8px; padding: 0 .8rem .8rem; }

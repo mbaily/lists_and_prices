@@ -28,8 +28,8 @@ listings. With named folder checkboxes, the nearby checkbox controls the last
 completion checkbox and preserves the other checks. Each item appears once.
 Tasks outside the selected radius remain listed with an explanation.
 
-Use **Pause #ikea** (or another task tag) above the checklist to defer occasional
-errands. Any task with a paused effective tag disappears from the checklist,
+Use the **pause icon** immediately left of a task’s dismiss × to defer occasional
+errands. Its tooltip names the tag being paused (for example #ikea). Any task with a paused effective tag disappears from the checklist,
 suggested stops, alternatives and unmatched-item counts. Its original todo or note
 stays unchanged. For items with multiple tags, pausing any one tag defers the whole
 item. Item tags still take precedence over inherited list tags.
