@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createApp, merge } from './helpers/app.mjs';
+import { createApp, merge, componentFunctions, transpile } from './helpers/app.mjs';
 
 test('todos, subtodos and notes in one list form one nearby pill with a limited inline preview', () => {
     const app = createApp();
@@ -90,6 +90,52 @@ test('only inherited tasks share an errand across pills, checklist, stops and un
         const bankOnly = nearbyListPills([], errands, 9);
         assert.deepEqual(bankOnly.map(pill => pill.id), [`item:${bank}`], 'a standalone match does not make its inherited siblings nearby');
     } finally { app.dispose(); }
+});
+
+test('group checkbox completes only its parent, preserves all child data, and keeps explicit errands through sync and undo', () => {
+    const a = createApp(), b = createApp();
+    try {
+        const folder = a.data.createFolder('Errands', null);
+        const list = a.data.createList('Shopping #supermarket', folder, 'plain');
+        const milk = a.data.createItem(list, 'Milk');
+        a.data.createItem(list, 'Bread', null, milk);
+        a.data.createItem(list, 'Voucher', null, null, true);
+        const bank = a.data.createItem(list, 'Deposit money $110 #bank');
+        const bag = a.data.createItem(list, 'washing bag #loyolacrt', null, null, true);
+        const done = a.data.createItem(list, 'Already done #bank');
+        const box = a.data.addFolderCheckbox(folder, 'Finished');
+        a.data.setItemCheckboxState(done, box, true);
+        const another = a.data.createList('Other #supermarket', folder, 'plain');
+        const other = a.data.createItem(another, 'Apples');
+        const before = a.data.readAllItems();
+        merge(a.doc, b.doc);
+        const collect = app => app.load('src/lib/nearbyErrands.ts').collectErrands(app.data.readAllItems(), app.data.readLists(), app.data.readFolders());
+        const originalIds = collect(a).map(errand => errand.item.id);
+        const handler = new Function('updateList', 'commitState', transpile(componentFunctions('src/lib/components/NearbyErrandsScreen.svelte', ['setGroupDone'])) + '\nreturn setGroupDone;')(a.data.updateList, a.store.commitState);
+        a.store.getUndoManager().clear();
+        handler(list, true);
+        assert.equal(a.data.readLists().find(entry => entry.id === list).done, true);
+        assert.equal(a.data.readLists().find(entry => entry.id === another).done, false);
+        assert.deepEqual(a.data.readAllItems(), before, 'neither checkbox maps nor any other item data changes');
+        assert.deepEqual(collect(a).map(errand => errand.item.id), [bank, bag, other]);
+        assert.equal(a.store.getUndoCount(), 1);
+        merge(a.doc, b.doc);
+        assert.deepEqual(b.data.readAllItems(), before);
+        assert.deepEqual(collect(b).map(errand => errand.item.id), [bank, bag, other]);
+        a.store.undoLastAction();
+        assert.deepEqual(collect(a).map(errand => errand.item.id), originalIds, 'undo restores the inherited group');
+        assert.deepEqual(a.data.readAllItems(), before);
+        handler(list, true);
+        handler(list, false);
+        assert.deepEqual(collect(a).map(errand => errand.item.id), originalIds, 'unchecking the parent restores inherited tasks');
+        a.store.createCommit('Original group');
+        a.store.viewCommit(a.store.readCommits()[0].id);
+        handler(list, true);
+        assert.equal(a.data.readLists().find(entry => entry.id === list).done, false, 'history disables the group checkbox');
+        a.store.exitCommitView();
+        a.data.updateFolder(folder, { archived: true });
+        assert.deepEqual(collect(a), [], 'explicit errands still respect archived parents');
+    } finally { a.dispose(); b.dispose(); }
 });
 
 test('preview limit syncs and survives backups, undo and history with validated imports', () => {

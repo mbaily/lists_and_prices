@@ -68,12 +68,14 @@ export function suggestStops(stops: NearbyStop[], errands: Errand[]): SuggestedS
 
 /** Item tags take precedence; otherwise inherit the list's tags. */
 export function collectErrands(items: Item[], lists: ListMeta[], folders: Folder[], includeCompleted = false): Errand[] {
-    const availableLists = new Map(lists.filter(list => !list.done && list.type !== 'divider' && !isListEffectivelyArchived(list, folders)).map(list => [list.id, list]));
+    const availableLists = new Map(lists.filter(list => list.type !== 'divider' && !isListEffectivelyArchived(list, folders)).map(list => [list.id, list]));
     const folderMap = new Map(folders.map(folder => [folder.id, folder]));
     return items.flatMap(item => {
         const list = availableLists.get(item.listId);
         if (!list || item.heading || (!includeCompleted && !item.note && isItemDone(item, folderMap.get(list.folderId)))) return [];
         const itemTags = extractTags(item.name);
+        // Completing a parent list hides its inherited errand, not explicitly tagged tasks.
+        if (list.done && !itemTags.length) return [];
         const tags = itemTags.length ? itemTags : extractTags(list.name);
         return tags.length ? [{ item, list, tags }] : [];
     });

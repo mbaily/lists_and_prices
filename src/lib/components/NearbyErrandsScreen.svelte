@@ -6,7 +6,7 @@
     import { nearbyTaskPills, nearbyListPills } from '$lib/nearbyPills';
     import { groupErrands, errandPreview } from '$lib/errandGroups';
     import { docState, commitState } from '$lib/yjsStore.svelte';
-    import { readFolders, readLists, readAllItems, readCustomLocations, saveCustomLocation, deleteCustomLocation, readStartingLocation, saveStartingLocation, readHotSuburbIds, saveHotSuburbIds, readNearbyPreviewLimit, saveNearbyPreviewLimit, isItemDone, readNearbyChecklist, nearbyItemFingerprint, rememberNearbyChecklist, dismissNearbyChecklist, setNearbyTodoDone, readPausedErrandTags, setErrandTagPaused, readPausedErrandItemIds, setErrandItemPaused } from '$lib/data';
+    import { updateList, readFolders, readLists, readAllItems, readCustomLocations, saveCustomLocation, deleteCustomLocation, readStartingLocation, saveStartingLocation, readHotSuburbIds, saveHotSuburbIds, readNearbyPreviewLimit, saveNearbyPreviewLimit, isItemDone, readNearbyChecklist, nearbyItemFingerprint, rememberNearbyChecklist, dismissNearbyChecklist, setNearbyTodoDone, readPausedErrandTags, setErrandTagPaused, readPausedErrandItemIds, setErrandItemPaused } from '$lib/data';
     import { collectErrands, nearbyStops, suggestStops, isErrandPaused, isLocationOptionalErrand, locationOptionalTag, LOCATION_OPTIONAL_TAGS, type NearbyStop, type Errand } from '$lib/nearbyErrands';
     import { availableLocationTags, matchingLocationTags, validCoordinates, normalizeLocationTag, type Coordinates, type RetailLocation } from '$lib/retailLocations';
     import ConfirmDialog from './ConfirmDialog.svelte';
@@ -137,6 +137,9 @@
     function setTaskDone(id: string, checked: boolean) {
         if (!commitState.isHistorical) setNearbyTodoDone(id, checked);
     }
+    function setGroupDone(id: string, done: boolean) {
+        if (!commitState.isHistorical) updateList(id, { done });
+    }
     const customIds = $derived(new Set(customLocations.map(location => location.id)));
 
     function useGps() {
@@ -204,9 +207,15 @@
     function distanceLabel(km: number) { return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`; }
 </script>
 
-{#snippet errandGroup(group: { id: string; list: { name: string }; rows: { errand: Errand }[] }, children: Snippet)}
+{#snippet groupCheckbox(list: Errand['list'])}
+    <input class="group-checkbox" type="checkbox" checked={list.done} disabled={commitState.isHistorical}
+        aria-label={`Completed list: ${list.name}`} title="Complete this list; individual task checkboxes stay unchanged"
+        onchange={(event) => setGroupDone(list.id, event.currentTarget.checked)} />
+{/snippet}
+
+{#snippet errandGroup(group: { id: string; list: Errand['list']; rows: { errand: Errand }[] }, children: Snippet)}
     {#if group.id.startsWith('list:') && group.rows.length > 1}
-        <li><details class="errand-group"><summary><strong>{group.list.name}</strong><span>{errandPreview(group.rows.map(row => row.errand), previewLimit)}</span></summary>
+        <li class="group-row">{@render groupCheckbox(group.list)}<details class="errand-group"><summary><strong>{group.list.name}</strong><span>{errandPreview(group.rows.map(row => row.errand), previewLimit)}</span></summary>
             <ul>{@render children()}</ul>
         </details></li>
     {:else}
@@ -243,10 +252,13 @@
             <h2 id="nearby-strip-heading"><button class="nearby-heading" title="Go to distance setting" onclick={scrollToRadius}>Nearby</button></h2>
             <select class="preview-limit" aria-label="Items per pill" title="Items per pill" value={previewLimit} onchange={setPreviewLimit} disabled={commitState.isHistorical}>{#each [1, 2, 3, 4, 5, 6, 7, 8, 9] as count}<option value={count}>{count}</option>{/each}</select>
             {#each nearbyPills as pill (pill.id)}
-                <button class="nearby-pill" title={`${pill.list.name}: ${pill.name} ${pill.tags.map(tag => '#' + tag).join(' ')}`}
-                    onclick={() => onOpenItem(pill.list.id, pill.errands[0].item.id)}>
-                    <span class="nearby-pill-name">{pill.name}</span><span class="nearby-pill-tag">{pill.tags.map(tag => '#' + tag).join(' ')}</span>
-                </button>
+                <span class="nearby-pill">
+                    {#if pill.id.startsWith('list:') && pill.errands.length > 1}{@render groupCheckbox(pill.list)}{/if}
+                    <button class="nearby-pill-link" title={`${pill.list.name}: ${pill.name} ${pill.tags.map(tag => '#' + tag).join(' ')}`}
+                        onclick={() => onOpenItem(pill.list.id, pill.errands[0].item.id)}>
+                        <span class="nearby-pill-name">{pill.name}</span><span class="nearby-pill-tag">{pill.tags.map(tag => '#' + tag).join(' ')}</span>
+                    </button>
+                </span>
             {/each}
         </section>
         <section class="position">
@@ -321,7 +333,7 @@
             {/if}
             <section class="task-checklist" aria-labelledby="matched-tasks-heading">
                 <div class="checklist-heading"><h2 id="matched-tasks-heading">Matched tasks ({checklistGroups.length})</h2>{#if completedChecklist.length}<button disabled={commitState.isHistorical} onclick={clearCompletedTasks}>Clear completed</button>{/if}</div>
-                <HelpText label="Help with matched tasks"><p class="hint">Ticks update the original todos. Completed tasks stay until cleared. Dismissed notes and unchecked tasks return when edited; checked todos stay completed. Expand a grouped errand to manage its individual tasks. Tasks using inherited hashtags share an errand; tasks with their own hashtags stay separate. The count is the number of errands. This checklist syncs across devices. Use #bank for banking or #errand for general errands with no set location.</p></HelpText>
+                <HelpText label="Help with matched tasks"><p class="hint">Ticks update the original todos. Completed tasks stay until cleared. Dismissed notes and unchecked tasks return when edited; checked todos stay completed. Expand a grouped errand to manage its individual tasks. Tasks using inherited hashtags share an errand; tasks with their own hashtags stay separate. The group checkbox completes only its parent list and hides inherited tasks; individual task checkboxes stay unchanged. Tasks with their own hashtags remain visible. The count is the number of errands. This checklist syncs across devices. Use #bank for banking or #errand for general errands with no set location.</p></HelpText>
                 <ul class="errand-groups">{#each checklistGroups as group (group.id)}
                     {#snippet errandRows()}
                         {#each group.rows as row (row.errand.item.id)}
@@ -417,7 +429,8 @@
     .nearby-strip h2 { margin: 0; flex-shrink: 0; }
     .nearby-strip .preview-limit { width: auto; flex-shrink: 0; padding: .35rem; }
     .nearby-heading { border: 0; background: transparent; padding: 0; font: inherit; color: inherit; }
-    .nearby-pill { display: inline-flex; align-items: center; gap: .35rem; max-width: 100%; min-width: 0; background: #000; border-radius: 999px; padding: .35rem .65rem; white-space: nowrap; }
+    .nearby-pill { display: inline-flex; align-items: center; gap: .35rem; max-width: 100%; min-width: 0; background: #000; border: 1px solid var(--border); border-radius: 999px; padding: .35rem .65rem; white-space: nowrap; }
+    .nearby-pill-link { display: inline-flex; align-items: center; gap: .35rem; min-width: 0; padding: 0; border: 0; background: transparent; }
     .nearby-pill-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .nearby-pill-tag { color: var(--accent); flex-shrink: 0; max-width: 45%; overflow: hidden; text-overflow: ellipsis; }
     button, select, input { font: inherit; color: var(--text); border: 1px solid var(--border); background: var(--bg2); border-radius: 6px; padding: .65rem; }
@@ -429,6 +442,10 @@
     .filters, .stop-heading, .saved { display: flex; align-items: center; justify-content: space-between; gap: .8rem; }
     .filters { flex-wrap: wrap; }
     .filters label { flex-direction: row; align-items: center; } .filters select { width: auto; }
+    .group-row { display: flex; align-items: flex-start; gap: .5rem; }
+    .group-row .errand-group { flex: 1; min-width: 0; }
+    .group-checkbox { width: 22px; height: 22px; flex-shrink: 0; margin: 0; padding: 0; accent-color: var(--accent); cursor: pointer; }
+    .group-row > .group-checkbox { margin-top: .85rem; }
     .errand-group > summary { display: flex; align-items: center; gap: .5rem; min-width: 0; }
     .errand-group > summary::before { content: "▸"; flex-shrink: 0; }
     .errand-group[open] > summary::before { content: "▾"; }

@@ -145,7 +145,7 @@ test('suggestions prefer coverage, remove redundant stops and assign overlapping
     } finally { app.dispose(); }
 });
 
-test('include tagged notes but exclude completed todos, headings, archived ancestors and completed lists', () => {
+test('include explicitly tagged tasks from completed lists but exclude completed todos, headings and archived ancestors', () => {
     const app = createApp();
     try {
         const nearby = app.load('src/lib/nearbyErrands.ts');
@@ -161,7 +161,7 @@ test('include tagged notes but exclude completed todos, headings, archived ances
         assert.deepEqual(collect().map(errand => errand.item.id), [kept, note]);
         app.data.updateFolder(parent, { archived: true }); assert.deepEqual(collect(), []);
         app.data.updateFolder(parent, { archived: false });
-        app.data.updateList(list, { done: true }); assert.deepEqual(collect(), []);
+        app.data.updateList(list, { done: true }); assert.deepEqual(collect().map(errand => errand.item.id), [kept, note]);
         app.data.updateList(list, { done: false });
         const checkbox = app.data.addFolderCheckbox(folder, 'Bought');
         app.data.setItemCheckboxState(kept, checkbox, true);
