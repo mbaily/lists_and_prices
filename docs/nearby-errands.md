@@ -45,6 +45,12 @@ no bank or ATM catalogue is required.
 Bank errands also appear as `#bank` pills in **Nearby**, and sort with nearby
 matches at the top of **Matched tasks**, even without a saved bank or ATM location.
 
+Use `#errand` for general tasks with no set location, such as `Post a letter #errand`,
+or put it on a list to apply to its untagged todos and notes. Like `#bank`, it
+appears in **Nearby** and at the top of **Matched tasks** without a starting point
+or a saved destination. You can complete, dismiss or pause it, and it does not
+count as an item missing a nearby match. The pill retains the `#errand` label.
+
 Use the **pause icon** immediately left of a task’s dismiss × to defer occasional
 errands. Its tooltip names the tag being paused (for example #ikea). Any task with a paused effective tag disappears from the checklist,
 suggested stops, alternatives and unmatched-item counts. Its original todo or note

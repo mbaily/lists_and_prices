@@ -165,18 +165,19 @@ test('completed candidates can be read without reviving archived, deleted or unt
     } finally { app.dispose(); }
 });
 
-test('bank reminders enter the checklist without locations and stay out of missing-location counts', () => {
+for (const tag of ['bank', 'errand']) {
+test(`${tag} reminders enter the checklist without locations and stay out of missing-location counts`, () => {
     const { app, list } = fixture();
     try {
         const nearby = app.load('src/lib/nearbyErrands.ts');
-        app.data.updateList(list, { name: 'Banking #BANK' });
+        app.data.updateList(list, { name: `Tasks #${tag.toUpperCase()}` });
         const bank = app.data.createItem(list, 'Withdraw cash');
         const other = app.data.createItem(list, 'Collect parcel #postoffice');
         const errands = nearby.collectErrands(app.data.readAllItems(), app.data.readLists(), app.data.readFolders());
         const bankErrand = errands.find(errand => errand.item.id === bank);
         assert.equal(nearby.isLocationOptionalErrand(bankErrand), true);
         assert.equal(nearby.isLocationOptionalErrand(errands.find(errand => errand.item.id === other)), false);
-        assert.equal(nearby.isErrandPaused(bankErrand, ['bank']), true);
+        assert.equal(nearby.isErrandPaused(bankErrand, [tag]), true);
         // Exercise the screen's eligibility and routing expressions with no catalogue matches.
         const screen = readFileSync(path.join(root, 'src/lib/components/NearbyErrandsScreen.svelte'), 'utf8');
         const derive = (name, scope) => {
@@ -204,3 +205,5 @@ test('bank reminders enter the checklist without locations and stay out of missi
         assert.equal(hidden(app, bank), false);
     } finally { app.dispose(); }
 });
+
+}

@@ -6,9 +6,15 @@ export interface Errand { item: Item; list: ListMeta; tags: string[] }
 export interface NearbyStop { location: RetailLocation; distanceKm: number; errands: Errand[] }
 export interface SuggestedStops { suggested: NearbyStop[]; alternatives: NearbyStop[]; unavailable: Errand[] }
 
-/** Bank errands remain useful reminders without a saved bank or ATM location. */
+export const LOCATION_OPTIONAL_TAGS = ['bank', 'errand'];
+
+export function locationOptionalTag(errand: Errand): string | undefined {
+    return errand.tags.map(normalizeLocationTag).find(tag => LOCATION_OPTIONAL_TAGS.includes(tag));
+}
+
+/** General and banking errands work without a saved destination. */
 export function isLocationOptionalErrand(errand: Errand): boolean {
-    return errand.tags.some(tag => normalizeLocationTag(tag) === 'bank');
+    return locationOptionalTag(errand) !== undefined;
 }
 
 /** Pausing any of an item's effective tags defers the entire errand. */
