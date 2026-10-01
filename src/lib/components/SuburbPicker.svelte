@@ -1,5 +1,6 @@
 <script lang="ts">
     import catalogue from '$lib/locations/melbourne-suburbs.json';
+    import HelpText from './HelpText.svelte';
     import { searchSuburbs, type Suburb } from '$lib/suburbSearch';
 
     let { value = $bindable(''), onSelect, onClear = () => {}, label = 'Or start near a Melbourne suburb' }: { value?: string; onSelect: (suburb: Suburb) => void; onClear?: () => void; label?: string } = $props();
@@ -55,7 +56,7 @@
         {/each}
     </div>
     {#if expanded && matches.length === 0}<p class="hint" role="status">No matching suburb. Try another spelling.</p>{/if}
-    <p id={`${uid}-hint`} class="hint">Type a suburb name and choose a match. Distances start from its approximate centre.</p>
+    <HelpText label="Help with searching suburbs"><p id={`${uid}-hint`} class="hint">Type a suburb name and choose a match. Distances start from its approximate centre.</p></HelpText>
     <p class="attribution"><a href={catalogue.source} target="_blank" rel="noopener noreferrer">Suburb data: Vicmap Admin © State of Victoria</a> · <a href={catalogue.licenseUrl} target="_blank" rel="noopener noreferrer">{catalogue.license}</a></p>
 </div>
 

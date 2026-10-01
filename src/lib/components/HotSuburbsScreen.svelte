@@ -2,6 +2,7 @@
     import { untrack } from 'svelte';
     import { suburbById } from '$lib/hotSuburbs';
     import SuburbPicker from './SuburbPicker.svelte';
+    import HelpText from './HelpText.svelte';
     import type { Suburb } from '$lib/suburbSearch';
 
     let { initialIds, onBack, onSave }: { initialIds: string[]; onBack: () => void; onSave: (ids: string[]) => void } = $props();
@@ -59,7 +60,7 @@
 <div class="hot-screen">
     <header><button onclick={onBack} aria-label="Back to nearby errands" title="Back">←</button><h1>Hot suburbs</h1></header>
     <main>
-        <p>Choose the suburb shortcuts shown beside the location button. Each uses the suburb’s approximate centre.</p>
+        <HelpText label="Help with hot suburbs"><p>Choose the suburb shortcuts shown beside the location button. Each uses the suburb’s approximate centre. Add suburbs below, drag their handles to reorder them, and Save your changes. Cancel discards changes.</p></HelpText>
         <SuburbPicker bind:value={query} onSelect={add} label="Add a suburb" />
         <ul bind:this={suburbList}>
             {#each ids as id, index (id)}

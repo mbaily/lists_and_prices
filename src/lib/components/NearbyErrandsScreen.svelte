@@ -9,6 +9,7 @@
     import { collectErrands, nearbyStops, suggestStops, isErrandPaused, isLocationOptionalErrand, locationOptionalTag, LOCATION_OPTIONAL_TAGS, type NearbyStop } from '$lib/nearbyErrands';
     import { availableLocationTags, matchingLocationTags, validCoordinates, normalizeLocationTag, type Coordinates, type RetailLocation } from '$lib/retailLocations';
     import ConfirmDialog from './ConfirmDialog.svelte';
+    import HelpText from './HelpText.svelte';
     import HotSuburbsScreen from './HotSuburbsScreen.svelte';
     import { suburbById } from '$lib/hotSuburbs';
     import type { Suburb } from '$lib/suburbSearch';
@@ -194,7 +195,7 @@
 
 {#snippet stopCard(stop: NearbyStop)}
                 <article class="stop">
-                    <div class="stop-heading"><div><h2>{stop.location.name}</h2><p>{distanceLabel(stop.distanceKm)} away{stop.location.address ? ' · ' + stop.location.address : ''}</p>{#if stop.location.coordinateAccuracy === 'shopping-centre'}<p>Distance and directions use the shopping centre location.</p>{:else if stop.location.coordinateAccuracy === 'suburb'}<p>Approximate suburb location. Check the destination before travelling.</p>{/if}</div><a href={directions(stop.location)} target="_blank" rel="noopener noreferrer">Directions ↗</a></div>
+                    <div class="stop-heading"><div><h2>{stop.location.name}</h2><p>{distanceLabel(stop.distanceKm)} away{stop.location.address ? ' · ' + stop.location.address : ''}</p>{#if stop.location.coordinateAccuracy === 'shopping-centre'}<HelpText label="Help with shopping centre coordinates"><p>Distance and directions use the shopping centre location.</p></HelpText>{:else if stop.location.coordinateAccuracy === 'suburb'}<HelpText label="Help with approximate suburb coordinates"><p>Approximate suburb location. Check the destination before travelling.</p></HelpText>{/if}</div><a href={directions(stop.location)} target="_blank" rel="noopener noreferrer">Directions ↗</a></div>
                     <p class="match-count">{stop.errands.length} matching item{stop.errands.length === 1 ? '' : 's'}</p>
                     <ul>{#each stop.errands as errand (errand.item.id)}<li><button class="errand" onclick={() => onOpenItem(errand.list.id, errand.item.id)}><span>{errand.item.name}</span><small>{errand.list.name}{errand.item.note ? ' · Note' : ''}</small></button></li>{/each}</ul>
                     {#if !customIds.has(stop.location.id) && stop.location.source}<a class="source" href={stop.location.source} target="_blank" rel="noopener noreferrer">Location source ↗</a>{/if}
@@ -237,7 +238,7 @@
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m16 3 5 5-12 12-6 1 1-6zM13 6l5 5" /></svg>
                 </button>
             </div>
-            <p class="hint">Tap the location icon for GPS, or a suburb pill to use its centre. Your starting location and hot suburbs sync across your devices.</p>
+            <HelpText label="Help with starting location"><p class="hint">Tap the location icon for GPS, or a suburb pill to use its centre. Your starting location and hot suburbs sync across your devices.</p></HelpText>
             {#if locationError}<p role="alert" class="error">{locationError}</p>{/if}
             {#if origin}<p class="origin">{originLabel}{accuracy !== null ? ` · GPS accuracy approximately ${Math.round(accuracy)} m` : ''}</p>{/if}
             {#if savedLocation}<p class="hint">Last updated: {new Date(savedLocation.updatedAt).toLocaleString()}</p>{/if}
@@ -247,7 +248,7 @@
         {#if showLocations}
             <section class="custom">
                 <h2>{editingId ? 'Edit location' : 'Add a location'}</h2>
-                <p class="hint">Add any shop or place. Matching hashtags might be #postoffice, #pharmacy or #home. A #coles or #woolworths location also matches #supermarket automatically.</p>
+                <HelpText label="Help with custom location hashtags"><p class="hint">Add any shop or place. Matching hashtags might be #postoffice, #pharmacy or #home. A #coles or #woolworths location also matches #supermarket automatically.</p></HelpText>
                 <form onsubmit={(event) => { event.preventDefault(); saveLocation(); }}>
                     <fieldset disabled={commitState.isHistorical}>
                         <label>Name<input bind:value={name} required placeholder="My local pharmacy" /></label>
@@ -260,7 +261,7 @@
                     {#if formError}<p class="error" role="alert">{formError}</p>{/if}
                 </form>
                 <h2>Your locations ({customLocations.length})</h2>
-                <p class="hint">Saved locations sync across your devices and are included in JSON backups.</p>
+                <HelpText label="Help with saving locations"><p class="hint">Saved locations sync across your devices and are included in JSON backups.</p></HelpText>
                 {#each customLocations as location (location.id)}
                     <article class="saved"><div><strong>{location.name}</strong><p>{location.tags.map(tag => '#' + tag).join(' ')} · {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}</p></div><div class="form-actions"><button disabled={commitState.isHistorical} onclick={() => editLocation(location)}>Edit</button><button disabled={commitState.isHistorical} onclick={() => deleteTarget = location}>Delete</button></div></article>
                 {:else}<p class="hint">No custom locations yet.</p>{/each}
@@ -269,14 +270,14 @@
             {#if pausedTags.length || pausedErrands.length}
                 <details class="paused-errands">
                     <summary>Paused errands ({pausedErrands.length})</summary>
-                    <p class="hint">Resume individual errands below. Hashtag pauses apply to all tasks using that tag. Original tasks stay unchanged, and pauses sync across devices.</p>
+                    <HelpText label="Help with paused errands"><p class="hint">Resume individual errands below. Hashtag pauses apply to all tasks using that tag. Original tasks stay unchanged, and pauses sync across devices.</p></HelpText>
                     <div class="pause-actions">{#each pausedTags as tag (tag)}<button disabled={commitState.isHistorical} onclick={() => pauseTag(tag, false)}>Resume all #{tag} errands</button>{/each}</div>
                     <ul>{#each pausedErrands as row (row.errand.item.id)}<li class="checklist-row"><button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}</small>{#if isErrandPaused(row.errand, pausedTags)}<small>Paused by hashtag: {row.errand.tags.map(normalizeLocationTag).filter(tag => pausedTags.includes(tag)).map(tag => '#' + tag).join(', ')}</small>{/if}</button>{#if row.itemPaused}<button class="resume-task" disabled={commitState.isHistorical} onclick={() => pauseItem(row.errand.item.id, false)} aria-label={`Resume ${row.errand.item.name}`} title="Resume this errand"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l14-8z" /></svg></button>{/if}</li>{:else}<li class="hint">No unfinished paused tasks.</li>{/each}</ul>
                 </details>
             {/if}
             <section class="task-checklist" bind:this={matchedTasksSection} aria-labelledby="matched-tasks-heading">
                 <div class="checklist-heading"><h2 id="matched-tasks-heading">Matched tasks ({checklist.length})</h2>{#if completedChecklist.length}<button disabled={commitState.isHistorical} onclick={clearCompletedTasks}>Clear completed</button>{/if}</div>
-                <p class="hint">Ticks update the original todos. Completed tasks stay until cleared. Dismissed notes and unchecked tasks return when edited; checked todos stay completed. This checklist syncs across devices. Use #bank for banking or #errand for general errands with no set location.</p>
+                <HelpText label="Help with matched tasks"><p class="hint">Ticks update the original todos. Completed tasks stay until cleared. Dismissed notes and unchecked tasks return when edited; checked todos stay completed. This checklist syncs across devices. Use #bank for banking or #errand for general errands with no set location.</p></HelpText>
                 <ul>{#each checklist as row (row.errand.item.id)}
                     <li class="checklist-row" class:completed={row.done}>
                         {#if row.errand.item.note}<span class="note-mark" aria-label="Note">📝</span>{:else}<input type="checkbox" checked={row.done} disabled={commitState.isHistorical} aria-label={`Completed: ${row.errand.item.name}`} onchange={(event) => setTaskDone(row.errand.item.id, event.currentTarget.checked)} />{/if}
@@ -293,7 +294,7 @@
                 <section class="suggestions" aria-labelledby="suggested-stops-heading">
                     <h2 id="suggested-stops-heading">Suggested stops</h2>
                     <p class="coverage" aria-live="polite">{coveredCount} of {locationErrands.length} location-based item{locationErrands.length === 1 ? '' : 's'} covered by {plan.suggested.length} stop{plan.suggested.length === 1 ? '' : 's'} within {radius} km.</p>
-                    <p class="hint">A short set of shops covering all nearby matches, shown nearest first. Each item appears once. Distances are straight-line distances.</p>
+                    <HelpText label="Help with suggested stops"><p class="hint">A short set of shops covering all nearby matches, shown nearest first. Each item appears once. Distances are straight-line distances.</p></HelpText>
                     {#if errands.length === 0}<p class="empty">{pausedErrands.length ? 'Your remaining errands are paused.' : 'Add location hashtags to an unchecked todo, note or list name to find places to go.'}</p>{/if}
                     {#each plan.suggested as stop (stop.location.id)}{@render stopCard(stop)}{/each}
                     {#if plan.unavailable.length}
@@ -308,7 +309,7 @@
                 {#if plan.alternatives.length}
                     <details class="alternatives" bind:open={showAlternatives}>
                         <summary>Alternatives ({plan.alternatives.length} other locations)</summary>
-                        <p class="hint">Other shops matching your items, nearest first. These offer alternatives to the suggested stops.</p>
+                        <HelpText label="Help with alternative stops"><p class="hint">Other shops matching your items, nearest first. These offer alternatives to the suggested stops.</p></HelpText>
                         {#if showAlternatives}{#each plan.alternatives as stop (stop.location.id)}{@render stopCard(stop)}{/each}{/if}
                     </details>
                 {/if}
@@ -316,8 +317,8 @@
         {/if}
         <details class="available-tags">
             <summary>Available location hashtags</summary>
-            <p class="hint">Add these hashtags to a list name to match its todos and notes, or tag individual items. Item hashtags take precedence over list hashtags. #bank and #errand keep tasks nearby without a saved location. Counts cover all locations in the database, including your saved places. #supermarket matches Coles, Woolworths and Aldi.</p>
-            <p class="hint">Melbourne suburbs are also available: #brunswick, #richmond or #brunswickeast. Suburb hashtags point to approximate suburb centres; remove spaces from multi-word names.</p>
+            <HelpText label="Help with location hashtags"><p class="hint">Add these hashtags to a list name to match its todos and notes, or tag individual items. Item hashtags take precedence over list hashtags. #bank and #errand keep tasks nearby without a saved location. Counts cover all locations in the database, including your saved places. #supermarket matches Coles, Woolworths and Aldi.</p></HelpText>
+            <HelpText label="Help with suburb hashtags"><p class="hint">Melbourne suburbs are also available: #brunswick, #richmond or #brunswickeast. Suburb hashtags point to approximate suburb centres; remove spaces from multi-word names.</p></HelpText>
             <label class="tag-search">Find a location hashtag<input type="search" bind:value={tagQuery} placeholder="e.g. bunnings, brunswick or st kilda" /></label>
             {#if selectedTag}
                 <section class="tag-locations" bind:this={tagLocationsPanel} aria-label={`Locations matching #${selectedTag}`}>
@@ -336,7 +337,7 @@
                 {:else}<li>{availableTags.length ? 'No matching hashtags.' : 'No location hashtags yet. Add a place in Locations.'}</li>{/each}
             </ul>
             {#if !tagQuery.trim() && availableTags.length > 12}<button onclick={() => showAllTags = !showAllTags}>{showAllTags ? 'Show fewer hashtags' : `Show all ${availableTags.length} hashtags`}</button>{/if}
-            <p class="hint">For example: name a list “Shopping #supermarket”, or tag one item “Buy milk #coles”. New location hashtags appear here automatically.</p>
+            <HelpText label="Help with tagging tasks and lists"><p class="hint">For example: name a list “Shopping #supermarket”, or tag one item “Buy milk #coles”. New location hashtags appear here automatically.</p></HelpText>
         </details>
         <footer>{catalogue.locations.length} pre-recorded Melbourne locations · <a href={catalogue.source} target="_blank" rel="noopener noreferrer">{catalogue.attribution}</a> · <a href={catalogue.licenseUrl} target="_blank" rel="noopener noreferrer">{catalogue.license}</a><p>Catalogue retrieved: {catalogue.retrievedAt}. Store openings and closures may need manual updates.</p><p>{suburbLocations.length} suburb centres · <a href={suburbCatalogue.source} target="_blank" rel="noopener noreferrer">{suburbCatalogue.attribution}</a> · <a href={suburbCatalogue.licenseUrl} target="_blank" rel="noopener noreferrer">{suburbCatalogue.license}</a></p></footer>
     </main>
