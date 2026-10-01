@@ -159,17 +159,15 @@
 	});
 
 	$effect(() => {
-		if (highlightItemId) {
-			let t: ReturnType<typeof setTimeout>;
+		const itemId = highlightItemId;
+		if (itemId) {
+			let cancelled = false;
 			tick().then(() => {
-				const el = document.querySelector(`[data-item-id="${highlightItemId}"]`);
-				if (el) {
-					el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-					el.classList.add('highlight-animation');
-					t = setTimeout(() => el.classList.remove('highlight-animation'), 2000);
-				}
+				if (cancelled) return;
+				const el = document.querySelector(`[data-item-id="${itemId}"]`);
+				el?.scrollIntoView({ behavior: 'instant', block: 'center' });
 			});
-			return () => clearTimeout(t);
+			return () => { cancelled = true; };
 		}
 	});
 
@@ -1542,6 +1540,7 @@
 			<div
 				id="item-{item.id}"
 				class="item-row"
+				class:linked-item={highlightItemId === item.id}
 				class:journal-mode={journalMode}
 				class:cursored={activeCursorId === item.id}
 				class:heading={item.heading}
@@ -2720,12 +2719,19 @@
 		font-size: 0.9rem;
 		cursor: pointer;
 	}
-	@keyframes highlightFade {
-		0% { background-color: var(--accent); }
-		100% { background-color: transparent; }
+	.item-row.linked-item {
+		position: relative;
 	}
-	:global(.highlight-animation) {
-		animation: highlightFade 2s ease-out;
+	.item-row.linked-item::before {
+		content: '';
+		position: absolute;
+		left: 0;
+		top: .25rem;
+		bottom: .25rem;
+		width: 4px;
+		border-radius: 2px;
+		background: var(--accent);
+		pointer-events: none;
 	}
 
 	@media (max-width: 600px) {
