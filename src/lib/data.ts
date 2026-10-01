@@ -384,7 +384,11 @@ export function updateList(id: string, patch: Partial<Omit<ListMeta, 'id' | 'cre
 	doc.transact(() => {
 		const m = findYMap(getLists(doc), id);
 		if (!m) return;
+		const destination = patch.folderId !== undefined && patch.folderId !== m.get('folderId')
+			? findYMap(getFolders(doc), patch.folderId)
+			: null;
 		for (const [k, v] of Object.entries(patch)) m.set(k, v);
+		if (destination) m.set('color', (destination.get('color') as string) ?? '#6366f1');
 		const keys = Object.keys(patch);
 		if (!(keys.length === 1 && keys[0] === 'order')) m.set('updatedAt', new Date().toISOString());
 	});

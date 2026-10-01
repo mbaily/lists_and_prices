@@ -20,6 +20,23 @@ function legacyNote(c, name = 'Original note') {
 }
 function replicate(from, to) { Y.applyUpdate(to.doc, Y.encodeStateAsUpdate(from.doc), 'peer'); }
 
+test('moving a list inherits its destination colour and undo restores both folder and colour', () => {
+	const c = app();
+	const source = c.data.createFolder('Source', null, '#ff0000');
+	const destination = c.data.createFolder('Destination', null, '#00ff00');
+	const list = c.data.createList('List', source, 'plain', '#0000ff');
+	c.store.getUndoManager().clear();
+	c.data.updateList(list, { folderId: destination });
+	assert.equal(c.data.readLists()[0].folderId, destination);
+	assert.equal(c.data.readLists()[0].color, '#00ff00');
+	c.store.undoLastAction();
+	assert.equal(c.data.readLists()[0].folderId, source);
+	assert.equal(c.data.readLists()[0].color, '#0000ff');
+
+	c.data.updateList(list, { name: 'Renamed', folderId: source });
+	assert.equal(c.data.readLists()[0].color, '#0000ff');
+});
+
 test('network handshake waits for local restoration and stale providers cannot connect a later session', () => {
 	const idbs = [], sockets = [];
 	class Local extends Provider { constructor() { super(); idbs.push(this); } }
