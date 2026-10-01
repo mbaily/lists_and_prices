@@ -66,11 +66,11 @@
     let showAllTags = $state(false);
     let selectedTag = $state<string | null>(null);
     let tagLocationsPanel = $state<HTMLElement>();
-    let matchedTasksSection = $state<HTMLElement>();
-    async function scrollToMatchedTasks() {
+    let radiusFilters = $state<HTMLElement>();
+    async function scrollToRadius() {
         showLocations = false;
         await tick();
-        matchedTasksSection?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        radiusFilters?.scrollIntoView({ block: 'start', behavior: 'smooth' });
     }
     const selectedTagLocations = $derived(selectedTag ? locations.filter(location => matchingLocationTags([selectedTag!], location).length > 0)
         .sort((a, b) => a.name.localeCompare(b.name) || (a.address ?? '').localeCompare(b.address ?? '')) : []);
@@ -240,7 +240,7 @@
     <main>
         {#if commitState.isHistorical}<p class="notice">Viewing historical todos and custom locations. Exit history to make changes.</p>{/if}
         <section class="nearby-strip" aria-labelledby="nearby-strip-heading">
-            <h2 id="nearby-strip-heading"><button class="nearby-heading" title="Go to matched tasks" onclick={scrollToMatchedTasks}>Nearby</button></h2>
+            <h2 id="nearby-strip-heading"><button class="nearby-heading" title="Go to distance setting" onclick={scrollToRadius}>Nearby</button></h2>
             <select class="preview-limit" aria-label="Items per pill" title="Items per pill" value={previewLimit} onchange={setPreviewLimit} disabled={commitState.isHistorical}>{#each [1, 2, 3, 4, 5, 6, 7, 8, 9] as count}<option value={count}>{count}</option>{/each}</select>
             {#each nearbyPills as pill (pill.id)}
                 <button class="nearby-pill" title={`${pill.list.name}: ${pill.name} ${pill.tags.map(tag => '#' + tag).join(' ')}`}
@@ -319,7 +319,7 @@
                     {:else}<li class="hint">No unfinished paused tasks.</li>{/each}</ul>
                 </details>
             {/if}
-            <section class="task-checklist" bind:this={matchedTasksSection} aria-labelledby="matched-tasks-heading">
+            <section class="task-checklist" aria-labelledby="matched-tasks-heading">
                 <div class="checklist-heading"><h2 id="matched-tasks-heading">Matched tasks ({checklistGroups.length})</h2>{#if completedChecklist.length}<button disabled={commitState.isHistorical} onclick={clearCompletedTasks}>Clear completed</button>{/if}</div>
                 <HelpText label="Help with matched tasks"><p class="hint">Ticks update the original todos. Completed tasks stay until cleared. Dismissed notes and unchecked tasks return when edited; checked todos stay completed. Expand a grouped errand to manage its individual tasks. Tasks using inherited hashtags share an errand; tasks with their own hashtags stay separate. The count is the number of errands. This checklist syncs across devices. Use #bank for banking or #errand for general errands with no set location.</p></HelpText>
                 <ul class="errand-groups">{#each checklistGroups as group (group.id)}
@@ -336,7 +336,7 @@
                     {@render errandGroup(group, errandRows)}
                 {:else}<li class="hint">{pausedErrands.length ? 'Your remaining errands are paused. Expand Paused errands to resume them.' : 'No matched tasks. Add location hashtags to a todo, note or list name.'}</li>{/each}</ul>
             </section>
-            <div class="filters"><label>Within <select bind:value={radius}>{#each [1, 2, 5, 10, 25, 50] as km}<option value={km}>{km} km</option>{/each}</select></label></div>
+            <div class="filters" bind:this={radiusFilters}><label>Within <select bind:value={radius}>{#each [1, 2, 5, 10, 25, 50] as km}<option value={km}>{km} km</option>{/each}</select></label></div>
             {#if !origin}
                 <p class="empty">Use your location or choose a starting suburb to see nearby errands.</p>
             {:else}
