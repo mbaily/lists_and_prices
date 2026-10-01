@@ -28,6 +28,18 @@ listings. With named folder checkboxes, the nearby checkbox controls the last
 completion checkbox and preserves the other checks. Each item appears once.
 Tasks outside the selected radius remain listed with an explanation.
 
+Use **Pause #ikea** (or another task tag) above the checklist to defer occasional
+errands. Any task with a paused effective tag disappears from the checklist,
+suggested stops, alternatives and unmatched-item counts. Its original todo or note
+stays unchanged. For items with multiple tags, pausing any one tag defers the whole
+item. Item tags still take precedence over inherited list tags.
+
+Expand **Paused errands** to see deferred tasks and press **Resume #ikea** when
+planning that trip. Pauses remain until resumed, including after edits and reloads,
+and apply to new tasks with that tag. They sync across devices, support undo,
+backups and history. Pause/resume is disabled in historical views. You can also
+pause or resume a tag while browsing its locations under **Available location hashtags**.
+
 Completing a todo removes it from the suggested stops but leaves its checked row
 in the checklist. **Clear completed** removes these rows without unchecking or
 deleting the original todos. The × beside a task dismisses it from errands only.

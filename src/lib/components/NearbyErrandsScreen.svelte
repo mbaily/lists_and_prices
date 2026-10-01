@@ -2,8 +2,8 @@
     import { onDestroy, tick } from 'svelte';
     import catalogue from '$lib/locations/melbourne.json';
     import { docState, commitState } from '$lib/yjsStore.svelte';
-    import { readFolders, readLists, readAllItems, readCustomLocations, saveCustomLocation, deleteCustomLocation, readStartingLocation, saveStartingLocation, clearStartingLocation, isItemDone, readNearbyChecklist, nearbyItemFingerprint, rememberNearbyChecklist, dismissNearbyChecklist, setNearbyTodoDone } from '$lib/data';
-    import { collectErrands, nearbyStops, suggestStops, type NearbyStop } from '$lib/nearbyErrands';
+    import { readFolders, readLists, readAllItems, readCustomLocations, saveCustomLocation, deleteCustomLocation, readStartingLocation, saveStartingLocation, clearStartingLocation, isItemDone, readNearbyChecklist, nearbyItemFingerprint, rememberNearbyChecklist, dismissNearbyChecklist, setNearbyTodoDone, readPausedErrandTags, setErrandTagPaused } from '$lib/data';
+    import { collectErrands, nearbyStops, suggestStops, isErrandPaused, type NearbyStop } from '$lib/nearbyErrands';
     import { availableLocationTags, matchingLocationTags, validCoordinates, normalizeLocationTag, type Coordinates, type RetailLocation } from '$lib/retailLocations';
     import ConfirmDialog from './ConfirmDialog.svelte';
     import SuburbPicker from './SuburbPicker.svelte';
@@ -56,6 +56,7 @@
     let showAlternatives = $state(false);
     const matchingTags = $derived(availableTags.filter(entry => entry.tag.includes(normalizeLocationTag(tagQuery).replace(/[^\w]/g, ''))));
     const visibleTags = $derived(tagQuery.trim() || showAllTags ? matchingTags : [...matchingTags].sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag)).slice(0, 12));
+    const pausedTags = $derived.by(() => { void docState.version; return readPausedErrandTags(); });
     const checklistStates = $derived.by(() => { void docState.version; return readNearbyChecklist(); });
     const candidates = $derived.by(() => {
         void docState.version;
@@ -66,13 +67,19 @@
             const done = !errand.item.note && isItemDone(errand.item, folder);
             const fingerprint = nearbyItemFingerprint(errand.item, errand.list, folder);
             const state = checklistStates[errand.item.id];
-            return { errand, done, fingerprint, state, hidden: isChecklistDismissed(state, fingerprint, done) };
+            return { errand, done, fingerprint, state, paused: isErrandPaused(errand, pausedTags), hidden: isChecklistDismissed(state, fingerprint, done) };
         });
     });
-    const errands = $derived(candidates.filter(row => !row.done && !row.hidden).map(row => row.errand));
+    const errands = $derived(candidates.filter(row => !row.done && !row.hidden && !row.paused).map(row => row.errand));
     const supportedErrands = $derived(errands.filter(errand => locations.some(location => matchingLocationTags(errand.tags, location).length > 0)));
     const supportedIds = $derived(new Set(supportedErrands.map(errand => errand.item.id)));
-    const checklist = $derived(candidates.filter(row => !row.hidden && (row.done ? !!row.state : supportedIds.has(row.errand.item.id) || !!row.state)));
+    const checklist = $derived(candidates.filter(row => !row.hidden && !row.paused && (row.done ? !!row.state : supportedIds.has(row.errand.item.id) || !!row.state)));
+    const pausedErrands = $derived(candidates.filter(row => !row.done && !row.hidden && row.paused));
+    const pausableTags = $derived([...new Set(candidates.filter(row => !row.done && !row.hidden && !row.paused)
+        .flatMap(row => row.errand.tags.map(normalizeLocationTag)))].filter(tag => availableTags.some(entry => entry.tag === tag)).sort());
+    function pauseTag(tag: string, paused: boolean) {
+        if (!commitState.isHistorical) setErrandTagPaused(tag, paused);
+    }
     const completedChecklist = $derived(checklist.filter(row => row.done));
     const stops = $derived(origin ? nearbyStops(locations, origin, radius, errands) : []);
     const plan = $derived(suggestStops(stops, errands));
@@ -215,6 +222,20 @@
                 {:else}<p class="hint">No custom locations yet.</p>{/each}
             </section>
         {:else}
+            {#if pausableTags.length}
+                <section class="errand-pauses" aria-label="Pause occasional errands">
+                    <p class="hint">Save occasional errands for later. Pausing a tag hides its tasks here until you resume it.</p>
+                    <div class="pause-actions">{#each pausableTags as tag (tag)}<button disabled={commitState.isHistorical} onclick={() => pauseTag(tag, true)}>Pause #{tag}</button>{/each}</div>
+                </section>
+            {/if}
+            {#if pausedTags.length}
+                <details class="paused-errands">
+                    <summary>Paused errands ({pausedErrands.length})</summary>
+                    <p class="hint">These tasks stay in your original lists. Pauses sync across devices and remain until resumed, even when tasks are edited.</p>
+                    <div class="pause-actions">{#each pausedTags as tag (tag)}<button disabled={commitState.isHistorical} onclick={() => pauseTag(tag, false)}>Resume #{tag}</button>{/each}</div>
+                    <ul>{#each pausedErrands as row (row.errand.item.id)}<li><button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}</small></button></li>{:else}<li class="hint">No unfinished tasks currently use these paused tags.</li>{/each}</ul>
+                </details>
+            {/if}
             <section class="task-checklist" aria-labelledby="matched-tasks-heading">
                 <div class="checklist-heading"><h2 id="matched-tasks-heading">Matched tasks ({checklist.length})</h2>{#if completedChecklist.length}<button disabled={commitState.isHistorical} onclick={clearCompletedTasks}>Clear completed</button>{/if}</div>
                 <p class="hint">Ticks update the original todos. Completed tasks stay until cleared. Dismissed notes and unchecked tasks return when edited; checked todos stay completed. This checklist syncs across devices.</p>
@@ -224,7 +245,7 @@
                         <button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}{row.errand.item.note ? ' · Note' : ''}</small>{#if !row.done && origin && !nearbyIds.has(row.errand.item.id)}<small>{supportedIds.has(row.errand.item.id) ? `No match within ${radius} km.` : 'No matching location in the database.'}</small>{/if}</button>
                         <button class="dismiss-task" disabled={commitState.isHistorical} onclick={() => dismissTask(row.errand.item.id)} aria-label={`Dismiss from errands: ${row.errand.item.name}`} title="Dismiss from errands">×</button>
                     </li>
-                {:else}<li class="hint">No matched tasks. Add location hashtags to a todo, note or list name.</li>{/each}</ul>
+                {:else}<li class="hint">{pausedErrands.length ? 'Your remaining errands are paused. Expand Paused errands to resume them.' : 'No matched tasks. Add location hashtags to a todo, note or list name.'}</li>{/each}</ul>
             </section>
             <div class="filters"><label>Within <select bind:value={radius}>{#each [1, 2, 5, 10, 25, 50] as km}<option value={km}>{km} km</option>{/each}</select></label></div>
             {#if !origin}
@@ -242,7 +263,7 @@
                             </li>{/each}</ul>
                         </div>
                     {/if}
-                    {#if errands.length === 0}<p class="empty">Add location hashtags to an unchecked todo, note or list name to find places to go.</p>{/if}
+                    {#if errands.length === 0}<p class="empty">{pausedErrands.length ? 'Your remaining errands are paused.' : 'Add location hashtags to an unchecked todo, note or list name to find places to go.'}</p>{/if}
                     {#each plan.suggested as stop (stop.location.id)}{@render stopCard(stop)}{/each}
                 </section>
                 {#if plan.alternatives.length}
@@ -261,6 +282,7 @@
             {#if selectedTag}
                 <section class="tag-locations" bind:this={tagLocationsPanel} aria-label={`Locations matching #${selectedTag}`}>
                     <div class="checklist-heading"><h2>#{selectedTag} · {selectedTagLocations.length} locations</h2><button aria-label="Close location list" onclick={() => selectedTag = null}>×</button></div>
+                    <button disabled={commitState.isHistorical} onclick={() => { if (selectedTag) pauseTag(selectedTag, !pausedTags.includes(selectedTag)); }}>{pausedTags.includes(selectedTag) ? 'Resume' : 'Pause'} #{selectedTag}</button>
                     <ul class="tag-location-list">
                         {#each selectedTagLocations as location (location.id)}
                             <li><div><strong>{location.name}</strong>{#if location.address}<p>{location.address}</p>{/if}</div><a href={directions(location)} target="_blank" rel="noopener noreferrer" aria-label={`Directions to ${location.name}`}>Directions ↗</a></li>
@@ -312,6 +334,8 @@
     .note-mark { width: 38px; flex-shrink: 0; text-align: center; }
     .dismiss-task { width: 44px; height: 44px; flex-shrink: 0; font-size: 1.4rem; border: 0; background: transparent; }
     .completed .errand > span { text-decoration: line-through; color: var(--text2); }
+    .pause-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+    .paused-errands { margin: 1rem auto; border: 1px solid var(--border); border-radius: 8px; padding: 0 .8rem .8rem; }
     .available-tags, .alternatives { margin-top: 1.2rem; }
     summary { cursor: pointer; padding: .75rem 0; font-weight: 600; }
     .coverage { font-weight: 600; line-height: 1.5; }

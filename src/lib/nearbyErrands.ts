@@ -1,10 +1,16 @@
 import { isItemDone, isListEffectivelyArchived, type Item, type ListMeta, type Folder } from './data';
 import { extractTags } from './tags';
-import { distanceKm, matchingLocationTags, validCoordinates, type Coordinates, type RetailLocation } from './retailLocations';
+import { distanceKm, matchingLocationTags, normalizeLocationTag, validCoordinates, type Coordinates, type RetailLocation } from './retailLocations';
 
 export interface Errand { item: Item; list: ListMeta; tags: string[] }
 export interface NearbyStop { location: RetailLocation; distanceKm: number; errands: Errand[] }
 export interface SuggestedStops { suggested: NearbyStop[]; alternatives: NearbyStop[]; unavailable: Errand[] }
+
+/** Pausing any of an item's effective tags defers the entire errand. */
+export function isErrandPaused(errand: Errand, pausedTags: readonly string[]): boolean {
+    const paused = new Set(pausedTags.map(normalizeLocationTag));
+    return errand.tags.some(tag => paused.has(normalizeLocationTag(tag)));
+}
 
 /** Greedy item coverage, then distance. Every reachable item gets one suggested stop. */
 export function suggestStops(stops: NearbyStop[], errands: Errand[]): SuggestedStops {
