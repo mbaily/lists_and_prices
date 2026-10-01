@@ -277,6 +277,8 @@
                     <h2 id="suggested-stops-heading">Suggested stops</h2>
                     <p class="coverage" aria-live="polite">{coveredCount} of {locationErrands.length} location-based item{locationErrands.length === 1 ? '' : 's'} covered by {plan.suggested.length} stop{plan.suggested.length === 1 ? '' : 's'} within {radius} km.</p>
                     <p class="hint">A short set of shops covering all nearby matches, shown nearest first. Each item appears once. Distances are straight-line distances.</p>
+                    {#if errands.length === 0}<p class="empty">{pausedErrands.length ? 'Your remaining errands are paused.' : 'Add location hashtags to an unchecked todo, note or list name to find places to go.'}</p>{/if}
+                    {#each plan.suggested as stop (stop.location.id)}{@render stopCard(stop)}{/each}
                     {#if plan.unavailable.length}
                         <div class="unavailable">
                             <h3>Items without a nearby match ({plan.unavailable.length})</h3>
@@ -285,8 +287,6 @@
                             </li>{/each}</ul>
                         </div>
                     {/if}
-                    {#if errands.length === 0}<p class="empty">{pausedErrands.length ? 'Your remaining errands are paused.' : 'Add location hashtags to an unchecked todo, note or list name to find places to go.'}</p>{/if}
-                    {#each plan.suggested as stop (stop.location.id)}{@render stopCard(stop)}{/each}
                 </section>
                 {#if plan.alternatives.length}
                     <details class="alternatives" bind:open={showAlternatives}>
