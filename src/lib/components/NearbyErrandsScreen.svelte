@@ -335,7 +335,7 @@
     .nearby-strip { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-bottom: .8rem; padding-bottom: .2rem; }
     .nearby-strip h2 { margin: 0; flex-shrink: 0; }
     .nearby-heading { border: 0; background: transparent; padding: 0; font: inherit; color: inherit; }
-    .nearby-pill { display: inline-flex; align-items: center; gap: .35rem; max-width: 100%; min-width: 0; border-radius: 999px; padding: .35rem .65rem; white-space: nowrap; }
+    .nearby-pill { display: inline-flex; align-items: center; gap: .35rem; max-width: 100%; min-width: 0; background: #000; border-radius: 999px; padding: .35rem .65rem; white-space: nowrap; }
     .nearby-pill-name { max-width: 5cm; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .nearby-pill-tag { color: var(--accent); flex-shrink: 0; }
     button, select, input { font: inherit; color: var(--text); border: 1px solid var(--border); background: var(--bg2); border-radius: 6px; padding: .65rem; }
