@@ -23,7 +23,7 @@
     const accuracy = $derived(savedLocation?.accuracy ?? null);
     let locating = $state(false);
     let locationError = $state('');
-    let showLocationDetails = $state(true);
+    let showLocationDetails = $state(false);
     let radius = $state(5);
     const previewLimit = $derived.by(() => { void docState.version; return readNearbyPreviewLimit(); });
     function setPreviewLimit(event: Event) {
