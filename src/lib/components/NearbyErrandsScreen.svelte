@@ -3,9 +3,10 @@
     import catalogue from '$lib/locations/melbourne.json';
     import suburbCatalogue from '$lib/locations/melbourne-suburbs.json';
     import { suburbLocations } from '$lib/suburbLocations';
-    import { nearbyTaskPills } from '$lib/nearbyPills';
+    import { nearbyTaskPills, nearbyListPills } from '$lib/nearbyPills';
+    import { groupErrandsByList, errandPreview } from '$lib/errandGroups';
     import { docState, commitState } from '$lib/yjsStore.svelte';
-    import { readFolders, readLists, readAllItems, readCustomLocations, saveCustomLocation, deleteCustomLocation, readStartingLocation, saveStartingLocation, readHotSuburbIds, saveHotSuburbIds, isItemDone, readNearbyChecklist, nearbyItemFingerprint, rememberNearbyChecklist, dismissNearbyChecklist, setNearbyTodoDone, readPausedErrandTags, setErrandTagPaused, readPausedErrandItemIds, setErrandItemPaused } from '$lib/data';
+    import { readFolders, readLists, readAllItems, readCustomLocations, saveCustomLocation, deleteCustomLocation, readStartingLocation, saveStartingLocation, readHotSuburbIds, saveHotSuburbIds, readNearbyPreviewLimit, saveNearbyPreviewLimit, isItemDone, readNearbyChecklist, nearbyItemFingerprint, rememberNearbyChecklist, dismissNearbyChecklist, setNearbyTodoDone, readPausedErrandTags, setErrandTagPaused, readPausedErrandItemIds, setErrandItemPaused } from '$lib/data';
     import { collectErrands, nearbyStops, suggestStops, isErrandPaused, isLocationOptionalErrand, locationOptionalTag, LOCATION_OPTIONAL_TAGS, type NearbyStop } from '$lib/nearbyErrands';
     import { availableLocationTags, matchingLocationTags, validCoordinates, normalizeLocationTag, type Coordinates, type RetailLocation } from '$lib/retailLocations';
     import ConfirmDialog from './ConfirmDialog.svelte';
@@ -23,6 +24,12 @@
     let locating = $state(false);
     let locationError = $state('');
     let radius = $state(5);
+    const previewLimit = $derived.by(() => { void docState.version; return readNearbyPreviewLimit(); });
+    function setPreviewLimit(event: Event) {
+        const input = event.currentTarget as HTMLInputElement;
+        if (!commitState.isHistorical && input.validity.valid) saveNearbyPreviewLimit(input.valueAsNumber);
+        input.value = String(previewLimit);
+    }
     let showHotSuburbs = $state(false);
     const hotSuburbIds = $derived.by(() => { void docState.version; return readHotSuburbIds(); });
     const hotSuburbs = $derived(hotSuburbIds.flatMap(id => { const suburb = suburbById.get(id); return suburb ? [suburb] : []; }));
@@ -93,7 +100,9 @@
     const supportedErrands = $derived(errands.filter(errand => locations.some(location => matchingLocationTags(errand.tags, location).length > 0)));
     const supportedIds = $derived(new Set(supportedErrands.map(errand => errand.item.id)));
     const checklist = $derived(candidates.filter(row => !row.hidden && !row.paused && (row.done ? !!row.state : supportedIds.has(row.errand.item.id) || isLocationOptionalErrand(row.errand) || !!row.state)).sort((a, b) => Number(nearbyIds.has(b.errand.item.id)) - Number(nearbyIds.has(a.errand.item.id))));
+    const checklistGroups = $derived(groupErrandsByList(checklist));
     const pausedErrands = $derived(candidates.filter(row => !row.done && !row.hidden && row.paused));
+    const pausedGroups = $derived(groupErrandsByList(pausedErrands));
     function pauseTag(tag: string, paused: boolean) {
         if (!commitState.isHistorical) setErrandTagPaused(tag, paused);
     }
@@ -102,12 +111,13 @@
     }
     const completedChecklist = $derived(checklist.filter(row => row.done));
     const stops = $derived(origin ? nearbyStops(locations, origin, radius, errands) : []);
-    const nearbyPills = $derived(nearbyTaskPills(stops, errands));
-    const nearbyIds = $derived(new Set(nearbyPills.map(pill => pill.errand.item.id)));
+    const nearbyPills = $derived(nearbyListPills(stops, errands, previewLimit));
+    const nearbyIds = $derived(new Set(nearbyTaskPills(stops, errands).map(pill => pill.errand.item.id)));
     const locationIds = $derived(new Set(stops.flatMap(stop => stop.errands.map(errand => errand.item.id))));
     const locationErrands = $derived(errands.filter(errand => !isLocationOptionalErrand(errand) || locationIds.has(errand.item.id)));
     const plan = $derived(suggestStops(stops, locationErrands));
-    const coveredCount = $derived(locationErrands.length - plan.unavailable.length);
+    const locationGroups = $derived(groupErrandsByList(locationErrands.map(errand => ({ errand }))));
+    const coveredCount = $derived(locationGroups.filter(group => group.rows.every(row => locationIds.has(row.errand.item.id))).length);
 
     $effect(() => {
         if (commitState.isHistorical) return;
@@ -196,8 +206,12 @@
 {#snippet stopCard(stop: NearbyStop)}
                 <article class="stop">
                     <div class="stop-heading"><div><h2>{stop.location.name}</h2><p>{distanceLabel(stop.distanceKm)} away{stop.location.address ? ' · ' + stop.location.address : ''}</p>{#if stop.location.coordinateAccuracy === 'shopping-centre'}<HelpText label="Help with shopping centre coordinates"><p>Distance and directions use the shopping centre location.</p></HelpText>{:else if stop.location.coordinateAccuracy === 'suburb'}<HelpText label="Help with approximate suburb coordinates"><p>Approximate suburb location. Check the destination before travelling.</p></HelpText>{/if}</div><a href={directions(stop.location)} target="_blank" rel="noopener noreferrer">Directions ↗</a></div>
-                    <p class="match-count">{stop.errands.length} matching item{stop.errands.length === 1 ? '' : 's'}</p>
-                    <ul>{#each stop.errands as errand (errand.item.id)}<li><button class="errand" onclick={() => onOpenItem(errand.list.id, errand.item.id)}><span>{errand.item.name}</span><small>{errand.list.name}{errand.item.note ? ' · Note' : ''}</small></button></li>{/each}</ul>
+                    <p class="match-count">{groupErrandsByList(stop.errands.map(errand => ({ errand }))).length} errands · {stop.errands.length} tasks</p>
+                    <ul class="errand-groups">{#each groupErrandsByList(stop.errands.map(errand => ({ errand }))) as group (group.list.id)}
+                        <li><details class="errand-group"><summary><strong>{group.list.name}</strong><span>{errandPreview(group.rows.map(row => row.errand), previewLimit)}</span></summary>
+                            <ul>{#each group.rows as row (row.errand.item.id)}<li><button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span></button></li>{/each}</ul>
+                        </details></li>
+                    {/each}</ul>
                     {#if !customIds.has(stop.location.id) && stop.location.source}<a class="source" href={stop.location.source} target="_blank" rel="noopener noreferrer">Location source ↗</a>{/if}
                 </article>
 {/snippet}
@@ -215,10 +229,10 @@
         {#if commitState.isHistorical}<p class="notice">Viewing historical todos and custom locations. Exit history to make changes.</p>{/if}
         <section class="nearby-strip" aria-labelledby="nearby-strip-heading">
             <h2 id="nearby-strip-heading"><button class="nearby-heading" title="Go to matched tasks" onclick={scrollToMatchedTasks}>Nearby</button></h2>
-            {#each nearbyPills as pill (pill.errand.item.id)}
-                <button class="nearby-pill" title={`${pill.name} #${pill.tag}`}
-                    onclick={() => onOpenItem(pill.errand.list.id, pill.errand.item.id)}>
-                    <span class="nearby-pill-name">{pill.name}</span><span class="nearby-pill-tag">#{pill.tag}</span>
+            {#each nearbyPills as pill (pill.list.id)}
+                <button class="nearby-pill" title={`${pill.list.name}: ${pill.name} ${pill.tags.map(tag => '#' + tag).join(' ')}`}
+                    onclick={() => onOpenItem(pill.list.id, pill.errands[0].item.id)}>
+                    <span class="nearby-pill-name">{pill.name}</span><span class="nearby-pill-tag">{pill.tags.map(tag => '#' + tag).join(' ')}</span>
                 </button>
             {/each}
         </section>
@@ -269,40 +283,52 @@
         {:else}
             {#if pausedTags.length || pausedErrands.length}
                 <details class="paused-errands">
-                    <summary>Paused errands ({pausedErrands.length})</summary>
+                    <summary>Paused errands ({pausedGroups.length})</summary>
                     <HelpText label="Help with paused errands"><p class="hint">Resume individual errands below. Hashtag pauses apply to all tasks using that tag. Original tasks stay unchanged, and pauses sync across devices.</p></HelpText>
                     <div class="pause-actions">{#each pausedTags as tag (tag)}<button disabled={commitState.isHistorical} onclick={() => pauseTag(tag, false)}>Resume all #{tag} errands</button>{/each}</div>
-                    <ul>{#each pausedErrands as row (row.errand.item.id)}<li class="checklist-row"><button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}</small>{#if isErrandPaused(row.errand, pausedTags)}<small>Paused by hashtag: {row.errand.tags.map(normalizeLocationTag).filter(tag => pausedTags.includes(tag)).map(tag => '#' + tag).join(', ')}</small>{/if}</button>{#if row.itemPaused}<button class="resume-task" disabled={commitState.isHistorical} onclick={() => pauseItem(row.errand.item.id, false)} aria-label={`Resume ${row.errand.item.name}`} title="Resume this errand"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l14-8z" /></svg></button>{/if}</li>{:else}<li class="hint">No unfinished paused tasks.</li>{/each}</ul>
+                    <ul class="errand-groups">{#each pausedGroups as group (group.list.id)}
+                        <li><details class="errand-group"><summary><strong>{group.list.name}</strong><span>{errandPreview(group.rows.map(row => row.errand), previewLimit)}</span></summary>
+                            <ul>{#each group.rows as row (row.errand.item.id)}<li class="checklist-row"><button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}</small>{#if isErrandPaused(row.errand, pausedTags)}<small>Paused by hashtag: {row.errand.tags.map(normalizeLocationTag).filter(tag => pausedTags.includes(tag)).map(tag => '#' + tag).join(', ')}</small>{/if}</button>{#if row.itemPaused}<button class="resume-task" disabled={commitState.isHistorical} onclick={() => pauseItem(row.errand.item.id, false)} aria-label={`Resume ${row.errand.item.name}`} title="Resume this errand"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l14-8z" /></svg></button>{/if}</li>{/each}</ul>
+                        </details></li>
+                    {:else}<li class="hint">No unfinished paused tasks.</li>{/each}</ul>
                 </details>
             {/if}
             <section class="task-checklist" bind:this={matchedTasksSection} aria-labelledby="matched-tasks-heading">
-                <div class="checklist-heading"><h2 id="matched-tasks-heading">Matched tasks ({checklist.length})</h2>{#if completedChecklist.length}<button disabled={commitState.isHistorical} onclick={clearCompletedTasks}>Clear completed</button>{/if}</div>
-                <HelpText label="Help with matched tasks"><p class="hint">Ticks update the original todos. Completed tasks stay until cleared. Dismissed notes and unchecked tasks return when edited; checked todos stay completed. This checklist syncs across devices. Use #bank for banking or #errand for general errands with no set location.</p></HelpText>
-                <ul>{#each checklist as row (row.errand.item.id)}
-                    <li class="checklist-row" class:completed={row.done}>
-                        {#if row.errand.item.note}<span class="note-mark" aria-label="Note">📝</span>{:else}<input type="checkbox" checked={row.done} disabled={commitState.isHistorical} aria-label={`Completed: ${row.errand.item.name}`} onchange={(event) => setTaskDone(row.errand.item.id, event.currentTarget.checked)} />{/if}
-                        <button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}{row.errand.item.note ? ' · Note' : ''}</small>{#if !row.done && isLocationOptionalErrand(row.errand) && !locationIds.has(row.errand.item.id)}<small>{locationOptionalTag(row.errand) === 'bank' ? 'Choose a bank or ATM yourself' : 'Choose a location yourself'} · no saved location needed.</small>{:else if !row.done && origin && !nearbyIds.has(row.errand.item.id)}<small>{supportedIds.has(row.errand.item.id) ? `No match within ${radius} km.` : 'No matching location in the database.'}</small>{/if}</button>
-                        {#if !row.done}<button class="pause-task" disabled={commitState.isHistorical} onclick={() => pauseItem(row.errand.item.id, true)} aria-label={`Pause ${row.errand.item.name}`} title="Pause this errand"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg></button>{/if}
-                        <button class="dismiss-task" disabled={commitState.isHistorical} onclick={() => dismissTask(row.errand.item.id)} aria-label={`Dismiss from errands: ${row.errand.item.name}`} title="Dismiss from errands">×</button>
-                    </li>
+                <div class="checklist-heading"><h2 id="matched-tasks-heading">Matched tasks ({checklistGroups.length})</h2>{#if completedChecklist.length}<button disabled={commitState.isHistorical} onclick={clearCompletedTasks}>Clear completed</button>{/if}</div>
+                <HelpText label="Help with matched tasks"><p class="hint">Ticks update the original todos. Completed tasks stay until cleared. Dismissed notes and unchecked tasks return when edited; checked todos stay completed. Expand an errand to manage its individual tasks. The count is the number of parent lists. This checklist syncs across devices. Use #bank for banking or #errand for general errands with no set location.</p></HelpText>
+                <ul class="errand-groups">{#each checklistGroups as group (group.list.id)}
+                    <li><details class="errand-group"><summary><strong>{group.list.name}</strong><span>{errandPreview(group.rows.map(row => row.errand), previewLimit)}</span></summary>
+                        <ul>{#each group.rows as row (row.errand.item.id)}
+                            <li class="checklist-row" class:completed={row.done}>
+                                {#if row.errand.item.note}<span class="note-mark" aria-label="Note">📝</span>{:else}<input type="checkbox" checked={row.done} disabled={commitState.isHistorical} aria-label={`Completed: ${row.errand.item.name}`} onchange={(event) => setTaskDone(row.errand.item.id, event.currentTarget.checked)} />{/if}
+                                <button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}{row.errand.item.note ? ' · Note' : ''}</small>{#if !row.done && isLocationOptionalErrand(row.errand) && !locationIds.has(row.errand.item.id)}<small>{locationOptionalTag(row.errand) === 'bank' ? 'Choose a bank or ATM yourself' : 'Choose a location yourself'} · no saved location needed.</small>{:else if !row.done && origin && !nearbyIds.has(row.errand.item.id)}<small>{supportedIds.has(row.errand.item.id) ? `No match within ${radius} km.` : 'No matching location in the database.'}</small>{/if}</button>
+                                {#if !row.done}<button class="pause-task" disabled={commitState.isHistorical} onclick={() => pauseItem(row.errand.item.id, true)} aria-label={`Pause ${row.errand.item.name}`} title="Pause this errand"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg></button>{/if}
+                                <button class="dismiss-task" disabled={commitState.isHistorical} onclick={() => dismissTask(row.errand.item.id)} aria-label={`Dismiss from errands: ${row.errand.item.name}`} title="Dismiss from errands">×</button>
+                            </li>
+                        {/each}</ul>
+                    </details></li>
                 {:else}<li class="hint">{pausedErrands.length ? 'Your remaining errands are paused. Expand Paused errands to resume them.' : 'No matched tasks. Add location hashtags to a todo, note or list name.'}</li>{/each}</ul>
             </section>
-            <div class="filters"><label>Within <select bind:value={radius}>{#each [1, 2, 5, 10, 25, 50] as km}<option value={km}>{km} km</option>{/each}</select></label></div>
+            <div class="filters"><label>Within <select bind:value={radius}>{#each [1, 2, 5, 10, 25, 50] as km}<option value={km}>{km} km</option>{/each}</select></label><label>Items per pill <input type="number" min="1" max="50" step="1" value={previewLimit} onchange={setPreviewLimit} disabled={commitState.isHistorical} /></label></div>
             {#if !origin}
                 <p class="empty">Use your location or choose a starting suburb to see nearby errands.</p>
             {:else}
                 <section class="suggestions" aria-labelledby="suggested-stops-heading">
                     <h2 id="suggested-stops-heading">Suggested stops</h2>
-                    <p class="coverage" aria-live="polite">{coveredCount} of {locationErrands.length} location-based item{locationErrands.length === 1 ? '' : 's'} covered by {plan.suggested.length} stop{plan.suggested.length === 1 ? '' : 's'} within {radius} km.</p>
-                    <HelpText label="Help with suggested stops"><p class="hint">A short set of shops covering all nearby matches, shown nearest first. Each item appears once. Distances are straight-line distances.</p></HelpText>
+                    <p class="coverage" aria-live="polite">{coveredCount} of {locationGroups.length} errand{locationGroups.length === 1 ? '' : 's'} fully covered by {plan.suggested.length} stop{plan.suggested.length === 1 ? '' : 's'} within {radius} km.</p>
+                    <HelpText label="Help with suggested stops"><p class="hint">A short set of shops covering all nearby matches, shown nearest first. Tasks are grouped by their parent list. An errand is fully covered when every active task has a nearby match. Distances are straight-line distances.</p></HelpText>
                     {#if errands.length === 0}<p class="empty">{pausedErrands.length ? 'Your remaining errands are paused.' : 'Add location hashtags to an unchecked todo, note or list name to find places to go.'}</p>{/if}
                     {#each plan.suggested as stop (stop.location.id)}{@render stopCard(stop)}{/each}
                     {#if plan.unavailable.length}
                         <div class="unavailable">
-                            <h3>Items without a nearby match ({plan.unavailable.length})</h3>
-                            <ul>{#each plan.unavailable as errand (errand.item.id)}<li>
+                            <h3>Items without a nearby match ({groupErrandsByList(plan.unavailable.map(errand => ({ errand }))).length})</h3>
+                            <ul class="errand-groups">{#each groupErrandsByList(plan.unavailable.map(errand => ({ errand }))) as group (group.list.id)}
+                                <li><details class="errand-group"><summary><strong>{group.list.name}</strong><span>{errandPreview(group.rows.map(row => row.errand), previewLimit)}</span></summary>
+                                    <ul>{#each group.rows as { errand } (errand.item.id)}<li>
                                 <button class="errand" onclick={() => onOpenItem(errand.list.id, errand.item.id)}><span>{errand.item.name}</span><small>{errand.list.name}{errand.item.note ? ' · Note' : ''}</small><small>{supportedIds.has(errand.item.id) ? `No match within ${radius} km. Try a larger radius.` : 'No matching location in the database. Add a place in Locations.'}</small></button>
-                            </li>{/each}</ul>
+                                    </li>{/each}</ul>
+                                </details></li>
+                            {/each}</ul>
                         </div>
                     {/if}
                 </section>
@@ -360,8 +386,8 @@
     .nearby-strip h2 { margin: 0; flex-shrink: 0; }
     .nearby-heading { border: 0; background: transparent; padding: 0; font: inherit; color: inherit; }
     .nearby-pill { display: inline-flex; align-items: center; gap: .35rem; max-width: 100%; min-width: 0; background: #000; border-radius: 999px; padding: .35rem .65rem; white-space: nowrap; }
-    .nearby-pill-name { max-width: 5cm; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .nearby-pill-tag { color: var(--accent); flex-shrink: 0; }
+    .nearby-pill-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .nearby-pill-tag { color: var(--accent); flex-shrink: 0; max-width: 45%; overflow: hidden; text-overflow: ellipsis; }
     button, select, input { font: inherit; color: var(--text); border: 1px solid var(--border); background: var(--bg2); border-radius: 6px; padding: .65rem; }
     button, select { cursor: pointer; } button:disabled { opacity: .5; cursor: default; }
     .back { border: 0; font-size: 1.35rem; padding: .3rem .6rem; } .primary { background: var(--accent); color: #fff; border-color: var(--accent); }
@@ -369,7 +395,14 @@
     .hint, .origin, footer, small { font-size: .85rem; color: var(--text2); line-height: 1.5; }
     .error { color: #dc2626; } .notice, .empty { padding: 1rem; border-radius: 6px; background: var(--bg2); }
     .filters, .stop-heading, .saved { display: flex; align-items: center; justify-content: space-between; gap: .8rem; }
-    .filters label { flex-direction: row; align-items: center; } .filters select { width: auto; }
+    .filters { flex-wrap: wrap; }
+    .filters label { flex-direction: row; align-items: center; } .filters select { width: auto; } .filters input { width: 4.5rem; }
+    .errand-group > summary { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+    .errand-group > summary::before { content: "▸"; flex-shrink: 0; }
+    .errand-group[open] > summary::before { content: "▾"; }
+    .errand-group > summary::-webkit-details-marker { display: none; }
+    .errand-group > summary strong { flex-shrink: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .errand-group > summary span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: normal; }
     .stop, .saved { border: 1px solid var(--border); border-radius: 8px; margin-top: .8rem; padding: .9rem; }
     .stop-heading { align-items: flex-start; } .stop-heading p, .saved p { color: var(--text2); font-size: .85rem; margin: .2rem 0; }
     a { color: var(--accent); } .stop-heading a { flex-shrink: 0; font-size: .85rem; padding-top: .2rem; }

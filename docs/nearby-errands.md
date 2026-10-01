@@ -1,5 +1,16 @@
 # Nearby errands and the location catalogue
 
+Todos and notes in the same parent list appear as one errand in the
+Nearby pills, Matched tasks, Paused errands and stop lists. Expand a list to use
+its individual completion, pause, resume and dismiss controls. Task-specific
+hashtags still determine which locations match each task.
+
+The Nearby pill previews the list's active task names on one line. Set **Items
+per pill** beside the radius control to choose 1–50 names (default 3); additional
+tasks show as **+n more**. This setting syncs across devices and is included in
+backups. The preview limit only changes the display; every eligible task is
+still considered when suggesting stops.
+
 Melbourne's 549 suburb centres are available as location hashtags, such as
 `#brunswick`, `#richmond`, `#brunswickeast`, `#stkilda` and `#mountwaverley`.
 Use the suburb name in lowercase without spaces or punctuation. These hashtags

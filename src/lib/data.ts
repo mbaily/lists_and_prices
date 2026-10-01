@@ -1055,6 +1055,7 @@ export interface BackupFile {
 	customLocations?: RetailLocation[];
 	startingLocation?: StartingLocation | null;
 	hotSuburbIds?: string[];
+	nearbyPreviewLimit?: number;
 	nearbyChecklist?: Record<string, NearbyChecklistState>;
 	pausedErrandTags?: string[];
 	pausedErrandItemIds?: string[];
@@ -1073,6 +1074,7 @@ export function exportBackup(): BackupFile {
 		customLocations: readCustomLocations(),
 		startingLocation: readStartingLocation(),
 		hotSuburbIds: readHotSuburbIds(),
+		nearbyPreviewLimit: readNearbyPreviewLimit(),
 		nearbyChecklist: readNearbyChecklist(),
 		pausedErrandTags: readPausedErrandTags(),
 		pausedErrandItemIds: readPausedErrandItemIds()
@@ -1116,6 +1118,7 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 	if (backup.pausedErrandItemIds !== undefined && (!Array.isArray(backup.pausedErrandItemIds) || backup.pausedErrandItemIds.some(id => typeof id !== 'string' || !id.trim()))) throw new Error('Invalid paused errand item ids.');
 	if (backup.startingLocation != null && !isStartingLocation(backup.startingLocation)) throw new Error('Invalid starting location.');
 	if (backup.hotSuburbIds !== undefined && !isHotSuburbIds(backup.hotSuburbIds)) throw new Error('Invalid hot suburbs.');
+	if (backup.nearbyPreviewLimit !== undefined && !isNearbyPreviewLimit(backup.nearbyPreviewLimit)) throw new Error('Invalid nearby preview limit.');
 	if (backup.nearbyChecklist !== undefined && (!backup.nearbyChecklist || typeof backup.nearbyChecklist !== 'object' || Array.isArray(backup.nearbyChecklist) || Object.entries(backup.nearbyChecklist).some(([id, state]) => !id || !isNearbyChecklistState(state)))) throw new Error('Invalid nearby checklist.');
 	if (backup.customLocations?.some(location => !location.id.startsWith('custom-'))) throw new Error('Custom location ids must start with custom-.');
 	if (backup.smartFolders != null && (typeof backup.smartFolders !== 'object' || Array.isArray(backup.smartFolders))) throw new Error('Invalid reports.');
@@ -1180,6 +1183,8 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 		else if (mode === 'replace' || backup.startingLocation === null) preferences.delete('starting-location');
 		if (backup.hotSuburbIds !== undefined) preferences.set('hot-suburbs', [...backup.hotSuburbIds]);
 		else if (mode === 'replace') preferences.delete('hot-suburbs');
+		if (backup.nearbyPreviewLimit !== undefined) preferences.set('preview-limit', backup.nearbyPreviewLimit);
+		else if (mode === 'replace') preferences.delete('preview-limit');
 		const checklist = doc.getMap<NearbyChecklistState>('nearby-checklist');
 		if (mode === 'replace') checklist.clear();
 		for (const [id, state] of Object.entries(backup.nearbyChecklist ?? {})) checklist.set(id, { ...state });
@@ -1305,6 +1310,20 @@ export function readHotSuburbIds(): string[] {
 export function saveHotSuburbIds(ids: string[]): void {
 	if (!isHotSuburbIds(ids)) throw new Error('Invalid hot suburbs.');
 	getMutableDoc().getMap('nearby-preferences').set('hot-suburbs', [...ids]);
+}
+
+function isNearbyPreviewLimit(value: unknown): value is number {
+	return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 50;
+}
+
+export function readNearbyPreviewLimit(): number {
+	const limit = getDoc().getMap('nearby-preferences').get('preview-limit');
+	return isNearbyPreviewLimit(limit) ? limit : 3;
+}
+
+export function saveNearbyPreviewLimit(limit: number): void {
+	if (!isNearbyPreviewLimit(limit)) throw new Error('Invalid nearby preview limit.');
+	getMutableDoc().getMap('nearby-preferences').set('preview-limit', limit);
 }
 // ─── Spreadsheets ─────────────────────────────────────────────────────────────
 
