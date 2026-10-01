@@ -1,6 +1,6 @@
 <script lang="ts">
 	/** Colour swatch picker — tapping a swatch sets the value. */
-	let { value = $bindable('#6366f1') }: { value: string } = $props();
+	let { value = $bindable('#6366f1'), folderColor }: { value: string; folderColor?: string } = $props();
 
 	const colours = [
 		'#6366f1', '#8b5cf6', '#ec4899', '#ef4444',
@@ -19,6 +19,12 @@
 			aria-label={c}
 		></button>
 	{/each}
+	{#if folderColor}
+		<button type="button" class="folder-color" onclick={() => { if (folderColor) value = folderColor; }}>
+			<span class="folder-swatch" style="background:{folderColor}" aria-hidden="true"></span>
+			Use folder colour
+		</button>
+	{/if}
 </div>
 
 <style>
@@ -37,5 +43,23 @@
 	}
 	.swatch.selected {
 		border-color: var(--text);
+	}
+	.folder-color {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.3rem 0.5rem;
+		border: 1px solid var(--border, #ccc);
+		border-radius: 6px;
+		background: var(--bg);
+		color: var(--text);
+		font: inherit;
+		cursor: pointer;
+	}
+	.folder-swatch {
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		flex-shrink: 0;
 	}
 </style>

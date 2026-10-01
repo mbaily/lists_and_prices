@@ -1887,7 +1887,7 @@ ${bodyHtml}
 								onkeydown={(e) => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') renamingId = null; }}
 								autofocus
 							/>
-							<ColorPicker bind:value={renameColor} />
+							<ColorPicker bind:value={renameColor} folderColor={allFolders.find((folder) => folder.id === list.folderId)?.color} />
 							<div class="rename-actions">
 								<button class="rename-ok" onclick={submitRename}>✓</button>
 								<button class="rename-cancel" onclick={() => renamingId = null}>✕</button>
