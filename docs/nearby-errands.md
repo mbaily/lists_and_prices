@@ -11,7 +11,8 @@ Open **📍 Nearby errands** from the home header. Add a hashtag to a todo, for
 example `Milk #supermarket`, `Coffee #coles`, `Bread #woolworths` or `Socks #kmart`.
 Press the **location icon** and allow browser location access, or tap a hot suburb
 pill to start at its centre. Use the **edit icon** to open **Hot suburbs**, where
-you can add, remove and reorder suburb shortcuts, then Save (or Cancel to discard).
+you can add, remove and drag suburb shortcuts into order, then Save (or Cancel to
+discard). The drag handles also support the keyboard's up and down arrow keys.
 The initial shortcuts are Melbourne, Brunswick and Richmond; your saved list syncs
 across devices and is included in backups. Search in the editor accepts
 partial names and spelling mistakes; use the arrow keys and Enter or tap a result.
