@@ -93,6 +93,7 @@
 	// ── View state ──────────────────────────────────────────────────────────────
 	let openListId = $state<string | null>(_init.openListId);
 	let openItemId = $state<string | null>(null);
+	let nearbyOpenedItem = $state<{ listId: string; itemId: string } | null>(null);
 	let showSettings = $state(false);
 	let showNearby = $state(_init.nearby ?? false);
 	let showFavouritesOrder = $state(false);
@@ -1366,11 +1367,11 @@ ${bodyHtml}
 <svelte:window onkeydown={handleGlobalKeydown} />
 
 {#if showNearby}
-	<NearbyErrandsScreen onBack={() => showNearby = false} onOpenItem={(listId, itemId) => { showNearby = false; openListId = listId; openItemId = itemId; }} />
+	<NearbyErrandsScreen onBack={() => showNearby = false} onOpenItem={(listId, itemId) => { showNearby = false; openListId = listId; openItemId = itemId; nearbyOpenedItem = { listId, itemId }; }} />
 {:else if openSheetId}
 	<SpreadsheetScreen sheetId={openSheetId} onBack={() => openSheetId = null} />
 {:else if openListId}
-	<ListScreen listId={openListId} highlightItemId={openItemId} orderedLists={navOrderedLists} onHome={() => { openListId = null; openItemId = null; breadcrumb = [null]; }} onOpenList={(id) => { openItemId = null; openListId = id; }} onOpenFavouritesOrder={() => { if (commitState.isHistorical) return; previousListId = openListId; openListId = null; openItemId = null; showFavouritesOrder = true; }} savedSearch={savedSearch} onRestoreSearch={() => { openListId = null; openItemId = null; breadcrumb = [null]; restoreSearch(); }} onTagClick={(tag) => { openListId = null; openItemId = null; breadcrumb = [null]; activeTagFilter = null; showSearch = true; searchQuery = '#' + tag; savedSearch = '#' + tag; tick().then(() => searchInputEl?.focus()); }} onNavigateTo={(folderId) => {
+	<ListScreen listId={openListId} highlightItemId={openItemId} onReturnNearby={nearbyOpenedItem?.listId === openListId && nearbyOpenedItem?.itemId === openItemId ? () => { openListId = null; openItemId = null; nearbyOpenedItem = null; showNearby = true; } : undefined} orderedLists={navOrderedLists} onHome={() => { openListId = null; openItemId = null; breadcrumb = [null]; }} onOpenList={(id) => { openItemId = null; openListId = id; }} onOpenFavouritesOrder={() => { if (commitState.isHistorical) return; previousListId = openListId; openListId = null; openItemId = null; showFavouritesOrder = true; }} savedSearch={savedSearch} onRestoreSearch={() => { openListId = null; openItemId = null; breadcrumb = [null]; restoreSearch(); }} onTagClick={(tag) => { openListId = null; openItemId = null; breadcrumb = [null]; activeTagFilter = null; showSearch = true; searchQuery = '#' + tag; savedSearch = '#' + tag; tick().then(() => searchInputEl?.focus()); }} onNavigateTo={(folderId) => {
 		openListId = null;
 		openItemId = null;
 		// Reconstruct the full ancestor path to folderId so the breadcrumb is correct

@@ -42,6 +42,7 @@
 		listId,
 		orderedLists = [],
 		highlightItemId = null,
+		onReturnNearby = undefined,
 		onHome,
 		onOpenList,
 		onOpenFavouritesOrder = undefined,
@@ -53,6 +54,7 @@
 		listId: string;
 		orderedLists?: { id: string; name: string }[];
 		highlightItemId?: string | null;
+		onReturnNearby?: () => void;
 		onHome: () => void;
 		onOpenList: (id: string) => void;
 		onOpenFavouritesOrder?: () => void;
@@ -1705,6 +1707,15 @@
 					]} />
 					{/if}
 				{/if}
+				{#if highlightItemId === item.id && onReturnNearby && settings.showNearbyReturnLink}
+					<a
+						class="nearby-return-link"
+						href="#nearby"
+						aria-label="Back to nearby errands"
+						title="Back to nearby errands"
+						onclick={(e) => { e.preventDefault(); e.stopPropagation(); onReturnNearby?.(); }}
+					>📍</a>
+				{/if}
 				{#if journalMode && item.createdAt && !item.heading}
 					<div class="journal-date">{formatJournalDate(item.createdAt)}</div>
 				{/if}
@@ -2719,6 +2730,19 @@
 		font-size: 0.9rem;
 		cursor: pointer;
 	}
+	.nearby-return-link {
+		flex-shrink: 0;
+		align-self: center;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-width: 2rem;
+		min-height: 2rem;
+		border-radius: 6px;
+		text-decoration: none;
+	}
+	.nearby-return-link:hover { background: var(--bg3); }
+	.nearby-return-link:focus-visible { outline: 2px solid var(--accent); }
 	.item-row.linked-item {
 		position: relative;
 	}

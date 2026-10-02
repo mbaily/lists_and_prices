@@ -191,6 +191,18 @@
 		</section>
 
 		<section>
+			<h2>Nearby errands</h2>
+			<label class="toggle-row">
+				<input
+					type="checkbox"
+					checked={settings.showNearbyReturnLink}
+					onchange={(e) => updateSettings({ showNearbyReturnLink: e.currentTarget.checked })}
+				/>
+				Show return icon on items opened from Nearby errands
+			</label>
+		</section>
+
+		<section>
 			<h2>Currency</h2>
 			<div class="currency-list">
 				{#each currencies as c}
