@@ -1542,7 +1542,7 @@
 					aria-label="Back to nearby errands"
 					title="Back to nearby errands"
 					onclick={(e) => { e.preventDefault(); e.stopPropagation(); onReturnNearby?.(); }}
-				>📍</a>
+				>🚗</a>
 			{/if}
 		{/snippet}
 		{#each filteredTreeItems as {item, level, tlIdx, rootTlIdx, sibIdx}}

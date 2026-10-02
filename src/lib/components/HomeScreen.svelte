@@ -1472,7 +1472,7 @@ ${bodyHtml}
 			<!-- {#if !isInArchiveView && currentFolderId !== ARCHIVE_ID} -->
 
 			<div class="header-actions">
-				<button class="icon-btn" onclick={() => { showReportsMenu = false; showNearby = true; }} aria-label="Nearby errands" title="Nearby errands">📍</button>
+				<button class="icon-btn" onclick={() => { showReportsMenu = false; showNearby = true; }} aria-label="Nearby errands" title="Nearby errands">🚗</button>
 				{#if currentFolderId === null && hasArchived}
 					<button class="icon-btn" onclick={() => (breadcrumb = [...breadcrumb, ARCHIVE_ID])} aria-label="Archived">
 						📦

@@ -18,12 +18,12 @@ match approximate suburb centres, and work on lists, todos and notes. Distances
 and directions use the centre rather than a particular address or every store
 within the suburb. Find them under **Available location hashtags**.
 
-Items opened from Nearby errands have an edge bar and a **📍 return icon** on
+Items opened from Nearby errands have an edge bar and a **🚗 return icon** on
 their row. Select the icon to return to Nearby errands. The icon defaults to on;
 turn it off under **Settings → Nearby errands**. This preference is saved per user
 on the current device.
 
-Open **📍 Nearby errands** from the home header. Add a hashtag to a todo, for
+Open **🚗 Nearby errands** from the home header. Add a hashtag to a todo, for
 example `Milk #supermarket`, `Coffee #coles`, `Bread #woolworths` or `Socks #kmart`.
 Press the **location icon** and allow browser location access, or tap a hot suburb
 pill to start at its centre. Use the **edit icon** to open **Hot suburbs**, where
