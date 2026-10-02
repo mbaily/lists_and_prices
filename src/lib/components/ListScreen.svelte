@@ -1534,6 +1534,17 @@
 				>{item.checked ? '☑' : '☐'}</button>
 			{/if}
 		{/snippet}
+		{#snippet nearbyReturnLink(item: Item)}
+			{#if highlightItemId === item.id && onReturnNearby && settings.showNearbyReturnLink}
+				<a
+					class="nearby-return-link"
+					href="#nearby"
+					aria-label="Back to nearby errands"
+					title="Back to nearby errands"
+					onclick={(e) => { e.preventDefault(); e.stopPropagation(); onReturnNearby?.(); }}
+				>📍</a>
+			{/if}
+		{/snippet}
 		{#each filteredTreeItems as {item, level, tlIdx, rootTlIdx, sibIdx}}
 			{@const canAddChildren = !item.heading && level < 2}
 			{@const linkParts = parseNameParts(item.name)}
@@ -1563,6 +1574,7 @@
 					{#if selectionMode}
 						{@render checkControl(item)}
 					{/if}
+					{@render nearbyReturnLink(item)}
 					<button
 						class="item-name heading-name"
 						class:editing={editingId === item.id}
@@ -1587,6 +1599,7 @@
 					{:else}
 						<span class="note-icon">📝</span>
 					{/if}
+					{@render nearbyReturnLink(item)}
 					<button
 						class="item-name note-name"
 						class:fullscreen-note={item.fullScreen}
@@ -1633,6 +1646,7 @@
 					<!-- Priced: name wraps top line, controls on bottom line -->
 					<div class="priced-top">
 						{@render checkControl(item)}
+						{@render nearbyReturnLink(item)}
 						<button
 							class="item-name"
 							class:strikethrough={isDone(item)}
@@ -1679,6 +1693,7 @@
 				{:else}
 					<!-- Plain: single row -->
 					{@render checkControl(item)}
+					{@render nearbyReturnLink(item)}
 					<button
 						class="item-name"
 						class:strikethrough={isDone(item)}
@@ -1706,15 +1721,6 @@
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${tName(item.name)}"?`, () => deleteItemCascade(item.id)) }
 					]} />
 					{/if}
-				{/if}
-				{#if highlightItemId === item.id && onReturnNearby && settings.showNearbyReturnLink}
-					<a
-						class="nearby-return-link"
-						href="#nearby"
-						aria-label="Back to nearby errands"
-						title="Back to nearby errands"
-						onclick={(e) => { e.preventDefault(); e.stopPropagation(); onReturnNearby?.(); }}
-					>📍</a>
 				{/if}
 				{#if journalMode && item.createdAt && !item.heading}
 					<div class="journal-date">{formatJournalDate(item.createdAt)}</div>
