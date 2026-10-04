@@ -515,6 +515,7 @@
 			}
 
 			let importedCount: number;
+			let skippedCount = 0;
 			if (typeof parsed === 'object' && parsed !== null && '__list_app__' in parsed && parsed.__list_app__ === true) {
 				if (!('items' in parsed) || !Array.isArray(parsed.items) || parsed.items.length === 0) {
 					alert('No valid items found in clipboard export.');
@@ -529,10 +530,15 @@
 					alert('No valid items found in clipboard.');
 					return;
 				}
-				createItemsBatch(targetListId, lines, addPosition);
-				importedCount = lines.length;
+				// Compare with the list before importing, retaining duplicates within the paste.
+				const existingNames = new Set(readItems(targetListId).map((item) => item.name.trim()));
+				const newLines = lines.filter((line) => !existingNames.has(line));
+				skippedCount = lines.length - newLines.length;
+				if (newLines.length > 0) createItemsBatch(targetListId, newLines, addPosition);
+				importedCount = newLines.length;
 			}
-			copyMessage = `✓ Imported ${importedCount} item${importedCount === 1 ? '' : 's'}.`;
+			copyMessage = `✓ Imported ${importedCount} item${importedCount === 1 ? '' : 's'}.` +
+				(skippedCount > 0 ? ` Skipped ${skippedCount} already in this list.` : '');
 			copyStatus = 'copied';
 			if (importFeedbackTimer) clearTimeout(importFeedbackTimer);
 			importFeedbackTimer = setTimeout(() => { copyStatus = 'idle'; importFeedbackTimer = null; }, 2500);

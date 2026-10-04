@@ -59,6 +59,7 @@ function clipboardState(readText) {
 		isPasting: false, canEditList: true, listId: 'list-a', listContextVersion: 0, isActive: true,
 		settings: { addItemPosition: 'bottom' }, commitState: { isHistorical: false },
 		navigator: { clipboard: { readText } }, readLists: () => [{ id: 'list-a' }, { id: 'list-b' }],
+		readItems: () => [],
 		createItemsBatch: (...args) => calls.push(['text', ...args]),
 		createItemsFromExport: (...args) => calls.push(['json', ...args]),
 		alert: (message) => alerts.push(message), copyMessage: '', copyStatus: 'idle', importFeedbackTimer: null,
@@ -75,6 +76,44 @@ test('clipboard imports can be repeated after both plain text and JSON success',
 	probe.state.navigator.clipboard.readText = async () => JSON.stringify({ __list_app__: true, items: [{ id: 'old', name: 'Second task' }] });
 	await probe.run(); assert.equal(probe.state.isPasting, false);
 	assert.equal(probe.calls.length, 2); assert.equal(probe.calls[1][0], 'json');
+});
+
+test('plain text skips existing list names but retains repeated new names and case differences', async () => {
+	const probe = clipboardState(async () => ' Milk \nBread\nBread\nmilk\nChild task\n\n123');
+	probe.state.settings.addItemPosition = 'top';
+	probe.state.readItems = (listId) => {
+		assert.equal(listId, 'list-a');
+		return [{ name: ' Milk ' }, { name: 'Child task', parentId: 'parent' }];
+	};
+	await probe.run();
+	assert.deepEqual(probe.calls, [['text', 'list-a', ['Bread', 'Bread', 'milk'], 'top']]);
+	assert.equal(probe.state.copyMessage, '✓ Imported 3 items. Skipped 2 already in this list.');
+});
+
+test('plain text with only existing names does not create items and releases the import guard', async () => {
+	const probe = clipboardState(async () => 'Milk\nMilk');
+	probe.state.readItems = () => [{ name: 'Milk' }];
+	await probe.run();
+	assert.deepEqual(probe.calls, []);
+	assert.deepEqual(probe.alerts, []);
+	assert.equal(probe.state.copyMessage, '✓ Imported 0 items. Skipped 2 already in this list.');
+	assert.equal(probe.state.isPasting, false);
+});
+
+test('plain text checks current names after the clipboard read, while JSON still imports existing names', async () => {
+	let resolve;
+	const probe = clipboardState(() => new Promise((done) => { resolve = done; }));
+	const pending = probe.run();
+	probe.state.readItems = () => [{ name: 'Milk' }];
+	resolve('Milk\nBread');
+	await pending;
+	const exportedItems = [{ id: 'old', name: 'Milk' }];
+	probe.state.navigator.clipboard.readText = async () => JSON.stringify({ __list_app__: true, items: exportedItems });
+	await probe.run();
+	assert.deepEqual(probe.calls, [
+		['text', 'list-a', ['Bread'], 'bottom'],
+		['json', 'list-a', exportedItems]
+	]);
 });
 
 test('clipboard permission rejection and invalid exports release the guard', async () => {
