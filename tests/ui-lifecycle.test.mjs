@@ -53,6 +53,61 @@ for (const transition of ['navigation', 'history', 'round-trip navigation']) {
 	});
 }
 
+function itemCopyProbe(item, folderCheckboxes = []) {
+	const writes = [], refs = [];
+	const state = {
+		folderCheckboxes, isChecked: (item, id) => !!item.checks?.[id],
+		navigator: { clipboard: { writeText: async (text) => { writes.push(text); } } },
+		copyRefToClipboard: (id) => refs.push(id), copyStatus: 'idle', copyMessage: '', setTimeout: () => 1,
+		selectedIds: new Set(), selectedItems: [], treeItems: [{ item }], showHeaderMenu: true
+	};
+	const source = componentFunctions('src/lib/components/ListScreen.svelte', [
+		'serializeClipboardItems', 'writeClipboard', 'getCopyMenuItem', 'exportToClipboard'
+	]);
+	const api = new Function('state', `with (state) { ${transpile(source)}; return { getCopyMenuItem, exportToClipboard }; }`)(state);
+	return { state, writes, refs, menu: api.getCopyMenuItem(item), exportList: api.exportToClipboard };
+}
+
+test('item copy submenu keeps Tag as Link and copies just the todo or note name as plain text', async () => {
+	for (const note of [false, true]) {
+		const item = { id: 'item-a', name: 'Buy milk #shopping', note };
+		const probe = itemCopyProbe(item);
+		assert.equal(probe.menu.action, undefined);
+		assert.deepEqual(probe.menu.submenu.map((entry) => entry.label), ['🔗 Tag as Link', '📋 Copy', '📋 Copy JSON']);
+		probe.menu.submenu[0].action();
+		await probe.menu.submenu[1].action();
+		assert.deepEqual(probe.refs, ['item-a']);
+		assert.deepEqual(probe.writes, [item.name]);
+	}
+});
+
+test('Copy JSON uses the list export format and preserves item attributes and named checkboxes', async () => {
+	for (const named of [false, true]) {
+		const item = {
+			id: 'item-a', name: 'Milk #shopping', price: 3.5, qty: 2, checked: true,
+			note: true, pinned: true, parentId: 'parent-a', checks: { bought: true, packed: false }
+		};
+		const probe = itemCopyProbe(item, named ? [{ id: 'bought', name: 'Bought' }, { id: 'packed', name: 'Packed' }] : []);
+		await probe.menu.submenu[2].action();
+		await probe.exportList();
+		assert.equal(probe.writes[0], probe.writes[1]);
+		assert.deepEqual(JSON.parse(probe.writes[0]), {
+			__list_app__: true,
+			items: [{ id: item.id, name: item.name, price: 3.5, qty: 2,
+				...(named ? { checkedNames: ['Bought'] } : { checked: true }),
+				note: true, pinned: true, parentId: 'parent-a' }]
+		});
+	}
+});
+
+test('item copy reports clipboard permission errors', async () => {
+	const probe = itemCopyProbe({ id: 'item-a', name: 'Milk' });
+	probe.state.navigator.clipboard.writeText = async () => { throw new Error('Permission denied'); };
+	await probe.menu.submenu[1].action();
+	assert.equal(probe.state.copyStatus, 'error');
+	assert.equal(probe.state.copyMessage, '✗ Clipboard access denied.');
+});
+
 function clipboardState(readText) {
 	const calls = [], alerts = [];
 	const state = {

@@ -33,7 +33,7 @@
 	import { extractTags, splitWithTags, type NameSegment } from '$lib/tags';
 	import NumericKeypad from './NumericKeypad.svelte';
 	import ConfirmDialog from './ConfirmDialog.svelte';
-	import RowMenu from './RowMenu.svelte';
+	import RowMenu, { type MenuItem } from './RowMenu.svelte';
 	import InfoDialog from './InfoDialog.svelte';
 	import CopyLinkDialog from './CopyLinkDialog.svelte';
 	import FullScreenEditor from './FullScreenEditor.svelte';
@@ -444,8 +444,7 @@
 	}
 
 	// ── Clipboard import ───────────────────────────────────────────────────
-	async function exportToClipboard() {
-		const source = selectedIds.size > 0 ? selectedItems : treeItems.map(({ item }) => item);
+	function serializeClipboardItems(source: Item[]): string {
 		const exportData = {
 			__list_app__: true,
 			items: source.map((item) => {
@@ -465,10 +464,13 @@
 				return ex;
 			})
 		};
-		const json = JSON.stringify(exportData, null, 2);
+		return JSON.stringify(exportData, null, 2);
+	}
+
+	async function writeClipboard(text: string, message: string) {
 		try {
-			await navigator.clipboard.writeText(json);
-			copyMessage = '✓ Copied as JSON!';
+			await navigator.clipboard.writeText(text);
+			copyMessage = message;
 			copyStatus = 'copied';
 			setTimeout(() => { copyStatus = 'idle'; }, 2000);
 		} catch {
@@ -476,7 +478,23 @@
 			copyStatus = 'error';
 			setTimeout(() => { copyStatus = 'idle'; }, 3000);
 		}
+	}
+
+	async function exportToClipboard() {
+		const source = selectedIds.size > 0 ? selectedItems : treeItems.map(({ item }) => item);
+		await writeClipboard(serializeClipboardItems(source), '✓ Copied as JSON!');
 		showHeaderMenu = false;
+	}
+
+	function getCopyMenuItem(item: Item): MenuItem {
+		return {
+			label: '📋 Copy & Link',
+			submenu: [
+				{ label: '🔗 Tag as Link', action: () => copyRefToClipboard(item.id) },
+				{ label: '📋 Copy', action: () => writeClipboard(item.name, '✓ Copied!') },
+				{ label: '📋 Copy JSON', action: () => writeClipboard(serializeClipboardItems([item]), '✓ Copied as JSON!') }
+			]
+		};
 	}
 
 	let isPasting = $state(false);
@@ -1633,7 +1651,7 @@
 							{ label: '➕ Add Subtask', action: () => { newItemParentId = item.id; newItemIsNote = false; focusInput(); } },
 							{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
 						] : []),
-						{ label: '🔗 Tag as Link', action: () => copyRefToClipboard(item.id) },
+						getCopyMenuItem(item),
 						...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItemId = item.id) }] : []),
 						...getReparentMenuItem(item.id),
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${tName(item.name)}"?`, () => deleteItemCascade(item.id)) }
@@ -1680,7 +1698,7 @@
 								{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
 							] : []),
 							...(level === 0 ? [{ label: '📌 Make Heading', action: () => makeHeading(item) }] : []),
-							{ label: '🔗 Tag as Link', action: () => copyRefToClipboard(item.id) },
+							getCopyMenuItem(item),
 							...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItemId = item.id) }] : []),
 							...getReparentMenuItem(item.id),
 							{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${tName(item.name)}"?`, () => deleteItemCascade(item.id)) }
@@ -1712,7 +1730,7 @@
 							{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
 						] : []),
 						...(level === 0 ? [{ label: '📌 Make Heading', action: () => makeHeading(item) }] : []),
-						{ label: '🔗 Tag as Link', action: () => copyRefToClipboard(item.id) },
+						getCopyMenuItem(item),
 						...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItemId = item.id) }] : []),
 						...getReparentMenuItem(item.id),
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${tName(item.name)}"?`, () => deleteItemCascade(item.id)) }
