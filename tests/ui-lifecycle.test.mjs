@@ -62,7 +62,7 @@ function clipboardState(readText) {
 		readItems: () => [],
 		createItemsBatch: (...args) => calls.push(['text', ...args]),
 		createItemsFromExport: (...args) => calls.push(['json', ...args]),
-		alert: (message) => alerts.push(message), copyMessage: '', copyStatus: 'idle', importFeedbackTimer: null,
+		alert: (message) => alerts.push(message), copyMessage: '', copyStatus: 'idle',
 		setTimeout: () => 1, clearTimeout: () => {}
 	};
 	const source = componentFunctions('src/lib/components/ListScreen.svelte', ['importFromClipboard']);
@@ -73,8 +73,10 @@ function clipboardState(readText) {
 test('clipboard imports can be repeated after both plain text and JSON success', async () => {
 	const probe = clipboardState(async () => 'First task');
 	await probe.run(); assert.equal(probe.state.isPasting, false);
+	assert.equal(probe.state.copyStatus, 'idle'); assert.equal(probe.state.copyMessage, '');
 	probe.state.navigator.clipboard.readText = async () => JSON.stringify({ __list_app__: true, items: [{ id: 'old', name: 'Second task' }] });
 	await probe.run(); assert.equal(probe.state.isPasting, false);
+	assert.equal(probe.state.copyStatus, 'idle'); assert.equal(probe.state.copyMessage, '');
 	assert.equal(probe.calls.length, 2); assert.equal(probe.calls[1][0], 'json');
 });
 
@@ -87,7 +89,7 @@ test('plain text skips existing list names but retains repeated new names and ca
 	};
 	await probe.run();
 	assert.deepEqual(probe.calls, [['text', 'list-a', ['Bread', 'Bread', 'milk'], 'top']]);
-	assert.equal(probe.state.copyMessage, '✓ Imported 3 items. Skipped 2 already in this list.');
+	assert.equal(probe.state.copyStatus, 'idle');
 });
 
 test('plain text with only existing names does not create items and releases the import guard', async () => {
@@ -96,7 +98,7 @@ test('plain text with only existing names does not create items and releases the
 	await probe.run();
 	assert.deepEqual(probe.calls, []);
 	assert.deepEqual(probe.alerts, []);
-	assert.equal(probe.state.copyMessage, '✓ Imported 0 items. Skipped 2 already in this list.');
+	assert.equal(probe.state.copyStatus, 'idle');
 	assert.equal(probe.state.isPasting, false);
 });
 
@@ -105,7 +107,7 @@ test('plain text matches existing names regardless of trailing hashtags on eithe
 	probe.state.readItems = () => [{ name: 'Milk' }, { name: 'Bread #bakery #weekly  ' }, { name: 'Eggs #shopping' }];
 	await probe.run();
 	assert.deepEqual(probe.calls, [['text', 'list-a', ['Coffee #shopping', 'Coffee #weekly'], 'bottom']]);
-	assert.equal(probe.state.copyMessage, '✓ Imported 2 items. Skipped 3 already in this list.');
+	assert.equal(probe.state.copyStatus, 'idle');
 });
 
 test('plain text preserves inline hashtags, URL fragments and different hashtag-only names when matching', async () => {

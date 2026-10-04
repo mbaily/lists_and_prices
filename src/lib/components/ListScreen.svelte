@@ -482,7 +482,6 @@
 	let isPasting = $state(false);
 	let isActive = true;
 	let listContextVersion = 0;
-	let importFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
 
 	async function importFromClipboard() {
 		if (isPasting || !canEditList) return;
@@ -514,15 +513,12 @@
 				}
 			}
 
-			let importedCount: number;
-			let skippedCount = 0;
 			if (typeof parsed === 'object' && parsed !== null && '__list_app__' in parsed && parsed.__list_app__ === true) {
 				if (!('items' in parsed) || !Array.isArray(parsed.items) || parsed.items.length === 0) {
 					alert('No valid items found in clipboard export.');
 					return;
 				}
 				createItemsFromExport(targetListId, parsed.items as ExportedItem[]);
-				importedCount = parsed.items.length;
 			} else {
 				// Plain text: one item per line, excluding blank lines and lines without letters.
 				const lines = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => /\p{L}/u.test(line));
@@ -538,15 +534,8 @@
 				};
 				const existingNames = new Set(readItems(targetListId).map((item) => matchName(item.name)));
 				const newLines = lines.filter((line) => !existingNames.has(matchName(line)));
-				skippedCount = lines.length - newLines.length;
 				if (newLines.length > 0) createItemsBatch(targetListId, newLines, addPosition);
-				importedCount = newLines.length;
 			}
-			copyMessage = `✓ Imported ${importedCount} item${importedCount === 1 ? '' : 's'}.` +
-				(skippedCount > 0 ? ` Skipped ${skippedCount} already in this list.` : '');
-			copyStatus = 'copied';
-			if (importFeedbackTimer) clearTimeout(importFeedbackTimer);
-			importFeedbackTimer = setTimeout(() => { copyStatus = 'idle'; importFeedbackTimer = null; }, 2500);
 		} catch (error) {
 			if (isCurrent()) alert(`Import failed: ${error instanceof Error ? error.message : String(error)}`);
 		} finally {
@@ -838,7 +827,6 @@
 		isActive = false;
 		listContextVersion++;
 		cancelLongPress();
-		if (importFeedbackTimer) clearTimeout(importFeedbackTimer);
 	});
 
 	// ── Drag reorder (pointer events — works on both touch and mouse) ──────────────
@@ -1173,8 +1161,6 @@
 		untrack(() => {
 			listContextVersion++;
 			cancelLongPress();
-			if (importFeedbackTimer) clearTimeout(importFeedbackTimer);
-			importFeedbackTimer = null;
 			copyStatus = 'idle';
 			editingId = null;
 			inputMode = 'add';
