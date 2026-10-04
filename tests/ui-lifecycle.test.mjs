@@ -100,6 +100,26 @@ test('plain text with only existing names does not create items and releases the
 	assert.equal(probe.state.isPasting, false);
 });
 
+test('plain text matches existing names regardless of trailing hashtags on either name', async () => {
+	const probe = clipboardState(async () => 'Milk #shopping #weekly\nBread\nEggs #fresh\nCoffee #shopping\nCoffee #weekly');
+	probe.state.readItems = () => [{ name: 'Milk' }, { name: 'Bread #bakery #weekly  ' }, { name: 'Eggs #shopping' }];
+	await probe.run();
+	assert.deepEqual(probe.calls, [['text', 'list-a', ['Coffee #shopping', 'Coffee #weekly'], 'bottom']]);
+	assert.equal(probe.state.copyMessage, '✓ Imported 2 items. Skipped 3 already in this list.');
+});
+
+test('plain text preserves inline hashtags, URL fragments and different hashtag-only names when matching', async () => {
+	const probe = clipboardState(async () => 'Buy milk\nhttps://example.com/#other\n#weekly\nMilk #shopping later\nMilk #shopping!');
+	probe.state.readItems = () => [
+		{ name: 'Buy #shopping milk' }, { name: 'https://example.com/#shopping' },
+		{ name: '#shopping' }, { name: 'Milk' }
+	];
+	await probe.run();
+	assert.deepEqual(probe.calls, [['text', 'list-a', [
+		'Buy milk', 'https://example.com/#other', '#weekly', 'Milk #shopping later', 'Milk #shopping!'
+	], 'bottom']]);
+});
+
 test('plain text checks current names after the clipboard read, while JSON still imports existing names', async () => {
 	let resolve;
 	const probe = clipboardState(() => new Promise((done) => { resolve = done; }));

@@ -531,8 +531,13 @@
 					return;
 				}
 				// Compare with the list before importing, retaining duplicates within the paste.
-				const existingNames = new Set(readItems(targetListId).map((item) => item.name.trim()));
-				const newLines = lines.filter((line) => !existingNames.has(line));
+				const matchName = (name: string) => {
+					const trimmedName = name.trim();
+					// Ignore whitespace-separated trailing tags, preserving inline tags and URL fragments.
+					return trimmedName.replace(/(?:\s+#\w+)+$/, '').trimEnd() || trimmedName;
+				};
+				const existingNames = new Set(readItems(targetListId).map((item) => matchName(item.name)));
+				const newLines = lines.filter((line) => !existingNames.has(matchName(line)));
 				skippedCount = lines.length - newLines.length;
 				if (newLines.length > 0) createItemsBatch(targetListId, newLines, addPosition);
 				importedCount = newLines.length;
