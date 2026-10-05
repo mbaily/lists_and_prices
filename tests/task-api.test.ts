@@ -3,7 +3,7 @@ import { test, type TestContext } from 'node:test';
 import { createRequire } from 'node:module';
 import { createHash } from 'node:crypto';
 import { once } from 'node:events';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
@@ -14,7 +14,7 @@ import { docs, getYDoc, getPersistence, setPersistence, setupWSConnection } from
 import { SessionStore, COOKIE_NAME } from '../server/auth.ts';
 import { attachYjsServer } from '../server/auth-websocket.ts';
 import { createTaskDocuments, type TaskDocuments } from '../server/task-documents.ts';
-import { createTaskRouter, importTasks, type TaskToken } from '../server/task-api.ts';
+import { bindTaskDestination, createTaskRouter, importTasks, readTaskTokens, type TaskToken } from '../server/task-api.ts';
 
 const require = createRequire(import.meta.url);
 const Y = require('yjs') as typeof Yjs;
@@ -61,15 +61,77 @@ async function apiFixture(t: TestContext, documents: TaskDocuments) {
 	const token = 'a'.repeat(64);
 	let tokens: TaskToken[] = [{ tokenHash: createHash('sha256').update(token).digest('hex'), username: 'alice', listIds: ['shopping'] }];
 	const app = express();
-	app.use('/api/tasks', createTaskRouter(sessions, documents, { readTokens: () => tokens, userExists: user => users.has(user) }));
+	let bindingFails = false;
+	app.use('/api/tasks', createTaskRouter(sessions, documents, {
+		readTokens: () => tokens, userExists: user => users.has(user),
+		bindDestination(hash, id) {
+			const entry = tokens.find(token => token.tokenHash === hash);
+			if (bindingFails || !entry?.fromPhotos) throw new Error('Binding failed');
+			entry.listIds = [id];
+		}
+	}));
 	const server = http.createServer(app);
 	const sockets = attachYjsServer(server, sessions, setupWSConnection);
 	server.listen(0, '127.0.0.1'); await once(server, 'listening');
 	const port = (server.address() as import('node:net').AddressInfo).port;
 	t.after(async () => { sockets.clients.forEach(socket => socket.terminate()); sockets.close(); await new Promise<void>(resolve => server.close(() => resolve())); db.close(); });
 	const request = (body: unknown, headers: Record<string, string> = { Authorization: `Bearer ${token}` }, route = '/import', method = 'POST') => fetch(`http://127.0.0.1:${port}/api/tasks${route}`, { method, headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) });
-	return { request, port, session, users, revoke: () => { tokens = []; } };
+	return { request, port, session, users, revoke: () => { tokens = []; }, enableRecovery: () => { tokens[0].fromPhotos = true; }, failBinding: (fail: boolean) => { bindingFails = fail; } };
 }
+
+test('destination recovery uses the exact root path, creates missing data, and rebinds only this token', async t => {
+	const alice = new Y.Doc(), bob = new Y.Doc(); seed(alice); seed(bob);
+	t.after(() => { alice.destroy(); bob.destroy(); });
+	const fixture = await apiFixture(t, { async use(user, operation) { return operation(user === 'alice' ? alice : bob); } });
+	assert.equal((await fixture.request({}, undefined, '/destination')).status,403);
+	fixture.enableRecovery();
+	assert.equal((await fixture.request({ name:'Other', username:'bob' }, undefined, '/destination')).status,400);
+	// A nested same-name folder and a same-name list elsewhere are not the root destination.
+	const nested = new Y.Map<unknown>(); nested.set('id','nested'); nested.set('name','From Photos'); nested.set('parentId','home');
+	alice.getArray('folders').push([nested]);
+	alice.getArray<Yjs.Map<unknown>>('lists').get(0).set('name','From Photos');
+	fixture.failBinding(true);
+	assert.equal((await fixture.request({}, undefined, '/destination')).status,503);
+	fixture.failBinding(false);
+	const replies = await Promise.all(Array.from({length:3}, () => fixture.request({}, undefined, '/destination')));
+	const resolved = await replies[0].json();
+	for (const reply of replies.slice(1)) assert.equal((await reply.json()).list.id,resolved.list.id);
+	assert.equal(resolved.folderCreated,false); assert.equal(resolved.listCreated,false,'retry reuses data created before a binding failure');
+	assert.notEqual(resolved.list.folderId,'nested');
+	assert.equal(alice.getArray('folders').length,3); assert.equal(alice.getArray('lists').length,2);
+	assert.equal(bob.getArray('folders').length,1); assert.equal(bob.getArray('lists').length,1);
+	assert.equal((await fixture.request({listId:'shopping',tasks:['Other list']})).status,403);
+	assert.equal((await fixture.request({listId:resolved.list.id,tasks:['Milk #supplies_photos']})).status,200);
+	const target = alice.getArray<Yjs.Map<unknown>>('lists').toArray().find(list => list.get('id') === resolved.list.id)!;
+	target.set('favourite',true);
+	assert.equal((await fixture.request({}, undefined, '/destination')).status,200); assert.equal(target.get('favourite'),true);
+	const index = alice.getArray<Yjs.Map<unknown>>('lists').toArray().indexOf(target);
+	alice.getArray('lists').delete(index,1);
+	const replacement = await (await fixture.request({}, undefined, '/destination')).json();
+	assert.equal(replacement.folderCreated,false); assert.equal(replacement.listCreated,true);
+	assert.notEqual(replacement.list.id,resolved.list.id);
+	assert.equal((await fixture.request({listId:replacement.list.id,tasks:['Eggs']})).status,200);
+	const folder = alice.getArray<Yjs.Map<unknown>>('folders').toArray().find(folder => folder.get('id') === replacement.list.folderId)!;
+	folder.set('archived',true);
+	assert.equal((await fixture.request({}, undefined, '/destination')).status,400);
+	folder.set('archived',false);
+	const duplicate = new Y.Map<unknown>(); duplicate.set('id','duplicate'); duplicate.set('name','From Photos'); duplicate.set('parentId',null);
+	alice.getArray('folders').push([duplicate]);
+	assert.equal((await fixture.request({}, undefined, '/destination')).status,409);
+	fixture.revoke(); assert.equal((await fixture.request({}, undefined, '/destination')).status,401);
+});
+
+test('recovery binding is durable and keeps unrelated tokens unchanged', async t => {
+	const directory = await mkdtemp(path.join(tmpdir(),'pnl-task-tokens-')); t.after(() => rm(directory,{recursive:true,force:true}));
+	const file = path.join(directory,'tokens.json'), hash = 'a'.repeat(64), other = {tokenHash:'b'.repeat(64),username:'bob',listIds:['other']};
+	await writeFile(file,JSON.stringify({tokens:[{tokenHash:hash,username:'alice',listIds:['old'],fromPhotos:true},other]}));
+	bindTaskDestination(file,hash,'replacement');
+	assert.deepEqual(readTaskTokens(file),[{tokenHash:hash,username:'alice',listIds:['replacement'],fromPhotos:true},other]);
+	assert.equal((await stat(file)).mode & 0o777,0o600);
+	assert.throws(() => bindTaskDestination(file,other.tokenHash,'unauthorized'));
+	assert.throws(() => bindTaskDestination(file,'c'.repeat(64),'unauthorized'));
+	assert.deepEqual(readTaskTokens(file)[1],other);
+});
 
 test('task API enforces user/list permissions, validates before mutation, and deduplicates retries', async t => {
 	const alice = new Y.Doc(), bob = new Y.Doc(); seed(alice); seed(bob);

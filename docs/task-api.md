@@ -16,7 +16,20 @@ creates or reuses an active top-level folder, returning `folder` and `created`.
 `PATCH /api/tasks/lists/:id` with `{"folderId":"folder-id"}` moves an existing
 list into an active folder, returning `list` and `moved`. It preserves the list ID
 and all tasks. Both require a session or user-wide setup token; the supplies app's
-list-scoped token cannot create folders or move lists.
+ordinary list-scoped token cannot create folders or move lists.
+
+`POST /api/tasks/destination` with `{}` is a restricted recovery endpoint for
+tokens issued with `--from-photos`. It looks up the exact **From Photos** list in
+the exact **From Photos** folder at the authenticated user's root, creating either
+if absent in one Yjs transaction. It ignores matching names elsewhere, preserves
+existing contents/favourite settings, and rejects ambiguous names or an archived
+root destination folder. After persistence it atomically rebinds this token to the
+resolved list ID, replacing its previous list scope. The response contains `list`
+(id, name, folderId), `folderCreated`, and `listCreated`. Retries reuse the same
+destination. The endpoint accepts no user, folder, or list name overrides; it does
+not permit general list creation, moving, or deletion. Ordinary scoped tokens and
+browser sessions cannot call it.
+
 `POST /api/tasks/import` accepts JSON:
 
 ```json
@@ -49,10 +62,12 @@ Issue a token in the deployed runtime, as its service user:
 ```sh
 cd /opt/lists_and_prices
 sudo -u www-data node --import tsx server/task-token.ts \
-  --user mb --list DESTINATION_LIST_ID --output /absolute/private/token-file
+  --user mb --from-photos --list DESTINATION_LIST_ID --output /absolute/private/token-file
 ```
 
-Omit `--list` only when the integration needs all the user's lists. The raw token
+With `--from-photos`, omit `--list` to start with an empty list scope and resolve
+the destination on the first send. Without `--from-photos`, omitting `--list`
+issues a user-wide token for explicit setup. The raw token
 is written once to a new file with mode 0600; it is never printed. Only its SHA-256
 hash and scope are stored in `server/task-tokens.json` (ignored by Git and protected
 from deployment overwrite). Use `Authorization: Bearer TOKEN` over HTTPS. Revoke
@@ -60,6 +75,10 @@ a token by removing its entry from that file. Tokens do not expire with browser
 sessions; keep the caller's raw token private.
 
 The supplies app calls the API only when its Send tasks button is clicked. Its
-server holds a list-scoped token, selects unfinished Task photos in the saved
+server holds a recovery-enabled list-scoped token, selects unfinished Task photos in the saved
 session scope, and sends notes tagged `#supplies_photos`. No photo bytes are sent.
 Its destination is user mb's **From Photos** list in the **From Photos** folder.
+It uses its saved ID directly while valid. A missing/invalid ID triggers recovery;
+the returned ID is persisted before retrying imports and survives restarts. Failed
+recovery fails the send. Renaming or moving a still-valid list does not trigger
+recovery or change its ID.

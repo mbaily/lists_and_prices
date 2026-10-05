@@ -8,8 +8,8 @@ import { importNameKey } from './import-text.ts';
 import type { TaskDocuments } from './task-documents.ts';
 
 const Y = createRequire(import.meta.url)('yjs') as typeof Yjs;
-export interface TaskToken { tokenHash: string; username: string; listIds?: string[] }
-interface Principal { username: string; listIds?: string[] }
+export interface TaskToken { tokenHash: string; username: string; listIds?: string[]; fromPhotos?: boolean }
+interface Principal { username: string; listIds?: string[]; tokenHash?: string; fromPhotos?: boolean }
 class RequestError extends Error {
 	constructor(readonly status: number, message: string) { super(message); }
 }
@@ -19,14 +19,29 @@ export function readTaskTokens(file: string): TaskToken[] {
 		const data = JSON.parse(fs.readFileSync(file, 'utf8'));
 		return Array.isArray(data.tokens) ? data.tokens.filter((entry: TaskToken) =>
 			entry && /^[a-f0-9]{64}$/.test(entry.tokenHash) && isValidUsername(entry.username) &&
-			(entry.listIds === undefined || (Array.isArray(entry.listIds) && entry.listIds.every(id => typeof id === 'string' && id.length > 0)))) : [];
+			(entry.listIds === undefined || (Array.isArray(entry.listIds) && entry.listIds.every(id => typeof id === 'string' && id.length > 0))) &&
+			(entry.fromPhotos === undefined || (entry.fromPhotos === true && Array.isArray(entry.listIds)))) : [];
 	} catch { return []; }
+}
+
+/** Rebind only a token explicitly allowed to recover the fixed From Photos path. */
+export function bindTaskDestination(file: string, tokenHash: string, listId: string) {
+	const config = JSON.parse(fs.readFileSync(file, 'utf8'));
+	const token = config.tokens?.find((entry: TaskToken) => entry.tokenHash === tokenHash);
+	if (token?.fromPhotos !== true || !Array.isArray(token.listIds)) throw new Error('Destination recovery token unavailable');
+	const temporary = `${file}.${randomUUID()}.tmp`;
+	try {
+		token.listIds = [listId];
+		fs.writeFileSync(temporary, JSON.stringify(config, null, 2) + '\n', { mode: 0o600, flag: 'wx' });
+		fs.renameSync(temporary, file);
+	} finally { fs.rmSync(temporary, { force: true }); }
 }
 
 /** Consult current credentials/tokens on each call; neither is exposed to clients. */
 export function createTaskRouter(sessions: SessionStore, documents: TaskDocuments, options: {
 	readTokens: () => TaskToken[];
 	userExists: (username: string) => boolean;
+	bindDestination?: (tokenHash: string, listId: string) => void;
 }) {
 	const router = express.Router();
 	router.use((req, res, next) => {
@@ -50,6 +65,15 @@ export function createTaskRouter(sessions: SessionStore, documents: TaskDocument
 		next();
 	});
 	router.use(express.json({ limit: '1mb' }));
+	router.post('/destination', async (req, res) => {
+		const principal: Principal = res.locals.taskPrincipal;
+		if (!principal.fromPhotos || !principal.tokenHash) throw new RequestError(403, 'Token does not allow destination recovery');
+		if (!req.body || Array.isArray(req.body) || Object.keys(req.body).length) throw new RequestError(400, 'Destination recovery accepts an empty object');
+		if (!options.bindDestination) throw new Error('Destination binding unavailable');
+		const result = await documents.use(principal.username, resolveFromPhotos, true);
+		options.bindDestination(principal.tokenHash, result.list.id);
+		res.json(result);
+	});
 	router.get('/lists', async (_req, res) => {
 		const principal: Principal = res.locals.taskPrincipal;
 		const lists = await documents.use(principal.username, doc => doc.getArray<Yjs.Map<unknown>>('lists').toArray()
@@ -151,6 +175,36 @@ export function createTaskRouter(sessions: SessionStore, documents: TaskDocument
 		res.status(status).json({ error: error instanceof RequestError ? error.message : status === 503 ? 'Task integration unavailable; retry safely' : 'Invalid task request' });
 	});
 	return router;
+}
+
+function resolveFromPhotos(doc: Yjs.Doc) {
+	const name = 'From Photos', folders = doc.getArray<Yjs.Map<unknown>>('folders'), lists = doc.getArray<Yjs.Map<unknown>>('lists');
+	const matches = folders.toArray().filter(folder => (folder.get('parentId') ?? null) === null && folder.get('name') === name);
+	if (matches.length > 1) throw new RequestError(409, 'Multiple root From Photos folders exist');
+	let folder = matches[0];
+	if (folder?.get('archived')) throw new RequestError(400, 'Destination folder is archived');
+	const matchingLists = folder ? lists.toArray().filter(list => list.get('folderId') === folder.get('id') && list.get('name') === name && list.get('type') !== 'divider') : [];
+	if (matchingLists.length > 1) throw new RequestError(409, 'Multiple From Photos lists exist in the destination folder');
+	let list = matchingLists[0];
+	const folderCreated = !folder, listCreated = !list, now = new Date().toISOString();
+	if (folderCreated || listCreated) doc.transact(() => {
+		if (!folder) {
+			const orders = folders.toArray().filter(folder => (folder.get('parentId') ?? null) === null).map(folder => folder.get('order'))
+				.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+			folder = new Y.Map<unknown>();
+			for (const [key, value] of Object.entries({ id: randomUUID(), name, parentId: null, color: '#6366f1', order: orders.length ? Math.max(...orders) + 1 : 0, done: false, favourite: false, archived: false, foldersFirst: true, localNav: false, createdAt: now, updatedAt: now })) folder.set(key, value);
+			folders.push([folder]);
+		}
+		if (!list) {
+			const folderId = folder.get('id');
+			const orders = [...folders.toArray().filter(folder => folder.get('parentId') === folderId), ...lists.toArray().filter(list => list.get('folderId') === folderId)]
+				.map(item => item.get('order')).filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+			list = new Y.Map<unknown>();
+			for (const [key, value] of Object.entries({ id: randomUUID(), name, folderId, type: 'plain', color: folder.get('color') ?? '#6366f1', order: orders.length ? Math.max(...orders) + 1 : 0, createdAt: now, updatedAt: now, defaultIsNote: false, journalMode: false })) list.set(key, value);
+			lists.push([list]);
+		}
+	}, 'task-api');
+	return { list: { id: list!.get('id') as string, name, folderId: folder!.get('id') as string }, folderCreated, listCreated };
 }
 
 function currentName(doc: Yjs.Doc, item: Yjs.Map<unknown>): string {

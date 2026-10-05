@@ -29,7 +29,7 @@ import { SessionStore, isValidUsername, isValidPassword, readHtpasswdHash, sessi
 import { createAuthRouter } from './auth-http.ts';
 import { attachYjsServer } from './auth-websocket.ts';
 import { createTaskDocuments } from './task-documents.ts';
-import { createTaskRouter, readTaskTokens } from './task-api.ts';
+import { bindTaskDestination, createTaskRouter, readTaskTokens } from './task-api.ts';
 
 // better-sqlite3 is a CJS module; use createRequire to import it from ESM.
 const require = createRequire(import.meta.url);
@@ -207,6 +207,7 @@ const useTls = fs.existsSync(CERT_FILE) && fs.existsSync(KEY_FILE);
 const app = express();
 app.use('/api/tasks', createTaskRouter(sessions, createTaskDocuments(), {
 	readTokens: () => readTaskTokens(path.join(__dirname, 'task-tokens.json')),
+	bindDestination: (tokenHash, listId) => bindTaskDestination(path.join(__dirname, 'task-tokens.json'), tokenHash, listId),
 	userExists: username => Boolean(readHtpasswdHash(fs.readFileSync(HTPASSWD_FILE, 'utf8'), username))
 }));
 app.use('/api', createAuthRouter(sessions, useTls));
