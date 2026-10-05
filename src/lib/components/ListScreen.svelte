@@ -421,6 +421,9 @@
 	});
 	// Subtask / subnote context when adding a child item
 	let newItemParentId = $state<string | null>(null);
+	let parentHereId = $state<string | null>(null);
+	const addParentId = $derived(newItemParentId ?? parentHereId);
+	const parentHereItem = $derived(items.find((item) => item.id === parentHereId) ?? null);
 	let newItemIsNote = $state(listMeta?.defaultIsNote ?? false);
 
 	$effect(() => {
@@ -433,11 +436,36 @@
 		tick().then(() => universalInputEl?.focus());
 	}
 
+	function setParentHere(item: Item) {
+		if (!canEditList) return;
+		if (inputMode === 'edit') cancelEdit();
+		pricingItemId = null;
+		qtyItemId = null;
+		newItemParentId = null;
+		newItemIsNote = listMeta?.defaultIsNote ?? false;
+		parentHereId = item.id;
+		focusInput();
+	}
+
+	function cancelParentHere() {
+		parentHereId = null;
+	}
+
+	function getInfoPinMenuItem(item: Item): MenuItem {
+		return {
+			label: 'ℹ️ Info & Pin',
+			submenu: [
+				{ label: 'ℹ️ Info', action: () => infoItem = item },
+				{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => { if (canEditList) updateItem(item.id, { pinned: !item.pinned }); } }
+			]
+		};
+	}
+
 	function addItem() {
 		if (!canEditList || !universalValue.trim()) return;
 		// Only apply addPosition for top-level items; subtasks/subnotes always append
-		const pos = newItemParentId ? 'bottom' : settings.addItemPosition;
-		createItem(listId, universalValue.trim(), null, newItemParentId, newItemIsNote, pos);
+		const pos = addParentId ? 'bottom' : settings.addItemPosition;
+		createItem(listId, universalValue.trim(), null, addParentId, newItemIsNote, pos);
 		universalValue = '';
 		newItemParentId = null;
 		newItemIsNote = listMeta?.defaultIsNote ?? false;
@@ -1066,6 +1094,7 @@
 			if (fullScreenNoteId !== null && !ids.has(fullScreenNoteId)) fullScreenNoteId = null;
 			if (copyLinksItemId !== null && !ids.has(copyLinksItemId)) copyLinksItemId = null;
 			if (newItemParentId !== null && !ids.has(newItemParentId)) newItemParentId = null;
+			if (parentHereId !== null && !treeItems.some(({ item, level }) => item.id === parentHereId && !item.heading && level < 2)) cancelParentHere();
 			// Also clear any selected IDs that no longer exist
 			if (selectedIds.size > 0) {
 				const next = new Set([...selectedIds].filter((id) => ids.has(id)));
@@ -1180,6 +1209,7 @@
 			inputMode = 'add';
 			universalValue = '';
 			newItemParentId = null;
+			parentHereId = null;
 			newItemIsNote = listMeta?.defaultIsNote ?? false;
 			pricingItemId = null;
 			priceBuffer = '';
@@ -1328,7 +1358,7 @@
 						class="universal-input"
 						class:editing={inputMode === 'edit'}
 						class:has-toggle={inputMode !== 'edit'}
-						placeholder={inputMode === 'edit' ? 'Edit name…' : newItemParentId ? (newItemIsNote ? 'Add subnote…' : 'Add subtask…') : (newItemIsNote ? 'Add note…' : 'Add item…')}
+						placeholder={inputMode === 'edit' ? 'Edit name…' : addParentId ? (newItemIsNote ? 'Add subnote…' : 'Add subtask…') : (newItemIsNote ? 'Add note…' : 'Add item…')}
 						bind:value={universalValue}
 						rows="1"
 						enterkeyhint="done"
@@ -1370,6 +1400,13 @@
 					<button type="button" onclick={() => { newItemParentId = null; newItemIsNote = listMeta?.defaultIsNote ?? false; universalValue = ''; }} aria-label="Cancel">✕</button>
 				</div>
 			{/if}
+		</div>
+	{/if}
+
+	{#if parentHereItem && !commitState.isHistorical}
+		<div class="summary-bar parent-here-bar">
+			<span class="parent-here-label">Parent here: <strong>{tName(parentHereItem.name)}</strong></span>
+			<button class="bulk-btn sel-done-btn" onclick={cancelParentHere} aria-label="Cancel Parent here">✕ Cancel</button>
 		</div>
 	{/if}
 
@@ -1632,6 +1669,8 @@
 					{#if !commitState.isHistorical}
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
+						...(canAddChildren ? [{ label: '↳ Parent here', action: () => setParentHere(item) }] : []),
+						getInfoPinMenuItem(item),
 						{ label: item.fullScreen ? '📉 Not FS' : '📝 Full Screen', action: () => {
 							if (!canEditList) return;
 							if (item.fullScreen) {
@@ -1641,8 +1680,6 @@
 								fullScreenNoteId = item.id;
 							}
 						}},
-						{ label: 'ℹ️ Info', action: () => infoItem = item },
-						{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => { if (canEditList) updateItem(item.id, { pinned: !item.pinned }); } },
 						...(canAddChildren ? [
 							{ label: '➕ Add Subtask', action: () => { newItemParentId = item.id; newItemIsNote = false; focusInput(); } },
 							{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
@@ -1687,8 +1724,8 @@
 						{#if !commitState.isHistorical}
 						<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 						<RowMenu items={[
-							{ label: 'ℹ️ Info', action: () => infoItem = item },
-							{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => { if (canEditList) updateItem(item.id, { pinned: !item.pinned }); } },
+							...(canAddChildren ? [{ label: '↳ Parent here', action: () => setParentHere(item) }] : []),
+							getInfoPinMenuItem(item),
 							...(canAddChildren ? [
 								{ label: '➕ Add Subtask', action: () => { newItemParentId = item.id; newItemIsNote = false; focusInput(); } },
 								{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
@@ -1719,8 +1756,8 @@
 					{#if !commitState.isHistorical}
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
-						{ label: 'ℹ️ Info', action: () => infoItem = item },
-						{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => { if (canEditList) updateItem(item.id, { pinned: !item.pinned }); } },
+						...(canAddChildren ? [{ label: '↳ Parent here', action: () => setParentHere(item) }] : []),
+						getInfoPinMenuItem(item),
 						...(canAddChildren ? [
 							{ label: '➕ Add Subtask', action: () => { newItemParentId = item.id; newItemIsNote = false; focusInput(); } },
 							{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
@@ -2243,6 +2280,17 @@
 		overflow: hidden;
 	}
 	.check-counts { color: var(--text2); white-space: nowrap; }
+	.parent-here-bar {
+		background: color-mix(in srgb, var(--list-color, var(--accent)) 15%, var(--bg2));
+		border-bottom: 2px solid var(--list-color, var(--accent));
+	}
+	.parent-here-label {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
 	.bulk-btn {
 		padding: 0.25rem 0.6rem;
 		border: 1px solid var(--border);
