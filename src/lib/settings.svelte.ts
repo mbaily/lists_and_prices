@@ -17,6 +17,7 @@ interface Settings {
 	handedness: 'left' | 'right';
 	addItemPosition: 'bottom' | 'top';
 	addListPosition: 'bottom' | 'top';
+	parentHerePosition: 'bottom' | 'top';
 	reportFontSize: number;
 	itemSpacing: number;
 	keybindings: Record<string, string>;
@@ -34,17 +35,17 @@ export const DEFAULT_KEYBINDINGS: Record<string, string> = {
 };
 
 function loadSettings(): Settings {
-	if (typeof localStorage === 'undefined') return { currency: '$', theme: 'light', handedness: 'right', addItemPosition: 'bottom', addListPosition: 'bottom', reportFontSize: 14, itemSpacing: 8, keybindings: { ...DEFAULT_KEYBINDINGS }, favouritesCollapsed: false, quickListFolderId: null, quickListName: 'Quick List', showNearbyReturnLink: true };
+	if (typeof localStorage === 'undefined') return { currency: '$', theme: 'light', handedness: 'right', addItemPosition: 'bottom', addListPosition: 'bottom', parentHerePosition: 'bottom', reportFontSize: 14, itemSpacing: 8, keybindings: { ...DEFAULT_KEYBINDINGS }, favouritesCollapsed: false, quickListFolderId: null, quickListName: 'Quick List', showNearbyReturnLink: true };
 	try {
 		const saved = JSON.parse(localStorage.getItem(settingsKey()) ?? 'null');
 		if (typeof saved === 'object' && saved !== null && !Array.isArray(saved)) {
-			return { currency: '$', theme: 'light' as const, handedness: 'right' as const, addItemPosition: 'bottom' as const, addListPosition: 'bottom' as const, reportFontSize: 14, itemSpacing: 8, favouritesCollapsed: false, quickListFolderId: null, quickListName: 'Quick List', showNearbyReturnLink: true, ...saved, keybindings: { ...DEFAULT_KEYBINDINGS, ...(saved.keybindings || {}) } };
+			return { currency: '$', theme: 'light' as const, handedness: 'right' as const, addItemPosition: 'bottom' as const, addListPosition: 'bottom' as const, parentHerePosition: 'bottom' as const, reportFontSize: 14, itemSpacing: 8, favouritesCollapsed: false, quickListFolderId: null, quickListName: 'Quick List', showNearbyReturnLink: true, ...saved, keybindings: { ...DEFAULT_KEYBINDINGS, ...(saved.keybindings || {}) } };
 		}
 	} catch { /* fall through */ }
 	// No saved settings — detect OS preference rather than hardcoding light
 	const prefersDark =
 		typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches;
-	return { currency: '$', theme: prefersDark ? 'dark' : 'light', handedness: 'right', addItemPosition: 'bottom', addListPosition: 'bottom', reportFontSize: 14, itemSpacing: 8, keybindings: { ...DEFAULT_KEYBINDINGS }, favouritesCollapsed: false, quickListFolderId: null, quickListName: 'Quick List', showNearbyReturnLink: true };
+	return { currency: '$', theme: prefersDark ? 'dark' : 'light', handedness: 'right', addItemPosition: 'bottom', addListPosition: 'bottom', parentHerePosition: 'bottom', reportFontSize: 14, itemSpacing: 8, keybindings: { ...DEFAULT_KEYBINDINGS }, favouritesCollapsed: false, quickListFolderId: null, quickListName: 'Quick List', showNearbyReturnLink: true };
 }
 
 function saveSettings(s: Settings) {

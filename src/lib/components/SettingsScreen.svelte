@@ -266,6 +266,22 @@
 		</section>
 
 		<section>
+			<h2>Parent here: add items to</h2>
+			<div class="toggle-row">
+				<button
+					class="theme-btn"
+					class:active={settings.parentHerePosition === 'bottom'}
+					onclick={() => updateSettings({ parentHerePosition: 'bottom' })}
+				>⬇ Bottom</button>
+				<button
+					class="theme-btn"
+					class:active={settings.parentHerePosition === 'top'}
+					onclick={() => updateSettings({ parentHerePosition: 'top' })}
+				>⬆ Top</button>
+			</div>
+		</section>
+
+		<section>
 			<h2>Handedness</h2>
 			<div class="toggle-row">
 				<button

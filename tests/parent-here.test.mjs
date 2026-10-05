@@ -10,7 +10,7 @@ function parentProbe() {
 		listId, canEditList: true, inputMode: 'add', universalValue: '',
 		parentHereId: null, newItemParentId: null, newItemIsNote: false,
 		editingId: null, pricingItemId: null, qtyItemId: null, infoItem: null, priceBuffer: '', qtyBuffer: '',
-		universalInputEl: null, settings: { addItemPosition: 'top' }, focusInput() {},
+		universalInputEl: null, settings: { addItemPosition: 'top', parentHerePosition: 'bottom' }, focusInput() {},
 		createItem: app.data.createItem, updateItem: app.data.updateItem, readItems: app.data.readItems,
 		get listMeta() { return app.data.readLists().find((list) => list.id === listId); },
 		get addParentId() { return this.newItemParentId ?? this.parentHereId; }

@@ -476,8 +476,8 @@
 
 	function addItem() {
 		if (!canEditList || !universalValue.trim()) return;
-		// Only apply addPosition for top-level items; subtasks/subnotes always append
-		const pos = addParentId ? 'bottom' : settings.addItemPosition;
+		const pos = newItemParentId !== null ? 'bottom'
+			: parentHereId !== null ? settings.parentHerePosition : settings.addItemPosition;
 		createItem(listId, universalValue.trim(), null, addParentId, newItemIsNote, pos);
 		universalValue = '';
 		newItemParentId = null;
