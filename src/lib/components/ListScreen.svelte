@@ -1460,7 +1460,7 @@
 
 	{#if parentHereItem && !commitState.isHistorical}
 		<div class="summary-bar parent-here-bar">
-			<span class="parent-here-label">Parent here: <strong>{tName(parentHereItem.name)}</strong></span>
+			<span class="parent-here-label">Parent: <strong>{tName(parentHereItem.name)}</strong></span>
 			<button class="bulk-btn sel-done-btn" onclick={cancelParentHere} aria-label="Cancel Parent here">✕ Cancel</button>
 		</div>
 	{/if}
