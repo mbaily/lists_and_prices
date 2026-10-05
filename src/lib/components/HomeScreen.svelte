@@ -35,6 +35,7 @@
 	import { syncState, docState, idbSynced, commitState, exitCommitView, undoLastAction, canUndo, getUndoCount } from '$lib/yjsStore.svelte';
 	import { auth } from '$lib/auth.svelte';
 	import { settings, updateSettings } from '$lib/settings.svelte';
+	import { DEFAULT_MARK_NAME, setDestinationMark } from '$lib/destinationMarks';
 	import { getSmartFolders, assignToReport, removeFromReport, deleteReport } from '$lib/smartFolders.svelte';
 	import { extractTags, splitWithTags } from '$lib/tags';
 	import ListScreen from './ListScreen.svelte';
@@ -123,7 +124,7 @@
 		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || (e.target instanceof HTMLElement && e.target.isContentEditable)) return;
 		
 		// Or if a modal/overlay is open
-		if (showSettings || showFavouritesOrder || showNewFolder || showNewList || showReportsMenu || infoTarget || sfDialogFolder || checkboxesFolder || renamingId) return;
+		if (showSettings || showFavouritesOrder || showNewFolder || showNewList || showReportsMenu || infoTarget || sfDialogFolder || checkboxesFolder || renamingId || markTarget) return;
 
 		// Modifier keys should not trigger a bind by themselves
 		if (['Control', 'Meta', 'Alt', 'Shift', 'CapsLock'].includes(e.key)) return;
@@ -623,6 +624,7 @@
 		// Clear stale tag if the tagged item was deleted by a peer
 		if (taggedFolderId !== null && !allFolders.some((f) => f.id === taggedFolderId)) taggedFolderId = null;
 		if (taggedListId !== null && !allLists.some((l) => l.id === taggedListId)) taggedListId = null;
+		if (markTarget !== null && !allLists.some((list) => list.id === markTarget!.id)) markTarget = null;
 	});
 
 	// ── Breadcrumb label ────────────────────────────────────────────────────────
@@ -724,6 +726,47 @@
 	// ── Info dialog ────────────────────────────────────────────────────────────
 	type InfoTarget = { kind: 'folder'; data: Folder } | { kind: 'list'; data: ListMeta } | { kind: 'sheet'; data: SheetMeta };
 	let infoTarget = $state<InfoTarget | null>(null);
+
+	// Destination registers are local to the user/device, outside the shared document.
+	let markTarget = $state<ListMeta | null>(null);
+	let markName = $state(DEFAULT_MARK_NAME);
+	let markError = $state('');
+	let markFeedback = $state('');
+	let markNameInputEl = $state<HTMLInputElement | null>(null);
+
+	$effect(() => {
+		if (!markFeedback) return;
+		const timer = setTimeout(() => { markFeedback = ''; }, 3000);
+		return () => clearTimeout(timer);
+	});
+
+	function startNamedMark(list: ListMeta) {
+		if (commitState.isHistorical || !allLists.some((entry) => entry.id === list.id)) return;
+		markTarget = list;
+		markName = DEFAULT_MARK_NAME;
+		markError = '';
+		tick().then(() => { markNameInputEl?.focus(); markNameInputEl?.select(); });
+	}
+
+	function markListDestination(list: ListMeta, name = DEFAULT_MARK_NAME) {
+		if (commitState.isHistorical) return;
+		const liveList = allLists.find((entry) => entry.id === list.id);
+		if (!liveList || !name.trim()) return;
+		try {
+			setDestinationMark(name, { kind: 'list', id: list.id });
+			markTarget = null;
+			markError = '';
+			markFeedback = `Marked "${liveList.name}" as "${name.trim()}".`;
+		} catch {
+			markTarget = liveList;
+			markName = name;
+			markError = 'Could not save the mark on this device. Please try again.';
+		}
+	}
+
+	function submitNamedMark() {
+		if (markTarget) markListDestination(markTarget, markName);
+	}
 
 	function fmtDate(iso: string | null | undefined): string {
 		if (!iso) return 'Unknown';
@@ -1325,6 +1368,8 @@ ${bodyHtml}
 		// cycle when it mutates renamingId.
 		renamingId = null;
 		infoTarget = null;
+		markTarget = null;
+		markFeedback = '';
 		activeTagFilter = null;
 		// Close create forms so they don't linger in the wrong folder context
 		showNewFolder = false;
@@ -1356,6 +1401,8 @@ ${bodyHtml}
 			quickAddTagSuggestions = [];
 			sfDialogFolder = null;
 			checkboxesFolder = null;
+			markTarget = null;
+			markFeedback = '';
 			touchDragKind = null;
 			touchDragFrom = null;
 			touchDragOver = null;
@@ -1926,6 +1973,10 @@ ${bodyHtml}
 						...(hasTag
 							? [{ label: '✕ Clear Tag', action: clearTag }]
 							: [{ label: '🏷 Tag (to move)', action: () => tagList(list.id) }]),
+						{ label: '🏷 Mark', submenu: [
+							{ label: '🏷 Mark', action: () => markListDestination(list) },
+							{ label: '🏷 Mark named', action: () => startNamedMark(list) }
+						]},
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete list "${list.name}"?`, () => deleteList(list.id)) }
 					]} />
 					{/if}
@@ -2065,6 +2116,27 @@ ${bodyHtml}
 		{/if}<!-- end search else -->
 		</div><!-- end .content -->
 
+		<!-- Named destination mark dialog -->
+		{#if markTarget && !commitState.isHistorical}
+			<div class="modal-backdrop" role="presentation" onclick={(e) => { if (e.target === e.currentTarget) markTarget = null; }}>
+				<div class="modal" role="dialog" aria-modal="true" aria-labelledby="mark-title" tabindex="-1"
+					onkeydown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); markTarget = null; } }}>
+					<form class="mark-form" onsubmit={(e) => { e.preventDefault(); submitNamedMark(); }}>
+						<h2 id="mark-title">Mark named</h2>
+						<p class="mark-destination">{allLists.find((list) => list.id === markTarget!.id)?.name ?? markTarget.name}</p>
+						<label for="mark-name">Mark name</label>
+						<input id="mark-name" bind:this={markNameInputEl} bind:value={markName} required />
+						<p class="mark-hint">Reusing a name replaces its destination.</p>
+						{#if markError}<p class="mark-error" role="alert">{markError}</p>{/if}
+						<div class="modal-actions">
+							<button type="submit" disabled={!markName.trim()}>Mark</button>
+							<button type="button" onclick={() => markTarget = null}>Cancel</button>
+						</div>
+					</form>
+				</div>
+			</div>
+		{/if}
+
 		<!-- New folder form (outside .content to avoid iOS fixed-position clipping) -->
 		{#if showNewFolder && !commitState.isHistorical}
 			<div class="modal-backdrop">
@@ -2151,6 +2223,10 @@ ${bodyHtml}
 	</div>
 {/if}
 
+{#if markFeedback}
+	<div class="mark-feedback" role="status">{markFeedback}</div>
+{/if}
+
 {#if showUndoConfirm && !commitState.isHistorical}
 	{#if canUndo()}
 		<ConfirmDialog
@@ -2181,6 +2257,25 @@ ${bodyHtml}
 {/if}
 
 <style>
+	.mark-form { display: flex; flex-direction: column; gap: 1rem; }
+	.mark-destination { margin: 0; overflow-wrap: anywhere; }
+	.mark-hint { margin: 0; font-size: 0.85rem; color: var(--text2); }
+	.mark-error { margin: 0; font-size: 0.85rem; color: #ef4444; }
+	.mark-feedback {
+		position: fixed;
+		bottom: 1rem;
+		left: 50%;
+		transform: translateX(-50%);
+		max-width: calc(100% - 2rem);
+		padding: 0.65rem 1rem;
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		background: var(--bg);
+		color: var(--text);
+		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+		overflow-wrap: anywhere;
+		z-index: 150;
+	}
 	.screen {
 		height: 100dvh;
 		background: var(--bg);
