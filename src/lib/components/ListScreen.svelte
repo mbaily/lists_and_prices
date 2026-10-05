@@ -454,12 +454,22 @@
 		parentHereId = null;
 	}
 
+	function toggleNoteTask(item: Item) {
+		if (!canEditList) return;
+		const current = readItems(listId).find((entry) => entry.id === item.id);
+		if (!current || current.heading) return;
+		if (pricingItemId === current.id) { pricingItemId = null; priceBuffer = ''; }
+		if (qtyItemId === current.id) { qtyItemId = null; qtyBuffer = ''; }
+		updateItem(current.id, { note: !current.note, ...(current.note ? { fullScreen: false } : {}) });
+	}
+
 	function getInfoPinMenuItem(item: Item): MenuItem {
 		return {
 			label: 'ℹ️ Info & Pin',
 			submenu: [
 				{ label: 'ℹ️ Info', action: () => infoItem = item },
-				{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => { if (canEditList) updateItem(item.id, { pinned: !item.pinned }); } }
+				{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => { if (canEditList) updateItem(item.id, { pinned: !item.pinned }); } },
+				{ label: '📝 Note/Task', action: () => toggleNoteTask(item) }
 			]
 		};
 	}

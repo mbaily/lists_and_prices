@@ -9,14 +9,14 @@ function parentProbe() {
 	const state = {
 		listId, canEditList: true, inputMode: 'add', universalValue: '',
 		parentHereId: null, newItemParentId: null, newItemIsNote: false,
-		editingId: null, pricingItemId: null, qtyItemId: null, infoItem: null,
+		editingId: null, pricingItemId: null, qtyItemId: null, infoItem: null, priceBuffer: '', qtyBuffer: '',
 		universalInputEl: null, settings: { addItemPosition: 'top' }, focusInput() {},
-		createItem: app.data.createItem, updateItem: app.data.updateItem,
+		createItem: app.data.createItem, updateItem: app.data.updateItem, readItems: app.data.readItems,
 		get listMeta() { return app.data.readLists().find((list) => list.id === listId); },
 		get addParentId() { return this.newItemParentId ?? this.parentHereId; }
 	};
 	const source = componentFunctions('src/lib/components/ListScreen.svelte', [
-		'setParentHere', 'cancelParentHere', 'getInfoPinMenuItem', 'addItem',
+		'setParentHere', 'cancelParentHere', 'getInfoPinMenuItem', 'toggleNoteTask', 'addItem',
 		'startEditName', 'submitEditName', 'cancelEdit'
 	]);
 	const handlers = new Function('state', `with (state) { ${transpile(source)}; return {
@@ -106,7 +106,7 @@ test('Info & Pin opens item info and toggles Pin/Unpin through the submenu', () 
 		const id = p.app.data.createItem(p.listId, 'Task');
 		const menu = p.handlers.getInfoPinMenuItem(p.item(id));
 		assert.equal(menu.action, undefined);
-		assert.deepEqual(menu.submenu.map((item) => item.label), ['ℹ️ Info', '📍 Pin']);
+		assert.deepEqual(menu.submenu.map((item) => item.label), ['ℹ️ Info', '📍 Pin', '📝 Note/Task']);
 		menu.submenu[0].action();
 		assert.equal(p.state.infoItem.id, id);
 		menu.submenu[1].action();
@@ -118,10 +118,56 @@ test('Info & Pin opens item info and toggles Pin/Unpin through the submenu', () 
 
 		p.state.canEditList = false;
 		menu.submenu[1].action();
+		menu.submenu[2].action();
 		p.handlers.setParentHere(p.item(id));
 		p.add('Read-only task');
 		assert.equal(p.item(id).pinned, false);
+		assert.equal(p.item(id).note, false);
 		assert.equal(p.state.parentHereId, null);
 		assert.equal(p.app.data.readItems(p.listId).length, 1);
+	} finally { p.app.dispose(); }
+});
+
+test('Note/Task conversion keeps rich text, task details, children and Parent here and undoes atomically', () => {
+	const p = parentProbe(), d = p.app.data;
+	try {
+		const folder = d.createFolder('Folder', null);
+		const checkbox = d.addFolderCheckbox(folder, 'Packed');
+		d.updateList(p.listId, { folderId: folder, type: 'priced' });
+		const id = d.createItem(p.listId, 'Rich note\nwith two lines', 7.5, null, true);
+		d.updateItem(id, { qty: 3, checked: true, pinned: true, fullScreen: true });
+		d.setItemCheckboxState(id, checkbox, true);
+		const child = d.createItem(p.listId, 'Child task', null, id);
+		const subnote = d.createItem(p.listId, 'Child note', null, id, true);
+		const text = d.getItemYText(p.app.doc, id);
+		text.format(0, 4, { bold: true });
+		const delta = text.toDelta(), before = d.readItems(p.listId);
+		p.handlers.setParentHere(p.item(id));
+		const menu = p.handlers.getInfoPinMenuItem(p.item(id));
+		p.app.store.getUndoManager().clear();
+		menu.submenu[2].action();
+		assert.equal(p.item(id).note, false);
+		assert.equal(p.item(id).fullScreen, false);
+		for (const key of ['id', 'listId', 'name', 'price', 'qty', 'checked', 'checks', 'pinned', 'parentId', 'order', 'createdAt']) {
+			assert.deepEqual(p.item(id)[key], before.find((item) => item.id === id)[key], key);
+		}
+		assert.equal(p.item(child).parentId, id); assert.equal(p.item(subnote).parentId, id);
+		assert.equal(p.state.parentHereId, id);
+		assert.equal(d.getItemYText(p.app.doc, id), text); assert.deepEqual(text.toDelta(), delta);
+		assert.equal(p.app.store.getUndoCount(), 1);
+		p.app.store.undoLastAction();
+		assert.deepEqual(d.readItems(p.listId), before);
+
+		// A stale menu still toggles the current type rather than its captured type.
+		menu.submenu[2].action();
+		p.state.pricingItemId = id; p.state.priceBuffer = '99';
+		p.state.qtyItemId = id; p.state.qtyBuffer = '5';
+		menu.submenu[2].action();
+		assert.equal(p.item(id).note, true);
+		assert.equal(p.state.pricingItemId, null); assert.equal(p.state.priceBuffer, '');
+		assert.equal(p.state.qtyItemId, null); assert.equal(p.state.qtyBuffer, '');
+		assert.deepEqual(text.toDelta(), delta);
+		p.add('After conversion');
+		assert.equal(d.readItems(p.listId).find((item) => item.name === 'After conversion').parentId, id);
 	} finally { p.app.dispose(); }
 });
