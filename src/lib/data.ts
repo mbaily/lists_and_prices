@@ -7,6 +7,7 @@ import { getFolders, getLists, getItems, getDoc, getMutableDoc, getSpreadsheets,
 import { removeFromAllReports } from './smartFolders.svelte';
 import { readFolderCheckboxes, addCheckbox, renameCheckbox, removeCheckbox, orderCheckboxes, replaceFolderCheckboxes, type FolderCheckbox } from './folderCheckboxes';
 import { resolveParentLinks, compareOrder, canReparentItems, selectedRoots } from './hierarchy';
+import { planItemMove, type ItemMoveDestination } from './itemMove';
 import { readItemName, getItemText, initializeItemText, replaceItemText } from './noteText';
 import { readReportAssignments, restoreReportAssignments } from './reportAssignments';
 import { validateLocations, normalizeLocationTag, type RetailLocation } from './retailLocations';
@@ -782,6 +783,52 @@ export function unarchiveFolder(id: string) {
 }
 
 // ─── Reorder helpers ──────────────────────────────────────────────────────────
+
+/** Move existing records, including descendants, while retaining IDs and note texts. */
+export function moveItemsToDestination(sourceListId: string, ids: string[], destination: ItemMoveDestination): boolean {
+	const doc = getMutableDoc();
+	const lists = readLists();
+	const folders = readFolders();
+	const sourceList = lists.find((list) => list.id === sourceListId);
+	const targetList = lists.find((list) => list.id === destination.listId);
+	if (!sourceList || !targetList || targetList.type === 'divider' || isListEffectivelyArchived(targetList, folders)) return false;
+	const sourceFolder = folders.find((folder) => folder.id === sourceList.folderId);
+	const targetFolder = folders.find((folder) => folder.id === targetList.folderId);
+	const source = readItems(sourceListId);
+	const sourceById = new Map(source.map((item) => [item.id, item]));
+	const target = sourceListId === destination.listId ? source : readItems(destination.listId);
+	const plan = planItemMove(source, target, ids, destination.parentId);
+	if (!plan) return false;
+	const records = new Map(getItems(doc).toArray().map((item) => [item.get('id') as string, item]));
+	let order = target.filter((item) => item.parentId === destination.parentId && !plan.movedIds.has(item.id))
+		.reduce((max, item) => Math.max(max, item.order), -1) + 1;
+	const now = new Date().toISOString();
+	doc.transact(() => {
+		materializeCycles(getItems(doc), source);
+		if (sourceListId !== destination.listId) materializeCycles(getItems(doc), target);
+		for (const id of plan.movedIds) {
+			const record = records.get(id)!;
+			if (record.get('listId') !== destination.listId) record.set('listId', destination.listId);
+			if (sourceListId !== destination.listId) record.set('updatedAt', now);
+			const item = sourceById.get(id)!;
+			if (sourceList.folderId !== targetList.folderId && !item.note && !item.heading) {
+				const done = isItemDone(item, sourceFolder);
+				record.set('checked', done);
+				for (const checkbox of targetFolder?.checkboxes ?? []) {
+					const matching = sourceFolder?.checkboxes?.find((entry) => entry.name.toLowerCase() === checkbox.name.toLowerCase());
+					record.set(`chk_${checkbox.id}`, matching ? !!item.checks[matching.id] : done);
+				}
+			}
+		}
+		for (const id of plan.roots) {
+			const record = records.get(id)!;
+			record.set('parentId', destination.parentId);
+			record.set('order', order++);
+			record.set('updatedAt', now);
+		}
+	});
+	return true;
+}
 
 export function reparentItems(listId: string, ids: string[], targetId: string | null): boolean {
 	const doc = getMutableDoc();

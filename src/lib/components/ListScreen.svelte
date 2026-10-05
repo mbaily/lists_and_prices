@@ -20,6 +20,7 @@
 		updateList,
 		reorderSiblings,
 		reparentItems,
+		moveItemsToDestination,
 		isListEffectivelyArchived,
 		isFolderEffectivelyArchived,
 		getMaxFavouriteOrder,
@@ -32,6 +33,8 @@
 	import { settings, updateSettings } from '$lib/settings.svelte';
 	import { extractTags, splitWithTags, type NameSegment } from '$lib/tags';
 	import { importNameKey } from '$lib/importText';
+	import { readDestinationMarks, getDestinationMark } from '$lib/destinationMarks';
+	import { planItemMove, resolveMarkedItemDestination } from '$lib/itemMove';
 	import NumericKeypad from './NumericKeypad.svelte';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import RowMenu, { type MenuItem } from './RowMenu.svelte';
@@ -758,12 +761,54 @@
 
 	// ── Selection mode ────────────────────────────────────────────────────────────
 	let showSelectionPanel = $state(false);
+	let destinationMarks = $state(readDestinationMarks());
+	let selectedMoveMark = $state('');
+	let markMoveError = $state('');
+	const compatibleMoveMarks = $derived.by(() => {
+		const lists = allLists.filter((list) => list.type !== 'divider' && !isListEffectivelyArchived(list, allFolders));
+		return Object.entries(destinationMarks).flatMap(([name, mark]) => {
+			const destination = resolveMarkedItemDestination(mark, lists, allItemsAll);
+			if (!destination || !planItemMove(items, allItemsAll.filter((item) => item.listId === destination.listId), selectedIds, destination.parentId)) return [];
+			const targetName = destination.parentId
+				? allItemsAll.find((item) => item.id === destination.parentId)?.name
+				: lists.find((list) => list.id === destination.listId)?.name;
+			return [{ name, label: `${name} — ${targetName ?? '…'}` }];
+		}).sort((a, b) => a.name.localeCompare(b.name));
+	});
+
+	function refreshDestinationMarks() {
+		destinationMarks = readDestinationMarks();
+	}
+
+	$effect(() => {
+		if (selectionMode && showSelectionPanel) refreshDestinationMarks();
+	});
+
+	$effect(() => {
+		if (selectedMoveMark && !compatibleMoveMarks.some((mark) => mark.name === selectedMoveMark)) selectedMoveMark = '';
+	});
+
+	function moveSelectedToMark() {
+		if (!canEditList || selectedIds.size === 0 || !selectedMoveMark) return;
+		const mark = getDestinationMark(selectedMoveMark);
+		const folders = readFolders();
+		const lists = readLists().filter((list) => list.type !== 'divider' && !isListEffectivelyArchived(list, folders));
+		const destination = mark ? resolveMarkedItemDestination(mark, lists, readAllItems()) : null;
+		if (!destination || !moveItemsToDestination(listId, [...selectedIds], destination)) {
+			markMoveError = 'This mark is no longer compatible with the selection. Choose another destination.';
+			refreshDestinationMarks();
+			return;
+		}
+		exitSelectionMode();
+	}
 
 	function enterSelectionMode() {
 		if (!canEditList) return;
 		selectedIds = new Set();
 		selectionMode = true;
 		showSelectionPanel = false;
+		selectedMoveMark = '';
+		markMoveError = '';
 		showHeaderMenu = false;
 		// Cancel any in-progress editing states
 		cancelEdit();
@@ -775,6 +820,8 @@
 		selectionMode = false;
 		showSelectionPanel = false;
 		selectedIds = new Set();
+		selectedMoveMark = '';
+		markMoveError = '';
 	}
 
 	function toggleSelectionItem(id: string) {
@@ -782,6 +829,7 @@
 		const next = new Set(selectedIds);
 		if (next.has(id)) next.delete(id); else next.add(id);
 		selectedIds = next;
+		markMoveError = '';
 	}
 
 	const selectedItems = $derived(
@@ -1218,6 +1266,8 @@
 			selectedIds = new Set();
 			selectionMode = false;
 			showSelectionPanel = false;
+			selectedMoveMark = '';
+			markMoveError = '';
 			touchDragFrom = null;
 			touchDragOver = null;
 			touchDragParentKey = null;
@@ -1260,7 +1310,7 @@
 	let screenEl = $state<HTMLElement | null>(null);
 </script>
 
-<svelte:window onkeydown={handleGlobalKeydown} />
+<svelte:window onkeydown={handleGlobalKeydown} onstorage={refreshDestinationMarks} />
 
 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 <div class="screen" bind:this={screenEl} class:has-keypad={(pricingItemId || qtyItemId) && isPriced} style="--list-color:{listMeta?.color ?? 'var(--text)'}">
@@ -1458,6 +1508,22 @@
 			{#if selectedItems.length === 0}
 				<p class="sel-empty">No items selected yet. Tap the ◇ next to each item to select it.</p>
 			{:else}
+				<div class="sel-move-section">
+					<label for="move-destination-mark">Move to mark</label>
+					{#if compatibleMoveMarks.length > 0}
+						<div class="sel-move-controls">
+							<select id="move-destination-mark" bind:value={selectedMoveMark} onchange={() => markMoveError = ''}>
+								<option value="">Choose a mark…</option>
+								{#each compatibleMoveMarks as mark}<option value={mark.name}>{mark.label}</option>{/each}
+							</select>
+							<button class="sel-move-btn" disabled={!selectedMoveMark || !canEditList} onclick={moveSelectedToMark}>Move {selectedItems.length} item(s)</button>
+						</div>
+						<p class="sel-move-hint">Selected parents move with their subtasks and subnotes.</p>
+					{:else}
+						<p class="sel-move-hint">No compatible marked destinations. Mark a list using its menu.</p>
+					{/if}
+					{#if markMoveError}<p class="sel-move-error" role="alert">{markMoveError}</p>{/if}
+				</div>
 				<ul class="sel-item-list">
 					{#each selectedItems as item}
 						<li class="sel-item-row">
@@ -2413,6 +2479,22 @@
 		overflow-y: auto;
 	}
 	.sel-empty { color: var(--text2); font-size: 0.88rem; margin: 0; padding: 0.25rem 0; }
+	.sel-move-section { padding-bottom: 0.75rem; margin-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+	.sel-move-section label { display: block; margin-bottom: 0.4rem; font-size: 0.9rem; font-weight: 600; }
+	.sel-move-controls { display: flex; gap: 0.5rem; }
+	.sel-move-controls select {
+		flex: 1;
+		min-width: 0;
+		padding: 0.45rem;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		background: var(--bg);
+		color: var(--text);
+	}
+	.sel-move-btn { padding: 0.45rem 0.65rem; border: 1px solid var(--accent); border-radius: 6px; background: var(--bg); color: var(--accent); cursor: pointer; }
+	.sel-move-btn:disabled { opacity: 0.5; cursor: default; }
+	.sel-move-hint { margin: 0.4rem 0 0; font-size: 0.82rem; color: var(--text2); }
+	.sel-move-error { margin: 0.4rem 0 0; font-size: 0.85rem; color: #ef4444; }
 	.sel-item-list { list-style: none; margin: 0; padding: 0; }
 	.sel-item-row {
 		display: flex;
@@ -2435,7 +2517,7 @@
 	.sel-item-name { flex: 1; word-break: break-word; }
 	.sel-delete-btn {
 		display: block;
-		margin-top: 0.5rem;
+		margin-top: 1rem;
 		width: 100%;
 		padding: 0.45rem;
 		background: #dc262620;
