@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createApp, componentFunctions, transpile } from './helpers/app.mjs';
+import { importNameKey } from '../server/import-text.ts';
 
 function uncheckProbe(selected = false, named = false) {
 	const calls = [];
@@ -115,6 +116,7 @@ function clipboardState(readText) {
 		settings: { addItemPosition: 'bottom' }, commitState: { isHistorical: false },
 		navigator: { clipboard: { readText } }, readLists: () => [{ id: 'list-a' }, { id: 'list-b' }],
 		readItems: () => [],
+		importNameKey,
 		createItemsBatch: (...args) => calls.push(['text', ...args]),
 		createItemsFromExport: (...args) => calls.push(['json', ...args]),
 		alert: (message) => alerts.push(message), copyMessage: '', copyStatus: 'idle',

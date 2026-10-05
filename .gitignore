@@ -36,6 +36,7 @@ server/.htpasswd
 server/server.db
 server/server.db-*
 server/yjs-data/
+server/task-tokens.json
 
 # Editor
 .idea/

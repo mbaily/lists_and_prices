@@ -28,6 +28,8 @@ import bcrypt from 'bcryptjs';
 import { SessionStore, isValidUsername, isValidPassword, readHtpasswdHash, sessionTtlMs } from './auth.ts';
 import { createAuthRouter } from './auth-http.ts';
 import { attachYjsServer } from './auth-websocket.ts';
+import { createTaskDocuments } from './task-documents.ts';
+import { createTaskRouter, readTaskTokens } from './task-api.ts';
 
 // better-sqlite3 is a CJS module; use createRequire to import it from ESM.
 const require = createRequire(import.meta.url);
@@ -203,6 +205,10 @@ async function cliRemoveUser() {
 // ── Express app ───────────────────────────────────────────────────────────────
 const useTls = fs.existsSync(CERT_FILE) && fs.existsSync(KEY_FILE);
 const app = express();
+app.use('/api/tasks', createTaskRouter(sessions, createTaskDocuments(), {
+	readTokens: () => readTaskTokens(path.join(__dirname, 'task-tokens.json')),
+	userExists: username => Boolean(readHtpasswdHash(fs.readFileSync(HTPASSWD_FILE, 'utf8'), username))
+}));
 app.use('/api', createAuthRouter(sessions, useTls));
 
 // Serve built SPA

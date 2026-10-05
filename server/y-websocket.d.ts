@@ -3,6 +3,20 @@
 declare module 'y-websocket/bin/utils' {
 	import type { EventEmitter } from 'node:events';
 	import type { IncomingMessage } from 'node:http';
+	import type { Doc } from 'yjs';
+
+	export interface SharedDoc extends Doc {
+		conns: Map<{ readonly readyState: number; send(data: Uint8Array, callback?: (error?: Error) => void): void }, Set<number>>;
+	}
+	export interface Persistence {
+		bindState(name: string, doc: SharedDoc): void | Promise<void>;
+		writeState(name: string, doc: SharedDoc): Promise<void>;
+		provider: { storeUpdate(name: string, update: Uint8Array): Promise<unknown> };
+	}
+	export const docs: Map<string, SharedDoc>;
+	export function getYDoc(name: string, gc?: boolean): SharedDoc;
+	export function getPersistence(): Persistence | null;
+	export function setPersistence(persistence: Persistence | null): void;
 
 	interface SyncConnection extends EventEmitter {
 		binaryType: string;

@@ -31,6 +31,7 @@
 	} from '$lib/data';
 	import { settings, updateSettings } from '$lib/settings.svelte';
 	import { extractTags, splitWithTags, type NameSegment } from '$lib/tags';
+	import { importNameKey } from '$lib/importText';
 	import NumericKeypad from './NumericKeypad.svelte';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import RowMenu, { type MenuItem } from './RowMenu.svelte';
@@ -545,13 +546,8 @@
 					return;
 				}
 				// Compare with the list before importing, retaining duplicates within the paste.
-				const matchName = (name: string) => {
-					const trimmedName = name.trim();
-					// Ignore whitespace-separated trailing tags, preserving inline tags and URL fragments.
-					return trimmedName.replace(/(?:\s+#\w+)+$/, '').trimEnd() || trimmedName;
-				};
-				const existingNames = new Set(readItems(targetListId).map((item) => matchName(item.name)));
-				const newLines = lines.filter((line) => !existingNames.has(matchName(line)));
+				const existingNames = new Set(readItems(targetListId).map((item) => importNameKey(item.name)));
+				const newLines = lines.filter((line) => !existingNames.has(importNameKey(line)));
 				if (newLines.length > 0) createItemsBatch(targetListId, newLines, addPosition);
 			}
 		} catch (error) {

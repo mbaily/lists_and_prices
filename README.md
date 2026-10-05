@@ -15,6 +15,9 @@ See [bug-fix and upgrade notes](docs/bug-fixes.md) before deploying the authenti
 
 See [safe deployment instructions](docs/deployment.md) for backups, dry runs and rollback.
 
+See [task integration API](docs/task-api.md) for authenticated server-to-server
+task imports, shared clipboard matching, list-scoped tokens, and retry behavior.
+
 ## Nearby errands
 
 Tag todos with `#supermarket`, `#coles`, `#woolworths` or `#kmart`, then open 🚗 from the home header. The bundled Melbourne catalogue is editable JSON; personal locations sync across devices. See [nearby errands and catalogue instructions](docs/nearby-errands.md).
