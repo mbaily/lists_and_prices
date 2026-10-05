@@ -33,7 +33,7 @@
 	import { settings, updateSettings } from '$lib/settings.svelte';
 	import { extractTags, splitWithTags, type NameSegment } from '$lib/tags';
 	import { importNameKey } from '$lib/importText';
-	import { readDestinationMarks, getDestinationMark } from '$lib/destinationMarks';
+	import { DEFAULT_MARK_NAME, readDestinationMarks, getDestinationMark } from '$lib/destinationMarks';
 	import { planItemMove, resolveMarkedItemDestination } from '$lib/itemMove';
 	import NumericKeypad from './NumericKeypad.svelte';
 	import ConfirmDialog from './ConfirmDialog.svelte';
@@ -773,7 +773,9 @@
 				? allItemsAll.find((item) => item.id === destination.parentId)?.name
 				: lists.find((list) => list.id === destination.listId)?.name;
 			return [{ name, label: `${name} — ${targetName ?? '…'}` }];
-		}).sort((a, b) => a.name.localeCompare(b.name));
+		}).sort((a, b) =>
+			Number(b.name === DEFAULT_MARK_NAME) - Number(a.name === DEFAULT_MARK_NAME) || a.name.localeCompare(b.name)
+		);
 	});
 
 	function refreshDestinationMarks() {
@@ -785,7 +787,10 @@
 	});
 
 	$effect(() => {
-		if (selectedMoveMark && !compatibleMoveMarks.some((mark) => mark.name === selectedMoveMark)) selectedMoveMark = '';
+		if (!selectionMode || !showSelectionPanel) return;
+		if (!compatibleMoveMarks.some((mark) => mark.name === selectedMoveMark)) {
+			selectedMoveMark = compatibleMoveMarks[0]?.name ?? '';
+		}
 	});
 
 	function moveSelectedToMark() {
@@ -1513,7 +1518,6 @@
 					{#if compatibleMoveMarks.length > 0}
 						<div class="sel-move-controls">
 							<select id="move-destination-mark" bind:value={selectedMoveMark} onchange={() => markMoveError = ''}>
-								<option value="">Choose a mark…</option>
 								{#each compatibleMoveMarks as mark}<option value={mark.name}>{mark.label}</option>{/each}
 							</select>
 							<button class="sel-move-btn" disabled={!selectedMoveMark || !canEditList} onclick={moveSelectedToMark}>Move {selectedItems.length} item(s)</button>

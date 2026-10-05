@@ -159,6 +159,7 @@ function selectionProbe() {
 		listId: p.source, canEditList: true, selectedIds: new Set([task]), selectedMoveMark: 'work',
 		selectionMode: true, showSelectionPanel: true, markMoveError: '',
 		settings: { addItemPosition: 'bottom', addListPosition: 'bottom' },
+		DEFAULT_MARK_NAME: p.app.load('src/lib/destinationMarks.ts').DEFAULT_MARK_NAME,
 		destinationMarks: { work: { kind: 'list', id: p.target } },
 		readLists: p.app.data.readLists, readFolders: p.app.data.readFolders, readAllItems: p.app.data.readAllItems,
 		isListEffectivelyArchived: p.app.data.isListEffectivelyArchived,
