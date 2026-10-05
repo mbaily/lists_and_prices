@@ -35,6 +35,7 @@
 	import { syncState, docState, idbSynced, commitState, exitCommitView, undoLastAction, canUndo, getUndoCount } from '$lib/yjsStore.svelte';
 	import { auth } from '$lib/auth.svelte';
 	import { settings, updateSettings } from '$lib/settings.svelte';
+	import { getInsertionOrder } from '$lib/hierarchy';
 	import { DEFAULT_MARK_NAME, setDestinationMark } from '$lib/destinationMarks';
 	import { getSmartFolders, assignToReport, removeFromReport, deleteReport } from '$lib/smartFolders.svelte';
 	import { extractTags, splitWithTags } from '$lib/tags';
@@ -827,6 +828,11 @@
 
 	function moveTaggedTo(targetFolderId: string | null) {
 		if (commitState.isHistorical) return;
+		const siblings = [
+			...readFolders().filter((folder) => folder.parentId === targetFolderId && folder.id !== taggedFolderId),
+			...readLists().filter((list) => list.folderId === targetFolderId && list.id !== taggedListId)
+		];
+		const order = getInsertionOrder(siblings, settings.addListPosition);
 		if (taggedFolderId) {
 			if (targetFolderId !== null && isDescendant(taggedFolderId, targetFolderId)) {
 				alert('Cannot move a folder into one of its own sub-folders.');
@@ -836,14 +842,14 @@
 				alert('Cannot move a folder into an archived folder.');
 				return;
 			}
-			updateFolder(taggedFolderId, { parentId: targetFolderId });
+			updateFolder(taggedFolderId, { parentId: targetFolderId, order });
 		} else if (taggedListId) {
 			if (targetFolderId === null) return; // lists must live in a folder
 			if (isFolderEffectivelyArchived(targetFolderId, allFolders)) {
 				alert('Cannot move a list into an archived folder.');
 				return;
 			}
-			updateList(taggedListId, { folderId: targetFolderId });
+			updateList(taggedListId, { folderId: targetFolderId, order });
 		}
 		clearTag();
 	}

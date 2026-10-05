@@ -33,6 +33,14 @@ export function compareOrder(a: { id: string; order: number }, b: { id: string; 
 	return a.order - b.order || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 }
 
+/** Reserve consecutive orders for a batch, preserving its order at either end. */
+export function getInsertionOrder(siblings: { order: number }[], position: 'top' | 'bottom', count = 1): number {
+	if (siblings.length === 0) return 0;
+	return position === 'top'
+		? siblings.reduce((min, item) => Math.min(min, item.order), Infinity) - count
+		: siblings.reduce((max, item) => Math.max(max, item.order), -Infinity) + 1;
+}
+
 export interface TreeItem {
 	item: Item;
 	level: number;

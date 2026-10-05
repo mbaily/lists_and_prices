@@ -158,18 +158,19 @@ function selectionProbe() {
 	const state = {
 		listId: p.source, canEditList: true, selectedIds: new Set([task]), selectedMoveMark: 'work',
 		selectionMode: true, showSelectionPanel: true, markMoveError: '',
+		settings: { addItemPosition: 'bottom', addListPosition: 'bottom' },
 		destinationMarks: { work: { kind: 'list', id: p.target } },
 		readLists: p.app.data.readLists, readFolders: p.app.data.readFolders, readAllItems: p.app.data.readAllItems,
 		isListEffectivelyArchived: p.app.data.isListEffectivelyArchived,
-		moveItemsToDestination: p.app.data.moveItemsToDestination, ...p.moving,
+		moveItemsToDestination: p.app.data.moveItemsToDestination, reparentItems: p.app.data.reparentItems, ...p.moving,
 		get allLists() { return this.readLists(); }, get allFolders() { return this.readFolders(); },
 		get allItemsAll() { return this.readAllItems(); }, get items() { return p.app.data.readItems(p.source); }
 	};
 	state.latestMarks = state.destinationMarks;
 	state.getDestinationMark = (name) => state.latestMarks[name] ?? null;
 	state.readDestinationMarks = () => state.latestMarks;
-	const source = componentFunctions('src/lib/components/ListScreen.svelte', ['moveSelectedToMark', 'refreshDestinationMarks', 'exitSelectionMode']);
-	const handlers = new Function('state', `with (state) { ${transpile(source)}; return { moveSelectedToMark }; }`)(state);
+	const source = componentFunctions('src/lib/components/ListScreen.svelte', ['moveSelectedToMark', 'reparentSelectedTo', 'refreshDestinationMarks', 'exitSelectionMode']);
+	const handlers = new Function('state', `with (state) { ${transpile(source)}; return { moveSelectedToMark, reparentSelectedTo }; }`)(state);
 	const script = readFileSync(path.join(root, 'src/lib/components/ListScreen.svelte'), 'utf8').match(/<script[^>]*>([\s\S]*?)<\/script>/)[1];
 	const ast = ts.createSourceFile('ListScreen.ts', script, ts.ScriptTarget.Latest, true);
 	const derived = ast.statements.filter(ts.isVariableStatement).flatMap((node) => [...node.declarationList.declarations]).find((node) => node.name.getText(ast) === 'compatibleMoveMarks').initializer.arguments[0];
@@ -209,6 +210,28 @@ test('the move button uses the chosen mark and closes selection only on success'
 		assert.equal(p.state.selectedMoveMark, '');
 	} finally { p.app.dispose(); }
 });
+
+for (const position of ['top', 'bottom']) {
+	for (const action of ['mark', 'reparent']) {
+		test(`the ${action} action uses the current Add items to ${position} setting and displayed selection order`, () => {
+			const p = selectionProbe(), d = p.app.data;
+			try {
+				const second = d.createItem(p.source, 'Second');
+				const parent = action === 'reparent' ? d.createItem(p.source, 'Destination') : null;
+				const target = action === 'reparent' ? p.source : p.target;
+				const existing = d.createItem(target, 'Existing', null, parent);
+				p.state.selectedIds = new Set([second, p.task]);
+				p.state.settings.addItemPosition = position;
+				p.state.settings.addListPosition = position === 'top' ? 'bottom' : 'top';
+				if (action === 'mark') p.handlers.moveSelectedToMark();
+				else p.handlers.reparentSelectedTo(parent);
+				assert.deepEqual(d.readItems(target).filter((item) => item.parentId === parent).map((item) => item.id),
+					position === 'top' ? [p.task, second, existing] : [existing, p.task, second]);
+				assert.equal(p.state.selectionMode, false);
+			} finally { p.app.dispose(); }
+		});
+	}
+}
 
 for (const change of ['removed mark', 'incompatible mark', 'deleted destination', 'historical view']) {
 	test(`a ${change} between picking and moving preserves the selection and source data`, () => {

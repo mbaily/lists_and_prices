@@ -794,7 +794,7 @@
 		const folders = readFolders();
 		const lists = readLists().filter((list) => list.type !== 'divider' && !isListEffectivelyArchived(list, folders));
 		const destination = mark ? resolveMarkedItemDestination(mark, lists, readAllItems()) : null;
-		if (!destination || !moveItemsToDestination(listId, [...selectedIds], destination)) {
+		if (!destination || !moveItemsToDestination(listId, [...selectedIds], destination, settings.addItemPosition)) {
 			markMoveError = 'This mark is no longer compatible with the selection. Choose another destination.';
 			refreshDestinationMarks();
 			return;
@@ -845,7 +845,7 @@
 
 	function reparentSelectedTo(targetId: string | null) {
 		if (!canEditList || selectedIds.size === 0) return;
-		if (reparentItems(listId, [...selectedIds], targetId)) {
+		if (reparentItems(listId, [...selectedIds], targetId, settings.addItemPosition)) {
 			exitSelectionMode();
 		} else {
 			alert('Cannot move these items here. The destination may have changed, or the move would create an invalid hierarchy.');

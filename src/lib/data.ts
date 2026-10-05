@@ -6,7 +6,7 @@ import * as Y from 'yjs';
 import { getFolders, getLists, getItems, getDoc, getMutableDoc, getSpreadsheets, getSheetCells } from './yjsStore.svelte';
 import { removeFromAllReports } from './smartFolders.svelte';
 import { readFolderCheckboxes, addCheckbox, renameCheckbox, removeCheckbox, orderCheckboxes, replaceFolderCheckboxes, type FolderCheckbox } from './folderCheckboxes';
-import { resolveParentLinks, compareOrder, canReparentItems, selectedRoots } from './hierarchy';
+import { resolveParentLinks, compareOrder, getInsertionOrder } from './hierarchy';
 import { planItemMove, type ItemMoveDestination } from './itemMove';
 import { readItemName, getItemText, initializeItemText, replaceItemText } from './noteText';
 import { readReportAssignments, restoreReportAssignments } from './reportAssignments';
@@ -785,7 +785,7 @@ export function unarchiveFolder(id: string) {
 // ─── Reorder helpers ──────────────────────────────────────────────────────────
 
 /** Move existing records, including descendants, while retaining IDs and note texts. */
-export function moveItemsToDestination(sourceListId: string, ids: string[], destination: ItemMoveDestination): boolean {
+export function moveItemsToDestination(sourceListId: string, ids: string[], destination: ItemMoveDestination, addPosition: 'top' | 'bottom' = 'bottom'): boolean {
 	const doc = getMutableDoc();
 	const lists = readLists();
 	const folders = readFolders();
@@ -800,8 +800,8 @@ export function moveItemsToDestination(sourceListId: string, ids: string[], dest
 	const plan = planItemMove(source, target, ids, destination.parentId);
 	if (!plan) return false;
 	const records = new Map(getItems(doc).toArray().map((item) => [item.get('id') as string, item]));
-	let order = target.filter((item) => item.parentId === destination.parentId && !plan.movedIds.has(item.id))
-		.reduce((max, item) => Math.max(max, item.order), -1) + 1;
+	const siblings = target.filter((item) => item.parentId === destination.parentId && !plan.movedIds.has(item.id));
+	let order = getInsertionOrder(siblings, addPosition, plan.roots.length);
 	const now = new Date().toISOString();
 	doc.transact(() => {
 		materializeCycles(getItems(doc), source);
@@ -830,16 +830,16 @@ export function moveItemsToDestination(sourceListId: string, ids: string[], dest
 	return true;
 }
 
-export function reparentItems(listId: string, ids: string[], targetId: string | null): boolean {
+export function reparentItems(listId: string, ids: string[], targetId: string | null, addPosition: 'top' | 'bottom' = 'bottom'): boolean {
 	const doc = getMutableDoc();
 	const items = readItems(listId);
-	if (!canReparentItems(items, ids, targetId)) return false;
-	const roots = selectedRoots(items, ids);
-	let order = items.filter((item) => item.parentId === targetId)
-		.reduce((max, item) => Math.max(max, item.order), -1) + 1;
+	const plan = planItemMove(items, items, ids, targetId);
+	if (!plan) return false;
+	const siblings = items.filter((item) => item.parentId === targetId && !plan.movedIds.has(item.id));
+	let order = getInsertionOrder(siblings, addPosition, plan.roots.length);
 	doc.transact(() => {
 		materializeCycles(getItems(doc), items);
-		for (const id of roots) updateItem(id, { parentId: targetId, order: order++ });
+		for (const id of plan.roots) updateItem(id, { parentId: targetId, order: order++ });
 	});
 	return true;
 }
