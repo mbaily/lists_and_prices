@@ -1669,8 +1669,6 @@
 					{#if !commitState.isHistorical}
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
-						...(canAddChildren ? [{ label: '↳ Parent here', action: () => setParentHere(item) }] : []),
-						getInfoPinMenuItem(item),
 						{ label: item.fullScreen ? '📉 Not FS' : '📝 Full Screen', action: () => {
 							if (!canEditList) return;
 							if (item.fullScreen) {
@@ -1680,6 +1678,8 @@
 								fullScreenNoteId = item.id;
 							}
 						}},
+						getInfoPinMenuItem(item),
+						...(canAddChildren ? [{ label: '↳ Parent here', action: () => setParentHere(item) }] : []),
 						...(canAddChildren ? [
 							{ label: '➕ Add Subtask', action: () => { newItemParentId = item.id; newItemIsNote = false; focusInput(); } },
 							{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
@@ -1724,14 +1724,14 @@
 						{#if !commitState.isHistorical}
 						<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 						<RowMenu items={[
-							...(canAddChildren ? [{ label: '↳ Parent here', action: () => setParentHere(item) }] : []),
+							getCopyMenuItem(item),
 							getInfoPinMenuItem(item),
+							...(canAddChildren ? [{ label: '↳ Parent here', action: () => setParentHere(item) }] : []),
 							...(canAddChildren ? [
 								{ label: '➕ Add Subtask', action: () => { newItemParentId = item.id; newItemIsNote = false; focusInput(); } },
 								{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
 							] : []),
 							...(level === 0 ? [{ label: '📌 Make Heading', action: () => makeHeading(item) }] : []),
-							getCopyMenuItem(item),
 							...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItemId = item.id) }] : []),
 							...getReparentMenuItem(item.id),
 							{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${tName(item.name)}"?`, () => deleteItemCascade(item.id)) }
@@ -1756,14 +1756,14 @@
 					{#if !commitState.isHistorical}
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
-						...(canAddChildren ? [{ label: '↳ Parent here', action: () => setParentHere(item) }] : []),
+						getCopyMenuItem(item),
 						getInfoPinMenuItem(item),
+						...(canAddChildren ? [{ label: '↳ Parent here', action: () => setParentHere(item) }] : []),
 						...(canAddChildren ? [
 							{ label: '➕ Add Subtask', action: () => { newItemParentId = item.id; newItemIsNote = false; focusInput(); } },
 							{ label: '📝 Add Subnote', action: () => { newItemParentId = item.id; newItemIsNote = true; focusInput(); } }
 						] : []),
 						...(level === 0 ? [{ label: '📌 Make Heading', action: () => makeHeading(item) }] : []),
-						getCopyMenuItem(item),
 						...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItemId = item.id) }] : []),
 						...getReparentMenuItem(item.id),
 						{ label: '🗑 Delete', danger: true, action: () => askDelete(`Delete "${tName(item.name)}"?`, () => deleteItemCascade(item.id)) }
