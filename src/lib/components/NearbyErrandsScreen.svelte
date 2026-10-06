@@ -346,6 +346,7 @@
                 {:else}<p class="hint">No custom locations yet.</p>{/each}
             </section>
         {:else}
+            <div class="filters" bind:this={radiusFilters}><label>Within <select bind:value={radius}>{#each [1, 2, 5, 10, 25, 50] as km}<option value={km}>{km} km</option>{/each}</select></label></div>
             {#if pausedTags.length || pausedErrands.length}
                 <details class="paused-errands">
                     <summary>Paused errands ({pausedGroups.length})</summary>
@@ -376,7 +377,6 @@
                     {@render errandGroup(group, errandRows)}
                 {:else}<li class="hint">{pausedErrands.length ? 'Your remaining errands are paused. Expand Paused errands to resume them.' : 'No matched tasks. Add location hashtags to a todo, note or list name.'}</li>{/each}</ul>
             </section>
-            <div class="filters" bind:this={radiusFilters}><label>Within <select bind:value={radius}>{#each [1, 2, 5, 10, 25, 50] as km}<option value={km}>{km} km</option>{/each}</select></label></div>
             {#if !origin}
                 <p class="empty">Use your location or choose a starting-point pill to see nearby errands.</p>
             {:else}
