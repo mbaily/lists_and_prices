@@ -24,7 +24,6 @@
     let locating = $state(false);
     let locationError = $state('');
     let showLocationDetails = $state(false);
-    let customStartingSelect = $state<HTMLSelectElement>();
     let radius = $state(5);
     const previewLimit = $derived.by(() => { void docState.version; return readNearbyPreviewLimit(); });
     function setPreviewLimit(event: Event) {
@@ -41,6 +40,7 @@
     let tags = $state('');
     let latitude = $state('');
     let longitude = $state('');
+    let startingPoint = $state(false);
     let editingId = $state<string | null>(null);
     let formError = $state('');
     let deleteTarget = $state<RetailLocation | null>(null);
@@ -56,6 +56,7 @@
     });
 
     const customLocations = $derived.by(() => { void docState.version; return readCustomLocations(); });
+    const customStartingPoints = $derived(customLocations.filter(location => location.startingPoint === true));
     const locations = $derived([...catalogue.locations, ...suburbLocations, ...customLocations] as RetailLocation[]);
     const availableTags = $derived.by(() => {
         const tags = availableLocationTags(locations);
@@ -174,8 +175,8 @@
     function selectCustomLocation(id: string) {
         if (commitState.isHistorical) return;
         const location = readCustomLocations().find(location => location.id === id);
-        if (!location) {
-            locationError = 'This location is no longer available. Choose another starting point.';
+        if (!location || location.startingPoint !== true) {
+            locationError = 'This location is no longer available as a starting point. Choose another starting point.';
             return;
         }
         requestVersion++;
@@ -185,7 +186,6 @@
             source: 'custom', customLocationId: location.id, label: location.name, accuracy: null, updatedAt: new Date().toISOString() });
         showLocations = false;
         showLocationDetails = true;
-        tick().then(() => customStartingSelect?.focus({ preventScroll: true }));
     }
 
     function saveHotSuburbs(ids: string[]) {
@@ -195,11 +195,12 @@
     }
 
     function clearForm() {
-        editingId = null; name = ''; address = ''; tags = ''; latitude = ''; longitude = ''; formError = '';
+        editingId = null; name = ''; address = ''; tags = ''; latitude = ''; longitude = ''; startingPoint = false; formError = '';
     }
     function editLocation(location: RetailLocation) {
         editingId = location.id; name = location.name; address = location.address ?? '';
         tags = location.tags.map(tag => '#' + tag).join(' ');
+        startingPoint = location.startingPoint === true;
         latitude = String(location.latitude); longitude = String(location.longitude); formError = '';
     }
     function saveLocation() {
@@ -209,7 +210,7 @@
         const coordinates = { latitude: Number(latitude), longitude: Number(longitude) };
         if (!validCoordinates(coordinates)) { formError = 'Enter a latitude from −90 to 90 and longitude from −180 to 180.'; return; }
         try {
-            saveCustomLocation({ id: editingId ?? 'custom-' + crypto.randomUUID(), name, address: address.trim(), tags: tags.trim().split(/[\s,]+/).filter(Boolean).map(normalizeLocationTag), ...coordinates });
+            saveCustomLocation({ id: editingId ?? 'custom-' + crypto.randomUUID(), name, address: address.trim(), tags: tags.trim().split(/[\s,]+/).filter(Boolean).map(normalizeLocationTag), startingPoint, ...coordinates });
             clearForm();
         } catch (error) { formError = error instanceof Error ? error.message : 'Could not save the location.'; }
     }
@@ -292,22 +293,17 @@
                         aria-pressed={savedLocation?.source === 'suburb' && savedLocation.label === suburb.name}
                         disabled={commitState.isHistorical} title={`Start near ${suburb.name} centre`} onclick={() => selectSuburb(suburb)}>{suburb.name}</button>
                 {/each}
+                {#each customStartingPoints as location (location.id)}
+                    <button class="suburb-shortcut custom-starting-point" class:active={savedLocation?.source === 'custom' && savedLocation.customLocationId === location.id}
+                        aria-pressed={savedLocation?.source === 'custom' && savedLocation.customLocationId === location.id}
+                        disabled={commitState.isHistorical} title={`Start near ${location.name}`} onclick={() => selectCustomLocation(location.id)}>{location.name}</button>
+                {/each}
                 <button class="location-icon" disabled={commitState.isHistorical} onclick={() => showHotSuburbs = true} aria-label="Edit hot suburbs" title="Edit hot suburbs">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m16 3 5 5-12 12-6 1 1-6zM13 6l5 5" /></svg>
                 </button>
             </div>
-            {#if customLocations.length}
-                <div class="custom-origin">
-                    <label for="custom-starting-point">Start from a saved location</label>
-                    <select id="custom-starting-point" bind:this={customStartingSelect} value={savedLocation?.source === 'custom' ? savedLocation.customLocationId : ''}
-                        disabled={commitState.isHistorical} onchange={(event) => selectCustomLocation(event.currentTarget.value)}>
-                        <option value="" disabled>Choose one of your locations…</option>
-                        {#each customLocations as location (location.id)}<option value={location.id}>{location.name}</option>{/each}
-                    </select>
-                </div>
-            {/if}
             <div class="location-details-controls">
-                <HelpText label="Help with starting location"><p class="hint">Use GPS, a suburb pill or one of your saved locations as the starting point. Add a place anywhere in the world under Locations, then choose Start here. Its hashtags still work as an errand destination. Your starting location syncs across your devices.</p></HelpText>
+                <HelpText label="Help with starting location"><p class="hint">Use GPS or a starting-point pill. Under Locations, add or edit a place anywhere in the world and turn on Available as a starting point to show its pill beside the suburbs. Its hashtags still work as an errand destination. Your starting location syncs across your devices.</p></HelpText>
                 {#if savedLocation}
                     <button class="location-details-toggle" onclick={() => showLocationDetails = !showLocationDetails}
                         aria-label={showLocationDetails ? 'Hide location details' : 'Show location details'}
@@ -328,13 +324,14 @@
         {#if showLocations}
             <section class="custom">
                 <h2>{editingId ? 'Edit location' : 'Add a location'}</h2>
-                <HelpText label="Help with custom location hashtags"><p class="hint">Add any shop or place with latitude, longitude and matching hashtags such as #postoffice, #pharmacy or #home. Choose Start here on a saved place to use it as a starting point too. A #coles or #woolworths location also matches #supermarket automatically.</p></HelpText>
+                <HelpText label="Help with custom location hashtags"><p class="hint">Add any shop or place with latitude, longitude and matching hashtags such as #postoffice, #pharmacy or #home. Turn on Available as a starting point to add its pill beside the suburbs. A #coles or #woolworths location also matches #supermarket automatically.</p></HelpText>
                 <form onsubmit={(event) => { event.preventDefault(); saveLocation(); }}>
                     <fieldset disabled={commitState.isHistorical}>
                         <label>Name<input bind:value={name} required placeholder="My local pharmacy" /></label>
                         <label>Address (optional)<input bind:value={address} placeholder="Street and suburb" /></label>
                         <label>Matching hashtags<input bind:value={tags} required placeholder="#pharmacy" /></label>
                         <div class="coordinates"><label>Latitude<input bind:value={latitude} inputmode="decimal" required placeholder="−37.8136" /></label><label>Longitude<input bind:value={longitude} inputmode="decimal" required placeholder="144.9631" /></label></div>
+                        <label class="starting-point-toggle"><input type="checkbox" role="switch" bind:checked={startingPoint} />Available as a starting point</label>
                         <button type="button" disabled={!origin} onclick={() => { if (origin) { latitude = String(origin.latitude); longitude = String(origin.longitude); } }}>Use starting location coordinates</button>
                         <div class="form-actions"><button class="primary" type="submit">{editingId ? 'Save changes' : 'Add location'}</button>{#if editingId}<button type="button" onclick={clearForm}>Cancel edit</button>{/if}</div>
                     </fieldset>
@@ -344,9 +341,6 @@
                 <HelpText label="Help with saving locations"><p class="hint">Saved locations sync across your devices and are included in JSON backups.</p></HelpText>
                 {#each customLocations as location (location.id)}
                     <article class="saved"><div><strong>{location.name}</strong><p>{location.tags.map(tag => '#' + tag).join(' ')} · {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}</p></div><div class="form-actions">
-                        <button class="start-location-btn" class:active={savedLocation?.source === 'custom' && savedLocation.customLocationId === location.id}
-                            aria-label={`Use ${location.name} as starting point`} aria-pressed={savedLocation?.source === 'custom' && savedLocation.customLocationId === location.id}
-                            disabled={commitState.isHistorical} onclick={() => selectCustomLocation(location.id)}>{savedLocation?.source === 'custom' && savedLocation.customLocationId === location.id ? 'Starting point' : 'Start here'}</button>
                         <button disabled={commitState.isHistorical} onclick={() => editLocation(location)}>Edit</button><button disabled={commitState.isHistorical} onclick={() => deleteTarget = location}>Delete</button>
                     </div></article>
                 {:else}<p class="hint">No custom locations yet.</p>{/each}
@@ -384,7 +378,7 @@
             </section>
             <div class="filters" bind:this={radiusFilters}><label>Within <select bind:value={radius}>{#each [1, 2, 5, 10, 25, 50] as km}<option value={km}>{km} km</option>{/each}</select></label></div>
             {#if !origin}
-                <p class="empty">Use your location or choose a starting suburb to see nearby errands.</p>
+                <p class="empty">Use your location or choose a starting-point pill to see nearby errands.</p>
             {:else}
                 <section class="suggestions" aria-labelledby="suggested-stops-heading">
                     <h2 id="suggested-stops-heading">Suggested stops</h2>
@@ -457,10 +451,8 @@
     .location-details-toggle { position: absolute; top: .4rem; left: 44px; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border-radius: 50%; background: #000; color: var(--text2); }
     .location-details-toggle:hover { color: var(--accent); border-color: var(--accent); }
     .location-icon { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; }
-    .suburb-shortcut { border-radius: 999px; background: #000; padding: .45rem .75rem; }
+    .suburb-shortcut { border-radius: 999px; background: #000; color: #fff; padding: .45rem .75rem; max-width: 100%; overflow-wrap: anywhere; }
     .suburb-shortcut.active { border-color: var(--accent); color: var(--accent); }
-    .start-location-btn.active { border-color: var(--accent); color: var(--accent); }
-    .custom-origin label { margin-bottom: .4rem; }
     .saved .form-actions { flex-wrap: wrap; }
     .nearby-strip { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-bottom: .8rem; padding-bottom: .2rem; }
     .nearby-strip h2 { margin: 0; flex-shrink: 0; }
@@ -474,6 +466,12 @@
     button, select { cursor: pointer; } button:disabled { opacity: .5; cursor: default; }
     .back { border: 0; font-size: 1.35rem; padding: .3rem .6rem; } .primary { background: var(--accent); color: #fff; border-color: var(--accent); }
     label { display: flex; flex-direction: column; gap: .4rem; margin: .7rem 0; } select, input { width: 100%; min-width: 0; }
+    .starting-point-toggle { flex-direction: row; align-items: center; gap: .6rem; cursor: pointer; }
+    .starting-point-toggle input { appearance: none; position: relative; box-sizing: border-box; width: 44px; height: 26px; flex-shrink: 0; margin: 0; padding: 0; border-radius: 999px; cursor: pointer; }
+    .starting-point-toggle input::before { content: ''; position: absolute; width: 18px; height: 18px; top: 3px; left: 3px; border-radius: 50%; background: var(--text2); }
+    .starting-point-toggle input:checked { background: var(--accent); border-color: var(--accent); }
+    .starting-point-toggle input:checked::before { transform: translateX(18px); background: #fff; }
+    .starting-point-toggle input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     .hint, .origin, footer, small { font-size: .85rem; color: var(--text2); line-height: 1.5; }
     .error { color: #dc2626; } .notice, .empty { padding: 1rem; border-radius: 6px; background: var(--bg2); }
     .filters, .stop-heading, .saved { display: flex; align-items: center; justify-content: space-between; gap: .8rem; }

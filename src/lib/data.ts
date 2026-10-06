@@ -1327,12 +1327,18 @@ export function saveCustomLocation(location: RetailLocation): void {
 	if (!location.id.startsWith('custom-')) throw new Error('Custom location ids must start with custom-.');
 	const doc = getMutableDoc();
 	const saved = { ...location, name: location.name.trim(), tags: [...new Set(location.tags.map(normalizeLocationTag))] };
+	const wasStartingPoint = doc.getMap<RetailLocation>('custom-locations').get(location.id)?.startingPoint === true;
 	doc.transact(() => {
 		doc.getMap<RetailLocation>('custom-locations').set(location.id, saved);
 		const preferences = doc.getMap('nearby-preferences');
 		const starting = preferences.get('starting-location');
 		if (isStartingLocation(starting) && starting.source === 'custom' && starting.customLocationId === location.id) {
-			preferences.set('starting-location', { ...starting, label: saved.name, latitude: saved.latitude, longitude: saved.longitude, updatedAt: new Date().toISOString() });
+			// Enabling a pill should not revive a stale selection from a disabled place.
+			if (wasStartingPoint && saved.startingPoint === true) {
+				preferences.set('starting-location', { ...starting, label: saved.name, latitude: saved.latitude, longitude: saved.longitude, updatedAt: new Date().toISOString() });
+			} else {
+				preferences.delete('starting-location');
+			}
 		}
 	});
 }
@@ -1356,7 +1362,7 @@ export function readStartingLocation(): StartingLocation | null {
 	if (location.source !== 'custom') return location;
 	const custom = doc.getMap<RetailLocation>('custom-locations').get(location.customLocationId!);
 	// Resolve the reference on read as well, so concurrent edits and selections converge.
-	return custom ? { ...location, label: custom.name, latitude: custom.latitude, longitude: custom.longitude } : null;
+	return custom?.startingPoint === true ? { ...location, label: custom.name, latitude: custom.latitude, longitude: custom.longitude } : null;
 }
 
 export function saveStartingLocation(location: StartingLocation): void {
@@ -1364,7 +1370,7 @@ export function saveStartingLocation(location: StartingLocation): void {
 	const doc = getMutableDoc();
 	if (location.source === 'custom') {
 		const custom = doc.getMap<RetailLocation>('custom-locations').get(location.customLocationId!);
-		if (!custom) throw new Error('This location is no longer available. Choose another starting point.');
+		if (!custom || custom.startingPoint !== true) throw new Error('This location is no longer available as a starting point. Choose another starting point.');
 		location = { ...location, label: custom.name, latitude: custom.latitude, longitude: custom.longitude, accuracy: null };
 	}
 	// A single value keeps coordinates and metadata together when devices update concurrently.

@@ -290,15 +290,17 @@ locations in the backup. Replacing with an older backup without `customLocations
 clears existing custom locations (and can be undone). Use updated clients for
 export/import: older app versions do not preserve this new backup field.
 
-Any personal location can also be selected as a starting point. Choose **Start
-here** on its saved row in **Locations**, or use **Start from a saved location**
-beside the GPS and suburb controls. Enter a name, latitude, longitude and matching
-hashtags to create a place anywhere in the world; neither GPS nor a local suburb
-catalogue is required. The place remains available as an errand destination.
+Any personal location can also be designated as a possible starting point. Under
+**Locations**, add or edit the place and turn on **Available as a starting point**.
+After saving, its name appears as a pill beside the predefined suburbs; tap that
+pill to start there. The toggle defaults to off, including for older saved places.
+Enter a name, latitude, longitude and matching hashtags to create a place anywhere
+in the world; neither GPS nor a local suburb catalogue is required. The place
+remains available as an errand destination whether the toggle is on or off.
 The starting point's hashtags do not filter destinations; tasks' hashtags and the
 radius determine matches. Editing the selected place updates its name and
-coordinates, and deleting it clears the active starting point. These actions
-support Undo, backups, historical views and cross-device sync.
+coordinates. Turning off its toggle or deleting it clears the active starting
+point. These actions support Undo, backups, historical views and cross-device sync.
 
 The last starting location (GPS, suburb or custom place) is saved in your Yjs document, persisted
 offline, and synced to your other signed-in devices. Returning to the screen restores

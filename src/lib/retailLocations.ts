@@ -5,6 +5,8 @@ export interface RetailLocation extends Coordinates {
     id: string;
     name: string;
     tags: string[];
+    /** Opt in a custom location to the starting-point pills. */
+    startingPoint?: boolean;
     address?: string;
     source?: string;
     coordinateAccuracy?: 'store' | 'shopping-centre' | 'suburb';
@@ -33,6 +35,7 @@ export function validateLocations(value: unknown): asserts value is RetailLocati
             (location.address !== undefined && typeof location.address !== 'string') ||
             (location.source !== undefined && typeof location.source !== 'string') ||
             (location.centre !== undefined && typeof location.centre !== 'string') ||
+            (location.startingPoint !== undefined && typeof location.startingPoint !== 'boolean') ||
             (location.coordinateAccuracy !== undefined && !['store', 'shopping-centre', 'suburb'].includes(location.coordinateAccuracy))) {
             throw new Error('Each location needs a unique id, name, tags and valid latitude/longitude.');
         }
