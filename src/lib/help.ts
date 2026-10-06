@@ -284,7 +284,8 @@ export const helpTopics: HelpTopic[] = [
 			{
 				title: 'Choose where to start',
 				paragraphs: [
-					'Press the location icon to request your current position, or choose a hot suburb pill to use that suburb’s centre. The edit icon opens Hot suburbs, where you can add, remove and rearrange suburb shortcuts, then Save. Selecting a shortcut changes the starting point; editing shortcuts alone does not.',
+					'Use GPS, a hot suburb pill or Start from a saved location to choose your starting point. Under Locations, add a place anywhere with a name, latitude, longitude and hashtags, then choose Start here. It remains an errand destination too. Edits update the selected point; deleting that place clears the selection.',
+					'The edit icon opens Hot suburbs to add, remove and rearrange Melbourne suburb shortcuts, then Save. Saved custom locations work worldwide without GPS or a suburb catalogue. The starting point’s hashtags do not restrict results: your tasks’ hashtags determine which destinations match.',
 					'The app saves your last starting point and syncs it across your devices. Check its label and update time before relying on the distance shown, particularly when it says Last GPS location. GPS is requested when you press the button, rather than tracked in the background.',
 					'Choose a radius from 1 to 50 km. Distances are straight-line distances from the starting point, rather than driving distances or travel times. Directions opens Google Maps for the destination. Some locations are approximate centre or suburb points, so read the location labels.'
 				]

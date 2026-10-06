@@ -290,14 +290,24 @@ locations in the backup. Replacing with an older backup without `customLocations
 clears existing custom locations (and can be undone). Use updated clients for
 export/import: older app versions do not preserve this new backup field.
 
-The last starting location (GPS or suburb) is saved in your Yjs document, persisted
+Any personal location can also be selected as a starting point. Choose **Start
+here** on its saved row in **Locations**, or use **Start from a saved location**
+beside the GPS and suburb controls. Enter a name, latitude, longitude and matching
+hashtags to create a place anywhere in the world; neither GPS nor a local suburb
+catalogue is required. The place remains available as an errand destination.
+The starting point's hashtags do not filter destinations; tasks' hashtags and the
+radius determine matches. Editing the selected place updates its name and
+coordinates, and deleting it clears the active starting point. These actions
+support Undo, backups, historical views and cross-device sync.
+
+The last starting location (GPS, suburb or custom place) is saved in your Yjs document, persisted
 offline, and synced to your other signed-in devices. Returning to the screen restores
 it, including updates synced while the screen is open. Coordinates, source, label,
 GPS accuracy and update time are stored together. The screen displays when it was
 last updated; a saved GPS point is labelled **Last GPS location**.
 
 GPS is requested only on a button press. It is a one-time fix with an update button;
-choosing a suburb also replaces the saved starting point. A denied or failed GPS
+choosing a suburb or custom place also replaces the saved starting point. A denied or failed GPS
 request keeps the previous location. Starting locations are included in JSON backups,
 commits and Undo. Historical views cannot update the saved point. A replace import
 of an older backup without a starting location clears it; a merge preserves it.

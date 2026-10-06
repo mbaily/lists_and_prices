@@ -19,11 +19,12 @@
     let { onBack, onOpenItem }: { onBack: () => void; onOpenItem: (listId: string, itemId: string) => void } = $props();
     const savedLocation = $derived.by(() => { void docState.version; return readStartingLocation(); });
     const origin = $derived<Coordinates | null>(savedLocation ? { latitude: savedLocation.latitude, longitude: savedLocation.longitude } : null);
-    const originLabel = $derived(savedLocation ? savedLocation.source === 'gps' ? 'Last GPS location' : `${savedLocation.label} · approximate suburb centre` : '');
+    const originLabel = $derived(savedLocation ? savedLocation.source === 'gps' ? 'Last GPS location' : savedLocation.source === 'suburb' ? `${savedLocation.label} · approximate suburb centre` : `${savedLocation.label} · saved location` : '');
     const accuracy = $derived(savedLocation?.accuracy ?? null);
     let locating = $state(false);
     let locationError = $state('');
     let showLocationDetails = $state(false);
+    let customStartingSelect = $state<HTMLSelectElement>();
     let radius = $state(5);
     const previewLimit = $derived.by(() => { void docState.version; return readNearbyPreviewLimit(); });
     function setPreviewLimit(event: Event) {
@@ -45,10 +46,11 @@
     let deleteTarget = $state<RetailLocation | null>(null);
     let requestVersion = 0;
     onDestroy(() => { requestVersion++; });
+    const startingLocationKey = $derived(JSON.stringify(savedLocation));
 
     $effect(() => {
         // Restore local persistence and follow remote updates without writing defaults back to Yjs.
-        void savedLocation;
+        void startingLocationKey;
         requestVersion++;
         locating = false;
     });
@@ -169,6 +171,23 @@
             source: 'suburb', label: suburb.name, accuracy: null, updatedAt: new Date().toISOString() });
     }
 
+    function selectCustomLocation(id: string) {
+        if (commitState.isHistorical) return;
+        const location = readCustomLocations().find(location => location.id === id);
+        if (!location) {
+            locationError = 'This location is no longer available. Choose another starting point.';
+            return;
+        }
+        requestVersion++;
+        locating = false;
+        locationError = '';
+        saveStartingLocation({ latitude: location.latitude, longitude: location.longitude,
+            source: 'custom', customLocationId: location.id, label: location.name, accuracy: null, updatedAt: new Date().toISOString() });
+        showLocations = false;
+        showLocationDetails = true;
+        tick().then(() => customStartingSelect?.focus({ preventScroll: true }));
+    }
+
     function saveHotSuburbs(ids: string[]) {
         if (commitState.isHistorical) return;
         saveHotSuburbIds(ids);
@@ -277,8 +296,18 @@
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m16 3 5 5-12 12-6 1 1-6zM13 6l5 5" /></svg>
                 </button>
             </div>
+            {#if customLocations.length}
+                <div class="custom-origin">
+                    <label for="custom-starting-point">Start from a saved location</label>
+                    <select id="custom-starting-point" bind:this={customStartingSelect} value={savedLocation?.source === 'custom' ? savedLocation.customLocationId : ''}
+                        disabled={commitState.isHistorical} onchange={(event) => selectCustomLocation(event.currentTarget.value)}>
+                        <option value="" disabled>Choose one of your locations…</option>
+                        {#each customLocations as location (location.id)}<option value={location.id}>{location.name}</option>{/each}
+                    </select>
+                </div>
+            {/if}
             <div class="location-details-controls">
-                <HelpText label="Help with starting location"><p class="hint">Tap the location icon for GPS, or a suburb pill to use its centre. Your starting location and hot suburbs sync across your devices.</p></HelpText>
+                <HelpText label="Help with starting location"><p class="hint">Use GPS, a suburb pill or one of your saved locations as the starting point. Add a place anywhere in the world under Locations, then choose Start here. Its hashtags still work as an errand destination. Your starting location syncs across your devices.</p></HelpText>
                 {#if savedLocation}
                     <button class="location-details-toggle" onclick={() => showLocationDetails = !showLocationDetails}
                         aria-label={showLocationDetails ? 'Hide location details' : 'Show location details'}
@@ -299,7 +328,7 @@
         {#if showLocations}
             <section class="custom">
                 <h2>{editingId ? 'Edit location' : 'Add a location'}</h2>
-                <HelpText label="Help with custom location hashtags"><p class="hint">Add any shop or place. Matching hashtags might be #postoffice, #pharmacy or #home. A #coles or #woolworths location also matches #supermarket automatically.</p></HelpText>
+                <HelpText label="Help with custom location hashtags"><p class="hint">Add any shop or place with latitude, longitude and matching hashtags such as #postoffice, #pharmacy or #home. Choose Start here on a saved place to use it as a starting point too. A #coles or #woolworths location also matches #supermarket automatically.</p></HelpText>
                 <form onsubmit={(event) => { event.preventDefault(); saveLocation(); }}>
                     <fieldset disabled={commitState.isHistorical}>
                         <label>Name<input bind:value={name} required placeholder="My local pharmacy" /></label>
@@ -314,7 +343,12 @@
                 <h2>Your locations ({customLocations.length})</h2>
                 <HelpText label="Help with saving locations"><p class="hint">Saved locations sync across your devices and are included in JSON backups.</p></HelpText>
                 {#each customLocations as location (location.id)}
-                    <article class="saved"><div><strong>{location.name}</strong><p>{location.tags.map(tag => '#' + tag).join(' ')} · {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}</p></div><div class="form-actions"><button disabled={commitState.isHistorical} onclick={() => editLocation(location)}>Edit</button><button disabled={commitState.isHistorical} onclick={() => deleteTarget = location}>Delete</button></div></article>
+                    <article class="saved"><div><strong>{location.name}</strong><p>{location.tags.map(tag => '#' + tag).join(' ')} · {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}</p></div><div class="form-actions">
+                        <button class="start-location-btn" class:active={savedLocation?.source === 'custom' && savedLocation.customLocationId === location.id}
+                            aria-label={`Use ${location.name} as starting point`} aria-pressed={savedLocation?.source === 'custom' && savedLocation.customLocationId === location.id}
+                            disabled={commitState.isHistorical} onclick={() => selectCustomLocation(location.id)}>{savedLocation?.source === 'custom' && savedLocation.customLocationId === location.id ? 'Starting point' : 'Start here'}</button>
+                        <button disabled={commitState.isHistorical} onclick={() => editLocation(location)}>Edit</button><button disabled={commitState.isHistorical} onclick={() => deleteTarget = location}>Delete</button>
+                    </div></article>
                 {:else}<p class="hint">No custom locations yet.</p>{/each}
             </section>
         {:else}
@@ -425,6 +459,9 @@
     .location-icon { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; }
     .suburb-shortcut { border-radius: 999px; background: #000; padding: .45rem .75rem; }
     .suburb-shortcut.active { border-color: var(--accent); color: var(--accent); }
+    .start-location-btn.active { border-color: var(--accent); color: var(--accent); }
+    .custom-origin label { margin-bottom: .4rem; }
+    .saved .form-actions { flex-wrap: wrap; }
     .nearby-strip { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-bottom: .8rem; padding-bottom: .2rem; }
     .nearby-strip h2 { margin: 0; flex-shrink: 0; }
     .nearby-strip .preview-limit { width: auto; flex-shrink: 0; padding: .35rem; }

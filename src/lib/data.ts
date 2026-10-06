@@ -1325,24 +1325,50 @@ export function readCustomLocations(): RetailLocation[] {
 export function saveCustomLocation(location: RetailLocation): void {
 	validateLocations([location]);
 	if (!location.id.startsWith('custom-')) throw new Error('Custom location ids must start with custom-.');
-	getMutableDoc().getMap<RetailLocation>('custom-locations').set(location.id, {
-		...location, name: location.name.trim(), tags: [...new Set(location.tags.map(normalizeLocationTag))]
+	const doc = getMutableDoc();
+	const saved = { ...location, name: location.name.trim(), tags: [...new Set(location.tags.map(normalizeLocationTag))] };
+	doc.transact(() => {
+		doc.getMap<RetailLocation>('custom-locations').set(location.id, saved);
+		const preferences = doc.getMap('nearby-preferences');
+		const starting = preferences.get('starting-location');
+		if (isStartingLocation(starting) && starting.source === 'custom' && starting.customLocationId === location.id) {
+			preferences.set('starting-location', { ...starting, label: saved.name, latitude: saved.latitude, longitude: saved.longitude, updatedAt: new Date().toISOString() });
+		}
 	});
 }
 
 export function deleteCustomLocation(id: string): void {
-	getMutableDoc().getMap('custom-locations').delete(id);
+	const doc = getMutableDoc();
+	doc.transact(() => {
+		doc.getMap('custom-locations').delete(id);
+		const preferences = doc.getMap('nearby-preferences');
+		const starting = preferences.get('starting-location');
+		if (isStartingLocation(starting) && starting.source === 'custom' && starting.customLocationId === id) {
+			preferences.delete('starting-location');
+		}
+	});
 }
 
 export function readStartingLocation(): StartingLocation | null {
-	const location = getDoc().getMap('nearby-preferences').get('starting-location');
-	return isStartingLocation(location) ? location : null;
+	const doc = getDoc();
+	const location = doc.getMap('nearby-preferences').get('starting-location');
+	if (!isStartingLocation(location)) return null;
+	if (location.source !== 'custom') return location;
+	const custom = doc.getMap<RetailLocation>('custom-locations').get(location.customLocationId!);
+	// Resolve the reference on read as well, so concurrent edits and selections converge.
+	return custom ? { ...location, label: custom.name, latitude: custom.latitude, longitude: custom.longitude } : null;
 }
 
 export function saveStartingLocation(location: StartingLocation): void {
 	if (!isStartingLocation(location)) throw new Error('Invalid starting location.');
+	const doc = getMutableDoc();
+	if (location.source === 'custom') {
+		const custom = doc.getMap<RetailLocation>('custom-locations').get(location.customLocationId!);
+		if (!custom) throw new Error('This location is no longer available. Choose another starting point.');
+		location = { ...location, label: custom.name, latitude: custom.latitude, longitude: custom.longitude, accuracy: null };
+	}
 	// A single value keeps coordinates and metadata together when devices update concurrently.
-	getMutableDoc().getMap('nearby-preferences').set('starting-location', { ...location });
+	doc.getMap('nearby-preferences').set('starting-location', { ...location });
 }
 
 export function clearStartingLocation(): void {
