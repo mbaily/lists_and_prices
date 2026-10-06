@@ -1,2 +1,5 @@
-# To defragment local storage for this app in JS Console in Chrome
-indexedDB.deleteDatabase('pnl-mb');
+# Reset this app's local browser cache
+Sync your changes before resetting the cache. Run this in the browser console:
+
+const username = localStorage.getItem('pnl_user');
+if (username) indexedDB.deleteDatabase(`pnl-${username}`);
