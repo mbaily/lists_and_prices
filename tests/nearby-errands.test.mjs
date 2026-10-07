@@ -7,6 +7,49 @@ import { createApp, merge, root, componentFunctions, transpile, Y } from './help
 const supermarket = { id: 'coles-test', name: 'Coles Test', tags: ['coles', 'supermarket'], latitude: -37.8136, longitude: 144.9631 };
 const custom = { id: 'custom-test', name: 'Pharmacy', tags: ['pharmacy'], latitude: -37.81, longitude: 144.96 };
 
+test('unrelated item hashtags inherit list errands while recognized errand tags override them', () => {
+    const app = createApp();
+    try {
+        const nearby = app.load('src/lib/nearbyErrands.ts');
+        const { errandGroupId } = app.load('src/lib/errandGroups.ts');
+        const folder = app.data.createFolder('Errands', null);
+        const list = app.data.createList('Shopping #supermarket', folder, 'plain');
+        const milk = app.data.createItem(list, 'Milk #urgent');
+        const note = app.data.createItem(list, 'Check hours #weekend', null, null, true);
+        const bread = app.data.createItem(list, 'Bread #urgent #coles');
+        const alias = app.data.createItem(list, 'Fruit #woolies');
+        const bank = app.data.createItem(list, 'Withdraw cash #bank #urgent');
+        const general = app.data.createItem(list, 'Post a letter #errand');
+        const local = app.data.createItem(list, 'Pick up parcel #mydepot');
+        const suburb = app.data.createItem(list, 'Visit #richmond');
+        const collect = () => nearby.collectErrands(app.data.readAllItems(), app.data.readLists(), app.data.readFolders());
+        let rows = new Map(collect().map(row => [row.item.id, row]));
+        assert.deepEqual(rows.get(milk).tags, ['urgent', 'supermarket']);
+        assert.deepEqual(rows.get(note).tags, ['weekend', 'supermarket']);
+        assert.deepEqual(rows.get(bread).tags, ['urgent', 'coles']);
+        assert.deepEqual(rows.get(alias).tags, ['woolies']);
+        assert.deepEqual(rows.get(bank).tags, ['bank', 'urgent']);
+        assert.deepEqual(rows.get(general).tags, ['errand']);
+        assert.deepEqual(rows.get(suburb).tags, ['richmond']);
+        assert.equal(errandGroupId(rows.get(milk)), `list:${list}`);
+        assert.equal(errandGroupId(rows.get(note)), `list:${list}`);
+        assert.equal(errandGroupId(rows.get(bread)), `item:${bread}`);
+        assert.ok(nearby.nearbyStops([supermarket], supermarket, 5, collect())[0].errands.some(row => row.item.id === milk));
+        assert.deepEqual(rows.get(local).tags, ['mydepot', 'supermarket']);
+        app.data.saveCustomLocation({ ...custom, tags: ['mydepot'] });
+        rows = new Map(collect().map(row => [row.item.id, row]));
+        assert.deepEqual(rows.get(local).tags, ['mydepot']);
+        assert.equal(errandGroupId(rows.get(local)), `item:${local}`);
+        // Recognition uses the whole catalogue, even when the destination is outside the radius.
+        assert.ok(!nearby.nearbyStops([supermarket], supermarket, 5, collect())[0].errands.some(row => row.item.id === local));
+        app.data.updateList(list, { done: true });
+        rows = new Map(collect().map(row => [row.item.id, row]));
+        assert.equal(rows.has(milk), false);
+        assert.equal(rows.has(note), false);
+        for (const id of [bread, alias, bank, general, local, suburb]) assert.ok(rows.has(id));
+    } finally { app.dispose(); }
+});
+
 test('list hashtags apply to untagged todos and notes while item tags take precedence', () => {
     const app = createApp();
     try {

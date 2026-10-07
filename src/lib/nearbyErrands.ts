@@ -1,8 +1,10 @@
-import { isItemDone, isListEffectivelyArchived, type Item, type ListMeta, type Folder } from './data';
+import { isItemDone, isListEffectivelyArchived, readCustomLocations, type Item, type ListMeta, type Folder } from './data';
 import { extractTags } from './tags';
-import { distanceKm, matchingLocationTags, normalizeLocationTag, validCoordinates, type Coordinates, type RetailLocation } from './retailLocations';
+import { availableLocationTags, distanceKm, matchingLocationTags, normalizeLocationTag, validCoordinates, type Coordinates, type RetailLocation } from './retailLocations';
+import catalogue from './locations/melbourne.json';
+import { suburbLocations } from './suburbLocations';
 
-export interface Errand { item: Item; list: ListMeta; tags: string[] }
+export interface Errand { item: Item; list: ListMeta; tags: string[]; inheritsListTags?: boolean }
 export interface NearbyStop { location: RetailLocation; distanceKm: number; errands: Errand[] }
 export interface SuggestedStops { suggested: NearbyStop[]; alternatives: NearbyStop[]; unavailable: Errand[] }
 
@@ -66,18 +68,22 @@ export function suggestStops(stops: NearbyStop[], errands: Errand[]): SuggestedS
     };
 }
 
-/** Item tags take precedence; otherwise inherit the list's tags. */
-export function collectErrands(items: Item[], lists: ListMeta[], folders: Folder[], includeCompleted = false): Errand[] {
+const defaultLocations: RetailLocation[] = [...catalogue.locations, ...suburbLocations];
+
+/** Item errand tags take precedence; unrelated tags still inherit list tags. */
+export function collectErrands(items: Item[], lists: ListMeta[], folders: Folder[], includeCompleted = false, locations: readonly RetailLocation[] = [...defaultLocations, ...readCustomLocations()]): Errand[] {
+    const errandTags = new Set([...LOCATION_OPTIONAL_TAGS, ...availableLocationTags(locations).map(entry => entry.tag)]);
     const availableLists = new Map(lists.filter(list => list.type !== 'divider' && !isListEffectivelyArchived(list, folders)).map(list => [list.id, list]));
     const folderMap = new Map(folders.map(folder => [folder.id, folder]));
     return items.flatMap(item => {
         const list = availableLists.get(item.listId);
         if (!list || item.heading || (!includeCompleted && !item.note && isItemDone(item, folderMap.get(list.folderId)))) return [];
         const itemTags = extractTags(item.name);
+        const inheritsListTags = !itemTags.some(tag => errandTags.has(normalizeLocationTag(tag)));
         // Completing a parent list hides its inherited errand, not explicitly tagged tasks.
-        if (list.done && !itemTags.length) return [];
-        const tags = itemTags.length ? itemTags : extractTags(list.name);
-        return tags.length ? [{ item, list, tags }] : [];
+        if (list.done && inheritsListTags) return [];
+        const tags = inheritsListTags ? [...new Set([...itemTags, ...extractTags(list.name)])] : itemTags;
+        return tags.length ? [{ item, list, tags, inheritsListTags }] : [];
     });
 }
 

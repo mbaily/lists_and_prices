@@ -64,6 +64,7 @@ test('only inherited tasks share an errand across pills, checklist, stops and un
         const milk = app.data.createItem(list, 'Milk');
         const bread = app.data.createItem(list, 'Bread');
         const bank = app.data.createItem(list, 'Deposit money $110 #bank');
+        app.data.saveCustomLocation({ id: 'custom-court', name: 'Loyola Court', tags: ['loyolacrt'], latitude: -37.8, longitude: 145 });
         const bag = app.data.createItem(list, 'washing bag #loyolacrt', null, null, true);
         const separate = app.data.createItem(list, 'Separate purchase #supermarket', null, milk);
         const unmatched = app.data.createItem(list, 'Far away #pharmacy');
@@ -101,6 +102,7 @@ test('group checkbox completes only its parent, preserves all child data, and ke
         a.data.createItem(list, 'Bread', null, milk);
         a.data.createItem(list, 'Voucher', null, null, true);
         const bank = a.data.createItem(list, 'Deposit money $110 #bank');
+        a.data.saveCustomLocation({ id: 'custom-court', name: 'Loyola Court', tags: ['loyolacrt'], latitude: -37.8, longitude: 145 });
         const bag = a.data.createItem(list, 'washing bag #loyolacrt', null, null, true);
         const done = a.data.createItem(list, 'Already done #bank');
         const box = a.data.addFolderCheckbox(folder, 'Finished');

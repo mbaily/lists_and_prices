@@ -4,7 +4,8 @@ import { extractTags } from './tags';
 
 /** Only tasks using inherited tags share their parent list's errand. */
 export function errandGroupId(errand: Errand): string {
-    return extractTags(errand.item.name).length ? `item:${errand.item.id}` : `list:${errand.list.id}`;
+    const inheritsListTags = errand.inheritsListTags ?? !extractTags(errand.item.name).length;
+    return inheritsListTags ? `list:${errand.list.id}` : `item:${errand.item.id}`;
 }
 
 export function groupErrands<T extends { errand: Errand }>(rows: readonly T[]): { id: string; list: ListMeta; rows: T[] }[] {

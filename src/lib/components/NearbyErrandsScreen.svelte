@@ -89,7 +89,7 @@
         void docState.version;
         const folders = readFolders();
         const folderById = new Map(folders.map(folder => [folder.id, folder]));
-        return collectErrands(readAllItems(), readLists(), folders, true).map(errand => {
+        return collectErrands(readAllItems(), readLists(), folders, true, locations).map(errand => {
             const folder = folderById.get(errand.list.folderId);
             const done = !errand.item.note && isItemDone(errand.item, folder);
             const fingerprint = nearbyItemFingerprint(errand.item, errand.list, folder);
@@ -333,7 +333,7 @@
             {/if}
             <section class="task-checklist" aria-labelledby="matched-tasks-heading">
                 <div class="checklist-heading"><h2 id="matched-tasks-heading">Matched tasks ({checklistGroups.length})</h2>{#if completedChecklist.length}<button disabled={commitState.isHistorical} onclick={clearCompletedTasks}>Clear completed</button>{/if}</div>
-                <HelpText label="Help with matched tasks"><p class="hint">Ticks update the original todos. Completed tasks stay until cleared. Dismissed notes and unchecked tasks return when edited; checked todos stay completed. Expand a grouped errand to manage its individual tasks. Tasks using inherited hashtags share an errand; tasks with their own hashtags stay separate. The group checkbox completes only its parent list and hides inherited tasks; individual task checkboxes stay unchanged. Tasks with their own hashtags remain visible. The count is the number of errands. This checklist syncs across devices. Use #bank for banking or #errand for general errands with no set location.</p></HelpText>
+                <HelpText label="Help with matched tasks"><p class="hint">Ticks update the original todos. Completed tasks stay until cleared. Dismissed notes and unchecked tasks return when edited; checked todos stay completed. Expand a grouped errand to manage its individual tasks. Tasks using inherited hashtags share an errand; tasks with their own errand hashtags stay separate. The group checkbox completes only its parent list and hides inherited tasks; individual task checkboxes stay unchanged. Tasks with their own errand hashtags remain visible. The count is the number of errands. This checklist syncs across devices. Use #bank for banking or #errand for general errands with no set location.</p></HelpText>
                 <ul class="errand-groups">{#each checklistGroups as group (group.id)}
                     {#snippet errandRows()}
                         {#each group.rows as row (row.errand.item.id)}
@@ -355,7 +355,7 @@
                 <section class="suggestions" aria-labelledby="suggested-stops-heading">
                     <h2 id="suggested-stops-heading">Suggested stops</h2>
                     <p class="coverage" aria-live="polite">{coveredCount} of {locationGroups.length} errand{locationGroups.length === 1 ? '' : 's'} fully covered by {plan.suggested.length} stop{plan.suggested.length === 1 ? '' : 's'} within {radius} km.</p>
-                    <HelpText label="Help with suggested stops"><p class="hint">A short set of shops covering all nearby matches, shown nearest first. Tasks using inherited hashtags are grouped by their parent list; tasks with their own hashtags stay separate. An errand is fully covered when every active task has a nearby match. Distances are straight-line distances.</p></HelpText>
+                    <HelpText label="Help with suggested stops"><p class="hint">A short set of shops covering all nearby matches, shown nearest first. Tasks using inherited hashtags are grouped by their parent list; tasks with their own errand hashtags stay separate. An errand is fully covered when every active task has a nearby match. Distances are straight-line distances.</p></HelpText>
                     {#if errands.length === 0}<p class="empty">{pausedErrands.length ? 'Your remaining errands are paused.' : 'Add location hashtags to an unchecked todo, note or list name to find places to go.'}</p>{/if}
                     {#each plan.suggested as stop (stop.location.id)}{@render stopCard(stop)}{/each}
                     {#if plan.unavailable.length}
@@ -383,7 +383,7 @@
         {/if}
         <details class="available-tags">
             <summary>Available location hashtags</summary>
-            <HelpText label="Help with location hashtags"><p class="hint">Add these hashtags to a list name to match its todos and notes, or tag individual items. Item hashtags take precedence over list hashtags. #bank and #errand keep tasks nearby without a saved location. Counts cover all locations in the database, including your saved places. #supermarket matches Coles, Woolworths and Aldi.</p></HelpText>
+            <HelpText label="Help with location hashtags"><p class="hint">Add these hashtags to a list name to match its todos and notes, or tag individual items. Item errand hashtags take precedence over list hashtags. Unrelated hashtags such as #urgent still inherit the list’s errand hashtags. #bank and #errand keep tasks nearby without a saved location. Counts cover all locations in the database, including your saved places. #supermarket matches Coles, Woolworths and Aldi.</p></HelpText>
             <HelpText label="Help with suburb hashtags"><p class="hint">Melbourne suburbs are also available: #brunswick, #richmond or #brunswickeast. Suburb hashtags point to approximate suburb centres; remove spaces from multi-word names.</p></HelpText>
             <label class="tag-search">Find a location hashtag<input type="search" bind:value={tagQuery} placeholder="e.g. bunnings, brunswick or st kilda" /></label>
             {#if selectedTag}
