@@ -1721,7 +1721,7 @@
 					]} />
 					{/if}
 				{:else if item.note}
-					<!-- Note: no checkbox, italic text -->
+					<!-- Note: no checkbox, normal text -->
 					{#if selectionMode}
 						{@render checkControl(item)}
 					{:else}
@@ -2692,9 +2692,9 @@
 		align-items: center;
 		justify-content: center;
 	}
-	.note-name {
+	.note-name, .note-name.editing {
 		font-size: 1rem;
-		font-style: italic;
+		font-style: normal;
 	}
 	/* ── Subtask hint bar ────────────────────────────────────────────────── */
 	.subtask-hint {
