@@ -1333,6 +1333,10 @@
 	<header>
 		<div class="header-row1">
 		<button class="home-btn" onclick={onHome} aria-label="Home">🏠</button>
+		{#if !highlightItemId && onReturnNearby && settings.showNearbyReturnLink}
+			<a class="nearby-return-link" href="#nearby" aria-label="Back to nearby errands"
+				title="Back to nearby errands" onclick={(e) => { e.preventDefault(); onReturnNearby?.(); }}>🚗</a>
+		{/if}
 		<div class="breadcrumb">
 			{#each breadcrumbItems as crumb, i}
 				<span class="sep">/</span>

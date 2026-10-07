@@ -3,6 +3,7 @@ import { extractTags } from './tags';
 import { availableLocationTags, distanceKm, matchingLocationTags, normalizeLocationTag, validCoordinates, type Coordinates, type RetailLocation } from './retailLocations';
 import catalogue from './locations/melbourne.json';
 import { suburbLocations } from './suburbLocations';
+import { buildItemTreeOrder } from './hierarchy';
 
 export interface Errand { item: Item; list: ListMeta; tags: string[]; inheritsListTags?: boolean }
 export interface NearbyStop { location: RetailLocation; distanceKm: number | null; errands: Errand[] }
@@ -81,7 +82,16 @@ export function collectErrands(items: Item[], lists: ListMeta[], folders: Folder
     const errandTags = new Set([...LOCATION_OPTIONAL_TAGS, ...availableLocationTags(locations).map(entry => entry.tag)]);
     const availableLists = new Map(lists.filter(list => list.type !== 'divider' && !isListEffectivelyArchived(list, folders)).map(list => [list.id, list]));
     const folderMap = new Map(folders.map(folder => [folder.id, folder]));
-    return items.flatMap(item => {
+    const itemsByList = new Map<string, Item[]>();
+    for (const item of items) {
+        const siblings = itemsByList.get(item.listId) ?? [];
+        siblings.push(item);
+        itemsByList.set(item.listId, siblings);
+    }
+    // Use the full tree before removing headings or completed parents, so
+    // surviving children retain their position in the source list.
+    const orderedItems = [...itemsByList.values()].flatMap(listItems => buildItemTreeOrder(listItems).map(row => row.item));
+    return orderedItems.flatMap(item => {
         const list = availableLists.get(item.listId);
         if (!list || item.heading || (!includeCompleted && !item.note && isItemDone(item, folderMap.get(list.folderId)))) return [];
         const itemTags = extractTags(item.name);

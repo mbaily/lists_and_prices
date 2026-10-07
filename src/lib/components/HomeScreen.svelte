@@ -95,12 +95,26 @@
 	// ── View state ──────────────────────────────────────────────────────────────
 	let openListId = $state<string | null>(_init.openListId);
 	let openItemId = $state<string | null>(null);
-	let nearbyOpenedItem = $state<{ listId: string; itemId: string } | null>(null);
+	let nearbyOpenedTarget = $state<{ listId: string; itemId: string | null } | null>(null);
 	let showSettings = $state(false);
 	let showNearby = $state(_init.nearby ?? false);
 	let showFavouritesOrder = $state(false);
 	let previousListId = $state<string | null>(null);
 	let showCommitsModal = $state(false);
+
+	function openFromNearby(listId: string, itemId: string | null = null) {
+		showNearby = false;
+		openListId = listId;
+		openItemId = itemId;
+		nearbyOpenedTarget = { listId, itemId };
+	}
+
+	function returnToNearby() {
+		openListId = null;
+		openItemId = null;
+		nearbyOpenedTarget = null;
+		showNearby = true;
+	}
 
 	let cursorMemory = $state<Record<string, string>>(
 		(typeof sessionStorage !== 'undefined')
@@ -1356,6 +1370,7 @@ ${bodyHtml}
 			breadcrumb = crumbs;
 			openListId = listId;
 			openItemId = null;
+			nearbyOpenedTarget = null;
 			_lastHash = window.location.hash;
 		}
 		window.addEventListener('popstate', onPopState);
@@ -1420,11 +1435,12 @@ ${bodyHtml}
 <svelte:window onkeydown={handleGlobalKeydown} />
 
 {#if showNearby}
-	<NearbyErrandsScreen onBack={() => showNearby = false} onOpenItem={(listId, itemId) => { showNearby = false; openListId = listId; openItemId = itemId; nearbyOpenedItem = { listId, itemId }; }} />
+	<NearbyErrandsScreen onBack={() => showNearby = false} onOpenList={openFromNearby} onOpenItem={openFromNearby} />
 {:else if openSheetId}
 	<SpreadsheetScreen sheetId={openSheetId} onBack={() => openSheetId = null} />
 {:else if openListId}
-	<ListScreen listId={openListId} highlightItemId={openItemId} onReturnNearby={nearbyOpenedItem?.listId === openListId && nearbyOpenedItem?.itemId === openItemId ? () => { openListId = null; openItemId = null; nearbyOpenedItem = null; showNearby = true; } : undefined} orderedLists={navOrderedLists} onHome={() => { openListId = null; openItemId = null; breadcrumb = [null]; }} onOpenList={(id) => { openItemId = null; openListId = id; }} onOpenFavouritesOrder={() => { if (commitState.isHistorical) return; previousListId = openListId; openListId = null; openItemId = null; showFavouritesOrder = true; }} savedSearch={savedSearch} onRestoreSearch={() => { openListId = null; openItemId = null; breadcrumb = [null]; restoreSearch(); }} onTagClick={(tag) => { openListId = null; openItemId = null; breadcrumb = [null]; activeTagFilter = null; showSearch = true; searchQuery = '#' + tag; savedSearch = '#' + tag; tick().then(() => searchInputEl?.focus()); }} onNavigateTo={(folderId) => {
+	<ListScreen listId={openListId} highlightItemId={openItemId} onReturnNearby={nearbyOpenedTarget?.listId === openListId && nearbyOpenedTarget?.itemId === openItemId ? returnToNearby : undefined} orderedLists={navOrderedLists} onHome={() => { nearbyOpenedTarget = null; openListId = null; openItemId = null; breadcrumb = [null]; }} onOpenList={(id) => { nearbyOpenedTarget = null; openItemId = null; openListId = id; }} onOpenFavouritesOrder={() => { if (commitState.isHistorical) return; nearbyOpenedTarget = null; previousListId = openListId; openListId = null; openItemId = null; showFavouritesOrder = true; }} savedSearch={savedSearch} onRestoreSearch={() => { nearbyOpenedTarget = null; openListId = null; openItemId = null; breadcrumb = [null]; restoreSearch(); }} onTagClick={(tag) => { nearbyOpenedTarget = null; openListId = null; openItemId = null; breadcrumb = [null]; activeTagFilter = null; showSearch = true; searchQuery = '#' + tag; savedSearch = '#' + tag; tick().then(() => searchInputEl?.focus()); }} onNavigateTo={(folderId) => {
+		nearbyOpenedTarget = null;
 		openListId = null;
 		openItemId = null;
 		// Reconstruct the full ancestor path to folderId so the breadcrumb is correct

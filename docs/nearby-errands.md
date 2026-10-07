@@ -9,7 +9,10 @@ The Nearby pill previews the list's active task names on one line. Set **Items
 per pill** beside the Nearby heading to choose 1–9 names (default 3); additional
 tasks show as **+n more**. This setting syncs across devices and is included in
 backups. The preview limit only changes the display; every eligible task is
-still considered when suggesting stops.
+still considered when suggesting stops. Task previews and grouped rows follow
+the source list's order, including subtasks and subnotes. Selecting an inherited
+list pill opens the list from the top, without highlighting a particular task.
+Selecting an explicitly tagged item pill opens and highlights that item.
 
 Melbourne's 549 suburb centres are available as location hashtags, such as
 `#brunswick`, `#richmond`, `#brunswickeast`, `#stkilda` and `#mountwaverley`.
@@ -21,7 +24,8 @@ within the suburb. Find them under **Available location hashtags**.
 Items opened from Nearby errands have an edge bar and a **🚗 return icon** on
 their row. Select the icon to return to Nearby errands. The icon defaults to on;
 turn it off under **Settings → Nearby errands**. This preference is saved per user
-on the current device.
+on the current device. When an inherited list pill opens a list, its return icon
+appears in the list header instead of on an item.
 
 Open **🚗 Nearby errands** from the home header. Add a hashtag to a todo, for
 example `Milk #supermarket`, `Coffee #coles`, `Bread #woolworths` or `Socks #kmart`.

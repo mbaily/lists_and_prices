@@ -215,7 +215,7 @@
 					checked={settings.showNearbyReturnLink}
 					onchange={(e) => updateSettings({ showNearbyReturnLink: e.currentTarget.checked })}
 				/>
-				Show return icon on items opened from Nearby errands
+				Show return icon on lists and items opened from Nearby errands
 			</label>
 		</section>
 

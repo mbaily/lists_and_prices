@@ -296,7 +296,7 @@ export const helpTopics: HelpTopic[] = [
 				paragraphs: [
 					'Errands inheriting hashtags from the same parent list are grouped together. Tasks with their own recognised errand hashtags stay separate. Expand a group to see and control its individual tasks. Items per pill sets how many task names appear in a preview; it does not limit which tasks are considered. Matched tasks can include reminders outside the current radius with an explanation.',
 					'Suggested stops chooses places covering your active matched errands, and Alternatives shows other matching places. Stops are nearest first when using a starting point, or alphabetical with No filter. The suggestions help cover your tasks but do not optimise a driving route. Increase the radius, choose No filter or add a matching personal location if a task has no nearby match.',
-					'Tick a todo to complete the original task. With named checkboxes, this controls the final completion checkbox and preserves earlier checks. Notes have no completion checkbox. Tap task text to open its source list; the 🚗 return icon on the highlighted item takes you back to Nearby errands.'
+					'Tick a todo to complete the original task. With named checkboxes, this controls the final completion checkbox and preserves earlier checks. Notes have no completion checkbox. Previews and grouped tasks follow their source list’s order. A pill inheriting its hashtag from a list opens that list from the top, with the 🚗 return icon in its header. An explicitly tagged item pill or individual task opens and highlights that item, with its return icon on the row.'
 				]
 			},
 			{
@@ -347,7 +347,7 @@ export const helpTopics: HelpTopic[] = [
 				paragraphs: [
 					'Configure Shortcuts opens bindings for Up one level, Up, Down and Open. Select a binding button, then press the key combination you want to use. You can include modifiers such as Ctrl, Alt, Shift or Meta. Reset to Default restores the supplied bindings.',
 					'Up and Down move the active selection through rows, and Open opens or edits the selected entry. Shortcut handling gives text entry priority, so ordinary typing in an input does not navigate away. Use the visible back and breadcrumb controls whenever you prefer touch navigation.',
-					'Settings → Nearby errands controls the return icon shown on items opened from that screen. Leave it enabled for a quick return to your errand suggestions, or turn it off to hide the icon. The highlighted item still opens in its source list.',
+					'Settings → Nearby errands controls the return icon shown in the list header or on an item opened from that screen. Leave it enabled for a quick return to your errand suggestions, or turn it off to hide the icon.',
 					'The same Settings screen provides Download backup, restore options, Tidy local cache, Sign out and the app version. Read the Sync, backups & history help before restoring data. Use Back from help to return to these settings without changing your preferences.'
 				]
 			}

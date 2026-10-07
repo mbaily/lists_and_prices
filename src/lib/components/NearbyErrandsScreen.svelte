@@ -16,7 +16,11 @@
     import type { Suburb } from '$lib/suburbSearch';
     import { isChecklistDismissed } from '$lib/nearbyChecklist';
 
-    let { onBack, onOpenItem }: { onBack: () => void; onOpenItem: (listId: string, itemId: string) => void } = $props();
+    let { onBack, onOpenList, onOpenItem }: { onBack: () => void; onOpenList: (listId: string) => void; onOpenItem: (listId: string, itemId: string) => void } = $props();
+    function openPill(pill: ReturnType<typeof nearbyListPills>[number]) {
+        if (pill.id.startsWith('list:')) onOpenList(pill.list.id);
+        else onOpenItem(pill.list.id, pill.errands[0].item.id);
+    }
     const savedLocation = $derived.by(() => { void docState.version; return readStartingLocation(); });
     const locationFilterEnabled = $derived.by(() => { void docState.version; return readNearbyLocationFilterEnabled(); });
     const origin = $derived<Coordinates | null>(locationFilterEnabled && savedLocation ? { latitude: savedLocation.latitude, longitude: savedLocation.longitude } : null);
@@ -104,8 +108,8 @@
     const errands = $derived(candidates.filter(row => !row.done && !row.hidden && !row.paused).map(row => row.errand));
     const supportedErrands = $derived(errands.filter(errand => locations.some(location => matchingLocationTags(errand.tags, location).length > 0)));
     const supportedIds = $derived(new Set(supportedErrands.map(errand => errand.item.id)));
-    const checklist = $derived(candidates.filter(row => !row.hidden && !row.paused && (row.done ? !!row.state : supportedIds.has(row.errand.item.id) || isLocationOptionalErrand(row.errand) || !!row.state)).sort((a, b) => Number(nearbyIds.has(b.errand.item.id)) - Number(nearbyIds.has(a.errand.item.id))));
-    const checklistGroups = $derived(groupErrands(checklist));
+    const checklist = $derived(candidates.filter(row => !row.hidden && !row.paused && (row.done ? !!row.state : supportedIds.has(row.errand.item.id) || isLocationOptionalErrand(row.errand) || !!row.state)));
+    const checklistGroups = $derived(groupErrands(checklist).sort((a, b) => Number(b.rows.some(row => nearbyIds.has(row.errand.item.id))) - Number(a.rows.some(row => nearbyIds.has(row.errand.item.id)))));
     const pausedErrands = $derived(candidates.filter(row => !row.done && !row.hidden && row.paused));
     const pausedGroups = $derived(groupErrands(pausedErrands));
     function pauseTag(tag: string, paused: boolean) {
@@ -286,7 +290,7 @@
                 <span class="nearby-pill">
                     {#if pill.id.startsWith('list:') && pill.errands.length > 1}{@render groupCheckbox(pill.list)}{/if}
                     <button class="nearby-pill-link" title={`${pill.list.name}: ${pill.name} ${pill.tags.map(tag => '#' + tag).join(' ')}`}
-                        onclick={() => onOpenItem(pill.list.id, pill.errands[0].item.id)}>
+                        onclick={() => openPill(pill)}>
                         <span class="nearby-pill-name">{pill.name}</span><span class="nearby-pill-tag">{pill.tags.map(tag => '#' + tag).join(' ')}</span>
                     </button>
                 </span>
