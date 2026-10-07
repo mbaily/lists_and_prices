@@ -14,6 +14,11 @@ node_modules
 /.svelte-kit
 /build
 
+# Personal connection settings and generated diagnostic logs
+/tui.config.real.json
+/check_output.txt
+/check_recent_git.txt
+
 # OS
 .DS_Store
 Thumbs.db

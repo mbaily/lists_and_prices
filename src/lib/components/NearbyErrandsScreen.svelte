@@ -6,7 +6,7 @@
     import { nearbyTaskPills, nearbyListPills } from '$lib/nearbyPills';
     import { groupErrands, errandPreview } from '$lib/errandGroups';
     import { docState, commitState } from '$lib/yjsStore.svelte';
-    import { updateList, readFolders, readLists, readAllItems, readCustomLocations, saveCustomLocation, deleteCustomLocation, readStartingLocation, saveStartingLocation, readHotSuburbIds, saveHotSuburbIds, readNearbyPreviewLimit, saveNearbyPreviewLimit, isItemDone, readNearbyChecklist, nearbyItemFingerprint, rememberNearbyChecklist, dismissNearbyChecklist, setNearbyTodoDone, readPausedErrandTags, setErrandTagPaused, readPausedErrandItemIds, setErrandItemPaused } from '$lib/data';
+    import { updateList, readFolders, readLists, readAllItems, readCustomLocations, saveCustomLocation, deleteCustomLocation, readStartingLocation, saveStartingLocation, readNearbyLocationFilterEnabled, saveNearbyLocationFilterEnabled, readHotSuburbIds, saveHotSuburbIds, readNearbyPreviewLimit, saveNearbyPreviewLimit, isItemDone, readNearbyChecklist, nearbyItemFingerprint, rememberNearbyChecklist, dismissNearbyChecklist, setNearbyTodoDone, readPausedErrandTags, setErrandTagPaused, readPausedErrandItemIds, setErrandItemPaused } from '$lib/data';
     import { collectErrands, nearbyStops, suggestStops, isErrandPaused, isLocationOptionalErrand, locationOptionalTag, LOCATION_OPTIONAL_TAGS, type NearbyStop, type Errand } from '$lib/nearbyErrands';
     import { availableLocationTags, matchingLocationTags, validCoordinates, normalizeLocationTag, type Coordinates, type RetailLocation } from '$lib/retailLocations';
     import ConfirmDialog from './ConfirmDialog.svelte';
@@ -18,8 +18,9 @@
 
     let { onBack, onOpenItem }: { onBack: () => void; onOpenItem: (listId: string, itemId: string) => void } = $props();
     const savedLocation = $derived.by(() => { void docState.version; return readStartingLocation(); });
-    const origin = $derived<Coordinates | null>(savedLocation ? { latitude: savedLocation.latitude, longitude: savedLocation.longitude } : null);
-    const originLabel = $derived(savedLocation ? savedLocation.source === 'gps' ? 'Last GPS location' : `${savedLocation.label} · approximate suburb centre` : '');
+    const locationFilterEnabled = $derived.by(() => { void docState.version; return readNearbyLocationFilterEnabled(); });
+    const origin = $derived<Coordinates | null>(locationFilterEnabled && savedLocation ? { latitude: savedLocation.latitude, longitude: savedLocation.longitude } : null);
+    const originLabel = $derived(savedLocation ? savedLocation.source === 'gps' ? 'Last GPS location' : savedLocation.source === 'suburb' ? `${savedLocation.label} · approximate suburb centre` : `${savedLocation.label} · saved location` : '');
     const accuracy = $derived(savedLocation?.accuracy ?? null);
     let locating = $state(false);
     let locationError = $state('');
@@ -40,20 +41,23 @@
     let tags = $state('');
     let latitude = $state('');
     let longitude = $state('');
+    let startingPoint = $state(false);
     let editingId = $state<string | null>(null);
     let formError = $state('');
     let deleteTarget = $state<RetailLocation | null>(null);
     let requestVersion = 0;
     onDestroy(() => { requestVersion++; });
+    const startingLocationKey = $derived(JSON.stringify([savedLocation, locationFilterEnabled]));
 
     $effect(() => {
         // Restore local persistence and follow remote updates without writing defaults back to Yjs.
-        void savedLocation;
+        void startingLocationKey;
         requestVersion++;
         locating = false;
     });
 
     const customLocations = $derived.by(() => { void docState.version; return readCustomLocations(); });
+    const customStartingPoints = $derived(customLocations.filter(location => location.startingPoint === true));
     const locations = $derived([...catalogue.locations, ...suburbLocations, ...customLocations] as RetailLocation[]);
     const availableTags = $derived.by(() => {
         const tags = availableLocationTags(locations);
@@ -111,7 +115,7 @@
         if (!commitState.isHistorical) setErrandItemPaused(id, paused);
     }
     const completedChecklist = $derived(checklist.filter(row => row.done));
-    const stops = $derived(origin ? nearbyStops(locations, origin, radius, errands) : []);
+    const stops = $derived(!locationFilterEnabled || origin ? nearbyStops(locations, origin, radius, errands) : []);
     const nearbyPills = $derived(nearbyListPills(stops, errands, previewLimit));
     const nearbyIds = $derived(new Set(nearbyTaskPills(stops, errands).map(pill => pill.errand.item.id)));
     const locationIds = $derived(new Set(stops.flatMap(stop => stop.errands.map(errand => errand.item.id))));
@@ -160,6 +164,16 @@
         }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
     }
 
+    function selectNoFilter() {
+        if (commitState.isHistorical) return;
+        requestVersion++;
+        locating = false;
+        locationError = '';
+        saveNearbyLocationFilterEnabled(false);
+        showLocations = false;
+        showLocationDetails = false;
+    }
+
     function selectSuburb(suburb: Suburb) {
         if (commitState.isHistorical) return;
         requestVersion++;
@@ -169,6 +183,22 @@
             source: 'suburb', label: suburb.name, accuracy: null, updatedAt: new Date().toISOString() });
     }
 
+    function selectCustomLocation(id: string) {
+        if (commitState.isHistorical) return;
+        const location = readCustomLocations().find(location => location.id === id);
+        if (!location || location.startingPoint !== true) {
+            locationError = 'This location is no longer available as a starting point. Choose another starting point.';
+            return;
+        }
+        requestVersion++;
+        locating = false;
+        locationError = '';
+        saveStartingLocation({ latitude: location.latitude, longitude: location.longitude,
+            source: 'custom', customLocationId: location.id, label: location.name, accuracy: null, updatedAt: new Date().toISOString() });
+        showLocations = false;
+        showLocationDetails = true;
+    }
+
     function saveHotSuburbs(ids: string[]) {
         if (commitState.isHistorical) return;
         saveHotSuburbIds(ids);
@@ -176,11 +206,12 @@
     }
 
     function clearForm() {
-        editingId = null; name = ''; address = ''; tags = ''; latitude = ''; longitude = ''; formError = '';
+        editingId = null; name = ''; address = ''; tags = ''; latitude = ''; longitude = ''; startingPoint = false; formError = '';
     }
     function editLocation(location: RetailLocation) {
         editingId = location.id; name = location.name; address = location.address ?? '';
         tags = location.tags.map(tag => '#' + tag).join(' ');
+        startingPoint = location.startingPoint === true;
         latitude = String(location.latitude); longitude = String(location.longitude); formError = '';
     }
     function saveLocation() {
@@ -190,7 +221,7 @@
         const coordinates = { latitude: Number(latitude), longitude: Number(longitude) };
         if (!validCoordinates(coordinates)) { formError = 'Enter a latitude from −90 to 90 and longitude from −180 to 180.'; return; }
         try {
-            saveCustomLocation({ id: editingId ?? 'custom-' + crypto.randomUUID(), name, address: address.trim(), tags: tags.trim().split(/[\s,]+/).filter(Boolean).map(normalizeLocationTag), ...coordinates });
+            saveCustomLocation({ id: editingId ?? 'custom-' + crypto.randomUUID(), name, address: address.trim(), tags: tags.trim().split(/[\s,]+/).filter(Boolean).map(normalizeLocationTag), startingPoint, ...coordinates });
             clearForm();
         } catch (error) { formError = error instanceof Error ? error.message : 'Could not save the location.'; }
     }
@@ -225,7 +256,7 @@
 
 {#snippet stopCard(stop: NearbyStop)}
                 <article class="stop">
-                    <div class="stop-heading"><div><h2>{stop.location.name}</h2><p>{distanceLabel(stop.distanceKm)} away{stop.location.address ? ' · ' + stop.location.address : ''}</p>{#if stop.location.coordinateAccuracy === 'shopping-centre'}<HelpText label="Help with shopping centre coordinates"><p>Distance and directions use the shopping centre location.</p></HelpText>{:else if stop.location.coordinateAccuracy === 'suburb'}<HelpText label="Help with approximate suburb coordinates"><p>Approximate suburb location. Check the destination before travelling.</p></HelpText>{/if}</div><a href={directions(stop.location)} target="_blank" rel="noopener noreferrer">Directions ↗</a></div>
+                    <div class="stop-heading"><div><h2>{stop.location.name}</h2>{#if stop.distanceKm !== null || stop.location.address}<p>{#if stop.distanceKm !== null}{distanceLabel(stop.distanceKm)} away{stop.location.address ? ' · ' : ''}{/if}{stop.location.address ?? ''}</p>{/if}{#if stop.location.coordinateAccuracy === 'shopping-centre'}<HelpText label="Help with shopping centre coordinates"><p>Directions use the shopping centre location.</p></HelpText>{:else if stop.location.coordinateAccuracy === 'suburb'}<HelpText label="Help with approximate suburb coordinates"><p>Approximate suburb location. Check the destination before travelling.</p></HelpText>{/if}</div><a href={directions(stop.location)} target="_blank" rel="noopener noreferrer">Directions ↗</a></div>
                     <p class="match-count">{groupErrands(stop.errands.map(errand => ({ errand }))).length} errands · {stop.errands.length} tasks</p>
                     <ul class="errand-groups">{#each groupErrands(stop.errands.map(errand => ({ errand }))) as group (group.id)}
                         {#snippet errandRows()}
@@ -263,23 +294,31 @@
         </section>
         <section class="position">
             <div class="location-shortcuts">
+                <button class="suburb-shortcut no-filter-shortcut" class:active={!locationFilterEnabled}
+                    aria-pressed={!locationFilterEnabled} disabled={commitState.isHistorical}
+                    title="Show all matching errands without a location filter" onclick={selectNoFilter}>No filter</button>
                 <button class="primary location-icon" onclick={useGps} disabled={locating || commitState.isHistorical}
                     aria-label={locating ? 'Finding your location…' : origin ? 'Update my location' : 'Use my location'}
                     title={locating ? 'Finding your location…' : origin ? 'Update my location' : 'Use my location'} aria-busy={locating}>
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2" /><path d="M12 2v3m0 14v3M2 12h3m14 0h3" /></svg>
                 </button>
                 {#each hotSuburbs as suburb (suburb.id)}
-                    <button class="suburb-shortcut" class:active={savedLocation?.source === 'suburb' && savedLocation.label === suburb.name}
-                        aria-pressed={savedLocation?.source === 'suburb' && savedLocation.label === suburb.name}
+                    <button class="suburb-shortcut" class:active={locationFilterEnabled && savedLocation?.source === 'suburb' && savedLocation.label === suburb.name}
+                        aria-pressed={locationFilterEnabled && savedLocation?.source === 'suburb' && savedLocation.label === suburb.name}
                         disabled={commitState.isHistorical} title={`Start near ${suburb.name} centre`} onclick={() => selectSuburb(suburb)}>{suburb.name}</button>
+                {/each}
+                {#each customStartingPoints as location (location.id)}
+                    <button class="suburb-shortcut custom-starting-point" class:active={locationFilterEnabled && savedLocation?.source === 'custom' && savedLocation.customLocationId === location.id}
+                        aria-pressed={locationFilterEnabled && savedLocation?.source === 'custom' && savedLocation.customLocationId === location.id}
+                        disabled={commitState.isHistorical} title={`Start near ${location.name}`} onclick={() => selectCustomLocation(location.id)}>{location.name}</button>
                 {/each}
                 <button class="location-icon" disabled={commitState.isHistorical} onclick={() => showHotSuburbs = true} aria-label="Edit hot suburbs" title="Edit hot suburbs">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m16 3 5 5-12 12-6 1 1-6zM13 6l5 5" /></svg>
                 </button>
             </div>
             <div class="location-details-controls">
-                <HelpText label="Help with starting location"><p class="hint">Tap the location icon for GPS, or a suburb pill to use its centre. Your starting location and hot suburbs sync across your devices.</p></HelpText>
-                {#if savedLocation}
+                <HelpText label="Help with starting location"><p class="hint">Choose No filter to show matching errands at any distance, without a starting location. Choose GPS or a starting-point pill to filter by distance again. Under Locations, add or edit a place anywhere in the world and turn on Available as a starting point to show its pill beside the suburbs. Its hashtags still work as an errand destination. Your starting location and filter choice sync across your devices.</p></HelpText>
+                {#if locationFilterEnabled && savedLocation}
                     <button class="location-details-toggle" onclick={() => showLocationDetails = !showLocationDetails}
                         aria-label={showLocationDetails ? 'Hide location details' : 'Show location details'}
                         title={showLocationDetails ? 'Hide location details' : 'Show location details'}
@@ -289,9 +328,9 @@
                 {/if}
             </div>
             {#if locationError}<p role="alert" class="error">{locationError}</p>{/if}
-            <div id="starting-location-details" hidden={!showLocationDetails}>
+            <div id="starting-location-details" hidden={!locationFilterEnabled || !showLocationDetails}>
                 {#if origin}<p class="origin">{originLabel}{accuracy !== null ? ` · GPS accuracy approximately ${Math.round(accuracy)} m` : ''}</p>{/if}
-                {#if savedLocation}<p class="hint">Last updated: {new Date(savedLocation.updatedAt).toLocaleString()}</p>{/if}
+                {#if locationFilterEnabled && savedLocation}<p class="hint">Last updated: {new Date(savedLocation.updatedAt).toLocaleString()}</p>{/if}
             </div>
         </section>
 
@@ -299,13 +338,14 @@
         {#if showLocations}
             <section class="custom">
                 <h2>{editingId ? 'Edit location' : 'Add a location'}</h2>
-                <HelpText label="Help with custom location hashtags"><p class="hint">Add any shop or place. Matching hashtags might be #postoffice, #pharmacy or #home. A #coles or #woolworths location also matches #supermarket automatically.</p></HelpText>
+                <HelpText label="Help with custom location hashtags"><p class="hint">Add any shop or place with latitude, longitude and matching hashtags such as #postoffice, #pharmacy or #home. Turn on Available as a starting point to add its pill beside the suburbs. A #coles or #woolworths location also matches #supermarket automatically.</p></HelpText>
                 <form onsubmit={(event) => { event.preventDefault(); saveLocation(); }}>
                     <fieldset disabled={commitState.isHistorical}>
                         <label>Name<input bind:value={name} required placeholder="My local pharmacy" /></label>
                         <label>Address (optional)<input bind:value={address} placeholder="Street and suburb" /></label>
                         <label>Matching hashtags<input bind:value={tags} required placeholder="#pharmacy" /></label>
                         <div class="coordinates"><label>Latitude<input bind:value={latitude} inputmode="decimal" required placeholder="−37.8136" /></label><label>Longitude<input bind:value={longitude} inputmode="decimal" required placeholder="144.9631" /></label></div>
+                        <label class="starting-point-toggle"><input type="checkbox" role="switch" bind:checked={startingPoint} />Available as a starting point</label>
                         <button type="button" disabled={!origin} onclick={() => { if (origin) { latitude = String(origin.latitude); longitude = String(origin.longitude); } }}>Use starting location coordinates</button>
                         <div class="form-actions"><button class="primary" type="submit">{editingId ? 'Save changes' : 'Add location'}</button>{#if editingId}<button type="button" onclick={clearForm}>Cancel edit</button>{/if}</div>
                     </fieldset>
@@ -314,10 +354,13 @@
                 <h2>Your locations ({customLocations.length})</h2>
                 <HelpText label="Help with saving locations"><p class="hint">Saved locations sync across your devices and are included in JSON backups.</p></HelpText>
                 {#each customLocations as location (location.id)}
-                    <article class="saved"><div><strong>{location.name}</strong><p>{location.tags.map(tag => '#' + tag).join(' ')} · {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}</p></div><div class="form-actions"><button disabled={commitState.isHistorical} onclick={() => editLocation(location)}>Edit</button><button disabled={commitState.isHistorical} onclick={() => deleteTarget = location}>Delete</button></div></article>
+                    <article class="saved"><div><strong>{location.name}</strong><p>{location.tags.map(tag => '#' + tag).join(' ')} · {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}</p></div><div class="form-actions">
+                        <button disabled={commitState.isHistorical} onclick={() => editLocation(location)}>Edit</button><button disabled={commitState.isHistorical} onclick={() => deleteTarget = location}>Delete</button>
+                    </div></article>
                 {:else}<p class="hint">No custom locations yet.</p>{/each}
             </section>
         {:else}
+            <div class="filters" bind:this={radiusFilters}>{#if locationFilterEnabled}<label>Within <select bind:value={radius}>{#each [1, 2, 5, 10, 25, 50] as km}<option value={km}>{km} km</option>{/each}</select></label>{:else}<p class="hint">No filter · Matching errands at any distance</p>{/if}</div>
             {#if pausedTags.length || pausedErrands.length}
                 <details class="paused-errands">
                     <summary>Paused errands ({pausedGroups.length})</summary>
@@ -339,7 +382,7 @@
                         {#each group.rows as row (row.errand.item.id)}
                             <li class="checklist-row" class:completed={row.done}>
                                 {#if row.errand.item.note}<span class="note-mark" aria-label="Note">📝</span>{:else}<input type="checkbox" checked={row.done} disabled={commitState.isHistorical} aria-label={`Completed: ${row.errand.item.name}`} onchange={(event) => setTaskDone(row.errand.item.id, event.currentTarget.checked)} />{/if}
-                                <button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}{row.errand.item.note ? ' · Note' : ''}</small>{#if !row.done && isLocationOptionalErrand(row.errand) && !locationIds.has(row.errand.item.id)}<small>{locationOptionalTag(row.errand) === 'bank' ? 'Choose a bank or ATM yourself' : 'Choose a location yourself'} · no saved location needed.</small>{:else if !row.done && origin && !nearbyIds.has(row.errand.item.id)}<small>{supportedIds.has(row.errand.item.id) ? `No match within ${radius} km.` : 'No matching location in the database.'}</small>{/if}</button>
+                                <button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}{row.errand.item.note ? ' · Note' : ''}</small>{#if !row.done && isLocationOptionalErrand(row.errand) && !locationIds.has(row.errand.item.id)}<small>{locationOptionalTag(row.errand) === 'bank' ? 'Choose a bank or ATM yourself' : 'Choose a location yourself'} · no saved location needed.</small>{:else if !row.done && (origin || !locationFilterEnabled) && !nearbyIds.has(row.errand.item.id)}<small>{locationFilterEnabled && supportedIds.has(row.errand.item.id) ? `No match within ${radius} km.` : 'No matching location in the database.'}</small>{/if}</button>
                                 {#if !row.done}<button class="pause-task" disabled={commitState.isHistorical} onclick={() => pauseItem(row.errand.item.id, true)} aria-label={`Pause ${row.errand.item.name}`} title="Pause this errand"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg></button>{/if}
                                 <button class="dismiss-task" disabled={commitState.isHistorical} onclick={() => dismissTask(row.errand.item.id)} aria-label={`Dismiss from errands: ${row.errand.item.name}`} title="Dismiss from errands">×</button>
                             </li>
@@ -348,23 +391,22 @@
                     {@render errandGroup(group, errandRows)}
                 {:else}<li class="hint">{pausedErrands.length ? 'Your remaining errands are paused. Expand Paused errands to resume them.' : 'No matched tasks. Add location hashtags to a todo, note or list name.'}</li>{/each}</ul>
             </section>
-            <div class="filters" bind:this={radiusFilters}><label>Within <select bind:value={radius}>{#each [1, 2, 5, 10, 25, 50] as km}<option value={km}>{km} km</option>{/each}</select></label></div>
-            {#if !origin}
-                <p class="empty">Use your location or choose a starting suburb to see nearby errands.</p>
+            {#if locationFilterEnabled && !origin}
+                <p class="empty">Choose No filter to see matching errands at any distance, or use your location or a starting-point pill to see nearby errands.</p>
             {:else}
                 <section class="suggestions" aria-labelledby="suggested-stops-heading">
                     <h2 id="suggested-stops-heading">Suggested stops</h2>
-                    <p class="coverage" aria-live="polite">{coveredCount} of {locationGroups.length} errand{locationGroups.length === 1 ? '' : 's'} fully covered by {plan.suggested.length} stop{plan.suggested.length === 1 ? '' : 's'} within {radius} km.</p>
-                    <HelpText label="Help with suggested stops"><p class="hint">A short set of shops covering all nearby matches, shown nearest first. Tasks using inherited hashtags are grouped by their parent list; tasks with their own errand hashtags stay separate. An errand is fully covered when every active task has a nearby match. Distances are straight-line distances.</p></HelpText>
+                    <p class="coverage" aria-live="polite">{coveredCount} of {locationGroups.length} errand{locationGroups.length === 1 ? '' : 's'} fully covered by {plan.suggested.length} stop{plan.suggested.length === 1 ? '' : 's'} {locationFilterEnabled ? `within ${radius} km` : 'without a distance limit'}.</p>
+                    <HelpText label="Help with suggested stops"><p class="hint">A short set of shops covering all matches, shown nearest first when using a starting point, or alphabetically with No filter. Tasks using inherited hashtags are grouped by their parent list; tasks with their own errand hashtags stay separate. An errand is fully covered when every active task has a match. Distances are straight-line distances.</p></HelpText>
                     {#if errands.length === 0}<p class="empty">{pausedErrands.length ? 'Your remaining errands are paused.' : 'Add location hashtags to an unchecked todo, note or list name to find places to go.'}</p>{/if}
                     {#each plan.suggested as stop (stop.location.id)}{@render stopCard(stop)}{/each}
                     {#if plan.unavailable.length}
                         <div class="unavailable">
-                            <h3>Items without a nearby match ({groupErrands(plan.unavailable.map(errand => ({ errand }))).length})</h3>
+                            <h3>{locationFilterEnabled ? 'Items without a nearby match' : 'Items without a matching location'} ({groupErrands(plan.unavailable.map(errand => ({ errand }))).length})</h3>
                             <ul class="errand-groups">{#each groupErrands(plan.unavailable.map(errand => ({ errand }))) as group (group.id)}
                                 {#snippet errandRows()}
                                     {#each group.rows as { errand } (errand.item.id)}<li>
-                                        <button class="errand" onclick={() => onOpenItem(errand.list.id, errand.item.id)}><span>{errand.item.name}</span><small>{errand.list.name}{errand.item.note ? ' · Note' : ''}</small><small>{supportedIds.has(errand.item.id) ? `No match within ${radius} km. Try a larger radius.` : 'No matching location in the database. Add a place in Locations.'}</small></button>
+                                        <button class="errand" onclick={() => onOpenItem(errand.list.id, errand.item.id)}><span>{errand.item.name}</span><small>{errand.list.name}{errand.item.note ? ' · Note' : ''}</small><small>{locationFilterEnabled && supportedIds.has(errand.item.id) ? `No match within ${radius} km. Try a larger radius.` : 'No matching location in the database. Add a place in Locations.'}</small></button>
                                     </li>{/each}
                                 {/snippet}
                                 {@render errandGroup(group, errandRows)}
@@ -375,7 +417,7 @@
                 {#if plan.alternatives.length}
                     <details class="alternatives" bind:open={showAlternatives}>
                         <summary>Alternatives ({plan.alternatives.length} other locations)</summary>
-                        <HelpText label="Help with alternative stops"><p class="hint">Other shops matching your items, nearest first. These offer alternatives to the suggested stops.</p></HelpText>
+                        <HelpText label="Help with alternative stops"><p class="hint">Other shops matching your items, nearest first when using a starting point, or alphabetically with No filter. These offer alternatives to the suggested stops.</p></HelpText>
                         {#if showAlternatives}{#each plan.alternatives as stop (stop.location.id)}{@render stopCard(stop)}{/each}{/if}
                     </details>
                 {/if}
@@ -423,8 +465,9 @@
     .location-details-toggle { position: absolute; top: .4rem; left: 44px; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border-radius: 50%; background: #000; color: var(--text2); }
     .location-details-toggle:hover { color: var(--accent); border-color: var(--accent); }
     .location-icon { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; }
-    .suburb-shortcut { border-radius: 999px; background: #000; padding: .45rem .75rem; }
+    .suburb-shortcut { border-radius: 999px; background: #000; color: #fff; padding: .45rem .75rem; max-width: 100%; overflow-wrap: anywhere; }
     .suburb-shortcut.active { border-color: var(--accent); color: var(--accent); }
+    .saved .form-actions { flex-wrap: wrap; }
     .nearby-strip { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-bottom: .8rem; padding-bottom: .2rem; }
     .nearby-strip h2 { margin: 0; flex-shrink: 0; }
     .nearby-strip .preview-limit { width: auto; flex-shrink: 0; padding: .35rem; }
@@ -437,6 +480,12 @@
     button, select { cursor: pointer; } button:disabled { opacity: .5; cursor: default; }
     .back { border: 0; font-size: 1.35rem; padding: .3rem .6rem; } .primary { background: var(--accent); color: #fff; border-color: var(--accent); }
     label { display: flex; flex-direction: column; gap: .4rem; margin: .7rem 0; } select, input { width: 100%; min-width: 0; }
+    .starting-point-toggle { flex-direction: row; align-items: center; gap: .6rem; cursor: pointer; }
+    .starting-point-toggle input { appearance: none; position: relative; box-sizing: border-box; width: 44px; height: 26px; flex-shrink: 0; margin: 0; padding: 0; border-radius: 999px; cursor: pointer; }
+    .starting-point-toggle input::before { content: ''; position: absolute; width: 18px; height: 18px; top: 3px; left: 3px; border-radius: 50%; background: var(--text2); }
+    .starting-point-toggle input:checked { background: var(--accent); border-color: var(--accent); }
+    .starting-point-toggle input:checked::before { transform: translateX(18px); background: #fff; }
+    .starting-point-toggle input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     .hint, .origin, footer, small { font-size: .85rem; color: var(--text2); line-height: 1.5; }
     .error { color: #dc2626; } .notice, .empty { padding: 1rem; border-radius: 6px; background: var(--bg2); }
     .filters, .stop-heading, .saved { display: flex; align-items: center; justify-content: space-between; gap: .8rem; }

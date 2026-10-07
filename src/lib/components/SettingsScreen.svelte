@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { onDestroy, untrack } from 'svelte';
+	import { onDestroy, tick, untrack } from 'svelte';
 	import { settings, updateSettings } from '$lib/settings.svelte';
 	import { exportBackup, importBackup, readFolders, type BackupFile } from '$lib/data';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import KeyboardSettingsScreen from './KeyboardSettingsScreen.svelte';
+	import HelpScreen from './HelpScreen.svelte';
 	import { docState, commitState, exitCommitView, cacheState, idbSynced, compactLocalCache } from '$lib/yjsStore.svelte';
 
 	let { onBack, onLogout }: { onBack: () => void; onLogout: () => void } = $props();
@@ -11,6 +12,14 @@
 	const APP_VERSION = __APP_VERSION__;
 
 	let showKeyboardSettings = $state(false);
+	let showHelp = $state(false);
+	let helpButtonEl = $state<HTMLButtonElement>();
+
+	async function closeHelp() {
+		showHelp = false;
+		await tick();
+		helpButtonEl?.focus({ preventScroll: true });
+	}
 
 	let topLevelFolders = $derived.by(() => {
 		void docState.version;
@@ -140,7 +149,9 @@
 	];
 </script>
 
-{#if showKeyboardSettings}
+{#if showHelp}
+	<HelpScreen onBack={closeHelp} />
+{:else if showKeyboardSettings}
 	<KeyboardSettingsScreen onBack={() => (showKeyboardSettings = false)} />
 {:else}
 <div class="screen">
@@ -156,6 +167,12 @@
 	{/if}
 
 	<div class="content">
+		<section>
+			<h2>Help</h2>
+			<button class="action-btn" bind:this={helpButtonEl} onclick={() => (showHelp = true)}>❓ Help &amp; user guide</button>
+			<p class="hint">Instructions for lists, Smart Reports, favourites and more. Available offline.</p>
+		</section>
+
 		<section>
 			<h2>Keyboard Shortcuts</h2>
 			<button class="action-btn" onclick={() => (showKeyboardSettings = true)}>⌨ Configure Shortcuts</button>

@@ -62,7 +62,7 @@ Issue a token in the deployed runtime, as its service user:
 ```sh
 cd /opt/lists_and_prices
 sudo -u www-data node --import tsx server/task-token.ts \
-  --user mb --from-photos --list DESTINATION_LIST_ID --output /absolute/private/token-file
+  --user YOUR_USERNAME --from-photos --list DESTINATION_LIST_ID --output /absolute/private/token-file
 ```
 
 With `--from-photos`, omit `--list` to start with an empty list scope and resolve

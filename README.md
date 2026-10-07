@@ -5,6 +5,9 @@ Uses completely local database for accessing all notes and todos, so is quite qu
 
 Recommended for personal todos and quick notes on the go for across desktop or laptop computer, or with an iOS or android phone. But not for detailed note taking. For that, I recommend to use in conjunction with dokuwiki.
 
+The terminal client's `tui.config.json` is a localhost example. Keep personal
+server settings in `tui.config.real.json`, which is ignored by Git.
+
 ## Validation
 
 - `npm test` runs isolated server, shared-data, and component lifecycle regression tests.

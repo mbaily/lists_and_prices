@@ -1101,6 +1101,7 @@ export interface BackupFile {
 	smartFolders?: Record<string, string[]>;
 	customLocations?: RetailLocation[];
 	startingLocation?: StartingLocation | null;
+	nearbyLocationFilterEnabled?: boolean;
 	hotSuburbIds?: string[];
 	nearbyPreviewLimit?: number;
 	nearbyChecklist?: Record<string, NearbyChecklistState>;
@@ -1120,6 +1121,7 @@ export function exportBackup(): BackupFile {
 		smartFolders: readReportAssignments(getDoc()),
 		customLocations: readCustomLocations(),
 		startingLocation: readStartingLocation(),
+		nearbyLocationFilterEnabled: readNearbyLocationFilterEnabled(),
 		hotSuburbIds: readHotSuburbIds(),
 		nearbyPreviewLimit: readNearbyPreviewLimit(),
 		nearbyChecklist: readNearbyChecklist(),
@@ -1164,6 +1166,7 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 	if (backup.pausedErrandTags !== undefined && (!Array.isArray(backup.pausedErrandTags) || backup.pausedErrandTags.some(tag => typeof tag !== 'string' || !/^#?\w+$/.test(tag)))) throw new Error('Invalid paused errand tags.');
 	if (backup.pausedErrandItemIds !== undefined && (!Array.isArray(backup.pausedErrandItemIds) || backup.pausedErrandItemIds.some(id => typeof id !== 'string' || !id.trim()))) throw new Error('Invalid paused errand item ids.');
 	if (backup.startingLocation != null && !isStartingLocation(backup.startingLocation)) throw new Error('Invalid starting location.');
+	if (backup.nearbyLocationFilterEnabled !== undefined && typeof backup.nearbyLocationFilterEnabled !== 'boolean') throw new Error('Invalid nearby location filter.');
 	if (backup.hotSuburbIds !== undefined && !isHotSuburbIds(backup.hotSuburbIds)) throw new Error('Invalid hot suburbs.');
 	if (backup.nearbyPreviewLimit !== undefined && !isNearbyPreviewLimit(backup.nearbyPreviewLimit)) throw new Error('Invalid nearby preview limit.');
 	if (backup.nearbyChecklist !== undefined && (!backup.nearbyChecklist || typeof backup.nearbyChecklist !== 'object' || Array.isArray(backup.nearbyChecklist) || Object.entries(backup.nearbyChecklist).some(([id, state]) => !id || !isNearbyChecklistState(state)))) throw new Error('Invalid nearby checklist.');
@@ -1228,6 +1231,8 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 		const preferences = doc.getMap('nearby-preferences');
 		if (backup.startingLocation != null) preferences.set('starting-location', { ...backup.startingLocation });
 		else if (mode === 'replace' || backup.startingLocation === null) preferences.delete('starting-location');
+		if (backup.nearbyLocationFilterEnabled !== undefined) preferences.set('location-filter-enabled', backup.nearbyLocationFilterEnabled);
+		else if (mode === 'replace') preferences.delete('location-filter-enabled');
 		if (backup.hotSuburbIds !== undefined) preferences.set('hot-suburbs', [...backup.hotSuburbIds]);
 		else if (mode === 'replace') preferences.delete('hot-suburbs');
 		if (backup.nearbyPreviewLimit !== undefined) preferences.set('preview-limit', backup.nearbyPreviewLimit);
@@ -1325,24 +1330,69 @@ export function readCustomLocations(): RetailLocation[] {
 export function saveCustomLocation(location: RetailLocation): void {
 	validateLocations([location]);
 	if (!location.id.startsWith('custom-')) throw new Error('Custom location ids must start with custom-.');
-	getMutableDoc().getMap<RetailLocation>('custom-locations').set(location.id, {
-		...location, name: location.name.trim(), tags: [...new Set(location.tags.map(normalizeLocationTag))]
+	const doc = getMutableDoc();
+	const saved = { ...location, name: location.name.trim(), tags: [...new Set(location.tags.map(normalizeLocationTag))] };
+	const wasStartingPoint = doc.getMap<RetailLocation>('custom-locations').get(location.id)?.startingPoint === true;
+	doc.transact(() => {
+		doc.getMap<RetailLocation>('custom-locations').set(location.id, saved);
+		const preferences = doc.getMap('nearby-preferences');
+		const starting = preferences.get('starting-location');
+		if (isStartingLocation(starting) && starting.source === 'custom' && starting.customLocationId === location.id) {
+			// Enabling a pill should not revive a stale selection from a disabled place.
+			if (wasStartingPoint && saved.startingPoint === true) {
+				preferences.set('starting-location', { ...starting, label: saved.name, latitude: saved.latitude, longitude: saved.longitude, updatedAt: new Date().toISOString() });
+			} else {
+				preferences.delete('starting-location');
+			}
+		}
 	});
 }
 
 export function deleteCustomLocation(id: string): void {
-	getMutableDoc().getMap('custom-locations').delete(id);
+	const doc = getMutableDoc();
+	doc.transact(() => {
+		doc.getMap('custom-locations').delete(id);
+		const preferences = doc.getMap('nearby-preferences');
+		const starting = preferences.get('starting-location');
+		if (isStartingLocation(starting) && starting.source === 'custom' && starting.customLocationId === id) {
+			preferences.delete('starting-location');
+		}
+	});
 }
 
 export function readStartingLocation(): StartingLocation | null {
-	const location = getDoc().getMap('nearby-preferences').get('starting-location');
-	return isStartingLocation(location) ? location : null;
+	const doc = getDoc();
+	const location = doc.getMap('nearby-preferences').get('starting-location');
+	if (!isStartingLocation(location)) return null;
+	if (location.source !== 'custom') return location;
+	const custom = doc.getMap<RetailLocation>('custom-locations').get(location.customLocationId!);
+	// Resolve the reference on read as well, so concurrent edits and selections converge.
+	return custom?.startingPoint === true ? { ...location, label: custom.name, latitude: custom.latitude, longitude: custom.longitude } : null;
 }
 
 export function saveStartingLocation(location: StartingLocation): void {
 	if (!isStartingLocation(location)) throw new Error('Invalid starting location.');
+	const doc = getMutableDoc();
+	if (location.source === 'custom') {
+		const custom = doc.getMap<RetailLocation>('custom-locations').get(location.customLocationId!);
+		if (!custom || custom.startingPoint !== true) throw new Error('This location is no longer available as a starting point. Choose another starting point.');
+		location = { ...location, label: custom.name, latitude: custom.latitude, longitude: custom.longitude, accuracy: null };
+	}
 	// A single value keeps coordinates and metadata together when devices update concurrently.
-	getMutableDoc().getMap('nearby-preferences').set('starting-location', { ...location });
+	doc.transact(() => {
+		const preferences = doc.getMap('nearby-preferences');
+		preferences.set('starting-location', { ...location });
+		preferences.set('location-filter-enabled', true);
+	});
+}
+
+export function readNearbyLocationFilterEnabled(): boolean {
+	return getDoc().getMap('nearby-preferences').get('location-filter-enabled') !== false;
+}
+
+export function saveNearbyLocationFilterEnabled(enabled: boolean): void {
+	if (typeof enabled !== 'boolean') throw new Error('Invalid nearby location filter.');
+	getMutableDoc().getMap('nearby-preferences').set('location-filter-enabled', enabled);
 }
 
 export function clearStartingLocation(): void {

@@ -3,7 +3,7 @@ import { locationOptionalTag } from './nearbyErrands';
 import { matchingLocationTags } from './retailLocations';
 import { errandPreview, errandGroupId, groupErrands } from './errandGroups';
 
-/** One pill per task, labelled with its first matching tag at the nearest stop. */
+/** One pill per task, labelled with its first tag at a matching stop. */
 export function nearbyTaskPills(stops: readonly NearbyStop[], errands: readonly Errand[] = []): { errand: Errand; name: string; tag: string }[] {
     const pills = new Map<string, { errand: Errand; name: string; tag: string }>();
     for (const stop of stops) {
