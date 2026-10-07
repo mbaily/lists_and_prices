@@ -6,7 +6,7 @@ its individual completion, pause, resume and dismiss controls. Task-specific
 hashtags still determine which locations match each task.
 
 The Nearby pill previews the list's active task names on one line. Set **Items
-per pill** beside the radius control to choose 1–50 names (default 3); additional
+per pill** beside the Nearby heading to choose 1–9 names (default 3); additional
 tasks show as **+n more**. This setting syncs across devices and is included in
 backups. The preview limit only changes the display; every eligible task is
 still considered when suggesting stops.
@@ -36,6 +36,14 @@ Distances start from the suburb's approximate centre. Choose a radius from 1 to 
 The **Clear** button beside the editor's suburb field clears the search text.
 Editing shortcuts leaves the current starting location unchanged.
 
+The **No filter** pill is always first in the starting-point list. Select it to
+show hashtag-matched errands at any distance, without GPS or a starting location.
+The radius control and distances are hidden while it is selected. Suggested and
+alternative stops are ordered alphabetically. Paused, completed and dismissed
+tasks keep their usual rules. Your filter choice syncs across devices and is
+included in backups. Select GPS, a suburb or a custom starting-point pill to
+restore distance filtering; your radius stays unchanged while switching modes.
+
 Expand **Available location hashtags**, below the suggestions, to browse hashtags supported by the whole
 retail catalogue and your saved locations, with the number of matching places.
 It updates automatically when custom locations are added, changed, deleted or synced,
@@ -48,7 +56,7 @@ the twelve hashtags with the most locations.
 Select a hashtag button to browse its matching locations, addresses and directions
 in a scrollable panel. Selecting another hashtag replaces the list; × closes it.
 
-**Matched tasks**, above the radius selector, is a persistent checklist of items
+**Matched tasks**, below the radius selector and Paused errands, is a persistent checklist of items
 with a location match in the database, `#bank` errands, plus previously seen tasks still active.
 Todos have checkboxes linked to their original completion state; notes are plain
 listings. With named folder checkboxes, the nearby checkbox controls the last
@@ -100,18 +108,20 @@ time-based expiry. Automatic membership tracking adds no undo action; dismissing
 clearing and ticking remain undoable. Historical views cannot change the checklist.
 
 **Suggested stops** shows a short set of individual shops covering every tagged
-unchecked todo or note with a match inside the selected radius. Specialist errands,
+unchecked todo or note with a match inside the selected radius, or at any distance
+with **No filter**. Specialist errands,
 such as `#officeworks`, are included alongside common supermarket errands. Each
 item appears once, and the summary counts distinct items covered inside the radius.
 Items without a nearby match are listed above the stops, distinguishing locations
 outside the radius from hashtags with no matching location in the database.
 
 Selection favours the shop covering the most remaining items, breaks ties by
-distance, and removes redundant stops. The chosen shops are displayed nearest
-first. This is a practical coverage heuristic; it does not compute a minimum-stop
+distance (or name with **No filter**), and removes redundant stops. The chosen shops
+are displayed nearest first, or alphabetically with **No filter**. This is a
+practical coverage heuristic; it does not compute a minimum-stop
 solution or optimise a driving route. Shopping-centre membership does not affect
 selection. **Alternatives** is collapsed by default and shows other matching shops
-nearest first when expanded. Alternative cards are rendered only while expanded.
+in the same order when expanded. Alternative cards are rendered only while expanded.
 
 Tap a todo or note to open its list and highlight it. Directions opens Google Maps
 using the destination coordinates; the app does not send your GPS coordinates in

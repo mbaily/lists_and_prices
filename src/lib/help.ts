@@ -287,14 +287,15 @@ export const helpTopics: HelpTopic[] = [
 					'Use GPS or a starting-point pill. Under Locations, add or edit a place anywhere with a name, latitude, longitude and hashtags. Turn on Available as a starting point and save to show its pill beside the suburbs. The toggle defaults to off. It remains a destination either way. Editing the selected place updates it; disabling or deleting it clears the selection.',
 					'The edit icon opens Hot suburbs to add, remove and rearrange Melbourne suburb shortcuts, then Save. Saved custom locations work worldwide without GPS or a suburb catalogue. The starting point’s hashtags do not restrict results: your tasks’ hashtags determine which destinations match.',
 					'The app saves your last starting point and syncs it across your devices. Check its label and update time before relying on the distance shown, particularly when it says Last GPS location. GPS is requested when you press the button, rather than tracked in the background.',
-					'Choose a radius from 1 to 50 km. Distances are straight-line distances from the starting point, rather than driving distances or travel times. Directions opens Google Maps for the destination. Some locations are approximate centre or suburb points, so read the location labels.'
+					'The No filter pill always appears first. It shows hashtag-matched errands at any distance without needing a starting point, and hides the radius and distances. This choice syncs and is included in backups. Choose GPS or a starting-point pill to restore the distance filter.',
+					'Choose a radius from 1 to 50 km when filtering by location. Distances are straight-line distances from the starting point, rather than driving distances or travel times. Directions opens Google Maps for the destination. Some locations are approximate centre or suburb points, so read the location labels.'
 				]
 			},
 			{
 				title: 'Use the checklist and suggested stops',
 				paragraphs: [
 					'Errands from the same parent list are grouped together. Expand a group to see and control its individual tasks. Items per pill sets how many task names appear in a preview; it does not limit which tasks are considered. Matched tasks can include reminders outside the current radius with an explanation.',
-					'Suggested stops chooses places covering your active matched errands, and Alternatives shows other matching places. The suggestions help cover your tasks but do not optimise a driving route. Increase the radius or add a matching personal location if a task has no nearby match.',
+					'Suggested stops chooses places covering your active matched errands, and Alternatives shows other matching places. Stops are nearest first when using a starting point, or alphabetical with No filter. The suggestions help cover your tasks but do not optimise a driving route. Increase the radius, choose No filter or add a matching personal location if a task has no nearby match.',
 					'Tick a todo to complete the original task. With named checkboxes, this controls the final completion checkbox and preserves earlier checks. Notes have no completion checkbox. Tap task text to open its source list; the 🚗 return icon on the highlighted item takes you back to Nearby errands.'
 				]
 			},

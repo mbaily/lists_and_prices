@@ -3,7 +3,7 @@ import { extractTags } from './tags';
 import { distanceKm, matchingLocationTags, normalizeLocationTag, validCoordinates, type Coordinates, type RetailLocation } from './retailLocations';
 
 export interface Errand { item: Item; list: ListMeta; tags: string[] }
-export interface NearbyStop { location: RetailLocation; distanceKm: number; errands: Errand[] }
+export interface NearbyStop { location: RetailLocation; distanceKm: number | null; errands: Errand[] }
 export interface SuggestedStops { suggested: NearbyStop[]; alternatives: NearbyStop[]; unavailable: Errand[] }
 
 export const LOCATION_OPTIONAL_TAGS = ['bank', 'errand'];
@@ -24,18 +24,24 @@ export function isErrandPaused(errand: Errand, pausedTags: readonly string[], pa
     return errand.tags.some(tag => paused.has(normalizeLocationTag(tag)));
 }
 
-/** Greedy item coverage, then distance. Every reachable item gets one suggested stop. */
+function compareStops(a: NearbyStop, b: NearbyStop): number {
+    if (a.distanceKm !== null || b.distanceKm !== null) {
+        return (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity) || a.location.id.localeCompare(b.location.id);
+    }
+    return a.location.name.localeCompare(b.location.name) || a.location.id.localeCompare(b.location.id);
+}
+
+/** Greedy item coverage, then distance (or name without an origin). */
 export function suggestStops(stops: NearbyStop[], errands: Errand[]): SuggestedStops {
     const reachable = new Set(stops.flatMap(stop => stop.errands.map(errand => errand.item.id)));
     const uncovered = new Set(reachable);
     const selected: NearbyStop[] = [];
-    const nearestFirst = (a: NearbyStop, b: NearbyStop) => a.distanceKm - b.distanceKm || a.location.id.localeCompare(b.location.id);
     while (uncovered.size) {
         let best: NearbyStop | undefined;
         let bestCount = 0;
         for (const stop of stops) {
             const count = new Set(stop.errands.filter(errand => uncovered.has(errand.item.id)).map(errand => errand.item.id)).size;
-            if (count > bestCount || (count === bestCount && count > 0 && best && nearestFirst(stop, best) < 0)) {
+            if (count > bestCount || (count === bestCount && count > 0 && best && compareStops(stop, best) < 0)) {
                 best = stop;
                 bestCount = count;
             }
@@ -50,7 +56,7 @@ export function suggestStops(stops: NearbyStop[], errands: Errand[]): SuggestedS
         if (selected[i].errands.every(errand => others.has(errand.item.id))) selected.splice(i, 1);
     }
     const assigned = new Set<string>();
-    const suggested = [...selected].sort(nearestFirst).map(stop => ({
+    const suggested = [...selected].sort(compareStops).map(stop => ({
         ...stop,
         errands: stop.errands.filter(errand => {
             if (assigned.has(errand.item.id)) return false;
@@ -61,7 +67,7 @@ export function suggestStops(stops: NearbyStop[], errands: Errand[]): SuggestedS
     const selectedIds = new Set(selected.map(stop => stop.location.id));
     return {
         suggested,
-        alternatives: stops.filter(stop => !selectedIds.has(stop.location.id)).sort(nearestFirst),
+        alternatives: stops.filter(stop => !selectedIds.has(stop.location.id)).sort(compareStops),
         unavailable: errands.filter(errand => !reachable.has(errand.item.id))
     };
 }
@@ -81,13 +87,14 @@ export function collectErrands(items: Item[], lists: ListMeta[], folders: Folder
     });
 }
 
-export function nearbyStops(locations: RetailLocation[], origin: Coordinates, radiusKm: number, errands: Errand[]): NearbyStop[] {
-    if (!validCoordinates(origin) || !Number.isFinite(radiusKm) || radiusKm <= 0) return [];
+/** A null origin matches destinations without any location or radius filter. */
+export function nearbyStops(locations: RetailLocation[], origin: Coordinates | null, radiusKm: number, errands: Errand[]): NearbyStop[] {
+    if (origin !== null && (!validCoordinates(origin) || !Number.isFinite(radiusKm) || radiusKm <= 0)) return [];
     return locations.flatMap(location => {
         if (!validCoordinates(location)) return [];
-        const distance = distanceKm(origin, location);
-        if (distance > radiusKm) return [];
+        const distance = origin === null ? null : distanceKm(origin, location);
+        if (distance !== null && distance > radiusKm) return [];
         const matches = errands.filter(errand => matchingLocationTags(errand.tags, location).length > 0);
         return matches.length ? [{ location, distanceKm: distance, errands: matches }] : [];
-    }).sort((a, b) => a.distanceKm - b.distanceKm || a.location.id.localeCompare(b.location.id));
+    }).sort(compareStops);
 }
