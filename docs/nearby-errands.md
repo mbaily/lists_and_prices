@@ -1,5 +1,7 @@
 # Nearby errands and the location catalogue
 
+For the equations and state transitions behind this feature, see the [typeset mathematical specification (PDF)](nearby-errands-math.pdf), [Markdown version](nearby-errands-math.md) or [LaTeX source](nearby-errands-math.tex).
+
 Todos and notes inheriting hashtags from the same parent list appear as one errand in the
 Nearby pills, Matched tasks, Paused errands and stop lists. Expand a list to use
 its individual completion, pause, resume and dismiss controls. Task-specific
