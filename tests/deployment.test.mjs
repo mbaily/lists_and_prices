@@ -16,10 +16,12 @@ function fixture(t) {
     const env = { ...process.env, PATH: bin + ':' + process.env.PATH, SERVICE_USER: userInfo().username };
     const source = path.join(directory, 'checkout'), dest = path.join(directory, 'live');
     for (const base of [source, dest]) {
-        for (const folder of ['build', 'server/yjs-data', 'node_modules']) mkdirSync(path.join(base, folder), { recursive: true });
+        for (const folder of ['build', 'server/yjs-data', 'node_modules', 'src/lib']) mkdirSync(path.join(base, folder), { recursive: true });
         for (const [file, content] of Object.entries({ 'build/index.html': base === source ? 'new app' : 'old app', 'build/sw.js': 'worker', 'server/index.ts': base === source ? 'new server' : 'old server', 'server/tsconfig.json': '{}', 'package.json': '{}', 'package-lock.json': '{}', 'node_modules/marker': base === source ? 'new deps' : 'old deps' })) writeFileSync(path.join(base, file), content);
         for (const file of ['server/yjs-data/notes', 'server/server.db', 'server/server.db-wal', 'server/server.db-shm', 'server/.htpasswd', 'server/cert.pem', 'server/key.pem', '.env']) writeFileSync(path.join(base, file), base === source ? 'checkout must never overwrite this' : 'live private data');
+        writeFileSync(path.join(base, 'src/lib/folderDefaultItems.ts'), base === source ? 'new shared module' : 'old shared module');
     }
+    writeFileSync(path.join(source, 'src/lib/unrelated.ts'), 'not deployed');
     writeFileSync(path.join(dest, 'build/old-hashed.js'), 'old asset');
     const sync = (extra = '') => execFileSync('bash', ['-c', 'set -euo pipefail; source "$1/scripts/deploy-runtime.sh"; sync_runtime "$2" "$3" ' + extra, 'probe', root, source, dest], { env, encoding: 'utf8' });
     return { directory, bin, command, env, source, dest, sync };
@@ -50,12 +52,27 @@ test('runtime copy preserves live data, secrets and old frontend assets', t => {
     assert.equal(readFileSync(path.join(f.dest, 'server/index.ts'), 'utf8'), 'new server');
     assert.equal(readFileSync(path.join(f.dest, 'node_modules/marker'), 'utf8'), 'new deps');
     assert.equal(readFileSync(path.join(f.dest, 'build/old-hashed.js'), 'utf8'), 'old asset');
+    assert.equal(readFileSync(path.join(f.dest, 'src/lib/folderDefaultItems.ts'), 'utf8'), 'new shared module');
+    assert.ok(!readdirSync(path.join(f.dest, 'src/lib')).includes('unrelated.ts'));
 });
 
 test('preview changes no application or data files', t => {
     const f = fixture(t); f.sync('--dry-run'); assertPrivateData(f.dest);
     assert.equal(readFileSync(path.join(f.dest, 'build/index.html'), 'utf8'), 'old app');
     assert.equal(readFileSync(path.join(f.dest, 'node_modules/marker'), 'utf8'), 'old deps');
+    assert.equal(readFileSync(path.join(f.dest, 'src/lib/folderDefaultItems.ts'), 'utf8'), 'old shared module');
+});
+
+test('runtime copy supports installations and rollback backups without shared modules', t => {
+    const f = fixture(t);
+    rmSync(path.join(f.dest, 'src'), { recursive: true });
+    f.sync('--dry-run');
+    assert.ok(!readdirSync(f.dest).includes('src'));
+    f.sync();
+    assert.equal(readFileSync(path.join(f.dest, 'src/lib/folderDefaultItems.ts'), 'utf8'), 'new shared module');
+    rmSync(path.join(f.source, 'src'), { recursive: true });
+    f.sync();
+    assertPrivateData(f.dest);
 });
 
 test('symlinked data/runtime directory is rejected before copying', t => {
@@ -95,6 +112,8 @@ for (const failure of ['none', 'build', 'dependencies', 'health']) {
             assert.ok(commands.indexOf('npm rebuild') < commands.indexOf('systemctl stop'));
             assert.equal(readFileSync(path.join(f.dest, 'build/index.html'), 'utf8'), failure === 'none' ? 'new app' : 'old app');
             assert.equal(readFileSync(path.join(f.dest, 'node_modules/marker'), 'utf8').trim(), failure === 'none' ? 'prepared deps' : 'old deps');
+            assert.equal(readFileSync(path.join(backups, backup, 'src/lib/folderDefaultItems.ts'), 'utf8'), 'old shared module');
+            assert.equal(readFileSync(path.join(f.dest, 'src/lib/folderDefaultItems.ts'), 'utf8'), failure === 'none' ? 'new shared module' : 'old shared module');
             assert.match(commands, /systemctl start/);
         }
     });

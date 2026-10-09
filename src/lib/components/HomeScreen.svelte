@@ -49,6 +49,7 @@
 	import RowMenu from './RowMenu.svelte';
 	import InfoDialog from './InfoDialog.svelte';
 	import FolderCheckboxesDialog from './FolderCheckboxesDialog.svelte';
+	import FolderDefaultItemsDialog from './FolderDefaultItemsDialog.svelte';
 	import CommitsScreen from './CommitsScreen.svelte';
 	import FavouritesOrderScreen from './FavouritesOrderScreen.svelte';
 	import NearbyErrandsScreen from './NearbyErrandsScreen.svelte';
@@ -139,7 +140,7 @@
 		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || (e.target instanceof HTMLElement && e.target.isContentEditable)) return;
 		
 		// Or if a modal/overlay is open
-		if (showSettings || showFavouritesOrder || showNewFolder || showNewList || showReportsMenu || infoTarget || sfDialogFolder || checkboxesFolder || renamingId || markTarget) return;
+		if (showSettings || showFavouritesOrder || showNewFolder || showNewList || showReportsMenu || infoTarget || sfDialogFolder || checkboxesFolder || defaultItemsFolder || renamingId || markTarget) return;
 
 		// Modifier keys should not trigger a bind by themselves
 		if (['Control', 'Meta', 'Alt', 'Shift', 'CapsLock'].includes(e.key)) return;
@@ -1115,6 +1116,7 @@
 	// ── Smart folders (reports) ──────────────────────────────────────────────────
 	let sfDialogFolder = $state<Folder | null>(null);
 	let checkboxesFolder = $state<Folder | null>(null);
+	let defaultItemsFolder = $state<Folder | null>(null);
 	let sfNewName = $state('');
 	let showReportsMenu = $state(false);
 
@@ -1422,6 +1424,7 @@ ${bodyHtml}
 			quickAddTagSuggestions = [];
 			sfDialogFolder = null;
 			checkboxesFolder = null;
+			defaultItemsFolder = null;
 			markTarget = null;
 			markFeedback = '';
 			touchDragKind = null;
@@ -1907,6 +1910,7 @@ ${bodyHtml}
 							{ label: 'ℹ️ Info', action: () => infoTarget = { kind: 'folder', data: folder } },
 							{ label: '✏ Rename', action: () => startRename(folder.id, folder.name, 'folder', folder.color) },
 							{ label: '☑ Checkboxes', action: () => { if (!commitState.isHistorical) checkboxesFolder = folder; } },
+							{ label: '📋 Default Items', action: () => { if (!commitState.isHistorical) defaultItemsFolder = folder; } },
 							{ label: folder.localNav ? '🌐 Global navigation' : '📂 Local navigation', action: () => { if (!commitState.isHistorical) updateFolder(folder.id, { localNav: !folder.localNav }); } },
 						]},
 						{ label: '📋 Smart Folder', action: () => { if (!commitState.isHistorical) { sfDialogFolder = folder; sfNewName = ''; } } },
@@ -2108,6 +2112,10 @@ ${bodyHtml}
 		<!-- Named checkboxes dialog -->
 		{#if checkboxesFolder !== null && !commitState.isHistorical}
 			<FolderCheckboxesDialog folder={checkboxesFolder} onClose={() => checkboxesFolder = null} />
+		{/if}
+
+		{#if defaultItemsFolder !== null && !commitState.isHistorical}
+			<FolderDefaultItemsDialog folder={defaultItemsFolder} onClose={() => defaultItemsFolder = null} />
 		{/if}
 
 		<!-- Info dialog -->

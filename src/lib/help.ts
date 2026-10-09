@@ -89,6 +89,13 @@ export const helpTopics: HelpTopic[] = [
 				]
 			},
 			{
+				title: 'Default items for new lists',
+				paragraphs: [
+					'Open a folder’s ⋮ menu, then Folder settings → Default Items to choose the todos and notes added to each new list directly inside that folder. Use the ☑/📝 toggle beside the input to choose an item type, then Add or press Enter. Shift+Enter adds a new line.',
+					'Edit an item by selecting its name, reorder items with the arrows, or remove a default with the bin button. Each new list receives its own items in the saved order. Defaults sync across devices and are included in backups and history.'
+				]
+			},
+			{
 				title: 'Named checkboxes for a workflow',
 				paragraphs: [
 					'Open a folder’s ⋮ menu, then Folder settings → Checkboxes to define stages such as Bought, Packed and Done. Tasks in lists directly inside that folder get one toggle for each stage. Add, rename or reorder the names in the dialog.',

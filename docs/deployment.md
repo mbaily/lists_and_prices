@@ -11,14 +11,15 @@ checked against the server's Node version. It then stops the service, copies a
 consistent backup, updates the runtime, and checks the served frontend and the
 unauthenticated session endpoint. Concurrent deployments share a lock.
 
-Only `build/`, server TypeScript files, `server/tsconfig.json`, package manifests,
-and prepared dependencies are installed. Checkout `.env` files, credentials,
+Only `build/`, server TypeScript files, `server/tsconfig.json`, the shared
+`src/lib/folderDefaultItems.ts` module, package manifests, and prepared
+dependencies are installed. Checkout `.env` files, credentials,
 certificates, SQLite files and Yjs data are never copied into production. Existing
 hashed frontend assets are retained for open tabs. `--delete` is limited to the
 prepared `node_modules/` directory; the script refuses symlinked runtime directories.
 
 Backups are retained in `/var/backups/lists-and-prices/deploy-*`, inside a root-only
-directory. They include the old application/dependencies, entire live `server/`
+directory. They include the old application/dependencies and shared module, entire live `server/`
 directory (including SQLite sidecars and Yjs data), and root `.env*` files. Check
 available disk space beforehand. Backups accumulate; remove old copies only after
 checking your retention needs. A backup contains credentials and private notes.

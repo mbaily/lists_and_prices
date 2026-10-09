@@ -6,6 +6,7 @@ import * as Y from 'yjs';
 import { getFolders, getLists, getItems, getDoc, getMutableDoc, getSpreadsheets, getSheetCells } from './yjsStore.svelte';
 import { removeFromAllReports } from './smartFolders.svelte';
 import { readFolderCheckboxes, addCheckbox, renameCheckbox, removeCheckbox, orderCheckboxes, replaceFolderCheckboxes, type FolderCheckbox } from './folderCheckboxes';
+import { readFolderDefaultItems, isFolderDefaultItems, addDefaultItem, updateDefaultItem, removeDefaultItem, orderDefaultItems, replaceFolderDefaultItems, type FolderDefaultItem } from './folderDefaultItems';
 import { resolveParentLinks, compareOrder, getInsertionOrder } from './hierarchy';
 import { planItemMove, type ItemMoveDestination } from './itemMove';
 import { readItemName, getItemText, initializeItemText, replaceItemText } from './noteText';
@@ -16,6 +17,7 @@ import { defaultHotSuburbIds, isHotSuburbIds } from './hotSuburbs';
 import { checklistFingerprint, isNearbyChecklistState, NEARBY_CHECKLIST_MEMBERSHIP_ORIGIN, type NearbyChecklistState } from './nearbyChecklist';
 
 export type { FolderCheckbox } from './folderCheckboxes';
+export type { FolderDefaultItem } from './folderDefaultItems';
 
 function uid(): string {
 	return crypto.randomUUID();
@@ -46,6 +48,8 @@ export interface Folder {
 	 *  Empty/absent = legacy single-checkbox mode. Order matters: the LAST
 	 *  entry is the one that determines whether an item counts as "done". */
 	checkboxes?: FolderCheckbox[];
+	/** Templates copied into new lists directly inside this folder. */
+	defaultItems?: FolderDefaultItem[];
 }
 
 export const MAX_FOLDER_CHECKBOXES = 8;
@@ -72,7 +76,8 @@ function yMapToFolder(m: Y.Map<unknown>): Folder {
 		foldersFirst: (m.get('foldersFirst') as boolean) ?? true,
 		localNav: (m.get('localNav') as boolean) ?? false,
 		filterView: (m.get('filterView') as 'all' | 'unchecked' | 'checked') ?? 'all',
-		checkboxes: readFolderCheckboxes(m)
+		checkboxes: readFolderCheckboxes(m),
+		defaultItems: readFolderDefaultItems(m)
 	};
 }
 
@@ -120,6 +125,7 @@ export function createFolder(name: string, parentId: string | null, color = '#63
 
 export function updateFolder(id: string, patch: Partial<Omit<Folder, 'id' | 'createdAt' | 'updatedAt'>>, options: { colorChildren?: boolean } = {}) {
 	const doc = getMutableDoc();
+	if (patch.defaultItems !== undefined && !isFolderDefaultItems(patch.defaultItems)) throw new Error('Invalid default items.');
 	const currentTree = patch.parentId !== undefined ? readFolders() : [];
 	if (patch.parentId !== undefined && patch.parentId !== null) {
 		if (!readFolders().some((folder) => folder.id === patch.parentId) || isDescendant(id, patch.parentId)) return;
@@ -132,6 +138,7 @@ export function updateFolder(id: string, patch: Partial<Omit<Folder, 'id' | 'cre
 		materializeCycles(getFolders(doc), currentTree);
 		for (const [k, v] of Object.entries(patch)) {
 			if (k === 'checkboxes') replaceFolderCheckboxes(m, patch.checkboxes ?? []);
+			else if (k === 'defaultItems') replaceFolderDefaultItems(m, patch.defaultItems ?? []);
 			else m.set(k, v);
 		}
 		const keys = Object.keys(patch);
@@ -228,6 +235,64 @@ export function moveFolderCheckbox(folderId: string, checkboxId: string, directi
 		[current[idx], current[swapWith]] = [current[swapWith], current[idx]];
 		orderCheckboxes(m, current);
 		m.set('updatedAt', new Date().toISOString());
+	});
+}
+
+// ─── Default items (per folder) ────────────────────────────────────────────────
+
+export function addFolderDefaultItem(folderId: string, name: string, note = false): string | null {
+	const doc = getMutableDoc();
+	const trimmed = name.trim();
+	if (!trimmed || typeof note !== 'boolean') return null;
+	const folder = findYMap(getFolders(doc), folderId);
+	if (!folder) return null;
+	const id = uid();
+	doc.transact(() => {
+		addDefaultItem(folder, { id, name: trimmed, note });
+		folder.set('updatedAt', new Date().toISOString());
+	});
+	return id;
+}
+
+export function updateFolderDefaultItem(folderId: string, id: string, patch: Partial<Pick<FolderDefaultItem, 'name' | 'note'>>): boolean {
+	const doc = getMutableDoc();
+	if (patch.name !== undefined && !patch.name.trim()) return false;
+	if (patch.note !== undefined && typeof patch.note !== 'boolean') return false;
+	const folder = findYMap(getFolders(doc), folderId);
+	const current = folder && readFolderDefaultItems(folder).find(item => item.id === id);
+	if (!folder || !current) return false;
+	const changes: Partial<Pick<FolderDefaultItem, 'name' | 'note'>> = {};
+	if (patch.name !== undefined && patch.name.trim() !== current.name) changes.name = patch.name.trim();
+	if (patch.note !== undefined && patch.note !== current.note) changes.note = patch.note;
+	if (Object.keys(changes).length) doc.transact(() => {
+		updateDefaultItem(folder, id, changes);
+		folder.set('updatedAt', new Date().toISOString());
+	});
+	return true;
+}
+
+export function removeFolderDefaultItem(folderId: string, id: string): void {
+	const doc = getMutableDoc();
+	const folder = findYMap(getFolders(doc), folderId);
+	if (!folder || !readFolderDefaultItems(folder).some(item => item.id === id)) return;
+	doc.transact(() => {
+		removeDefaultItem(folder, id);
+		folder.set('updatedAt', new Date().toISOString());
+	});
+}
+
+export function moveFolderDefaultItem(folderId: string, id: string, direction: 'up' | 'down'): void {
+	const doc = getMutableDoc();
+	const folder = findYMap(getFolders(doc), folderId);
+	if (!folder) return;
+	const current = readFolderDefaultItems(folder);
+	const index = current.findIndex(item => item.id === id);
+	const target = direction === 'up' ? index - 1 : index + 1;
+	if (index < 0 || target < 0 || target >= current.length) return;
+	[current[index], current[target]] = [current[target], current[index]];
+	doc.transact(() => {
+		orderDefaultItems(folder, current);
+		folder.set('updatedAt', new Date().toISOString());
 	});
 }
 
@@ -388,6 +453,12 @@ export function createList(
 		m.set('defaultIsNote', false);
 		m.set('journalMode', false);
 		lists.push([m]);
+		const folder = findYMap(getFolders(doc), folderId);
+		if (folder && type !== 'divider') {
+			readFolderDefaultItems(folder).forEach((item, index) => {
+				createItem(id, item.name, null, null, item.note, 'bottom', index);
+			});
+		}
 	});
 	return id;
 }
@@ -1143,6 +1214,7 @@ function validateRecords(records: unknown, kind: string): asserts records is Rec
 		if (record.parentId != null && typeof record.parentId !== 'string') throw new Error('Invalid parent id.');
 		if (record.checks !== undefined && (!record.checks || typeof record.checks !== 'object' || Array.isArray(record.checks) || Object.values(record.checks).some((value) => typeof value !== 'boolean'))) throw new Error('Invalid checkbox states.');
 		if (record.checkboxes !== undefined && (!Array.isArray(record.checkboxes) || record.checkboxes.some((box: FolderCheckbox) => !box || typeof box.id !== 'string' || typeof box.name !== 'string'))) throw new Error('Invalid checkbox definitions.');
+		if (kind === 'folders' && record.defaultItems !== undefined && !isFolderDefaultItems(record.defaultItems)) throw new Error('Invalid default items.');
 		if (record.checkedNames !== undefined && (!Array.isArray(record.checkedNames) || record.checkedNames.some((name: unknown) => typeof name !== 'string'))) throw new Error('Invalid checkbox names.');
 		for (const key of ['price', 'qty', 'order', 'favouriteOrder']) {
 			if (record[key] != null && (typeof record[key] !== 'number' || !Number.isFinite(record[key]))) throw new Error(`Invalid ${key}.`);
@@ -1208,9 +1280,10 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 				arr.push([m]);
 			}
 			for (const [key, value] of Object.entries(record)) {
-				if (key !== 'checks' && key !== 'checkboxes') m.set(key, value);
+				if (key !== 'checks' && key !== 'checkboxes' && !(kind === 'folder' && key === 'defaultItems')) m.set(key, value);
 			}
 			if (kind === 'folder' && record.checkboxes !== undefined) replaceFolderCheckboxes(m, record.checkboxes as FolderCheckbox[]);
+			if (kind === 'folder' && record.defaultItems !== undefined) replaceFolderDefaultItems(m, record.defaultItems as FolderDefaultItem[]);
 			if (kind === 'item') {
 				if (record.checks !== undefined) {
 					m.delete('checks');

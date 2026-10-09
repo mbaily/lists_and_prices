@@ -6,6 +6,7 @@ import type * as Yjs from 'yjs';
 import { isValidUsername, readSessionCookie, type SessionStore } from './auth.ts';
 import { importNameKey } from './import-text.ts';
 import type { TaskDocuments } from './task-documents.ts';
+import { readFolderDefaultItems } from '../src/lib/folderDefaultItems.ts';
 
 const Y = createRequire(import.meta.url)('yjs') as typeof Yjs;
 export interface TaskToken { tokenHash: string; username: string; listIds?: string[]; fromPhotos?: boolean }
@@ -149,6 +150,7 @@ export function createTaskRouter(sessions: SessionStore, documents: TaskDocument
 			doc.transact(() => {
 				for (const [key, value] of Object.entries({ id, name, folderId: body.folderId, type: 'plain', color: '#6366f1', order: orders.length ? Math.max(...orders) + 1 : 0, createdAt: now, updatedAt: now, defaultIsNote: false, journalMode: false })) list.set(key, value);
 				lists.push([list]);
+				seedListDefaults(doc, folder, id, now);
 			}, 'task-api');
 			return { list: { id, name, folderId: body.folderId }, created: true };
 		}, true);
@@ -202,9 +204,21 @@ function resolveFromPhotos(doc: Yjs.Doc) {
 			list = new Y.Map<unknown>();
 			for (const [key, value] of Object.entries({ id: randomUUID(), name, folderId, type: 'plain', color: folder.get('color') ?? '#6366f1', order: orders.length ? Math.max(...orders) + 1 : 0, createdAt: now, updatedAt: now, defaultIsNote: false, journalMode: false })) list.set(key, value);
 			lists.push([list]);
+			seedListDefaults(doc, folder, list.get('id') as string, now);
 		}
 	}, 'task-api');
 	return { list: { id: list!.get('id') as string, name, folderId: folder!.get('id') as string }, folderCreated, listCreated };
+}
+
+function seedListDefaults(doc: Yjs.Doc, folder: Yjs.Map<unknown>, listId: string, now: string): void {
+	const items = readFolderDefaultItems(folder).map((template, order) => {
+		const id = randomUUID(), item = new Y.Map<unknown>();
+		for (const [key, value] of Object.entries({ id, listId, name: template.name, note: template.note, price: null, checked: false, order, createdAt: now, updatedAt: now })) item.set(key, value);
+		doc.getText(`note_text_${id}`).insert(0, template.name);
+		doc.getMap('note-text-initialized').set(id, true);
+		return item;
+	});
+	if (items.length) doc.getArray<Yjs.Map<unknown>>('items').push(items);
 }
 
 function currentName(doc: Yjs.Doc, item: Yjs.Map<unknown>): string {

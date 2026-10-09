@@ -79,6 +79,48 @@ async function apiFixture(t: TestContext, documents: TaskDocuments) {
 	return { request, port, session, users, revoke: () => { tokens = []; }, enableRecovery: () => { tokens[0].fromPhotos = true; }, failBinding: (fail: boolean) => { bindingFails = fail; } };
 }
 
+test('API list creation copies folder defaults once with todo/note types and editable text', async t => {
+	const doc = new Y.Doc(); seed(doc);
+	t.after(() => doc.destroy());
+	doc.getArray<Yjs.Map<unknown>>('folders').get(0).set('defaultItems', [
+		{ id: 'todo-template', name: 'Passport', note: false },
+		{ id: 'note-template', name: 'Booking\nReference', note: true }
+	]);
+	const fixture = await apiFixture(t, { async use(_user, operation) { return operation(doc); } });
+	const headers = { Cookie: `${COOKIE_NAME}=${encodeURIComponent(fixture.session.token)}` };
+	const response = await fixture.request({ name: 'Trip', folderId: 'home' }, headers, '/lists');
+	assert.equal(response.status, 200);
+	const result = await response.json();
+	assert.equal(result.created, true);
+	const rows = doc.getArray<Yjs.Map<unknown>>('items').toArray().filter(item => item.get('listId') === result.list.id);
+	assert.deepEqual(rows.map(item => [item.get('name'), item.get('note'), item.get('order')]), [['Passport', false, 0], ['Booking\nReference', true, 1]]);
+	for (const item of rows) {
+		assert.equal(item.get('checked'), false);
+		assert.equal(doc.getText(`note_text_${item.get('id')}`).toString(), item.get('name'));
+		assert.notEqual(item.get('id'), item.get('note') ? 'note-template' : 'todo-template');
+	}
+	const repeat = await (await fixture.request({ name: 'Trip', folderId: 'home' }, headers, '/lists')).json();
+	assert.equal(repeat.created, false);
+	assert.equal(doc.getArray('items').length, 2);
+	assert.equal((await fixture.request({ folderId: 'home' }, headers, '/lists/shopping', 'PATCH')).status, 200);
+	assert.equal(doc.getArray('items').length, 2, 'moving/reusing a list must not seed default items');
+});
+
+test('destination recovery creates defaults from an existing folder without repeating them on retry', async t => {
+	const doc = new Y.Doc(); seed(doc);
+	t.after(() => doc.destroy());
+	const folder = doc.getArray<Yjs.Map<unknown>>('folders').get(0);
+	folder.set('name', 'From Photos');
+	folder.set('defaultItems', [{ id: 'template', name: 'Review photos', note: true }]);
+	const fixture = await apiFixture(t, { async use(_user, operation) { return operation(doc); } });
+	fixture.enableRecovery();
+	const result = await (await fixture.request({}, undefined, '/destination')).json();
+	assert.equal(result.listCreated, true);
+	assert.equal(doc.getArray('items').length, 1);
+	assert.equal((await fixture.request({}, undefined, '/destination')).status, 200);
+	assert.equal(doc.getArray('items').length, 1);
+});
+
 test('destination recovery uses the exact root path, creates missing data, and rebinds only this token', async t => {
 	const alice = new Y.Doc(), bob = new Y.Doc(); seed(alice); seed(bob);
 	t.after(() => { alice.destroy(); bob.destroy(); });

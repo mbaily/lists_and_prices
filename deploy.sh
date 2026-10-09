@@ -93,6 +93,10 @@ backup=$(sudo mktemp -d "$BACKUP_ROOT/deploy-$(date -u +%Y%m%dT%H%M%SZ).XXXXXX")
 backup_entries=(build server node_modules package.json package-lock.json)
 while IFS= read -r -d '' env_file; do backup_entries+=("${env_file##*/}"); done < <(sudo find "$DEST_DIR" -maxdepth 1 -type f -name '.env*' -print0)
 sudo cp -a -- "${backup_entries[@]/#/$DEST_DIR/}" "$backup/"
+if sudo test -f "$DEST_DIR/src/lib/folderDefaultItems.ts"; then
+    sudo install -d "$backup/src/lib"
+    sudo cp -a -- "$DEST_DIR/src/lib/folderDefaultItems.ts" "$backup/src/lib/"
+fi
 printf 'Backup: %s\n' "$backup"
 
 changed=true

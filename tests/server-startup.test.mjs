@@ -17,16 +17,23 @@ function stagedFile(name) {
 	return execFileSync('git', ['show', `:${name}`], { cwd: root, encoding: 'utf8' });
 }
 
-test('Git release contains every relative server import', () => {
-	const files = execFileSync('git', ['ls-files', '-z', '--', 'server'], { cwd: root, encoding: 'utf8' })
+function releaseFiles() {
+	const files = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' })
 		.split('\0').filter(Boolean);
 	const tracked = new Set(files);
-	for (const file of files.filter((name) => name.endsWith('.ts'))) {
+	const dependencies = new Set(files.filter(name => name.startsWith('server/') && name.endsWith('.ts')));
+	for (const file of dependencies) {
 		for (const match of stagedFile(file).matchAll(/\bfrom\s+['"](\.[^'"]+)['"]/g)) {
 			const dependency = path.posix.normalize(path.posix.join(path.posix.dirname(file), match[1]));
 			assert.ok(tracked.has(dependency), `${file} imports ${dependency}, but it is missing from Git. Stage and commit it with the server.`);
+			dependencies.add(dependency);
 		}
 	}
+	return [...dependencies];
+}
+
+test('Git release contains every relative server import', () => {
+	releaseFiles();
 });
 
 test('actual server entry point boots from Git release files and answers session requests', { timeout: 20_000 }, async (t) => {
@@ -36,8 +43,7 @@ test('actual server entry point boots from Git release files and answers session
 	await mkdir(path.join(directory, 'build'));
 	await writeFile(path.join(directory, 'build/index.html'), '<!doctype html><title>Isolated release test</title>');
 	await writeFile(path.join(directory, 'package.json'), stagedFile('package.json'));
-	const files = execFileSync('git', ['ls-files', '-z', '--', 'server/*.ts'], { cwd: root, encoding: 'utf8' })
-		.split('\0').filter(Boolean);
+	const files = releaseFiles();
 	for (const file of files) {
 		await mkdir(path.dirname(path.join(directory, file)), { recursive: true });
 		await writeFile(path.join(directory, file), stagedFile(file));
