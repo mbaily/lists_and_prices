@@ -774,6 +774,33 @@
 	let destinationMarks = $state(readDestinationMarks());
 	let selectedMoveMark = $state('');
 	let markMoveError = $state('');
+	const folderMoveTarget = $derived(getFolderMoveTarget(allLists, allFolders));
+	const folderMoveLabel = $derived(folderMoveTarget?.id === listId
+		? `Already in the ${settings.addListPosition} list in this folder`
+		: folderMoveTarget
+			? `Move selected items and subtrees to ${settings.addListPosition} list: ${folderMoveTarget.name}`
+			: 'No available destination list in this folder');
+
+	function getFolderMoveTarget(lists: ListMeta[], folders: Folder[]): ListMeta | null {
+		const source = lists.find((list) => list.id === listId);
+		if (!source) return null;
+		const destinations = lists
+			.filter((list) => list.folderId === source.folderId && list.type !== 'divider' && !isListEffectivelyArchived(list, folders))
+			.sort((a, b) => a.order - b.order);
+		return (settings.addListPosition === 'top' ? destinations[0] : destinations.at(-1)) ?? null;
+	}
+
+	function moveSelectedToFolderEdge() {
+		if (!canEditList || selectedIds.size === 0) return;
+		const destination = getFolderMoveTarget(readLists(), readFolders());
+		if (!destination || destination.id === listId) return;
+		if (moveItemsToDestination(listId, [...selectedIds], { listId: destination.id, parentId: null }, settings.addItemPosition)) {
+			exitSelectionMode();
+		} else {
+			alert('Cannot move these items here. The destination or selection may have changed.');
+		}
+	}
+
 	const compatibleMoveMarks = $derived.by(() => {
 		const lists = allLists.filter((list) => list.type !== 'divider' && !isListEffectivelyArchived(list, allFolders));
 		return Object.entries(destinationMarks).flatMap(([name, mark]) => {
@@ -1500,6 +1527,13 @@
 	{#if selectionMode && !commitState.isHistorical}
 		<div class="summary-bar selection-bar">
 			<span class="sel-count">{selectedIds.size} selected</span>
+			<button
+				class="bulk-btn icon-btn sel-folder-move-btn"
+				onclick={moveSelectedToFolderEdge}
+				disabled={!canEditList || selectedIds.size === 0 || !folderMoveTarget || folderMoveTarget.id === listId}
+				title={folderMoveLabel}
+				aria-label={folderMoveLabel}
+			><span aria-hidden="true">{settings.addListPosition === 'top' ? '⤒' : '⤓'}</span></button>
 			<button class="bulk-btn sel-view-btn" onclick={() => showSelectionPanel = !showSelectionPanel}>
 				{showSelectionPanel ? '▾ Hide list' : '▸ View list'}
 			</button>
@@ -2486,7 +2520,8 @@
 		background: color-mix(in srgb, var(--list-color, var(--accent)) 15%, var(--bg2));
 		border-bottom: 2px solid var(--list-color, var(--accent));
 	}
-	.sel-count { font-weight: 600; flex: 1; }
+	.sel-count { font-weight: 600; flex: 1; min-width: 0; }
+	.sel-folder-move-btn:disabled { opacity: 0.5; cursor: default; }
 	.sel-view-btn {
 		background: var(--bg3);
 		border: 1px solid var(--border);

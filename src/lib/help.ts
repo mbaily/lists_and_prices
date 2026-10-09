@@ -268,6 +268,7 @@ export const helpTopics: HelpTopic[] = [
 				paragraphs: [
 					'To move a folder or list, choose Tag (to move) from its row menu. Navigate to the destination and choose Move Tagged Here. Use the root destination control when moving a folder back to the top level. Clear Tag cancels the pending move. A folder cannot be moved inside itself or its descendants.',
 					'To move tasks, mark a destination list using its row menu, then open the source list and choose Select items from the header menu. Select the items, open View list in the selection bar, choose a compatible destination mark and use Move to mark. Marks are saved for your account on the current device.',
+					'The arrow beside View list moves selected items and their subtrees to the first or last available list in the same folder, following Add lists & folders to. Its tooltip names the destination. Add items to controls placement inside that list. Archived lists and dividers are skipped; the arrow is disabled when you are already in the destination list.',
 					'Within a list, select items and use Reparent selected here from a suitable target item’s menu to put them underneath it. Move selected to root returns them to the top level. The app prevents moves that would create invalid parent relationships. Check the destination and selected items before confirming any move.'
 				]
 			}
