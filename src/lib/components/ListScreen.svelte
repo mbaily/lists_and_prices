@@ -938,6 +938,23 @@
 	let touchDragFrom = $state<number | null>(null);
 	let touchDragOver = $state<number | null>(null);
 	let touchDragParentKey = $state<string | null>(null); // item.parentId ?? '__top__'
+	const dragBelowId = $derived(getDragBelowId());
+
+	function getDragBelowId(): string | null {
+		if (touchDragFrom === null || touchDragOver === null || touchDragParentKey === null || touchDragFrom >= touchDragOver) return null;
+		const targetIndex = treeItems.findIndex(({ item, sibIdx }) =>
+			(item.parentId ?? '__top__') === touchDragParentKey && sibIdx === touchDragOver);
+		if (targetIndex < 0) return null;
+		const targetLevel = treeItems[targetIndex].level;
+		const visibleIds = new Set(filteredTreeItems.map(({ item }) => item.id));
+		let lastVisibleId: string | null = null;
+		// Use the complete tree for the boundary: filters can hide the next parent
+		// while leaving its children visible, and those belong to another subtree.
+		for (let index = targetIndex; index < treeItems.length && (index === targetIndex || treeItems[index].level > targetLevel); index++) {
+			if (visibleIds.has(treeItems[index].item.id)) lastVisibleId = treeItems[index].item.id;
+		}
+		return lastVisibleId;
+	}
 
 	function startItemDrag(e: PointerEvent, sibIdx: number, parentKey: string) {
 		if (!canEditList) return;
@@ -1695,7 +1712,7 @@
 				class:selected={selectedIds.has(item.id)}
 				class:drag-source={touchDragParentKey === parentKey && sibIdx === touchDragFrom}
 				class:drag-above={touchDragParentKey === parentKey && touchDragOver === sibIdx && touchDragFrom !== null && touchDragFrom > sibIdx}
-				class:drag-below={touchDragParentKey === parentKey && touchDragOver === sibIdx && touchDragFrom !== null && touchDragFrom < sibIdx}
+				class:drag-below={dragBelowId === item.id}
 				data-sibling-index={sibIdx}
 				data-parent-key={parentKey}
 				data-item-id={item.id}
