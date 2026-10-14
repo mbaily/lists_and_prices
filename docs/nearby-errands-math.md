@@ -91,16 +91,20 @@ For example, `Take photos #supplies_photos` in an untagged list or a list tagged
 
 ## 4. Fingerprints, pauses and checklist membership
 
-Let $i\setminus order$ mean all fields of the resolved item record except `order`. Let $\operatorname{text}(i)$ be its current Yjs rich-text delta when a `Y.Text` exists, otherwise its name. Define
+Let $\operatorname{omit}(i,\texttt{order})$ be a copy of the resolved item record with only the `order` field removed. All other fields and values are retained. Let $\operatorname{text}(i)$ be its current Yjs rich-text delta when a `Y.Text` exists, otherwise its name. Define the hash payload and fingerprint separately:
 
 $$
-\phi_i=\operatorname{hex}_{\mathrm{lower}}\!\left(
+\begin{aligned}
+\operatorname{payload}(i)&=\{\texttt{item}:\operatorname{omit}(i,\texttt{order}),\ \texttt{listName}:\ell.\texttt{name},\\
+&\qquad\texttt{done}:d_i,\ \texttt{text}:\operatorname{text}(i)\},\\
+\phi_i&=\operatorname{hex}_{\mathrm{lower}}\!\left(
 \operatorname{SHA256}\!\left(\operatorname{UTF8}\!\left(\operatorname{JSON}\!\left(
-\operatorname{stable}\{item:i\setminus order,\ listName:\ell.name,\ done:d_i,\ text:\operatorname{text}(i)\}
+\operatorname{stable}(\operatorname{payload}(i))
 \right)\right)\right)\right).
+\end{aligned}
 $$
 
-$\operatorname{stable}$ recursively reconstructs objects with keys sorted by $\prec_c$ and preserves array order; $\operatorname{JSON}$ retains the runtime's property-enumeration/serialization semantics. Equality is actual digest equality. List name is included for every item, including explicit errands; metadata, checkbox state, timestamps, resolved parent and rich-text formatting are included. Item `order` alone is excluded.
+$\operatorname{stable}$ recursively reconstructs objects with keys sorted by $\prec_c$ and preserves array order; $\operatorname{JSON}$ retains the runtime's property-enumeration/serialization semantics. The names `item`, `listName`, `done` and `text` are literal object keys, not mathematical variables. Equality is actual digest equality. List name is included for every item, including explicit errands; metadata, checkbox state, timestamps, resolved parent and rich-text formatting are included. Item `order` alone is excluded, so changing only that field does not change the fingerprint.
 
 Only $Q$ entries with a 64-character lowercase hexadecimal fingerprint and a Boolean dismissed flag are read as checklist states. Write $q_i=Q[i.id]$ for a valid record; missing/invalid records give $q_i=\bot$. Define
 
