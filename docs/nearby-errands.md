@@ -16,7 +16,7 @@ the source list's order, including subtasks and subnotes. Selecting an inherited
 list pill opens the list from the top, without highlighting a particular task.
 Selecting an explicitly tagged item pill opens and highlights that item.
 
-Turn on **Recently modified first**, to the left of the Nearby heading, to sort
+Turn on the **Recently modified first** clock-icon button to the left of the Nearby heading to sort
 pills by their tasks' latest modification date. Grouped pills use the most recent
 modification among their active tasks; previews retain the source task order.
 Equal dates retain the usual pill order, and missing dates go last. The toggle

@@ -71,11 +71,14 @@ test('recently modified preference syncs, restores from backups and respects und
     const a = createApp(), b = createApp();
     try {
         assert.equal(a.data.readNearbyRecentlyModifiedFirst(), false);
-        const handler = new Function('saveNearbyRecentlyModifiedFirst', 'commitState', 'recentlyModifiedFirst',
-            transpile(componentFunctions('src/lib/components/NearbyErrandsScreen.svelte', ['setRecentlyModifiedFirst'])) + '\nreturn setRecentlyModifiedFirst;'
-        )(a.data.saveNearbyRecentlyModifiedFirst, a.store.commitState, true);
-        handler({ currentTarget: { checked: true } });
+        const handler = () => new Function('saveNearbyRecentlyModifiedFirst', 'commitState', 'recentlyModifiedFirst',
+            transpile(componentFunctions('src/lib/components/NearbyErrandsScreen.svelte', ['toggleRecentlyModifiedFirst'])) + '\nreturn toggleRecentlyModifiedFirst;'
+        )(a.data.saveNearbyRecentlyModifiedFirst, a.store.commitState, a.data.readNearbyRecentlyModifiedFirst())();
+        handler();
         assert.equal(a.data.readNearbyRecentlyModifiedFirst(), true);
+        handler();
+        assert.equal(a.data.readNearbyRecentlyModifiedFirst(), false);
+        handler();
         merge(a.doc, b.doc);
         assert.equal(b.data.readNearbyRecentlyModifiedFirst(), true);
         const backup = JSON.parse(JSON.stringify(a.data.exportBackup()));
@@ -89,7 +92,7 @@ test('recently modified preference syncs, restores from backups and respects und
         a.store.viewCommit(a.store.readCommits()[0].id);
         assert.equal(a.data.readNearbyRecentlyModifiedFirst(), true);
         assert.throws(() => a.data.saveNearbyRecentlyModifiedFirst(false), /read-only/);
-        handler({ currentTarget: { checked: false } });
+        handler();
         assert.equal(a.data.readNearbyRecentlyModifiedFirst(), true, 'toggle handler ignores historical changes');
         a.store.exitCommitView();
         assert.equal(a.data.readNearbyRecentlyModifiedFirst(), false);

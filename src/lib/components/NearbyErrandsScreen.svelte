@@ -33,10 +33,8 @@
     let radius = $state(5);
     const previewLimit = $derived.by(() => { void docState.version; return readNearbyPreviewLimit(); });
     const recentlyModifiedFirst = $derived.by(() => { void docState.version; return readNearbyRecentlyModifiedFirst(); });
-    function setRecentlyModifiedFirst(event: Event) {
-        const input = event.currentTarget as HTMLInputElement;
-        if (!commitState.isHistorical) saveNearbyRecentlyModifiedFirst(input.checked);
-        input.checked = recentlyModifiedFirst;
+    function toggleRecentlyModifiedFirst() {
+        if (!commitState.isHistorical) saveNearbyRecentlyModifiedFirst(!recentlyModifiedFirst);
     }
     function setPreviewLimit(event: Event) {
         const input = event.currentTarget as HTMLSelectElement;
@@ -291,10 +289,15 @@
     <main>
         {#if commitState.isHistorical}<p class="notice">Viewing historical todos and custom locations. Exit history to make changes.</p>{/if}
         <section class="nearby-strip" aria-labelledby="nearby-strip-heading">
-            <label class="starting-point-toggle recently-modified-toggle">
-                <input type="checkbox" role="switch" checked={recentlyModifiedFirst} onchange={setRecentlyModifiedFirst} disabled={commitState.isHistorical} />
-                Recently modified first
-            </label>
+            <button class="recently-modified-toggle" class:active={recentlyModifiedFirst}
+                aria-label="Recently modified first" aria-pressed={recentlyModifiedFirst}
+                title={`Recently modified first: ${recentlyModifiedFirst ? 'on' : 'off'}`}
+                onclick={toggleRecentlyModifiedFirst} disabled={commitState.isHistorical}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7v5l3 2" />
+                </svg>
+            </button>
             <h2 id="nearby-strip-heading"><button class="nearby-heading" title="Go to distance setting" onclick={scrollToRadius}>Nearby</button></h2>
             <select class="preview-limit" aria-label="Items per pill" title="Items per pill" value={previewLimit} onchange={setPreviewLimit} disabled={commitState.isHistorical}>{#each [1, 2, 3, 4, 5, 6, 7, 8, 9] as count}<option value={count}>{count}</option>{/each}</select>
             {#each nearbyPills as pill (pill.id)}
@@ -496,7 +499,9 @@
     .back { border: 0; font-size: 1.35rem; padding: .3rem .6rem; } .primary { background: var(--accent); color: #fff; border-color: var(--accent); }
     label { display: flex; flex-direction: column; gap: .4rem; margin: .7rem 0; } select, input { width: 100%; min-width: 0; }
     .starting-point-toggle { flex-direction: row; align-items: center; gap: .6rem; cursor: pointer; }
-    .recently-modified-toggle { margin: 0; font-size: .85rem; }
+    .recently-modified-toggle { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex-shrink: 0; padding: 0; }
+    .recently-modified-toggle.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .recently-modified-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     .starting-point-toggle input { appearance: none; position: relative; box-sizing: border-box; width: 44px; height: 26px; flex-shrink: 0; margin: 0; padding: 0; border-radius: 999px; cursor: pointer; }
     .starting-point-toggle input::before { content: ''; position: absolute; width: 18px; height: 18px; top: 3px; left: 3px; border-radius: 50%; background: var(--text2); }
     .starting-point-toggle input:checked { background: var(--accent); border-color: var(--accent); }
