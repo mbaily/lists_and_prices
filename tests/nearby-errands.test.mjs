@@ -7,6 +7,56 @@ import { createApp, merge, root, componentFunctions, transpile, Y } from './help
 const supermarket = { id: 'coles-test', name: 'Coles Test', tags: ['coles', 'supermarket'], latitude: -37.8136, longitude: 144.9631 };
 const custom = { id: 'custom-test', name: 'Pharmacy', tags: ['pharmacy'], latitude: -37.81, longitude: 144.96 };
 
+test('ordinary item and list hashtags stay out of nearby errands while location tags still qualify', () => {
+    const app = createApp();
+    try {
+        const nearby = app.load('src/lib/nearbyErrands.ts');
+        const folder = app.data.createFolder('Tasks', null);
+        const list = app.data.createList('Supplies #supplies_photos', folder, 'plain');
+        app.data.createItem(list, 'Take photos #supplies_photos');
+        app.data.createItem(list, 'Sort supplies');
+        app.data.createItem(list, 'Photo notes #urgent', null, null, true);
+        const explicit = app.data.createItem(list, 'Buy milk #WOOLIES #supplies_photos');
+        const bank = app.data.createItem(list, 'Withdraw cash #bank #urgent');
+        const general = app.data.createItem(list, 'Collect parcel #errand');
+        const shopping = app.data.createList('Shopping #supermarket #weekly', folder, 'plain');
+        const inherited = app.data.createItem(shopping, 'Milk #supplies_photos');
+        const collect = (includeCompleted = false) => nearby.collectErrands(app.data.readAllItems(), app.data.readLists(), app.data.readFolders(), includeCompleted);
+        const before = app.data.readAllItems();
+        for (const includeCompleted of [false, true]) {
+            const errands = collect(includeCompleted);
+            assert.deepEqual(errands.map(errand => errand.item.id), [explicit, bank, general, inherited]);
+            assert.equal(errands.find(errand => errand.item.id === explicit).inheritsListTags, false);
+            assert.equal(errands.find(errand => errand.item.id === inherited).inheritsListTags, true);
+            const locationErrands = errands.filter(errand => !nearby.isLocationOptionalErrand(errand));
+            const woolworths = { ...supermarket, tags: ['woolworths'] };
+            assert.deepEqual(nearby.suggestStops(nearby.nearbyStops([woolworths], null, 5, errands), locationErrands).unavailable, []);
+        }
+        assert.deepEqual(app.data.readAllItems(), before, 'ordinary hashtags remain intact on the original items');
+    } finally { app.dispose(); }
+});
+
+test('custom hashtags qualify only while registered on a location', () => {
+    const app = createApp();
+    try {
+        const nearby = app.load('src/lib/nearbyErrands.ts');
+        const folder = app.data.createFolder('Tasks', null);
+        const list = app.data.createList('Supplies', folder, 'plain');
+        const photo = app.data.createItem(list, 'Take photos #supplies_photos');
+        const taggedList = app.data.createList('Supplies #supplies_photos', folder, 'plain');
+        const inherited = app.data.createItem(taggedList, 'Sort supplies #urgent');
+        const collect = () => nearby.collectErrands(app.data.readAllItems(), app.data.readLists(), app.data.readFolders());
+        assert.deepEqual(collect(), []);
+        app.data.saveCustomLocation({ ...custom, tags: ['supplies_photos'] });
+        assert.deepEqual(collect().map(errand => errand.item.id), [photo, inherited]);
+        assert.deepEqual(collect().map(errand => errand.inheritsListTags), [false, true]);
+        const stops = nearby.nearbyStops(app.data.readCustomLocations(), null, 5, collect());
+        assert.deepEqual(nearby.suggestStops(stops, collect()).unavailable, []);
+        app.data.deleteCustomLocation(custom.id);
+        assert.deepEqual(collect(), []);
+    } finally { app.dispose(); }
+});
+
 test('unrelated item hashtags inherit list errands while recognized errand tags override them', () => {
     const app = createApp();
     try {
@@ -149,22 +199,24 @@ test('suggested stops cover specialist errands alongside milk and hide repeated 
         const screws = app.data.createItem(list, 'Screws #bunnings');
         const distant = app.data.createItem(list, 'Distant shop #far');
         const unknown = app.data.createItem(list, 'Unknown #notindatabase');
-        const errands = nearby.collectErrands(app.data.readAllItems(), app.data.readLists(), app.data.readFolders());
         const branches = Array.from({ length: 30 }, (_, i) => ({ ...supermarket, id: `supermarket-${i}`, latitude: supermarket.latitude + i * .0001 }));
         const officeworks = { ...supermarket, id: 'officeworks', tags: ['officeworks'], latitude: supermarket.latitude + .01 };
         const bunnings = { ...supermarket, id: 'bunnings', tags: ['bunnings'], latitude: supermarket.latitude + .02 };
         const far = { ...supermarket, id: 'far', tags: ['far'], latitude: -38.1 };
-        const stops = nearby.nearbyStops([...branches, officeworks, bunnings, far], supermarket, 5, errands);
+        const locations = [...branches, officeworks, bunnings, far];
+        const errands = nearby.collectErrands(app.data.readAllItems(), app.data.readLists(), app.data.readFolders(), false, locations);
+        assert.ok(!errands.some(errand => errand.item.id === unknown), 'unregistered hashtags do not become errands');
+        const stops = nearby.nearbyStops(locations, supermarket, 5, errands);
         const plan = nearby.suggestStops(stops, errands);
         assert.deepEqual(plan.suggested.map(stop => stop.location.id), ['supermarket-0', 'officeworks', 'bunnings']);
         assert.deepEqual(plan.suggested.flatMap(stop => stop.errands.map(errand => errand.item.id)), [milk, paper, screws]);
         assert.equal(plan.alternatives.length, 29);
-        assert.deepEqual(plan.unavailable.map(errand => errand.item.id), [distant, unknown]);
+        assert.deepEqual(plan.unavailable.map(errand => errand.item.id), [distant]);
         assert.equal(stops.length, 32, 'planning does not mutate nearby alternatives');
         assert.equal(nearby.suggestStops(nearby.nearbyStops([...branches, officeworks, bunnings, far], supermarket, 1, errands), errands).suggested.length, 1);
         const restored = nearby.suggestStops(nearby.nearbyStops([...branches, officeworks, bunnings, far], supermarket, 50, errands), errands);
         assert.ok(restored.suggested.some(stop => stop.location.id === 'far'));
-        assert.deepEqual(restored.unavailable.map(errand => errand.item.id), [unknown]);
+        assert.deepEqual(restored.unavailable, []);
     } finally { app.dispose(); }
 });
 

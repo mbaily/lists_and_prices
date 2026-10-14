@@ -15,6 +15,8 @@ function tasks(app) {
 test('No filter includes worldwide hashtag matches without an origin or radius and orders stops by name', () => {
     const app = createApp();
     try {
+        app.data.saveCustomLocation(home);
+        app.data.saveCustomLocation(overseas);
         const { list, collect } = tasks(app);
         const parcel = app.data.createItem(list, 'Collect parcel #home');
         const meeting = app.data.createItem(list, 'Attend meeting #office');
@@ -34,7 +36,8 @@ test('No filter includes worldwide hashtag matches without an origin or radius a
         assert.deepEqual(plan.suggested.map(stop => stop.location.name), ['London home', 'New York office']);
         assert.deepEqual(plan.suggested.flatMap(stop => stop.errands.map(errand => errand.item.id)), [parcel, meeting]);
         assert.deepEqual(plan.alternatives.map(stop => stop.location.name), ['Zurich office']);
-        assert.deepEqual(plan.unavailable.map(errand => errand.item.id), [unknown, bank]);
+        assert.ok(!errands.some(errand => errand.item.id === unknown), 'unregistered hashtags do not become errands');
+        assert.deepEqual(plan.unavailable.map(errand => errand.item.id), [bank]);
         const pills = app.load('src/lib/nearbyPills.ts').nearbyTaskPills;
         assert.deepEqual(new Set(pills(stops, errands).map(pill => pill.errand.item.id)), new Set([parcel, meeting, bank]));
         const filtered = nearby.nearbyStops(locations, home, 1, errands);
@@ -75,6 +78,8 @@ test('No filter respects inherited tags, explicit custom destinations and parent
 test('No filter preserves task eligibility and individual and hashtag pauses', () => {
     const app = createApp();
     try {
+        app.data.saveCustomLocation(home);
+        app.data.saveCustomLocation(overseas);
         const { folder, list, collect } = tasks(app);
         const active = app.data.createItem(list, 'Active #home');
         const paused = app.data.createItem(list, 'Deferred #home');

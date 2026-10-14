@@ -77,7 +77,7 @@ export function suggestStops(stops: NearbyStop[], errands: Errand[]): SuggestedS
 
 const defaultLocations: RetailLocation[] = [...catalogue.locations, ...suburbLocations];
 
-/** Item errand tags take precedence; unrelated tags still inherit list tags. */
+/** Only recognized errand tags qualify; unrelated item tags still inherit list tags. */
 export function collectErrands(items: Item[], lists: ListMeta[], folders: Folder[], includeCompleted = false, locations: readonly RetailLocation[] = [...defaultLocations, ...readCustomLocations()]): Errand[] {
     const errandTags = new Set([...LOCATION_OPTIONAL_TAGS, ...availableLocationTags(locations).map(entry => entry.tag)]);
     const availableLists = new Map(lists.filter(list => list.type !== 'divider' && !isListEffectivelyArchived(list, folders)).map(list => [list.id, list]));
@@ -99,7 +99,8 @@ export function collectErrands(items: Item[], lists: ListMeta[], folders: Folder
         // Completing a parent list hides its inherited errand, not explicitly tagged tasks.
         if (list.done && inheritsListTags) return [];
         const tags = inheritsListTags ? [...new Set([...itemTags, ...extractTags(list.name)])] : itemTags;
-        return tags.length ? [{ item, list, tags, inheritsListTags }] : [];
+        return tags.some(tag => errandTags.has(normalizeLocationTag(tag)))
+            ? [{ item, list, tags, inheritsListTags }] : [];
     });
 }
 
