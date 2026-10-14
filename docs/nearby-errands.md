@@ -16,10 +16,12 @@ the source list's order, including subtasks and subnotes. Selecting an inherited
 list pill opens the list from the top, without highlighting a particular task.
 Selecting an explicitly tagged item pill opens and highlights that item.
 
-Turn on the **Recently modified first** clock-icon button to the left of the Nearby heading to sort
-pills by their tasks' latest modification date. Grouped pills use the most recent
-modification among their active tasks; previews retain the source task order.
-Equal dates retain the usual pill order, and missing dates go last. The toggle
+Turn on the **Recently modified first** clock-icon button to the left of the
+Nearby heading to sort source lists by their most recently modified nearby task.
+All pills from the same source list stay together in source order, and task names
+inside grouped previews keep that order too. All tasks represented by a pill
+contribute to the date, including those hidden by the preview limit. Source lists
+with equal dates retain their usual order; lists with no valid dates go last. The toggle
 defaults to off, which preserves the usual order. It syncs across devices through
 Yjs and is included in backups.
 

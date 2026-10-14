@@ -42,14 +42,20 @@ export function nearbyListPills(stops: readonly NearbyStop[], errands: readonly 
             tags: [...tagsByGroup.get(group.id)!]
         }));
     if (!recentlyModifiedFirst) return pills;
-    // Keep previews in source order; only move whole pills. Missing dates go last.
-    const datedPills = pills.map(pill => ({
-        pill,
-        modifiedAt: pill.errands.reduce((latest, errand) => {
+    // Move whole source lists so their pills and previews retain source order.
+    const sourceLists = new Map<string, { pills: typeof pills; modifiedAt: number }>();
+    for (const pill of pills) {
+        let source = sourceLists.get(pill.list.id);
+        if (!source) {
+            source = { pills: [], modifiedAt: -Infinity };
+            sourceLists.set(pill.list.id, source);
+        }
+        source.pills.push(pill);
+        source.modifiedAt = pill.errands.reduce((latest, errand) => {
             const timestamp = Date.parse(errand.item.updatedAt ?? '');
             return Number.isFinite(timestamp) ? Math.max(latest, timestamp) : latest;
-        }, -Infinity)
-    }));
-    datedPills.sort((a, b) => b.modifiedAt - a.modifiedAt || 0);
-    return datedPills.map(({ pill }) => pill);
+        }, source.modifiedAt);
+    }
+    const orderedLists = [...sourceLists.values()].sort((a, b) => b.modifiedAt - a.modifiedAt || 0);
+    return orderedLists.flatMap(source => source.pills);
 }

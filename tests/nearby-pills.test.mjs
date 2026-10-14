@@ -40,13 +40,13 @@ test('bank errands appear without a location and are not duplicated by saved mat
     } finally { app.dispose(); }
 });
 
-test('recently modified ordering sorts whole pills, keeps ties stable and puts missing dates last', () => {
+test('recently modified ordering sorts source lists, keeps ties stable and puts missing dates last', () => {
     const app = createApp();
     try {
         const { nearbyListPills } = app.load('src/lib/nearbyPills.ts');
         const errand = (id, updatedAt, inherited = false) => ({
             item: { id, name: inherited ? id : `${id} #errand`, updatedAt },
-            list: { id: inherited ? 'group' : 'list' }, tags: ['errand'], inheritsListTags: inherited
+            list: { id: inherited ? 'group' : `list-${id}` }, tags: ['errand'], inheritsListTags: inherited
         });
         const errands = [
             errand('missing', null),
@@ -64,6 +64,35 @@ test('recently modified ordering sorts whole pills, keeps ties stable and puts m
         assert.deepEqual(nearbyListPills([], errands, 1, false), original, 'off restores the existing order');
         assert.deepEqual(errands.map(row => row.item.id), ['missing', 'old', 'group-old', 'tie', 'group-new', 'invalid']);
         assert.deepEqual(nearbyListPills([], [], 3, true), []);
+    } finally { app.dispose(); }
+});
+
+test('recently modified ordering keeps every pill from the same list in source order', () => {
+    const app = createApp();
+    try {
+        const { nearbyListPills } = app.load('src/lib/nearbyPills.ts');
+        const errand = (id, listId, updatedAt, inherited = false) => ({
+            item: { id, name: inherited ? id : `${id} #errand`, updatedAt },
+            list: { id: listId }, tags: ['errand'], inheritsListTags: inherited
+        });
+        const errands = [
+            errand('other', 'other-list', '2026-10-03T00:00:00Z'),
+            errand('first', 'source-list', null),
+            errand('group-first', 'source-list', '2026-01-01T00:00:00Z', true),
+            errand('last', 'source-list', '2026-10-04T00:00:00Z'),
+            errand('group-last', 'source-list', '2026-10-02T00:00:00Z', true),
+            { ...errand('unmatched', 'other-list', '2030-01-01T00:00:00Z'), tags: ['kmart'] }
+        ];
+        const original = nearbyListPills([], errands, 1);
+        assert.deepEqual(original.map(pill => pill.id), ['item:other', 'item:first', 'list:source-list', 'item:last']);
+        const sorted = nearbyListPills([], errands, 1, true);
+        assert.deepEqual(sorted.map(pill => pill.id), ['item:first', 'list:source-list', 'item:last', 'item:other'],
+            'latest eligible task moves its whole source list ahead, retaining every pill position within it');
+        assert.deepEqual(sorted.filter(pill => pill.list.id === 'source-list'), original.filter(pill => pill.list.id === 'source-list'));
+        assert.equal(sorted[1].name, 'group-first · +1 more');
+        assert.deepEqual(nearbyListPills([], errands.filter(row => row.list.id === 'source-list'), 1, true), sorted.slice(0, 3),
+            'a single source list keeps exactly the same order when enabled');
+        assert.deepEqual(nearbyListPills([], errands, 1, false), original);
     } finally { app.dispose(); }
 });
 
