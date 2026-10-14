@@ -1175,6 +1175,7 @@ export interface BackupFile {
 	nearbyLocationFilterEnabled?: boolean;
 	hotSuburbIds?: string[];
 	nearbyPreviewLimit?: number;
+	nearbyRecentlyModifiedFirst?: boolean;
 	nearbyChecklist?: Record<string, NearbyChecklistState>;
 	pausedErrandTags?: string[];
 	pausedErrandItemIds?: string[];
@@ -1195,6 +1196,7 @@ export function exportBackup(): BackupFile {
 		nearbyLocationFilterEnabled: readNearbyLocationFilterEnabled(),
 		hotSuburbIds: readHotSuburbIds(),
 		nearbyPreviewLimit: readNearbyPreviewLimit(),
+		nearbyRecentlyModifiedFirst: readNearbyRecentlyModifiedFirst(),
 		nearbyChecklist: readNearbyChecklist(),
 		pausedErrandTags: readPausedErrandTags(),
 		pausedErrandItemIds: readPausedErrandItemIds()
@@ -1241,6 +1243,7 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 	if (backup.nearbyLocationFilterEnabled !== undefined && typeof backup.nearbyLocationFilterEnabled !== 'boolean') throw new Error('Invalid nearby location filter.');
 	if (backup.hotSuburbIds !== undefined && !isHotSuburbIds(backup.hotSuburbIds)) throw new Error('Invalid hot suburbs.');
 	if (backup.nearbyPreviewLimit !== undefined && !isNearbyPreviewLimit(backup.nearbyPreviewLimit)) throw new Error('Invalid nearby preview limit.');
+	if (backup.nearbyRecentlyModifiedFirst !== undefined && typeof backup.nearbyRecentlyModifiedFirst !== 'boolean') throw new Error('Invalid nearby recently modified order.');
 	if (backup.nearbyChecklist !== undefined && (!backup.nearbyChecklist || typeof backup.nearbyChecklist !== 'object' || Array.isArray(backup.nearbyChecklist) || Object.entries(backup.nearbyChecklist).some(([id, state]) => !id || !isNearbyChecklistState(state)))) throw new Error('Invalid nearby checklist.');
 	if (backup.customLocations?.some(location => !location.id.startsWith('custom-'))) throw new Error('Custom location ids must start with custom-.');
 	if (backup.smartFolders != null && (typeof backup.smartFolders !== 'object' || Array.isArray(backup.smartFolders))) throw new Error('Invalid reports.');
@@ -1310,6 +1313,8 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 		else if (mode === 'replace') preferences.delete('hot-suburbs');
 		if (backup.nearbyPreviewLimit !== undefined) preferences.set('preview-limit', backup.nearbyPreviewLimit);
 		else if (mode === 'replace') preferences.delete('preview-limit');
+		if (backup.nearbyRecentlyModifiedFirst !== undefined) preferences.set('recently-modified-first', backup.nearbyRecentlyModifiedFirst);
+		else if (mode === 'replace') preferences.delete('recently-modified-first');
 		const checklist = doc.getMap<NearbyChecklistState>('nearby-checklist');
 		if (mode === 'replace') checklist.clear();
 		for (const [id, state] of Object.entries(backup.nearbyChecklist ?? {})) checklist.set(id, { ...state });
@@ -1495,6 +1500,15 @@ export function readNearbyPreviewLimit(): number {
 export function saveNearbyPreviewLimit(limit: number): void {
 	if (!isNearbyPreviewLimit(limit) || limit > 9) throw new Error('Invalid nearby preview limit.');
 	getMutableDoc().getMap('nearby-preferences').set('preview-limit', limit);
+}
+
+export function readNearbyRecentlyModifiedFirst(): boolean {
+	return getDoc().getMap('nearby-preferences').get('recently-modified-first') === true;
+}
+
+export function saveNearbyRecentlyModifiedFirst(enabled: boolean): void {
+	if (typeof enabled !== 'boolean') throw new Error('Invalid nearby recently modified order.');
+	getMutableDoc().getMap('nearby-preferences').set('recently-modified-first', enabled);
 }
 // ─── Spreadsheets ─────────────────────────────────────────────────────────────
 

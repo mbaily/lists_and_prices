@@ -25,7 +25,7 @@ export function nearbyTaskPills(stops: readonly NearbyStop[], errands: readonly 
 }
 
 /** Inherited tags share a pill; explicitly tagged tasks each have their own. */
-export function nearbyListPills(stops: readonly NearbyStop[], errands: readonly Errand[], limit: number) {
+export function nearbyListPills(stops: readonly NearbyStop[], errands: readonly Errand[], limit: number, recentlyModifiedFirst = false) {
     const matches = nearbyTaskPills(stops, errands);
     const tagsByGroup = new Map<string, Set<string>>();
     for (const match of matches) {
@@ -33,7 +33,7 @@ export function nearbyListPills(stops: readonly NearbyStop[], errands: readonly 
         if (!tagsByGroup.has(id)) tagsByGroup.set(id, new Set());
         tagsByGroup.get(id)!.add(match.tag);
     }
-    return groupErrands(errands.filter(errand => tagsByGroup.has(errandGroupId(errand))).map(errand => ({ errand })))
+    const pills = groupErrands(errands.filter(errand => tagsByGroup.has(errandGroupId(errand))).map(errand => ({ errand })))
         .map(group => ({
             id: group.id,
             list: group.list,
@@ -41,4 +41,15 @@ export function nearbyListPills(stops: readonly NearbyStop[], errands: readonly 
             name: errandPreview(group.rows.map(row => row.errand), limit),
             tags: [...tagsByGroup.get(group.id)!]
         }));
+    if (!recentlyModifiedFirst) return pills;
+    // Keep previews in source order; only move whole pills. Missing dates go last.
+    const datedPills = pills.map(pill => ({
+        pill,
+        modifiedAt: pill.errands.reduce((latest, errand) => {
+            const timestamp = Date.parse(errand.item.updatedAt ?? '');
+            return Number.isFinite(timestamp) ? Math.max(latest, timestamp) : latest;
+        }, -Infinity)
+    }));
+    datedPills.sort((a, b) => b.modifiedAt - a.modifiedAt || 0);
+    return datedPills.map(({ pill }) => pill);
 }

@@ -16,6 +16,13 @@ the source list's order, including subtasks and subnotes. Selecting an inherited
 list pill opens the list from the top, without highlighting a particular task.
 Selecting an explicitly tagged item pill opens and highlights that item.
 
+Turn on **Recently modified first**, to the left of the Nearby heading, to sort
+pills by their tasks' latest modification date. Grouped pills use the most recent
+modification among their active tasks; previews retain the source task order.
+Equal dates retain the usual pill order, and missing dates go last. The toggle
+defaults to off, which preserves the usual order. It syncs across devices through
+Yjs and is included in backups.
+
 Melbourne's 549 suburb centres are available as location hashtags, such as
 `#brunswick`, `#richmond`, `#brunswickeast`, `#stkilda` and `#mountwaverley`.
 Use the suburb name in lowercase without spaces or punctuation. These hashtags
