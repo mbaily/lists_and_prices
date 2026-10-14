@@ -291,7 +291,7 @@
         <section class="nearby-strip" aria-labelledby="nearby-strip-heading">
             <button class="recently-modified-toggle" class:active={recentlyModifiedFirst}
                 aria-label="Recently modified first" aria-pressed={recentlyModifiedFirst}
-                title={`Recently modified first: ${recentlyModifiedFirst ? 'on' : 'off'}`}
+                title={`Recently modified first: ${recentlyModifiedFirst ? 'on' : 'off'}. When on, source lists are sorted by their most recently modified nearby task. Pills from the same list stay together in source order, including task names inside grouped pills. When off, the usual order is used.`}
                 onclick={toggleRecentlyModifiedFirst} disabled={commitState.isHistorical}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <circle cx="12" cy="12" r="9" />
