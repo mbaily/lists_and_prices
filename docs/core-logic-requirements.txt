@@ -1,0 +1,1423 @@
+CORE DOMAIN LIBRARY: BEHAVIORAL SPECIFICATION AND REQUIREMENTS
+Revision 1
+Behavioral baseline: repository commit 41d09b15cda823cbe5d98b5ee7de8864e5308099
+
+1. SCOPE AND CONVENTIONS
+
+1.1 The library shall own the domain state and operations for folders, lists,
+tasks, notes, headings, completion, prices, ordering, moves, archives,
+favourites, references, imports, reports, nearby errands, undo and history.
+It shall support the retained spreadsheet data described in section 23.
+
+1.2 This specification defines the current domain behavior, including legacy
+compatibility and distinctions between different operations. Extraction into a
+library shall preserve these distinctions. It does not require a particular
+application framework, transport, storage product, or presentation system.
+
+1.3 A host shall supply user identity, a clock, fresh identifiers, durable
+storage, synchronization access, location observations, and operation inputs.
+The library shall accept and return domain values and Yjs updates. It shall
+not obtain user input, coordinates, or credentials by itself. Domain mutations
+shall also be usable without a connected synchronization peer.
+
+1.4 Yjs shall provide replicated shared types, transactions, update encoding,
+update application, state vectors, snapshots, and selective undo. Replicas
+shall converge using Yjs semantics. A timestamp field is ordinary replicated
+data; it does not decide which concurrent field assignment wins.
+
+1.5 Terms used throughout:
+  - Record: a folder, list, item, or retained spreadsheet metadata record.
+  - Item: a task, note, or heading represented by one item record.
+  - Task/todo: an item with heading=false and note=false.
+  - Source order: depth-first, parent-before-child item order as defined in 4.
+  - Active list: a list not effectively archived; additional operations may
+    separately exclude completed lists or dividers.
+  - Errand: an eligible item together with its list and effective location tags.
+  - Errand summary: a logical group of errands, displayed as a pill by some
+    consumers. Grouping and ordering are domain results, independent of display.
+  - Missing field: a field absent from stored data. Defaults apply on reading;
+    reading a default does not write that default into Yjs.
+  - Stable sort: equal comparison keys preserve the input sequence.
+
+1.6 Unless stated otherwise, identifiers are opaque strings. New ordinary
+record identifiers are UUIDs. Existing/imported identifiers are retained where
+the operation explicitly preserves identity. Names need not be unique.
+
+1.7 Dates written by ordinary commands are clock-derived ISO timestamp strings.
+Existing records may have null timestamps. No due-date field exists. A date
+embedded in a name, such as 15/10/26, is ordinary text, not a sorting timestamp.
+
+1.8 Numeric order keys are finite numbers for valid inputs. They need not be
+integers, nonnegative, consecutive, or globally unique. Unless specifically
+renumbering a sequence, an operation shall not normalize unrelated order keys.
+
+1.9 Comparisons have distinct contracts:
+  - Item sibling order: ascending numeric order, then ordinal ID comparison.
+  - Checkbox/template order: ascending numeric order, then ordinal ID.
+  - A sort specified only as numeric order is stable and has no extra ID tie-break.
+  - Human-name/tag comparisons specified as locale comparison use equivalent
+    locale comparison semantics on the participating host. The baseline does
+    not fix one universal locale for those comparisons.
+  - Exact and case-insensitive name equality are called out separately.
+
+2. DOCUMENT OWNERSHIP, LIFECYCLE AND TRANSACTIONS
+
+2.1 Maintain one live Y.Doc per user context. User contexts shall never share
+domain data accidentally. Closing or switching a context shall detach its
+observers, cancel its scheduled work and release its owned resources.
+
+2.2 Live and reconstructed historical documents shall use Yjs with gc=false.
+All participating replicas that retain snapshot history shall retain deleted
+Yjs structures. Ordinary removal of a record is not permission to erase Yjs
+history or recreate the user's document under new CRDT identities.
+
+2.3 Restore locally persisted Yjs updates before starting initial peer
+synchronization. A completion callback from an older context shall not activate
+or mutate the new context. Existing local data remains usable while offline.
+
+2.4 Expose a read document and a writable live document separately. The read
+document is the historical document while history is active, otherwise the
+live document. Requesting the writable document while viewing history shall
+fail. If no document exists, document-dependent operations shall fail rather
+than create an unrelated implicit document.
+
+2.5 The host shall be able to subscribe to state changes caused by local
+transactions, remote updates, restoration, and entering/exiting history.
+Derived results shall be recomputed from the current read document. Observer
+notifications do not confer permission to write repairs or defaults.
+
+2.6 Use a Yjs transaction for each operation explicitly described as atomic.
+Nested operations within that transaction are part of the same change. Yjs
+transactions do not roll back on a thrown exception. Validate complete import
+payloads and move plans before beginning destructive changes.
+
+2.7 Commands that follow asynchronous work shall revalidate the user context,
+target identity, target existence and historical/live status before mutation.
+Returning to the same target after leaving it does not make an old operation
+current again; use a context generation or equivalent freshness token.
+
+2.8 Persistence shall retain and replay Yjs updates, including updates whose
+dependencies have not yet arrived. An integration operation requiring durable
+acknowledgement shall wait for initial document restoration and for its write
+to be persisted. It shall use the same live document as other clients of that
+user, and keep that document alive for the duration of the operation.
+
+3. PERSISTED DATA MODEL
+
+3.1 The following are independent named roots in the Y.Doc, not fields inside
+one enclosing root map:
+
+  Root name                       Yjs type and meaning
+  folders                         Y.Array of Y.Map folder records
+  lists                           Y.Array of Y.Map list records
+  items                           Y.Array of Y.Map item records
+  spreadsheets                    Y.Array of Y.Map spreadsheet metadata
+  commits                         Y.Array of Y.Map history checkpoints
+  note_text_<itemId>               Y.Text authoritative item text
+  note-text-initialized            Y.Map initialization markers by item ID
+  smart-folders                   Y.Map legacy report membership values
+  smart-folder-memberships        Y.Map boolean per report/member pair
+  custom-locations                Y.Map location object by location ID
+  nearby-preferences              Y.Map preference keys from section 18
+  nearby-checklist                Y.Map checklist state by item ID
+  paused-errand-tags              Y.Map boolean by normalized tag
+  paused-errand-items             Y.Map boolean by item ID
+  sheet-cells-<sheetId>            Y.Map raw string by cell coordinate
+
+Array storage order is distinct from record.order. Reordering normally changes
+order fields, not physical array positions. There is no foreign-key database
+enforcement: missing references and transiently inconsistent replicated states
+must remain readable under the recovery rules below.
+
+3.2 Folder fields and read defaults:
+  id, name                        identifier and text
+  parentId                        folder ID or null; default null
+  color                           opaque string; default '#6366f1'
+  order                           number; default 0
+  favouriteOrder                  number; default order, then 0
+  done, favourite, archived       boolean; each default false
+  archivedPrevId, archivedNextId   same-kind sibling IDs or null; default null
+  createdAt, updatedAt            timestamp or null; default null
+  foldersFirst                    retained boolean preference; default true
+  localNav                        boolean; default false
+  filterView                      all/unchecked/checked; default all
+  checkboxes                      derived ordered definitions; default []
+  defaultItems                    derived ordered templates; default []
+
+3.3 List fields and read defaults:
+  id, name                        identifier and text
+  folderId                        owning folder ID
+  type                            plain/priced/divider; default plain
+  color, order, favouriteOrder     same defaults as folders
+  done, favourite, archived        each default false
+  archivedPrevId, archivedNextId   list sibling IDs or null; default null
+  createdAt, updatedAt             timestamp or null; default null
+  filterView                      all/unchecked/checked; default all
+  defaultIsNote, journalMode       retained booleans; each default false
+
+Ordinary list placement uses a folder. Legacy or low-level imported data may
+contain null or missing folder references; reading shall not invent a folder
+or discard such records. Lists with duplicate names remain different lists.
+A divider is a list record used as an ordering boundary, not a task container
+for the errand and integration rules that explicitly exclude it.
+
+3.4 Item fields and read defaults:
+  id, listId                      identifier and owning list ID
+  name                            authoritative text projection from section 10
+  price, qty                      number or null; each default null
+  checked                         legacy completion boolean; default false
+  order                           number; default 0
+  parentId                        parent item ID or null; default null
+  heading, note, pinned           each default false
+  fullScreen                      retained metadata; default false
+  createdAt, updatedAt            timestamp or null; default null
+  checks                          checkbox-ID-to-boolean projection; default {}
+
+Task, note and heading are stored as flags rather than a tagged union. Preserve
+existing combinations on import; do not silently rewrite them into a new type
+system. Operations generally test heading first, and exclude both headings and
+notes when they mean completable/priced tasks.
+
+3.5 A named checkbox state is stored as chk_<checkboxId> on the item map.
+For legacy compatibility, begin with an item.checks plain-object baseline,
+interpreting each value as value===true; then override with all chk_ fields,
+also interpreted as value===true. Independent checkbox changes shall use
+separate Yjs keys, not replace one shared JSON object.
+
+3.6 Folder named checkbox definitions use these per-definition fields on the
+folder map:
+  checkbox_name_<id>               string
+  checkbox_order_<id>              number
+  checkbox_removed_<id>            boolean tombstone
+
+Begin with valid {id:string,name:string} entries from a legacy checkboxes array,
+using array index as baseline order. Overlay string checkbox_name_ fields;
+new overlay-only IDs have baseline order 0. Remove definitions whose tombstone
+is true. Explicit order fields override baseline order. Sort by order then ID.
+Reading shall not migrate or rewrite the baseline array.
+
+3.7 Folder default templates use:
+  default_item_name_<id>           nonblank string
+  default_item_note_<id>           boolean
+  default_item_order_<id>          finite number
+  default_item_removed_<id>        boolean tombstone
+
+A valid template is {id,name,note}, with nonblank string id/name and boolean
+note. Begin with valid entries in a legacy defaultItems array, in array order.
+Overlay nonblank per-ID names, boolean note values and finite order values;
+overlay-only entries default to note=false and order=0. Remove tombstoned IDs;
+sort by order then ID. Read operations shall not rewrite the legacy baseline.
+
+3.8 Other retained presentation metadata, such as color or journalMode, is
+part of record compatibility. The core shall preserve it without prescribing
+how a consumer displays it.
+
+4. HIERARCHY RECOVERY AND SOURCE ORDER
+
+4.1 Resolve folder parent links over all folders. Resolve item parent links
+separately within each list. An item reference to an item in another list is
+therefore a missing parent for that list's hierarchy.
+
+4.2 Recovery is a pure projection:
+  a. Copy each node's parent relation.
+  b. Replace a non-null parent absent from the node set with null.
+  c. For each parent-chain cycle, select the ordinally smallest node ID in the
+     cycle and replace that node's projected parent with null.
+  d. Return copies with projected parent links. Preserve all nodes and fields.
+
+4.3 Do not persist recovery while reading or receiving updates. A missing
+parent may arrive in a later update. During an explicit move, existing cycle
+breaks may be materialized: write a recovered parent only if the stored parent
+exists in the relevant node set and differs from its recovered parent. Do not
+materialize unrelated missing-parent recovery.
+
+4.4 To obtain source item order, group recovered nodes by parentId; sort each
+sibling group by ascending order then ordinal ID; traverse roots and descendants
+depth-first, parent before children. Include headings and all descendants.
+Legacy trees deeper than the permitted move depth remain readable.
+
+4.5 A traversal entry shall expose item, level, sibling index, root-level
+ancestor index, and top-level index. Root level is 0; the top-level index of a
+non-root entry is -1. Each valid unique-ID node occurs exactly once.
+
+4.6 Reading a list's flat items recovers parent links then sorts all those
+items by order/ID. A source-order query performs the tree traversal instead.
+Reading all items groups physical item-array entries by list ID in first-seen
+list order, recovers each group, and concatenates the groups. This is not the
+folder navigation order and is not a sort by creation date.
+
+5. CREATION, UPDATES AND TIMESTAMPS
+
+5.1 Creating a folder writes a fresh ID, supplied name/color/parent, done=false,
+favourite=false, archived=false, foldersFirst=true, localNav=false and current
+createdAt/updatedAt. Its order is based on both child folders and child lists
+at the destination. For an empty mixed sibling set, extrema are min=0,max=-1;
+thus bottom insertion gives 0 and top insertion gives -1. Otherwise use min-1
+or max+1. Creation is one transaction.
+
+5.2 Creating a list writes a fresh ID, supplied name/folder/type/color, current
+timestamps, defaultIsNote=false and journalMode=false. It uses the same mixed
+sibling extrema and insertion rules. Other flags are read through defaults.
+
+5.3 A create-list request may explicitly designate a future list. Find the
+first stored divider list in that folder. If none exists, use ordinary insertion.
+If one exists with order D:
+  - Top insertion: assign D to the new list; increment by 1 every existing
+    folder/list sibling with order >= D.
+  - Bottom insertion: assign D+1 to the new list; increment by 1 every existing
+    folder/list sibling with order > D.
+The date-like text in a list name is not inspected by this ordering operation.
+
+5.4 A new non-divider list copies the current templates of its direct owning
+folder exactly once, in template order. Each copy is a fresh root item with
+the template's name and note flag, no price, no completion, and order 0..n-1.
+The list and template copies are created in one transaction. No ancestor
+template inheritance occurs. Divider creation, moving a list, restoring a
+backup, and changing templates do not seed or reseed an existing list.
+
+5.5 Creating an item requires its destination list to exist. It writes fresh
+identity, listId, name, price (default null), checked=false, current timestamps,
+optional non-null parentId and note=true when requested. Initialize its Y.Text
+in the same transaction. If explicitOrder is supplied, use it; otherwise:
+  - Consider only items in the same list and with the same stored parentId,
+    treating absent parentId as null.
+  - Empty sibling set: order 0.
+  - Top: minimum sibling order minus 1.
+  - Bottom: maximum sibling order plus 1.
+
+5.6 Batch creation of n root tasks reserves n consecutive keys. For nonempty
+siblings the base is min-n at top or max+1 at bottom; for an empty set it is 0.
+Assign base+i in input order. Duplicates in the supplied names are allowed.
+Create the batch atomically.
+
+5.7 Updating an item ignores a missing item. Compare each supplied field to
+its current value; name comparison uses authoritative item text. If no value
+changes, do nothing. A changed name shall update the Y.Text and compatibility
+name field. If the only actual changed field is order, preserve updatedAt;
+otherwise set updatedAt to the current clock. createdAt remains unchanged.
+
+5.8 Updating a folder/list/sheet ignores a missing target. Apply the supplied
+fields, except derived folder checkbox/template collections use their explicit
+replacement rules. Preserve updatedAt only when the supplied patch consists
+of the single field order; other patches set it to the current clock. Unlike
+item updates, these general metadata helpers do not first eliminate unchanged
+field values. Do not treat favouriteOrder as an order-only timestamp exemption.
+
+5.9 Updating a folder's parent to a non-null value requires the destination
+folder to exist and not be the folder itself or its descendant; otherwise do
+nothing. An explicit folder move may materialize recovered cycles as in 4.3.
+
+5.10 When a list changes to an existing destination folder, copy the destination
+folder's color after applying the patch, even if a color was supplied in that
+patch. Ordinary item edits do not update the parent list's timestamp.
+
+5.11 A folder color update may request colorChildren. In the same transaction,
+copy the new color and a current updatedAt to direct child folders and direct
+child lists. Do not recurse into grandchildren or change item records.
+
+5.12 Setting one named checkbox writes its chk_ field and updates the item's
+updatedAt. Clearing a batch of named checkbox IDs sets each requested field to
+false on every existing target and updates each target's updatedAt, atomically.
+
+5.13 A text observer mirrors changed authoritative names to legacy name fields.
+It stamps updatedAt only when the projected plain name actually changes. This
+also applies when processing a remote text change. Formatting-only changes
+whose plain name is unchanged do not independently stamp updatedAt; they still
+affect the checklist fingerprint described in 19.2.
+
+5.14 Automatic list naming is a separate pure name-generation operation with
+clock/calendar inputs. Use a supplied trimmed nonempty name unchanged. If it
+is empty, use the following precedence:
+  - Divider: '↑ future days | previous days ↓'.
+  - Day-offset mode: current local calendar date plus the supplied number of
+    days, formatted DD/MM/YY.
+  - Explicit-date mode: supplied YYYY-MM-DD converted to DD/MM/YY.
+  - Otherwise: current local date/time in the baseline en-GB day/month/two-digit
+    year and two-digit hour/minute representation.
+An offset >0 designates a future list. An explicit date designates one when
+its parsed instant is after the current local midnight. The future designation
+affects section 5.3 even when an explicit nonempty list name was supplied.
+
+6. COMPLETION, TYPES AND TOTALS
+
+6.1 Effective completion(item, folder) is:
+  - If the item's direct owning folder currently defines at least one named
+    checkbox: true exactly when the last definition's ID has checks[id]=true.
+  - Otherwise: the item's legacy checked flag.
+Earlier named checks represent independent progress. Completion does not require
+all earlier checks. Reordering definitions can change effective completion.
+
+6.2 The completion function itself does not special-case notes or headings.
+Operations described as operating on tasks shall exclude those types explicitly.
+Folder.done and list.done are independent metadata, not aggregates of children.
+Completing a list does not complete or otherwise modify its item records.
+
+6.3 A quick task-completion command changes the final named checkbox when
+configured, otherwise checked. Preserve all earlier named checks. Nearby task
+completion ignores notes/headings and registers eligible previously incomplete
+tasks in the checklist before changing completion.
+
+6.4 Bulk uncheck operates on selected tasks, or all tasks when selection is
+empty; exclude notes/headings. Clear every configured named checkbox, not only
+the final checkbox. In single-checkbox mode, set checked=false.
+
+6.5 Delete-completed selects items for which effective completion is true,
+optionally restricted to selected IDs, then deletes their subtrees. The
+underlying delete-completed operation does not add an independent note/heading
+filter; retained completion fields on those records can therefore matter.
+
+6.6 Converting an ordinary item to a heading sets heading=true, checked=false,
+price=null and qty=null, and clears all currently configured named checks.
+Retain descendants and identity. This does not clear every orphaned checkbox
+ID, and does not implicitly change note unless separately requested.
+
+6.7 Toggling note/task requires an existing non-heading item. Invert note;
+when converting a note to a task, also set fullScreen=false. Retain identity,
+text, price, quantity, hierarchy, pin state and stored completion fields.
+
+6.8 Task counts exclude headings and notes; classify the remainder using 6.1.
+A list monetary total includes all its tasks, including completed tasks and
+subtasks. For each task calculate round((price ?? 0)*(qty ?? 1)*100); sum those
+integer-cent amounts; return round(sum)/100. Preserve zero quantity. Round each
+line before summation. Use the baseline numeric rounding semantics, including
+half-way rounding toward positive infinity. No currency conversion is performed.
+
+7. CHECKBOX DEFINITIONS AND DEFAULT TEMPLATES
+
+7.1 For interactive checkbox add/rename, collapse runs of tab, CR and LF to
+one space, trim, and truncate to 40 UTF-16 code units. Reject an empty result.
+Reject a duplicate name by case-insensitive equality within that folder.
+Adding allows at most eight current definitions; return no ID if rejected.
+An add or successful rename stamps the folder's updatedAt.
+
+7.2 Adding a checkbox creates a new UUID, writes its name, appends after the
+maximum current stored/fallback definition order, and writes removed=false.
+Renaming changes only its name field; it does not clear a removal tombstone.
+Removing sets removed=true and stamps the folder. Retain corresponding item
+chk_ fields. If no definitions remain, completion returns to legacy checked.
+
+7.3 Moving a definition up/down swaps it with the adjacent definition, if one
+exists, writes orders 0..n-1 and stamps the folder. Missing IDs and attempts to
+move beyond an edge have no effect.
+
+7.4 Explicit definition replacement tombstones existing IDs absent from the
+replacement, writes names for desired IDs, clears their removal tombstones,
+and writes orders 0..n-1. Legacy backup validation does not enforce interactive
+name length, unique names, or the eight-definition cap; preserve that distinction.
+
+7.5 Adding a default template requires a trimmed nonblank name and a boolean
+note flag. There is no template count limit or duplicate-name prohibition.
+Assign a fresh ID, append after the maximum current order, set removed=false
+and stamp the folder. Updating changes only supplied name/note values; trim
+names, reject blanks/non-booleans, and stamp only when something changes.
+
+7.6 Removing a current template writes its removal tombstone and stamps the
+folder. Moving swaps adjacent templates and renumbers 0..n-1. Explicit
+replacement tombstones absent IDs, writes desired name/note fields, clears
+their removal tombstones, and rewrites their order. A valid replacement has
+unique nonblank IDs, nonblank names and boolean note flags.
+
+7.7 Independent offline changes to different definitions or different fields
+of a template shall merge through their independent Yjs keys. A concurrent
+rename/edit shall not revive a removed definition/template because it does
+not clear the separate removal tombstone.
+
+8. MOVES, REPARENTING AND REORDERING
+
+8.1 Plan item moves before writing. Inputs are one source list, selected IDs,
+a destination list, a destination parent ID or null, and top/bottom insertion.
+Reject empty selection, unknown source IDs, a missing non-null destination
+parent, or a heading destination parent.
+
+8.2 Reduce selection to selected roots: omit any selected item whose ancestor
+is also selected. Order roots by source traversal, not selection order. Move
+each root with all descendants, whether or not each descendant is selected.
+Reject a destination parent inside the moved set.
+
+8.3 Project the move into the destination hierarchy before writing. Reject if
+any moved node would have level greater than 2 (root, child, grandchild).
+Do not delete or flatten deeper legacy trees merely because reading permits
+them. A move can succeed if the resulting depth of all moved nodes is <=2.
+
+8.4 Cross-list/same-list destination moves require both list records to exist.
+Reject a divider destination or an effectively archived destination list.
+The command does not separately reject a source merely for being archived.
+
+8.5 Compute insertion keys from destination-parent siblings excluding all
+moved nodes. For k moved roots use base=min-k at top or max+1 at bottom; empty
+sibling set uses 0. Change each moved root's parentId and assign consecutive
+keys in source-root order. Preserve descendant parent relationships and order.
+
+8.6 A move preserves IDs, authoritative Y.Text identities, content, createdAt,
+and other item metadata. Change listId on every moved descendant when crossing
+lists. Stamp all moved items when crossing lists; the general destination-move
+command also stamps roots when staying within the same list. Commit the entire
+move in one transaction, including necessary cycle materialization.
+
+8.7 When source and destination lists have different owning folder IDs, map
+completion for each moved task (not notes/headings):
+  a. Compute source effective completion before the move.
+  b. Set legacy checked to that completion value.
+  c. For each destination checkbox, find the first source checkbox whose name
+     equals it case-insensitively. If found, copy that source check value;
+     otherwise use source effective completion.
+  d. Retain orphaned chk_ fields not overwritten by this mapping.
+Moving within the same folder does not perform this mapping. Moving a whole
+list to another folder is a separate metadata operation and does not remap
+its items' completion fields.
+
+8.8 Same-list reparenting uses the same subtree/depth/insertion plan, and
+updates only selected root parent/order fields through ordinary item updates.
+Consequently a root whose only actual change is order keeps its timestamp.
+
+8.9 Reorder siblings by removing the selected sibling index and inserting it
+at the target index in the complete sibling sequence. Validate both indices.
+Write order=0..n-1 for that sequence in one transaction. Descendants follow
+their parent through traversal; their fields are not individually renumbered.
+The retained flat reorder operation instead reorders readItems' flat sequence.
+
+8.10 Folder-only, list-only and mixed folder/list reorder operations exist.
+For a filtered visible sequence, first move the visible ID in that sequence;
+remove it from the complete sibling sequence; insert it immediately before
+the new next visible sibling, otherwise immediately after the new previous
+visible sibling, otherwise at the end. Renumber the complete affected sequence
+0..n-1. Hidden siblings retain their relative order. Mixed sequences share
+one numeric order space. Order-only writes preserve modification dates.
+
+8.11 Moving a folder/list to a folder uses destination mixed sibling extrema,
+excluding the moved record. A folder may move to root. A list-move workflow
+requires a folder destination. Reject self/descendant folder destinations and
+effectively archived destinations. Moving a list inherits destination color.
+
+8.12 The folder-edge item-move shortcut considers non-divider, non-effectively-
+archived lists directly in the source folder, sorted by order. Select the
+first for a top preference, last for bottom. If that is the source list, make
+no move. Otherwise move selected item subtrees to the destination's root using
+the supplied item insertion preference.
+
+8.13 A destination mark is {kind,id}, with nonblank strings, stored under a
+trimmed nonblank mark name; the default name is 'default'. Marks are user-local
+host state, not synchronized Yjs data or part of the backup. Resolve at use time:
+  - kind=list: existing allowed non-divider list, parentId=null.
+  - kind=item/note/todo/task: existing non-heading item in an allowed list;
+    note requires note=true; todo/task requires note=false; item accepts either.
+  - Other kinds or missing/incompatible records: no destination.
+Use the normal move planner after resolving; a saved mark does not bypass it.
+
+9. DELETION AND ARCHIVING
+
+9.1 Plain item deletion removes only that item's array record. Remaining
+children become projected roots if their parent is missing. Cascading item
+deletion recursively removes descendants; batch deletion cascades from every
+requested root in one transaction and tolerates overlapping selections/cycles.
+Cascade discovery follows stored parentId links across the item array, not
+the projected tree; use a visited-ID set. It does not independently constrain
+each discovered descendant to the original list in malformed legacy data.
+
+9.2 Deleting a list removes its item records and list record in one transaction.
+The explicit list-delete command also removes that ID from report memberships.
+Deleting a folder recursively deletes recovered child folders and their lists
+and items, removes folder records, and clears those folder IDs from reports.
+Retained sheet records are not part of the folder-deletion cascade.
+
+9.3 Item/list/folder deletion does not purge root Y.Text objects, initialization
+markers, checklist entries or pause entries. Missing items are excluded by
+queries. These remaining roots support existing history/undo compatibility.
+
+9.4 Effective archive for a folder is true if it or any reachable ancestor is
+explicitly archived. Missing ancestors terminate the walk; guard against cycles.
+Effective archive for a list is list.archived OR its folder's effective archive.
+Folder.done does not imply archive or completion of descendants.
+
+9.5 Archive a list/folder without deleting or modifying descendants. Among
+currently unarchived siblings of the same kind and parent, sorted by order,
+save the preceding/following IDs as archivedPrevId/archivedNextId and set
+archived=true. Already archived or missing records produce no archive change.
+
+9.6 Unarchive into the current parent's currently unarchived same-kind sequence:
+  a. Insert after saved previous ID if present.
+  b. Otherwise insert before saved next ID if present.
+  c. Otherwise insert first when the saved previous ID is null.
+  d. Otherwise append.
+Set archived=false, clear saved neighbor IDs, and renumber that same-kind
+sequence 0..n-1 atomically. This restoration does not renumber the other kind
+of record in a mixed folder/list sequence.
+
+9.7 Normal folder-content queries exclude effectively archived children.
+Archive queries retain paths to archived descendants: include nonarchived
+ancestors needed to reach explicitly archived content. Inside an effectively
+archived folder include all direct children. Inside a nonarchived path-through
+folder include archived/path-through folders and explicitly archived lists.
+At archive root include tops of explicitly archived folder subtrees, root
+path-through folders, and explicitly archived lists whose owning folder is
+missing. Completion filters apply after this selection.
+
+10. COLLABORATIVE ITEM TEXT
+
+10.1 All new item names, including tasks and headings, have a root Y.Text
+named note_text_<id>. Set a note-text-initialized marker in the creation
+transaction even for empty text. Text is authoritative when the marker exists
+or the text has existing Yjs structures, including deleted structures.
+
+10.2 The plain name projection is Y.Text.toString() with exactly one terminal
+LF removed. If no authoritative text has ever existed, fall back to the legacy
+name field, default ''. Never repopulate intentionally emptied text from the
+legacy name or a caller-supplied stale string.
+
+10.3 Replacing text preserves the longest equal prefix and longest equal suffix
+that do not overlap. Delete only the differing middle range and insert only
+the new differing middle. Comparisons/indices use UTF-16 code units, matching
+the baseline text operations. Set the initialization marker. Do not replace
+the whole Y.Text or reassign unchanged characters new CRDT identities.
+
+10.4 Legacy text initialization shall be idempotent across offline replicas.
+Use retained immutable Yjs assignments of the legacy name, oldest to newest.
+For each assignment, derive a synthetic author from
+  'pnl-note-v1:' + itemId + ':' + assignmentClient + ':' + assignmentClock.
+Hash its UTF-8 bytes with SHA-256. Let h be the integer formed from the low
+four bits of byte 0 followed by bytes 1..6. Use client ID 2^52+h. These IDs
+are for temporary seed documents only; never change the live document's ID.
+
+10.5 Each legacy assignment seeds its name using root-relative anchors in
+its own temporary Yjs document. Replay into a temporary gc=false seed document,
+deleting the preceding seed text before applying the next assignment. Detect
+synthetic-author reuse within the seed and fail rather than use one identity
+for conflicting assignments. Apply the seed update to the live document, then
+write the initialized marker in a separate transaction. Both use a migration
+origin excluded from ordinary undo. The separation prevents treating local
+metadata writes as a collision with the synthetic authors.
+
+10.6 Observe changed root texts and mirror their derived names to matching
+item metadata. Ignore the mirror observer's own origin. Index item records
+once per changed-text transaction. Missing item records are skipped. Mirror
+writes are derived maintenance and are not independent undo actions.
+
+10.7 A text edit session uses a session-specific origin and a Yjs UndoManager
+scoped to that Y.Text. Changes are live replicated edits, not a private copy.
+Register the session origin and local undo manager with application undo.
+
+10.8 Saving a session combines its pending application-undo stack entries by
+merging insertion/deletion sets, leaving one entry at the position of the last
+session entry and preserving intervening unrelated actions. Clear the local
+session undo history and pending set; stop undo capture across the boundary.
+
+10.9 Discarding selectively undoes this session's unsaved local edits. Preserve
+remote edits and edits saved before the current session boundary. Remove the
+session's pending entries from application undo/redo, clear local history,
+and stop capture. Do not restore a stale whole-name string.
+
+10.10 Closing a session through context change or peer deletion commits its
+already replicated edits into application undo before disposing observers.
+Remote-only edits do not count as local unsaved changes. Historical text is
+read-only and cannot acquire a mutable edit session.
+
+11. APPLICATION UNDO AND HISTORY
+
+11.1 Application undo uses a Yjs UndoManager over the live document, with
+captureTimeout=0. Each separately captured transaction is a separate action,
+except session changes explicitly combined as in section 10.
+
+11.2 Capture only local transactions with changed shared types and a tracked
+origin. Track ordinary local commands and explicitly registered text-session
+origins. Do not capture remote/provider updates, legacy migrations, name
+mirrors, checkpoint management, or automatic nearby-checklist registration.
+Remote changes with a null origin must still not become local undo actions.
+
+11.3 Undo reverses the latest local tracked action using Yjs selective undo,
+preserving concurrent peer changes. Expose availability and count. In history,
+availability=false, count=0, and undo performs no change.
+
+11.4 A history checkpoint has id, name, createdAt, encoded Yjs snapshot, and
+optionally a self-contained encoded state. Capture the snapshot/state before
+inserting the new checkpoint at the start of the live commits array.
+Checkpoint creation/deletion is excluded from ordinary undo. While history is
+active, checkpoint creation/deletion makes no change.
+
+11.5 New checkpoint state copies current materialized root values into a fresh
+gc=false document. Clone record arrays and nested Yjs values; copy item texts
+by their complete Yjs deltas; copy other root maps. Exclude the commits root.
+Encode that document as a Yjs update. Excluding checkpoint history prevents
+recursive/exponential nesting of earlier checkpoint bytes.
+
+11.6 To view a checkpoint, create a fresh gc=false document. Prefer applying
+its self-contained state; for legacy checkpoints without state, use Yjs to
+reconstruct from its snapshot and the live document. On reconstruction failure,
+discard the failed temporary document and preserve the previous read context.
+On success dispose the preceding historical document and activate the new one.
+
+11.7 The checkpoint catalogue is always read from the live document. The live
+document may continue to receive synchronization updates while a historical
+document is being read. Exiting history disposes that historical document and
+resumes reading the current live state. Viewing history never restores it over
+the live document. Self-contained checkpoints are readable even if an older
+replica garbage-collected structures needed by a legacy snapshot.
+
+12. QUERIES, SEARCH, REFERENCES AND NAVIGATION ORDER
+
+12.1 List filter all returns the full source-order traversal. For checked or
+unchecked, first retain headings, root notes, and tasks matching the effective
+completion predicate. Then, in source order, retain a child note if its parent
+was retained; this allows chains of notes. Return selected entries in original
+source order. Do not automatically retain a nonmatching task merely to provide
+context for a matching task descendant.
+
+12.2 Folder-content completion filtering tests each direct folder/list record's
+own done value. The filter cycle is all -> unchecked -> checked -> all. Stored
+folder/list filter preferences are synchronized metadata; a root browsing
+filter can be an explicit transient query argument.
+
+12.3 General text search trims and lowercases the query. Empty query produces
+no results. Match a case-insensitive substring in folder, list and item names.
+For item results require the owning list to exist. An unchecked-only search
+excludes done lists and items whose owning list is done or whose effective
+completion is true. It does not filter folder.done, and does not independently
+exclude archived records, headings or notes. Return folders, then lists, then
+items as the initial sequence; stable-sort by createdAt descending using ISO
+string comparison, with missing dates last.
+
+12.4 Hashtag extraction returns matches of (?<=^|\s)#(\w+) in occurrence order,
+lowercased without '#'. Here \w means the baseline ASCII letters/digits/
+underscore set. Extraction itself may return duplicates. Tags must begin at
+the start of text or immediately after whitespace. General folder/list tag
+filtering tests direct names only, not inherited tags.
+
+12.5 Internal references are literal [[item:ID]], [[list:ID]], [[folder:ID]]
+tokens. Resolve by stable ID to the current record name, or an unresolved
+result if missing. References do not copy target content or change ownership.
+The inline tokenizer recognizes references, http/https URLs and #word tokens,
+returning text/url/tag/item-ref/list-ref/folder-ref segments in text order.
+URLs consume fragments containing '#' and exclude terminal . , ! ? ; : ' " )
+punctuation. This tokenizer recognizes #word anywhere, whereas semantic tag
+extraction in 12.4 requires a start/whitespace boundary; preserve the distinction.
+
+12.6 Favourite folder/list queries require favourite=true and not effectively
+archived. Combine both kinds, sort by favouriteOrder (fallback order, then 0),
+and put folders before lists at equal numeric keys; remaining ties are stable.
+Reordering favourites writes favouriteOrder=0..n-1 for the supplied sequence.
+The maximum-favourite-order helper starts at -1 and considers all marked
+folders/lists, including archived ones. Favouriting does not imply completion.
+
+12.7 A pinned-item query returns pinned items belonging to existing lists that
+are not effectively archived. It does not independently exclude completed
+lists/tasks. Pinning does not affect ordinary source item order.
+
+12.8 Global list traversal starts at root, recovers folder hierarchy, and walks
+depth-first through child folders and lists mixed by numeric order. Skip
+effectively archived branches, completed lists, and lists directly inside a
+localNav folder. Continue traversing that folder's child folders. The current
+traversal does not use foldersFirst as a sort key and does not independently
+filter divider records. Preserve these compatibility details.
+
+12.9 When navigating from a list directly in a localNav folder, use only lists
+in that same folder, sorted by order and excluding effectively archived lists.
+This local sequence includes completed lists. A previous/next query with delta
+-1/+1 returns no navigation change for fewer than two entries. Otherwise find
+the current index i (or -1 if absent), and use (i+delta+n) modulo n, where n is
+the sequence length. Navigation wraps and does not mutate record order.
+
+12.10 Quick-add target resolution receives local preferences as arguments.
+Choose the requested nonarchived root folder if it exists; otherwise the first
+nonarchived root folder by order; otherwise create root folder 'General'.
+Use trimmed configured list name or 'Quick List'. Reuse the first direct,
+unarchived, non-divider list whose trimmed name equals it case-insensitively;
+otherwise create a plain list using folder color and the supplied list insertion
+preference. Add the supplied trimmed nonempty text as one root task/note using
+the item insertion preference. A reused completed list is not automatically
+reopened. These target preferences are user-local host state, not Yjs fields.
+
+13. STRUCTURED ITEM EXPORT AND TEXT IMPORT
+
+13.1 A portable item export is a JSON object with __list_app__=true and an
+items array in source order. Export the selected items when selection is
+nonempty, otherwise all items. Selecting a parent does not implicitly export
+unselected descendants. Each entry contains id and authoritative name, plus:
+  - price/qty when non-null;
+  - checkedNames for currently checked configured definitions, when any;
+  - otherwise checked=true only in single-checkbox mode when checked;
+  - heading/note/pinned only when true;
+  - parentId when non-null.
+Do not include original timestamps, fullScreen, list identity or raw checkbox
+IDs as portable item state. Copying one item as plain text returns its name.
+
+13.2 Structured item import validates the entire items array before insertion.
+Entries require unique nonempty string IDs and string names; apply the shared
+record validations in 22.2. Process entries in input order. Assign each a fresh
+ID and map old ID -> new ID. A parent is mapped only if its exported parent
+has already been imported; otherwise import at root. Append within each new
+parent sibling group. Preserve name, price, note, non-null qty, and true
+checked/heading/pinned attributes. New timestamps are generated.
+
+13.3 If checkedNames is nonempty and the destination has named definitions,
+set matching definitions true by case-insensitive name equality. Ignore names
+not found; do not fall back merely because none match. Otherwise, if legacy
+checked=true and destination definitions exist, set all those definitions true.
+No name-based duplicate suppression occurs for structured item imports.
+
+13.4 Generic text ingestion first attempts JSON parsing only if trimmed text
+starts with '{'. A parsed object marked __list_app__=true requires a nonempty
+items array and uses structured import. Invalid marked exports are errors.
+Parse failures or unmarked values use plain-text parsing. Mutation/validation
+failure of a recognized export must never be retried as plain text.
+
+13.5 Plain-text parsing splits on CRLF or LF, trims each line and retains only
+lines containing at least one Unicode letter. Numeric-only or punctuation-only
+lines are ignored. Each retained line becomes a root task with no price.
+
+13.6 Define importNameKey(name): trim the string; remove one trailing sequence
+matching (?:\s+#\w+)+$; trim the resulting end; if that result is empty, use the
+original trimmed string. Equality of these keys is case-sensitive. Thus
+'Milk #coles' and 'Milk #supermarket' match; 'Milk' and 'milk' differ; inline
+tags, URL fragments and different hashtag-only names remain distinguishable.
+
+13.7 Ordinary plain-text import computes the existing-name-key set from all
+current destination items immediately before mutation, including children,
+headings and notes. Discard incoming lines matching that pre-import set.
+Do not extend that set while processing the incoming batch: repeated new
+lines within one batch are retained. Insert remaining lines as one atomic
+batch using the supplied top/bottom preference. A repeat import after the
+first is applied will see the newly stored names and skip them.
+
+13.8 Integration task ingestion has a different duplicate contract. Validate
+one destination list ID (nonempty, at most 128 characters), top/bottom insertion
+(default bottom), and exactly one of text or a string array. Before trimming,
+allow at most 500 lines/tasks, each at most 5000 UTF-16 code units and containing
+no CR, LF or NUL. Text is split before this validation. Trim and retain lines
+containing a Unicode letter. Validate before mutation.
+
+13.9 Integration ingestion requires an existing non-divider destination list.
+Build a key-to-ID map from all its existing authoritative names; the last stored
+matching existing item supplies the ID. Extend that map as incoming names are
+accepted, so duplicates within this batch are also suppressed. Return one
+{id,name,status} result per retained input, status added or duplicate, and
+added/duplicate/ignored counts. Additions are root tasks, with initialized text,
+fresh IDs and timestamps, in one transaction. This gives retry deduplication
+by current names; it is not a durable request-ID ledger and does not promise
+deduplication between independent simultaneous offline importers.
+
+13.10 The fixed integration destination recovery operation resolves exactly
+root folder 'From Photos' and its direct non-divider list 'From Photos', using
+case-sensitive names. Multiple matching folders/lists are ambiguity errors.
+Reject an archived matching root folder. Create missing folder/list at the
+bottom with fresh IDs; seed defaults only for a newly created list. Repeated
+resolution reuses existing records. The current resolver does not separately
+reject a matching archived list. Return destination identity and separate
+folderCreated/listCreated flags. Authorization and credential binding belong
+to the caller; they are not part of this domain command.
+
+13.11 Journal text export starts with all source-order items except headings,
+including completed tasks and notes. Stable-sort by parsed createdAt ascending;
+missing/unparseable timestamps have positive-infinity sort keys. For a valid
+timestamp format local time as D/M/YYYY h:mmAM or h:mmPM (12-hour clock, no
+space before AM/PM). Each output line is two spaces, '* ', optional date and
+one space, then the full name. Missing timestamps omit the date prefix. Join
+with LF. Preserve embedded item-name newlines rather than flattening them.
+
+13.12 Tab-separated list export uses full source order, not completion-filtered
+order or nearby order. It begins with '--- START: <name> ---', then a metadata
+row name<TAB>Modified<TAB>modified<TAB>Created<TAB>created, a blank row, and
+'Done<TAB>Item' or 'Done<TAB>Price<TAB>Qty<TAB>Item' for a priced list. Timestamp
+formatting is a host-supplied equivalent of local date with numeric day, short
+month, full year and two-digit hour/minute; a missing timestamp is 'Unknown'.
+For a task, Done is '✓' in checked single-checkbox mode, otherwise empty;
+with named definitions it is '✓(name1,name2,...)' for checked names in definition
+order, or empty. Priced task values use two decimal places for a non-null price,
+empty for null price, and supplied quantity or '1' for null quantity. A heading
+or note has empty completion/price/quantity columns. Prefix each item name with
+one additional TAB per hierarchy level. Do not add CSV-style escaping.
+Append ceil(itemCount/3) blank rows with the appropriate column separators.
+For priced lists append a Total row with this literal formula in column two,
+substituting S=itemCount+blankRowCount:
+  =SUMPRODUCT(INDIRECT("B"&(ROW()-S)&":B"&(ROW()-1)),INDIRECT("C"&(ROW()-S)&":C"&(ROW()-1)))
+The row is TAB + formula + TAB + TAB + 'Total'. End with
+'--- END: <name> ---'. Join rows with LF. Formula evaluation is not performed
+by the core library.
+
+14. REPORT MEMBERSHIP AND REPORT CONTENT
+
+14.1 A report is identified by its name and contains direct folder IDs. Report
+names are case-sensitive. Current report assignment values may also contain
+other opaque IDs, but report generation selects existing folders only.
+
+14.2 The legacy smart-folders map contains report-name -> JSON-string array of
+IDs. Read valid string-array members; ignore malformed values. Overlay the
+smart-folder-memberships map keyed by JSON.stringify([reportName,memberId]).
+A true value adds the membership; false removes it and remains a tombstone.
+Ignore malformed keys. Return nonempty reports with member IDs sorted.
+
+14.3 Assign/remove changes one pair key. Delete-report writes false for every
+current member and deletes the legacy baseline for that name. Removing an
+entity from all reports tombstones every current matching membership. These
+operations are atomic and undoable. Independent membership edits must not
+overwrite a whole report's membership array.
+
+14.4 Standard report content selects assigned, non-effectively-archived
+folders, sorted by numeric order. Include only their direct, non-effectively-
+archived, incomplete lists, sorted by numeric order. Assignment to a folder
+does not recursively assign its descendants.
+
+14.5 Favourite report content instead selects non-effectively-archived folders
+that are favourite or directly contain a favourite list. Within them, include
+incomplete/nonarchived direct lists if the list or its folder is favourite.
+This report uses ordinary order, not favouriteOrder.
+
+14.6 Within each included list, report roots are incomplete root tasks only:
+parentId=null, heading=false, note=false, effective completion=false. Descend
+only through included nodes. At each subsequent level include non-heading
+children when incomplete OR note=true, sorted by numeric order. Excluding a
+completed task or heading also excludes its subtree from the report. A root
+note is not a report root. A note descendant is included even if it retains
+completion fields. Omit empty lists and folders.
+
+14.7 Report results shall retain folder/list identity and names, and item name,
+creation date, note status and recursively nested children. Formatting dates,
+rendering references and writing text to an external destination are consumer
+operations; the report's membership/tree semantics shall be reusable directly.
+
+15. LOCATION CATALOGUE AND TAG MATCHING
+
+15.1 A location has id, name, latitude, longitude, nonempty tags, and optional
+address, source, centre, coordinateAccuracy and startingPoint. Accuracy kind,
+when supplied, is store/shopping-centre/suburb. Coordinates must be finite with
+latitude in [-90,90] and longitude in [-180,180]. Require nonblank unique IDs
+within a supplied location collection, nonblank names, and tags matching
+^#?\w+$. Optional text fields must be strings and startingPoint boolean.
+
+15.2 The effective catalogue is the configured retailer catalogue followed by
+derived suburb locations followed by saved custom locations. Catalogue contents
+and the alias table are domain data inputs; they must be available for offline
+queries. The rules do not depend on a particular retailer count.
+
+15.3 Normalize a location tag by trimming, removing one leading '#', lowercasing,
+and applying one lookup in the configured alias map. Also recognize wooloworths,
+woolworth and woolies as woolworths. Do not recursively follow aliases.
+
+15.4 A location supports its normalized declared tags plus these derived tags:
+  supermarket: if it supports coles, woolworths or aldi;
+  hardware:    if it supports bunnings, mitre10 or homehardware;
+  pcparts:     if it supports scorptec, centrecom, cpl or msy.
+MatchingLocationTags returns the item's normalized, deduplicated tags that
+the location supports, in first item-tag occurrence order. An errand matches a
+location when this intersection is nonempty: multiple item tags are OR choices.
+
+15.5 Available-tag counts count distinct location IDs supporting each tag,
+including derived tags; return tag/count records alphabetically by locale
+comparison. These counts use the whole catalogue, not the selected radius.
+The location-optional tags bank and errand are always recognized, and may
+have count 0 when no stored location supports them.
+
+15.6 Derive each suburb location with ID 'suburb-'+suburb.id, label
+suburb.name+' (suburb centre)', its coordinates, coordinateAccuracy=suburb and
+the catalogue source. Its tag is the name normalized with Unicode NFKD,
+removal of U+0300..U+036F combining marks, lowercase, and removal of every
+character outside ASCII a-z and 0-9.
+
+15.7 Saved custom locations use IDs beginning 'custom-'. Validate before save;
+trim name, normalize/deduplicate tags in first-seen order, and store one whole
+location object under its ID. Independent locations have separate Yjs keys;
+concurrent changes to one whole location follow Yjs map-value conflict rules.
+Deletion removes that location entry. Return copies of location/tag values
+from reads so callers cannot mutate persisted plain-object values in place.
+
+16. ERRAND ELIGIBILITY AND EFFECTIVE TAGS
+
+16.1 Recognized errand tags are all supported tags from the entire effective
+catalogue, plus bank and errand. Recognition is independent of radius, starting
+point, or whether the task currently has a nearby match.
+
+16.2 Start with items grouped by first-seen source-list storage order, traversed
+in full source item order. Build the full tree before excluding headings or
+completed parents, so eligible descendants retain their relative positions.
+
+16.3 Exclude items with missing lists, divider lists, effective archive, or
+heading=true. When includeCompleted=false, also exclude completed tasks;
+notes are not excluded for retained completion flags. A completed folder is
+not itself an exclusion. A completed list is treated specially in 16.5.
+
+16.4 Extract item tags and test whether ANY is a recognized errand tag after
+normalization. If yes, inheritsListTags=false and use only the item's tags.
+Otherwise inheritsListTags=true and use the deduplicated union of item tags
+then direct list-name tags. Never inherit folder tags or parent-item tags.
+Retain unrelated tags in the effective set; they may affect pause matching.
+
+16.5 If list.done=true, exclude the item when inheritsListTags=true. Explicitly
+tagged eligible items can remain. Finally require at least one recognized tag
+in the effective set. No tag means no errand, regardless of checklist history.
+
+16.6 Examples:
+  'Milk' in 'Shopping #supermarket' inherits supermarket.
+  'Milk #urgent' in that list inherits supermarket and retains urgent.
+  'Bread #coles' uses coles and does not inherit supermarket.
+  'Call #bank' qualifies without a stored bank location.
+  An unknown #custom tag alone does not qualify until a location registers it.
+Changing the catalogue can therefore change both eligibility and inheritance.
+
+16.7 An errand is paused if its item ID is individually paused OR any effective
+normalized tag is paused. Both conditions are independent; clearing one does
+not clear the other. This test includes retained unrelated effective tags.
+
+16.8 Store tag pauses by normalized word tag, rejecting invalid tags; true
+sets the map key and resume deletes it. Store individual pauses by nonblank
+item ID; pausing a nonexistent item is a no-op, resuming deletes its key.
+Read only true entries with valid keys and return sorted keys. Pausing does
+not change the original item, completion, membership or text.
+
+17. DISTANCES, NEARBY MATCHES AND STOP SELECTION
+
+17.1 Use great-circle distance in kilometres with Earth radius 6371.0088:
+  h = sin^2((lat2-lat1)/2)
+      + cos(lat1)*cos(lat2)*sin^2((lon2-lon1)/2)
+  distance = 6371.0088 * 2 * asin(sqrt(clamp(h,0,1)))
+Angles in this formula are radians. Do not round before radius comparison.
+This is not travel time or route distance.
+
+17.2 With a non-null origin, require valid origin coordinates and a finite
+positive radius. Invalid origin/radius yields no stops. Ignore locations with
+invalid coordinates. Include a location exactly at the radius boundary. Keep
+only locations matching at least one supplied active errand.
+
+17.3 With null origin, apply no radius filter, store distanceKm=null, and match
+all valid locations. At the composed-query level, distinguish this mode from
+'filter enabled but no origin': that latter state produces no location stops.
+Location-optional errands can still be nearby in that state.
+
+17.4 Stop order is:
+  - If either compared distance is non-null: ascending distance, treating null
+    as positive infinity; tie-break by location ID locale comparison.
+  - If both distances are null: location name then location ID, locale order.
+Within a stop, preserve the supplied errand sequence.
+
+17.5 Suggested stops use greedy item coverage, not globally optimal routing:
+  a. Let reachable be all distinct item IDs matched by any candidate stop.
+  b. Let uncovered=reachable and selected=[].
+  c. Choose the stop covering the largest number of distinct uncovered IDs.
+     Break positive-count ties with the stop comparator in 17.4. Exact ties
+     retain the first encountered candidate.
+  d. Add the chosen stop and remove its item IDs from uncovered. Repeat until
+     no uncovered IDs remain or no positive-coverage choice exists.
+  e. Walk selected in reverse selection order. Remove a stop if all its item
+     IDs are covered by the currently remaining other selected stops.
+  f. Sort retained stops with 17.4. Assign each item to the first retained stop
+     containing it; remove duplicate item assignments from later stops.
+  g. Alternatives are all original stops whose location IDs were not retained,
+     sorted with 17.4; preserve their full matching errand sets.
+  h. Unavailable errands are input errands whose IDs are absent from reachable.
+
+17.6 A bank/errand-tagged item is location-optional. For route planning, include
+it only if a candidate location stop actually matches it. Otherwise retain it
+as an independent nearby reminder, without putting it in unavailable-location
+results. Group-level coverage counts consider a group covered only when every
+row in that group has a matching location ID; grouping is defined in section 20.
+
+18. STARTING POINTS AND NEARBY PREFERENCES
+
+18.1 A starting location has latitude/longitude, source gps/suburb/custom,
+nonblank label, parseable updatedAt, and accuracy=null or a finite nonnegative
+number. For source=custom require customLocationId beginning 'custom-' with a
+nonempty suffix. Store coordinates and metadata together as one map value.
+
+18.2 Saving a custom-source starting location requires the referenced saved
+location to exist and have startingPoint=true. Replace supplied name/coordinates
+with the current saved location's name/coordinates and set accuracy=null.
+Saving any valid starting location atomically enables location filtering.
+
+18.3 Reading a custom-source starting location re-resolves its location. If
+missing or no longer enabled as a startingPoint, return no origin. Otherwise
+use current name/coordinates while retaining other saved starting metadata.
+
+18.4 Editing the currently selected custom location refreshes the saved
+starting name/coordinates and timestamp only when it was enabled before and
+remains enabled. Otherwise clear the saved custom selection. Deleting the
+selected custom location also clears the selection. Re-enabling a previously
+disabled location does not revive a stale selection.
+
+18.5 'No filter' sets location-filter-enabled=false and retains the saved
+starting location. Clearing a saved starting location deletes that preference
+without independently changing the filter preference. Radius is a transient
+query input, initially 5 km in the current consumer, not a persisted Yjs field.
+The consumer offers 1..50 km; the core distance function accepts any finite
+positive radius as specified in 17.2.
+
+18.6 A late location observation must not override a later manual selection,
+a changed filter choice, a changed user context, or an active history view.
+Invalidate pending observations using a request/context generation. Failure to
+obtain a location leaves the existing saved starting point intact.
+
+18.7 Keys in nearby-preferences, defaults and validation:
+  starting-location         valid object from 18.1, otherwise no origin
+  location-filter-enabled   enabled unless stored value is exactly false;
+                            commands/import accept booleans only
+  hot-suburbs               ordered unique array of known suburb IDs;
+                            default Melbourne, Brunswick, Richmond IDs;
+                            empty array is valid
+  preview-limit             default 3; commands accept integers 1..9;
+                            legacy import accepts integers 1..50;
+                            reads clamp valid legacy values to 9
+  recently-modified-first   true only if stored value is exactly true;
+                            default false; commands/import require boolean
+
+These preferences synchronize, participate in undo/history and JSON backups,
+and are read without writing defaults. The preview limit affects the summary
+text only, not eligibility, matching, date aggregation or stop coverage.
+
+19. CHECKLIST MEMBERSHIP, DISMISSAL AND COMPLETION
+
+19.1 A checklist entry is keyed by item ID and holds
+{fingerprint:64-lowercase-hex-SHA256,dismissed:boolean}. Ignore malformed stored
+entries on read. Checklist membership is independent of ordinary task existence,
+completion and pause state.
+
+19.2 Compute the current fingerprint from:
+  {item: itemProjectionExceptOrder,
+   listName: directList.name,
+   done: !item.note && effectiveCompletion(item,directFolder),
+   text: authoritativeYText.toDelta() if that root is a Y.Text, otherwise name}
+Recursively sort object entries by key using locale comparison; preserve array
+order; JSON-serialize; hash UTF-8 bytes with SHA-256; return lowercase hex.
+The item contribution includes IDs, flags, timestamps, checks, price/qty and
+all other projected fields except order. The full list name contributes even
+for explicitly tagged items. Rich-text formatting contributes through the delta.
+
+19.3 A row is hidden by dismissal exactly when a stored entry is dismissed
+AND (the current row is done OR its stored fingerprint equals the current
+fingerprint). Thus editing a dismissed incomplete task or note can revive it.
+Editing a still-completed dismissed task cannot revive it. Unchecking changes
+its completion/fingerprint and can revive it. An order-only move that preserves
+updatedAt does not by itself change the fingerprint.
+
+19.4 Compute candidates using errand collection with includeCompleted=true.
+For each candidate derive done, fingerprint, stored state, paused and hidden.
+Active errands for nearby matching are candidates with !done && !hidden &&
+!paused. Supported IDs are active errands matching any catalogue location,
+without applying the radius.
+
+19.5 Checklist rows satisfy !hidden && !paused, and additionally:
+  - Completed row: it has a valid stored checklist entry.
+  - Incomplete row: it is supported by some catalogue location, is location-
+    optional, or has a valid stored entry.
+Candidate eligibility still applies; remembered state cannot resurrect a deleted,
+untagged, archived or otherwise excluded item.
+
+19.6 Automatically remember every eligible incomplete checklist row in live
+mode. Write {currentFingerprint,dismissed:false} only when no stored entry
+exists or the old entry was dismissed and has a different fingerprint. Do not
+rewrite ordinary nondismissed entries on every read. Use a dedicated origin
+excluded from application undo. Never perform this registration in history.
+
+19.7 Dismissing a row writes its current fingerprint with dismissed=true in an
+ordinary undoable transaction. Clearing completed rows performs that dismissal
+for the current completed checklist set. Neither operation deletes the source
+item or changes source completion.
+
+19.8 Setting nearby task completion ignores missing items, notes and headings.
+Before completing a currently incomplete task, remember its current membership
+if its list exists. Then update the last named checkbox or legacy checked as
+in 6.3. This preserves a revived task's completed checklist row even if automatic
+registration has not yet occurred.
+
+19.9 Paused results are candidates satisfying !done && !hidden && paused.
+Checklist and paused results use the same grouping rule as summaries. Checklist
+groups containing any currently nearby task come first, followed by remaining
+groups; ties retain the original group sequence. This ordering is separate
+from the recently-modified summary preference.
+
+20. ERRAND SUMMARY GROUPING AND ORDER
+
+20.1 Group ID is 'list:'+list.id for an errand inheriting list tags, and
+'item:'+item.id for an explicitly tagged errand. All inherited errands of one
+list share a group; explicit errands remain separate even when their tags
+match the list or each other. For legacy caller-supplied errands without an
+inheritsListTags value, infer inheritance only if the item name has no tags.
+
+20.2 Generic grouping processes input rows in order. The first occurrence of
+a group determines its position; append subsequent rows to that group in
+input order. Preserve each row's state. Completing an inherited list group
+changes list.done only, not its children; explicit errands can remain eligible.
+
+20.3 Determine nearby task matches by scanning ordered location stops and
+their errands. For each item ID keep only its first match, with the first
+matching normalized tag for that stop. Afterwards scan active errands for
+bank/errand tags; choose the first effective tag that normalizes to either.
+Add it as a nearby task even without a stop. If the item was already matched,
+replace its selected tag without moving its existing insertion position.
+
+20.4 Accumulate selected tags per group in match encounter order, deduplicated.
+Then return to the original active errand sequence and include groups with at
+least one nearby match. Group those errands in source order. This includes all
+active inherited rows in a matched inherited group, but an unmatched explicit
+task never joins merely because a sibling from the same list is nearby.
+
+20.5 A summary result has group ID, source list, ordered errands, preview text
+and selected tags. Each preview name removes hashtag tokens matching
+(^|\s)#\w+, collapses whitespace runs to one space and trims. Take the first
+limit errands before removing empty cleaned names; join remaining names with
+' · '. If more errands exist, append ' · +N more', where
+N = totalErrands - min(totalErrands,limit). Do not use the preview text as identity.
+
+20.6 With recently-modified-first=false, return the group sequence from 20.4.
+Within each source list this follows source order; an inherited group occupies
+its first eligible row's position. Across lists it follows the first-seen list
+order of the stored items, not folder order or alphabetic/distance/date order.
+
+20.7 With recently-modified-first=true:
+  a. Start with the complete summaries from 20.4, before any reordering.
+  b. Partition summaries by source list ID in first-occurrence order.
+  c. For each source list, compute the maximum finite parsed item.updatedAt
+     among all errands represented by all its included summaries. Include
+     tasks beyond the preview limit. Exclude tasks absent from these summaries.
+     Use negative infinity if no represented task has a valid date.
+  d. Stable-sort these source-list groups by that maximum descending.
+  e. Concatenate each group's original summary sequence without reordering it.
+
+Consequently all pills from one source list stay together in source order.
+Task names inside a grouped summary also retain source order. Parent-list
+updatedAt, createdAt and date-like list names are not used. Equal source-list
+dates retain their previous sequence; lists without valid dates go last. If
+all summaries belong to one list, enabling this option changes no ordering.
+
+20.8 Changing the sort preference does not mutate item/list order fields or
+timestamps, change eligibility, or reorder checklist groups or suggested stops.
+
+21. SUBURB SEARCH
+
+21.1 Search receives a suburb collection, input text and result limit (default
+8). Normalize text with NFKD, strip U+0300..U+036F combining marks, lowercase,
+replace word-boundary 'mt' optionally followed by '.' and whitespace with
+'mount ', replace non-ASCII-alphanumeric runs with one space, then trim.
+Empty query or nonpositive limit yields no results.
+
+21.2 Ranking scores are exact normalized name=0, prefix=1, substring=2.
+Otherwise compute approximate substring edit distance with insertion, deletion,
+substitution and adjacent transposition, each costing 1. Initialize the
+distance row for an empty query against every name prefix to 0; query column
+zero has cost i for query-prefix length i. Use the minimum last-row value,
+allowing a match inside the name rather than requiring the whole name.
+
+21.3 Tolerance is 0 for query length <3; otherwise
+min(3, floor(length/4) or 1 when that floor is zero). Approximate matches above
+tolerance are excluded; accepted approximate score is 3+distance. Sort by
+score, original name length, locale name comparison, locale ID comparison.
+Return the first limit suburbs. The saved hot-suburb order is independent of
+search ranking and is not automatically reordered by search.
+
+22. JSON BACKUP, MERGE AND REPLACE
+
+22.1 The portable backup format has version=1, exported=current timestamp,
+folders, lists, items, and optional sheets, smartFolders, customLocations,
+startingLocation, nearbyLocationFilterEnabled, hotSuburbIds, nearbyPreviewLimit,
+nearbyRecentlyModifiedFirst, nearbyChecklist, pausedErrandTags,
+pausedErrandItemIds. Export the current read document's materialized values.
+Folder/item parent projections are recovered values. Include authoritative
+plain names and per-ID completion projections.
+
+22.2 Validate the whole backup before any destructive transaction:
+  - version must equal 1; mode must be merge or replace.
+  - folders/lists/items must be arrays; omitted or null sheets becomes [].
+  - Each record is a non-array object with a unique, nonempty string id within
+    its record array and a string name. Non-null parentId must be a string.
+  - If checks is supplied, require a non-array object of boolean values.
+  - If checkboxes is supplied, require an array of definitions with string
+    id/name; the baseline validator does not require their uniqueness.
+  - Folder defaultItems, when supplied, must satisfy 7.6's shape/ID rules.
+  - checkedNames, when supplied, is an array of strings.
+  - Non-null price, qty, order and favouriteOrder must be finite numbers.
+  - Validate custom locations as in 15.1, with custom- IDs; omitted or null
+    customLocations is treated as an empty array.
+  - Validate non-null startingLocation as in 18.1.
+  - Validate nearby booleans, known unique hot-suburb IDs, and preview limit
+    including the legacy 1..50 allowance.
+  - Validate checklist as an ID-keyed object of valid states from 19.1.
+  - Paused tags must be strings matching ^#?\w+$; paused item IDs nonblank strings.
+  - Reports, when non-null, must be an object mapping names to arrays of strings;
+    omitted or null smartFolders is treated as an empty assignment map.
+
+This is a compatibility validator, not a complete graph/schema validator. It
+does not enforce referential integrity, unique names, legal depth, acyclicity,
+every flag's type or timestamp validity. Valid legacy graphs are interpreted
+through the read/recovery rules, not rejected by invented stronger constraints.
+
+22.3 Before importing into existing items whose IDs appear in the backup,
+initialize any legacy text baseline outside the undoable import transaction,
+using the excluded migration origin. This allows undo to restore the original
+text even if it had never been edited through authoritative Y.Text before.
+
+22.4 Merge upserts each record by ID, appending missing records. Supplied
+ordinary fields overwrite stored fields; omitted ordinary fields are retained.
+Folder checkboxes/defaultItems, if supplied, use explicit replacement including
+tombstones. If an item's checks is supplied, delete its legacy checks object
+and all stored chk_ fields, then write exactly the supplied check fields.
+Always replace each supplied item's authoritative text with its supplied name,
+including empty names. Import does not create default-template copies.
+
+22.5 Merge report memberships by adding supplied pairs; preserve existing
+unsupplied memberships. Upsert supplied custom locations and checklist states.
+Add supplied tag/item pauses. For optional nearby preferences, omission
+preserves the current value. An explicit startingLocation=null clears that
+selection even in merge mode. A supplied false preference is a real value,
+not equivalent to omission.
+
+22.6 Replace first removes folder/list/item/sheet metadata array contents,
+empties all note_text_ roots, clears note-text-initialized and all sheet-cells-
+maps. Then inserts supplied records through the same import logic. Replace
+clears report baselines/memberships, custom locations, checklist and pause maps
+before adding supplied entries. Omitted starting/filter/hot-suburb/preview/sort
+preferences are deleted so their read defaults apply. The operation does not
+clear history checkpoints or unknown root data. Replace is not destruction
+and recreation of the entire Y.Doc.
+
+22.7 Both import modes commit their domain replacement/merge as one ordinary
+undoable transaction. Preserve supplied record timestamps except for derived
+text-mirror effects where applicable. Custom locations from backups are copied
+as supplied after validation; they do not pass through interactive name/tag
+normalization or starting-point side effects.
+
+22.8 A version-1 JSON backup is not a complete Yjs backup. It omits history
+checkpoints, undo stacks, rich-text formatting, retained sheet cell values,
+local marks/preferences, and CRDT identities/tombstone history. Text is exported
+as plain names. Complete Yjs update persistence and history checkpoints have
+different preservation contracts; do not claim JSON round-trip fidelity for
+the omitted information.
+
+23. RETAINED SPREADSHEET DATA
+
+23.1 Spreadsheet metadata has id, name, folderId (default null), order (default
+0), createdAt and updatedAt (default null). Creating a sheet assigns a fresh ID
+and timestamps, and order equal to the count of current sheets in that folder.
+This retained helper uses sibling count, not the min/max insertion rule for
+folders, lists and items. Updating follows 5.8.
+
+23.2 Raw cells are strings stored at key 'row,column', with zero-based numeric
+row and column inputs, in sheet-cells-<sheetId>. Nonempty strings set a cell;
+empty string deletes it. A cell write stamps the metadata updatedAt if the
+sheet exists, in the same transaction. The existing low-level setter can write
+a cell map even when its metadata record is missing.
+
+23.3 Reading returns the raw key/string mapping. Deleting a sheet clears its
+cell map and removes its metadata record atomically. These cells participate
+in Yjs history/undo; JSON backups include metadata only. There is no core
+spreadsheet formula evaluator; a formula-looking string remains raw text.
+
+24. PERSISTENCE LOG COMPACTION
+
+24.1 Compaction shall merge persisted Yjs update bytes using Yjs.mergeUpdates.
+Read the complete durable update log, including other writers' persisted
+updates, rather than encoding only the current in-memory document.
+
+24.2 With fewer than two persisted records, perform no replacement. Otherwise
+atomically replace the log's records with the one merged update while preserving
+the storage sequence/cursor behavior required by concurrent readers. Serialize
+with other writers. On failure, retain the original log through storage rollback.
+
+24.3 Preserve CRDT identities, deletions, missing-dependency updates and snapshot
+history. Do not garbage-collect or reconstruct state into new record identities
+as a substitute for merging update bytes. Compaction does not reset the user
+document or retrieve a replacement copy from a peer.
+
+24.4 Expose record counts, byte counts and elapsed duration before/after a run.
+Concurrent requests on one context share its in-progress compaction operation.
+The current maintenance policy schedules one run shortly after restoration
+(1 second), then schedules at most one pending run 60 seconds after an update.
+Additional updates do not postpone that pending run. Stop scheduling when the
+context closes; report errors without deleting data.
+
+25. CORE LIBRARY OPERATION SURFACE
+
+25.1 The extracted library shall expose the following capabilities through
+ordinary callable operations, with equivalent names/types allowed:
+  - Open/close a user document; read live/historical state; observe changes;
+    apply/encode Yjs updates; report readiness and persistence completion.
+  - Query and create/update/delete folders, lists and items.
+  - Resolve hierarchies; enumerate source order; plan/apply moves and reorders.
+  - Compute completion/counts/totals; change named checks and item types.
+  - Manage checkbox definitions and folder default templates.
+  - Archive/unarchive and query effective archive/archive paths.
+  - Query/reorder favourites and resolve pins, tags, references and destinations.
+  - Read/edit authoritative text; save/discard a selective edit session.
+  - Undo; create/list/delete/view history checkpoints; exit history.
+  - Serialize portable item exports; parse/import text and structured items;
+    serialize journal/tab-separated text; perform integration deduplicating
+    ingestion and destination resolution.
+  - Query text search, filters, navigation sequences and quick-add destinations.
+  - Manage report memberships and derive report content trees.
+  - Validate/query catalogues, locations, aliases and suburb searches.
+  - Collect errands; derive candidates, checklists, summaries and stop plans;
+    pause/resume, dismiss, complete, and manage nearby preferences.
+  - Export/validate/merge/replace version-1 backups.
+  - Read/preserve retained spreadsheet metadata and raw cells.
+  - Coordinate safe compaction through the supplied persistence boundary.
+
+25.2 Pure query/planning operations shall accept domain values or a read context
+and shall not depend on display objects or side effects. Explicit mutation
+operations shall acquire a writable context and use the transaction, identity,
+validation and history rules above. Derived state that is deliberately persisted
+(text mirrors and checklist registration) shall have named maintenance origins
+so it is not confused with user actions in undo.
+
+25.3 Do not collapse distinct contracts into one ambiguous helper: direct
+deletion versus cascading deletion; flat ordering versus tree ordering; generic
+completion versus task eligibility; plain-text import versus integration
+deduplication; plain JSON backup versus Yjs checkpoint; list completion versus
+item completion; and nearby summary order versus checklist/stop order remain
+separate operations or explicit modes.
+
+26. REQUIRED CONFORMANCE EXAMPLES
+
+26.1 Two replicas independently set different named checks on one item; both
+values survive merge. Deleting a definition concurrently with renaming it
+leaves it removed. An earlier checked stage alone does not make a task done.
+
+26.2 Concurrent folder moves form A->B and B->A. Both replicas project the same
+tree by rooting the smaller ID without writing a repair during read. A later
+arrival of a previously missing parent can restore the ordinary relationship.
+
+26.3 Moving a selected parent and selected child moves one subtree once, in
+source order, retaining IDs and Y.Text. A move producing level 3 is rejected
+before any write. Undo restores the whole accepted move.
+
+26.4 Two replicas initialize the same legacy note while offline, then each
+edits it. Merge contains the baseline once and both compatible edits. Clearing
+all text never restores an old legacy name. Discarding one session preserves
+a peer's concurrent contribution.
+
+26.5 Creating a list in a folder with task/note templates creates fresh ordered
+copies in the same undo action. Editing templates later leaves those copies
+unchanged. Moving or restoring that list does not create extra copies.
+
+26.6 Given an existing 'Milk #coles', ordinary text import of 'Milk #supermarket'
+adds nothing. Given no existing Milk, a batch ['Milk','Milk'] adds two ordinary
+text-import items but one integration-import item. 'milk' remains a different
+case-sensitive matching key.
+
+26.7 An invalid optional backup section is rejected before removing existing
+records. Merge without the new nearby sort field retains the current setting;
+replace without it returns to false. A legacy preview limit of 50 reads as 9.
+
+26.8 A completed list hides inherited supermarket errands but retains an
+incomplete explicitly tagged bank task. Archiving its folder excludes both.
+An unrecognized #urgent task still inherits its list's supermarket tag.
+
+26.9 A location-optional bank task is nearby with no origin or saved location.
+It does not become an unavailable-location task merely for lacking a bank stop.
+An origin-filtered location exactly at the radius boundary is included.
+
+26.10 A dismissed incomplete note revives when its rich-text formatting changes.
+A dismissed completed task stays hidden after edits, and can revive after it
+is unchecked. Merely reading the checklist does not reset dismissal or add
+automatic membership actions to the application undo stack.
+
+26.11 Source list A has separate nearby summaries A1,A2,A3 in that source order.
+A3 has the newest timestamp. Source list B has B1, with a timestamp older than
+A3 but newer than A1. With recently-modified-first=true, the sequence is
+A1,A2,A3,B1, not A3,B1,A1,A2. If all summaries belong to A, their order stays
+A1,A2,A3. An unmatched newer item in B does not determine B's sort date.
+
+26.12 A grouped summary contains five tasks and preview-limit=3. A newer date
+on task five contributes to its source list's sort date. All five contribute
+to matching/coverage, while the text previews three names and '+2 more'.
+
+26.13 A report excludes a completed parent task's subtree, whereas nearby
+errand collection can still include an eligible incomplete descendant in its
+original source position. These are intentionally different projections.
+
+26.14 Compaction of a persisted log containing updates absent from the current
+in-memory document preserves those updates, their dependencies and history.
+Storage failure leaves the original durable log intact.
