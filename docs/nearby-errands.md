@@ -137,6 +137,11 @@ Items with their own recognised errand hashtags use those tags; otherwise they
 keep their item hashtags and inherit hashtags from their list's name. For example,
 `Bread #coles` in `Shopping #supermarket` stays specific to Coles, while
 `Milk #urgent` still matches supermarkets and shares the list's errand.
+An item qualifies only when its effective hashtags contain a recognised errand
+tag. Ordinary hashtags such as `#supplies_photos` or `#tools` do not introduce
+items into Nearby errands unless registered on a location. A remembered checklist
+entry or pause does not override this requirement. Removing the last location
+supporting a custom tag can remove its errands or cause them to inherit list tags.
 Recognised tags come from the whole location catalogue, suburbs and saved places,
 plus `#bank` and `#errand`, regardless of distance. Adding or deleting a saved
 place can change whether its hashtag overrides the list.
@@ -191,6 +196,17 @@ Every imported point is checked against the official boundaries of Melbourne's
 Regional branches outside these boundaries are excluded. Verified suburb addresses
 can supply a labelled approximate point when a source coordinate is missing or
 incorrect. Store points may not be parking or entrance locations.
+
+The distance model uses these recorded points with an inclusive radius boundary;
+it does not calculate distance to a suburb or shopping-centre boundary. Coordinate
+validation checks geographic bounds and finite numbers, not decimal-place counts
+or accuracy within 10 metres. Approximate suburb and centre points remain valid
+inputs. GPS supplies a saved position when requested, with no continuous tracking
+or age-based expiry; its reported accuracy does not change the radius calculation.
+Starting-location tags do not restrict destination matching. Saved suburb choices
+are separate preferences, while custom starting points use a flag on their
+destination record. Bundled shopping centres need an enabled custom record to
+serve as saved selectable starting points.
 
 The Svelte screen imports this JSON as a module. Vite parses the JSON during the
 build and bundles the resulting data into frontend JavaScript; the browser does

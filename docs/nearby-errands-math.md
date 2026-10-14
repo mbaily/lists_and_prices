@@ -1,6 +1,6 @@
 # Nearby errands: mathematical specification
 
-Source transcription, 2026-10-08. This specifies the current feature's decisions and state transitions, including its ordering and presentation rules. Catalogue records are input data; shared Yjs, rich-text, JSON, hashing, browser and generic CRUD semantics are named primitives. It is not a formal equivalence proof. The companion `.tex` file typesets this document.
+Source transcription, revised 2026-10-14. This specifies the current feature's matching decisions and state transitions. The mathematical model includes recognized tags, task eligibility, pauses, selected origins, point distances and coverage; existing ordering and presentation definitions are retained for source correspondence. Catalogue records are input data; shared Yjs, rich-text, JSON, hashing, browser and generic CRUD semantics are named primitives. It is not a formal equivalence proof. The companion `.tex` file typesets this document.
 
 ## 1. Notation and inputs
 
@@ -42,12 +42,16 @@ S(d)&=S_0(d)
 \cup\{\mathrm{supermarket}:S_0(d)\cap\{\mathrm{coles},\mathrm{woolworths},\mathrm{aldi}\}\ne\varnothing\}\\
 &\quad\cup\{\mathrm{hardware}:S_0(d)\cap\{\mathrm{bunnings},\mathrm{mitre10},\mathrm{homehardware}\}\ne\varnothing\}\\
 &\quad\cup\{\mathrm{pcparts}:S_0(d)\cap\{\mathrm{scorptec},\mathrm{centrecom},\mathrm{cpl},\mathrm{msy}\}\ne\varnothing\},\\
-G&=\{\mathrm{bank},\mathrm{errand}\},\qquad K=G\cup\bigcup_{d\in D}S(d),\\
+K_D&=\bigcup_{d\in D}S(d),\qquad G=\{\mathrm{bank},\mathrm{errand}\},\qquad K=K_D\cup G,\\
 M(t,d)&=[a\in\operatorname{uniq}([n(x):x\in t]):a\in S(d)].
 \end{aligned}
 $$
 
 Conditional singleton sets are empty when their condition is false. Recognition uses all destinations, independent of radius, starting-point status or pauses. Matching needs any supported tag. No shopping-centre, brand-frequency or route preference is added.
+
+$K_D$ is the keyset of the location-to-tag relation, not the set of all hashtags in the user's tasks. A tag outside $K$ cannot independently create an errand candidate. Tags are compared after normalization; multiple tags and multiple locations use existential (OR) matching. Normalization does not perform general spelling correction: `#supermarket` is recognized, whereas `#supermaket` is not unless registered on a location. Ordinary tags such as `#tools` and `#supplies_photos` remain ordinary while absent from $K$. Registering one on a custom location deliberately makes it a location tag; deleting its last supporting location removes it from $K_D$.
+
+A shopping-centre hashtag such as `#northland` can support many business records, with their individual or shared centre coordinates. It does not introduce a separate centre polygon or a distance-to-boundary calculation. A custom location can support several hashtags at the same coordinate; three active tasks tagged `#myhouse` each match the saved location supporting that tag.
 
 For each suburb $u$, its destination has ID `suburb-` concatenated with $u.id$, name $u.name$ followed by ` (suburb centre)`, its catalogue coordinates/source, accuracy class `suburb`, and the single tag
 
@@ -73,14 +77,17 @@ j_i&\iff\{n(t):t\in H(i.name)\}\cap K=\varnothing,\\
 \operatorname{uniq}\bigl(H(i.name)\mathbin{\Vert}H(\ell.name)\bigr),&j_i,\\
 H(i.name),&\neg j_i,
 \end{cases}\\
+k_i&\iff\{n(t):t\in\tau_i\}\cap K\ne\varnothing,\\
 C_b&=[i\in T(I):\ell\ne\bot\land\ell.type\ne\mathrm{divider}\land\neg\operatorname{arch}(\ell)
 \land\neg i.heading\\
-&\hspace{35mm}\land(b\lor\neg d_i)\land\neg(\ell.done\land j_i)\land|\tau_i|>0],\\
+&\hspace{35mm}\land(b\lor\neg d_i)\land\neg(\ell.done\land j_i)\land k_i],\\
 C&=C_{\mathrm{true}}.
 \end{aligned}
 $$
 
-Each candidate carries $(i,\ell,\tau_i,j_i)$. $C_{\mathrm{false}}$ is `collectErrands`' default result; the screen uses $C$. Notes ignore checked state. Folder names and parent-item tags contribute no inherited tags. Unrecognized item tags are retained alongside list tags; even an unmatched, unrecognized hashtag can produce a candidate. Completing a list excludes its inherited candidates, including notes, while explicitly recognized item errands remain eligible.
+Each candidate carries $(i,\ell,\tau_i,j_i)$. $C_{\mathrm{false}}$ is `collectErrands`' default result; the screen uses $C$. Notes ignore checked state. Folder names and parent-item tags contribute no inherited tags. Unrecognized item tags are retained alongside list tags, but a candidate requires at least one normalized effective tag in $K$. Recognized item tags override all list tags; otherwise list tags are inherited. Completing a list excludes its inherited candidates, including notes, while explicitly recognized item errands remain eligible.
+
+For example, `Take photos #supplies_photos` in an untagged list or a list tagged only `#supplies_photos` is excluded when that tag is absent from $K$. The same task in `Shopping #supermarket` inherits `supermarket` and qualifies. `Buy milk #coles` in that list uses its own location tags instead. Changing $D$ can change $K$, $j_i$, $k_i$ and inheritance without editing any task; ordinary hashtags in the original items are never removed by this calculation.
 
 ## 4. Fingerprints, pauses and checklist membership
 
@@ -110,9 +117,18 @@ P&=[i\in C:\neg d_i\land\neg z_i\land a_i],\qquad E^+=[i\in E:d_i].
 \end{aligned}
 $$
 
-$A$ are active errands; $W$ are active tasks supported anywhere in the database; $E$ is the persistent checklist; $P$ is the paused list; $E^+$ are clearable completed rows. Computing $W$ does not validate coordinates or impose a radius. A previously remembered task can remain in $E$ after losing all location matches. An already-completed task without a remembered state is excluded from $E$. Optional tags apply to the whole task even if it also has other tags; the first optional tag in tag order supplies its label.
+$A$ are active errands; $W$ are active tasks supported anywhere in the database; $E$ is the persistent checklist; $P$ is the paused list; $E^+$ are clearable completed rows. Computing $W$ does not validate coordinates or impose a radius. Remembered state does not override membership in $C$: losing every recognized effective tag excludes an item from $E$, $A$ and $P$, even if its checklist or pause record remains stored. A remembered candidate may remain in $E$ without a nearby match, and optional tags qualify without a database match. An already-completed task without a remembered state is excluded from $E$. Optional tags apply to the whole task even if it also has other tags; the first optional tag in tag order supplies its label.
 
 ## 5. Starting point, distance and nearby stops
+
+The saved selectable-origin sets are
+
+$$
+O_U(h)=\{u\in U:u.id\in h\},\qquad
+O_X=\{x\in\operatorname{values}(X):x.startingPoint=\mathrm{true}\}.
+$$
+
+GPS supplies a separate measured origin. $h$ is stored independently of destination recognition, but $O_X$ uses flags on the same custom records used as destinations. There is no general independent origin catalogue referencing arbitrary records in $B$: a bundled shopping centre must be represented by an enabled custom location to become a saved selectable origin. Origin tags do not restrict destination tags; selecting a `myhouse` origin still permits matching `supermarket` or `northland` destinations.
 
 Resolve the stored starting point $s$ as follows. Invalid/absent records yield $\bar s=\bot$; GPS/suburb records yield themselves; custom records yield themselves with label/coordinates replaced by the referenced $X$ record exactly when it exists and has `startingPoint = true`, otherwise $\bot$.
 
@@ -130,7 +146,9 @@ m_d&=[i\in A:|M(\tau_i,d)|>0],\qquad
 \end{aligned}
 $$
 
-Distances are kilometres; arithmetic is evaluated with the source runtime's floating-point operations. Define the library function
+Distances are kilometres; arithmetic is evaluated with the source runtime's floating-point operations. Coordinates represent points, not suburb areas, centre footprints, roads or travel times. Validation enforces numeric finiteness and geographic bounds only; it does not require four decimal places or establish accuracy within 10 metres. Suburb records are approximate centres, and retail records may use store, shopping-centre or suburb points. More decimal places do not prove positional accuracy. Four decimal places correspond to approximately 11.1-metre latitude steps under the model's Earth radius. Accuracy class and GPS accuracy do not expand or contract the radius, and no positional uncertainty interval is computed.
+
+Define the library function
 
 $$
 \begin{aligned}
@@ -150,6 +168,17 @@ Z=\begin{cases}\mathcal N(D,o,\rho,A),&\neg f\lor o\ne\bot,\\\epsilon,&f\land o=
 $$
 
 $\prec_s$ compares distance then location ID under $\prec_c$ when either distance is present (absent distance is $+\infty$); when both are absent, it compares location name then ID under $\prec_c$. Remaining ties retain input order. Thus a null library origin bypasses radius validation/filtering, but the screen with filtering enabled and no saved origin has no stops. The radius boundary is inclusive; destination coordinates are always validated. The screen starts with $\rho=5$ and offers $\{1,2,5,10,25,50\}$; it keeps the local radius when switching filter mode and resets it on remount.
+
+For the application's valid selected radii, the task-level nearby predicate is
+
+$$
+\begin{aligned}
+\operatorname{nearby}(i)\iff i\in A\land\bigl(\omega_i\lor\exists d\in D:\ &\operatorname{valid}(d)\land|M(\tau_i,d)|>0\\
+&\land(\neg f\lor(o\ne\bot\land\Delta(o,d)\le\rho))\bigr).
+\end{aligned}
+$$
+
+This is an existential location match followed by a distance test, with an explicit exception for $G$. No filter removes the origin/distance requirement but retains coordinate validity, recognized-tag eligibility, completion, dismissal and pause rules. `bank` and `errand` tasks remain nearby without any destination or origin, even when filtering is enabled. They are excluded from missing-location and coverage calculations unless an actual matching destination is reachable. Each item is counted once in the reachable ID set even if many locations match it; stop selection is a subsequent operation and cannot remove its nearby membership.
 
 ## 6. Greedy selection, reverse pruning and assignment
 
@@ -307,7 +336,7 @@ $$
 \end{aligned}
 $$
 
-Rejected callbacks do nothing. Unsupported geolocation sets the unsupported-browser error and preserves the saved point. Failures preserve the saved point. Whenever the resolved starting-record/filter pair changes, a reactive effect increments $v$ and clears $\lambda$; unmount increments $v$. There is no background GPS request. The success guard also checks history; the error callback checks generation only.
+Rejected callbacks do nothing. Unsupported geolocation sets the unsupported-browser error and preserves the saved point. Failures preserve the saved point. Whenever the resolved starting-record/filter pair changes, a reactive effect increments $v$ and clears $\lambda$; unmount increments $v$. There is no background GPS request or continuous position tracking. The saved fix remains usable after movement and reload, with no age-based expiry. The browser may supply a cached fix up to 60 seconds old at request time; the saved timestamp is the callback/save time. Neither that timestamp nor reported GPS accuracy participates in the distance predicate or imposes a 10-metre acceptance threshold. The success guard also checks history; the error callback checks generation only.
 
 Custom locations require unique nonblank IDs/names, valid coordinates, nonempty tag sequences whose strings match optional-`#` ASCII words, optional string address/source/centre, optional Boolean starting-point flag, and optional accuracy class in $\{store,shopping\text{-}centre,suburb\}$. Custom save additionally requires ID prefix `custom-`, trims name and stores normalized first-occurrence-unique tags. The form requires nonblank coordinate fields, uses runtime numeric conversion, splits tags on whitespace/commas, trims address and creates `custom-` plus a UUID for a new location; validation failure leaves stored state unchanged, success clears the form. Copy-coordinates uses $o$ only when present; cancel-edit clears the form.
 
@@ -367,6 +396,8 @@ Clicking any individual row opens its list and highlights its item. The return a
 Directions use $d.address$ iff its accuracy class is `suburb` and its address is nonempty; otherwise use the numeric `latitude,longitude` string. Append its runtime URI-encoded value to `https://www.google.com/maps/dir/?api=1&destination=`. The origin is not included. Distance labels use rounded $1000\Delta$ metres for $\Delta<1$, otherwise one decimal kilometre. Shopping-centre/suburb accuracy labels affect explanations/directions only. Alternative cards render only while their initially collapsed panel is expanded. Suggestions/alternatives are hidden when $f\land o=\bot$ or the location editor is open; the pill strip remains available. With an empty checklist/active sequence, the empty-state message distinguishes remaining paused rows from no eligible tasks.
 
 ## 11. Persistence, history, undo and backups
+
+External sources enter the same mathematical model after conversion to records with stable IDs, names, numeric coordinates and nonempty supported-tag sequences. The source website or dataset does not participate in matching. Bundled catalogues are imported into the frontend at build time and require rebuilding/deploying after changes; custom records are stored in $X$ and can be restored or merged through the backup format. There is no generic in-app importer for arbitrary raw internet datasets. The model covers every valid supplied coordinate worldwide; the bundled retail collection's Melbourne coverage is a property of its input data, not a restriction in the distance algorithm.
 
 $X,Q,P_T,P_I,s,f,p,h$ live in the user's Yjs document: `custom-locations`, `nearby-checklist`, `paused-errand-tags`, `paused-errand-items`, and `nearby-preferences`. Reload/remote updates change the snapshot and recompute the equations. Custom places, pause keys and checklist entries are independent map entries; a starting record is one value so its coordinates/metadata stay together. Concurrent conflict resolution is exactly Yjs's shared map/sequence semantics, not wall-clock timestamp comparison. Undo follows the shared Yjs undo manager; automatic checklist membership is explicitly excluded, while user mutations participate. Historical reads use the selected historical document, and durable mutations are prohibited. The bundled catalogue is shared input data, not copied into user backups.
 
