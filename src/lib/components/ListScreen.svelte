@@ -878,6 +878,14 @@
 		treeItems.filter(({ item }) => selectedIds.has(item.id)).map(({ item }) => item)
 	);
 
+	async function copySelectedAsText() {
+		const lines = treeItems
+			.filter(({ item }) => selectedIds.has(item.id))
+			.map(({ item, level }) => '  '.repeat(level) + item.name.replace(/\r\n|\r|\n/g, ' '));
+		if (lines.length === 0) return;
+		await writeClipboard(lines.join('\n'), '✓ Copied selected items!');
+	}
+
 	function deleteSelected() {
 		if (!canEditList) return;
 		const ids = [...selectedIds];
@@ -1527,6 +1535,13 @@
 	{#if selectionMode && !commitState.isHistorical}
 		<div class="summary-bar selection-bar">
 			<span class="sel-count">{selectedIds.size} selected</span>
+			<button
+				class="bulk-btn icon-btn"
+				onclick={copySelectedAsText}
+				disabled={selectedIds.size === 0}
+				title="Copy selected items as plain text"
+				aria-label="Copy selected items as plain text"
+			><span aria-hidden="true">📋</span></button>
 			<button
 				class="bulk-btn icon-btn sel-folder-move-btn"
 				onclick={moveSelectedToFolderEdge}
