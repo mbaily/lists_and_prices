@@ -19,8 +19,34 @@ test('recognized todos retain bracket text inside names and allow numeric or emo
 	]);
 });
 
-test('clipboard todo recognition checks every nonblank line before stripping or discarding anything', () => {
-	for (const text of ['', '  \n\t', '[C] One task', '[ ] Task\n[C] ', '[ ] Task\n[Y] Unknown', '[ ] Task\nPlain text', '[ ] Task\n[X]No separator']) {
+test('clipboard task parsing ignores timestamps, headings and trailing notes', () => {
+	assert.deepEqual(parseClipboardTodos('9:26 AM\n[X] Choc milk\n[X] Death of the outsider\n[X] Charge phone\n[X] Northland #northland\nEnd of list'), [
+		{ id: 'clipboard-0', name: 'Choc milk', checked: true, parentId: null },
+		{ id: 'clipboard-1', name: 'Death of the outsider', checked: true, parentId: null },
+		{ id: 'clipboard-2', name: 'Charge phone', checked: true, parentId: null },
+		{ id: 'clipboard-3', name: 'Northland #northland', checked: true, parentId: null }
+	]);
+});
+
+test('clipboard task parsing accepts a single task and ignores malformed markers', () => {
+	for (const text of ['[X] Task', 'Shopping\n[X] Task\n[C] \n[Y] Unknown\n[X]No separator']) {
+		assert.deepEqual(parseClipboardTodos(text), [
+			{ id: 'clipboard-0', name: 'Task', checked: true, parentId: null }
+		]);
+	}
+});
+
+test('ignored text between tasks preserves indentation and cancelled subtrees', () => {
+	assert.deepEqual(parseClipboardTodos('Heading\n[ ] Parent\nComment\n  [X] Child\n  [C] Cancelled\nMore context\n    [ ] Cancelled child\n  [ ] Next child\nFooter'), [
+		{ id: 'clipboard-0', name: 'Parent', checked: false, parentId: null },
+		{ id: 'clipboard-1', name: 'Child', checked: true, parentId: 'clipboard-0' },
+		{ id: 'clipboard-4', name: 'Next child', checked: false, parentId: 'clipboard-0' }
+	]);
+	assert.deepEqual(parseClipboardTodos('Heading\n[C] One cancelled task\nFooter'), []);
+});
+
+test('clipboard task parsing returns null when there are no task lines', () => {
+	for (const text of ['', '  \n\t', '9:26 AM\nShopping\nFooter', '[C] ', '[Y] Unknown', '[X]No separator', 'Write about [X] and [C]']) {
 		assert.equal(parseClipboardTodos(text), null, JSON.stringify(text));
 	}
 });

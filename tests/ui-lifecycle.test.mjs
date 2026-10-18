@@ -141,7 +141,7 @@ test('clipboard imports can be repeated after both plain text and JSON success',
 test('clipboard todos import completion and omit cancelled items', async () => {
 	const text = '[ ] Choc milk\n[X] Tomatoes\n[ ] Tuna can\n[ ] Zuchinni\n[C] Capsicum';
 	const probe = clipboardState(async () => text);
-	await probe.run();
+	await probe.run('tasks');
 	assert.deepEqual(probe.calls, [['json', 'list-a', [
 		{ id: 'clipboard-0', name: 'Choc milk', checked: false, parentId: null },
 		{ id: 'clipboard-1', name: 'Tomatoes', checked: true, parentId: null },
@@ -152,9 +152,11 @@ test('clipboard todos import completion and omit cancelled items', async () => {
 	assert.equal(probe.state.isPasting, false);
 });
 
-test('ambiguous clipboard text preserves checkbox-like content verbatim', async () => {
+test('normal clipboard import preserves checkbox markers as literal text', async () => {
 	for (const text of [
 		'[X] Tomatoes',
+		'[ ] Milk\n[X] Tomatoes\n[C] Capsicum',
+		'9:26 AM\n[X] Choc milk\n[X] Death of the outsider\n[X] Charge phone\n[X] Northland #northland',
 		'Shopping\n[ ] Milk\n[X] Tomatoes\n[C] Capsicum',
 		'[ ] Milk\n[?] Tomatoes\n[C] Capsicum',
 		'[ ] Milk\n[X]Tomatoes\n[C] Capsicum',
@@ -167,14 +169,44 @@ test('ambiguous clipboard text preserves checkbox-like content verbatim', async 
 	}
 });
 
+test('task import extracts the example tasks without the timestamp or other text', async () => {
+	const text = '9:26 AM\n[X] Choc milk\n[X] Death of the outsider\n[X] Charge phone\n[X] Northland #northland\nEnd of list';
+	const probe = clipboardState(async () => text);
+	await probe.run('tasks');
+	assert.deepEqual(probe.calls, [['json', 'list-a', [
+		{ id: 'clipboard-0', name: 'Choc milk', checked: true, parentId: null },
+		{ id: 'clipboard-1', name: 'Death of the outsider', checked: true, parentId: null },
+		{ id: 'clipboard-2', name: 'Charge phone', checked: true, parentId: null },
+		{ id: 'clipboard-3', name: 'Northland #northland', checked: true, parentId: null }
+	], { addPosition: 'bottom', skipExisting: true }]]);
+	assert.deepEqual(probe.alerts, []);
+	assert.equal(probe.state.isPasting, false);
+});
+
+test('task import reports missing tasks without importing literal text or app JSON', async () => {
+	for (const text of ['9:26 AM\nShopping\nNo tasks here', '{"__list_app__":true,"items":[{"id":"x","name":"Task"}]}']) {
+		const probe = clipboardState(async () => text);
+		await probe.run('tasks');
+		assert.deepEqual(probe.calls, []);
+		assert.equal(probe.alerts.length, 1);
+		assert.match(probe.alerts[0], /No tasks found in clipboard/);
+		assert.equal(probe.state.isPasting, false);
+		probe.state.navigator.clipboard.readText = async () => '[X] Single task';
+		await probe.run('tasks');
+		assert.deepEqual(probe.calls, [['json', 'list-a', [
+			{ id: 'clipboard-0', name: 'Single task', checked: true, parentId: null }
+		], { addPosition: 'bottom', skipExisting: true }]]);
+	}
+});
+
 test('a cancelled clipboard subtree imports nothing and releases the guard', async () => {
 	const probe = clipboardState(async () => '[C] Cancelled parent\n  [X] Completed child\n    [ ] Grandchild');
-	await probe.run();
+	await probe.run('tasks');
 	assert.deepEqual(probe.calls, []);
 	assert.deepEqual(probe.alerts, []);
 	assert.equal(probe.state.isPasting, false);
-	probe.state.navigator.clipboard.readText = async () => 'Next task';
-	await probe.run();
+	probe.state.navigator.clipboard.readText = async () => '[ ] Next task';
+	await probe.run('tasks');
 	assert.equal(probe.calls.length, 1);
 });
 
@@ -195,8 +227,10 @@ for (const position of ['top', 'bottom']) {
 				const otherList = c.data.createList('Other', folderId, 'plain');
 				c.data.createItem(otherList, 'Choc milk');
 				const text = [
+					'Shopping at 9:26 AM',
 					'[ ] Existing root #shopping',
 					'  [ ] Choc milk',
+					'Notes between tasks are ignored',
 					'    [X] Tomatoes',
 					'      [ ] Great grandchild',
 					'  [C] Capsicum',
@@ -205,7 +239,8 @@ for (const position of ['top', 'bottom']) {
 					'  [ ] Tuna can',
 					'[X] Zuchinni',
 					'[ ] New root',
-					'[ ] New root'
+					'[ ] New root',
+					'End of list'
 				].join('\n');
 				const probe = clipboardState(async () => text);
 				Object.assign(probe.state, {
@@ -214,7 +249,7 @@ for (const position of ['top', 'bottom']) {
 					createItemsFromExport: c.data.createItemsFromExport
 				});
 				c.store.getUndoManager().clear();
-				await probe.run();
+				await probe.run('tasks');
 				assert.deepEqual(probe.alerts, []);
 				const items = c.data.readItems(listId);
 				const get = (name) => items.find((item) => item.name === name);
@@ -312,34 +347,51 @@ test('clipboard permission rejection and invalid exports release the guard', asy
 	assert.equal(probe.calls.length, 1); assert.equal(probe.alerts.length, 2);
 });
 
-test('import mutation errors are reported, not retried as plain text', async () => {
-	const probe = clipboardState(async () => '{"__list_app__":true,"items":[{"id":"x","name":"Task"}]}');
-	probe.state.createItemsFromExport = () => { throw new Error('Invalid record'); };
-	await probe.run(); assert.equal(probe.state.isPasting, false);
-	assert.deepEqual(probe.calls, []); assert.match(probe.alerts[0], /Import failed: Invalid record/);
-});
+for (const mode of ['items', 'tasks']) {
+	test(`${mode} import mutation errors are reported, not retried as plain text`, async () => {
+		const probe = clipboardState(async () => mode === 'tasks'
+			? '[ ] Task'
+			: '{"__list_app__":true,"items":[{"id":"x","name":"Task"}]}');
+		probe.state.createItemsFromExport = () => { throw new Error('Invalid record'); };
+		await probe.run(mode); assert.equal(probe.state.isPasting, false);
+		assert.deepEqual(probe.calls, []); assert.match(probe.alerts[0], /Import failed: Invalid record/);
+	});
 
-for (const transition of ['navigation', 'history', 'unmount', 'deletion', 'round-trip navigation']) {
-	test(`pending clipboard import is cancelled after ${transition}`, async () => {
-		let resolve;
-		const probe = clipboardState(() => new Promise((done) => { resolve = done; }));
-		const pending = probe.run();
-		if (transition === 'navigation') probe.state.listId = 'list-b';
-		if (transition === 'history') probe.state.commitState.isHistorical = true;
-		if (transition === 'unmount') probe.state.isActive = false;
-		if (transition === 'deletion') probe.state.readLists = () => [];
-		if (transition === 'round-trip navigation') probe.state.listContextVersion++;
-		resolve('Task'); await pending;
-		assert.deepEqual(probe.calls, []); assert.equal(probe.state.isPasting, false);
+	test(`${mode} clipboard permission errors release the guard for another import`, async () => {
+		const probe = clipboardState(async () => { throw new Error('Permission denied'); });
+		await probe.run(mode);
+		assert.equal(probe.state.isPasting, false);
+		assert.deepEqual(probe.calls, []);
+		assert.match(probe.alerts[0], /Could not read clipboard/);
+		probe.state.navigator.clipboard.readText = async () => '[ ] Task';
+		await probe.run(mode);
+		assert.equal(probe.calls.length, 1);
+	});
+
+	for (const transition of ['navigation', 'history', 'unmount', 'deletion', 'round-trip navigation']) {
+		test(`pending ${mode} clipboard import is cancelled after ${transition}`, async () => {
+			let resolve;
+			const probe = clipboardState(() => new Promise((done) => { resolve = done; }));
+			const pending = probe.run(mode);
+			if (transition === 'navigation') probe.state.listId = 'list-b';
+			if (transition === 'history') probe.state.commitState.isHistorical = true;
+			if (transition === 'unmount') probe.state.isActive = false;
+			if (transition === 'deletion') probe.state.readLists = () => [];
+			if (transition === 'round-trip navigation') probe.state.listContextVersion++;
+			resolve('[ ] Task'); await pending;
+			assert.deepEqual(probe.calls, []); assert.equal(probe.state.isPasting, false);
+		});
+	}
+
+	test(`concurrent clipboard imports share one read while importing ${mode}`, async () => {
+		let resolve, reads = 0;
+		const probe = clipboardState(() => { reads++; return new Promise((done) => { resolve = done; }); });
+		const first = probe.run(mode);
+		await probe.run('items'); await probe.run('tasks');
+		assert.equal(reads, 1);
+		resolve('[ ] Task'); await first; assert.equal(probe.calls.length, 1);
 	});
 }
-
-test('concurrent clipboard clicks issue only one read', async () => {
-	let resolve, reads = 0;
-	const probe = clipboardState(() => { reads++; return new Promise((done) => { resolve = done; }); });
-	const first = probe.run(); await probe.run(); assert.equal(reads, 1);
-	resolve('Task'); await first; assert.equal(probe.calls.length, 1);
-});
 
 for (const outcome of ['network-online', 'network-offline', 'server-error', 'success']) {
 	test(`logout ${outcome} keeps authentication and document lifecycle consistent`, async () => {

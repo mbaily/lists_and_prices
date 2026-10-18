@@ -142,7 +142,7 @@ export const helpTopics: HelpTopic[] = [
 				title: 'Currency and sharing',
 				paragraphs: [
 					'Choose the displayed currency symbol under Settings → Currency. Changing the symbol does not convert stored prices or apply an exchange rate. Treat the amounts as using one consistent currency and choose the symbol that describes them. Prices display with two decimal places.',
-					'For a spreadsheet, open the list’s header ⋮ menu and choose Copy as spreadsheet, then paste into your spreadsheet application. Export to clipboard (JSON) is useful when copying app item data with its attributes. Import from clipboard can bring supported JSON or plain-text items into a list.',
+					'For a spreadsheet, open the list’s header ⋮ menu and choose Copy as… → Copy as spreadsheet, then paste into your spreadsheet application. Export to clipboard (JSON) is useful when copying app item data with its attributes. Import from clipboard can bring supported JSON or plain-text items into a list.',
 					'Smart Reports summarise outstanding task text rather than providing a cost breakdown. Use the priced list itself for its total and quantities. Use Download backup in Settings when you want a file containing your lists and item prices, rather than a text summary.'
 				]
 			}
@@ -259,9 +259,9 @@ export const helpTopics: HelpTopic[] = [
 			{
 				title: 'Copy or import list content',
 				paragraphs: [
-					'An item’s Copy & Link submenu offers Copy for its plain-text name and Copy JSON for its attributes. A list’s header ⋮ menu offers Export to clipboard (JSON), Copy as spreadsheet and Copy as journal. Use spreadsheet output for tabular pasting, or journal output when you want a text record.',
-					'Import from clipboard accepts supported app JSON or plain text. Plain-text import adds each non-empty line as an item and skips names already present in the destination list. JSON can carry attributes such as price, quantity, note status and parent relationships. Clipboard access may require browser permission; if it fails, check the browser’s clipboard settings.',
-					'A checklist is recognized when at least two non-empty lines all start with [ ], [X] or [C] followed by text. [X] imports as completed; [C] and its indented subtasks are omitted. Whitespace indentation preserves parent and subtask relationships at multiple levels. Other text keeps its brackets. Existing names are skipped; new subtasks can attach to an existing parent.'
+					'An item’s Copy & Link submenu offers Copy for its plain-text name and Copy JSON for its attributes. A list’s header ⋮ menu offers Export to clipboard (JSON) and a Copy as… submenu with Copy as spreadsheet and Copy as journal. Use spreadsheet output for tabular pasting, or journal output when you want a text record.',
+					'Import from clipboard accepts supported app JSON or plain text. Plain-text import adds each non-empty line containing letters as a literal item, keeps checkbox markers as text and skips names already present in the destination list. JSON can carry attributes such as price, quantity, note status and parent relationships. Clipboard access may require browser permission; if it fails, check the browser’s clipboard settings.',
+					'Import as tasks extracts lines starting with [ ], [X] or [C] followed by a space and task text, even for a single task. Timestamps, headings and other non-task lines are ignored. [X] imports as completed; [C] and its indented subtasks are omitted. Whitespace indentation preserves parent and subtask relationships at multiple levels. Existing names are skipped; new subtasks can attach to an existing parent.'
 				]
 			},
 			{

@@ -543,7 +543,7 @@
 	let isActive = true;
 	let listContextVersion = 0;
 
-	async function importFromClipboard() {
+	async function importFromClipboard(mode: 'items' | 'tasks' = 'items') {
 		if (isPasting || !canEditList) return;
 		const targetListId = listId;
 		const contextVersion = listContextVersion;
@@ -563,6 +563,16 @@
 			// A completed clipboard read must never write into another list or document view.
 			if (!isCurrent() || !readLists().some((list) => list.id === targetListId)) return;
 
+			if (mode === 'tasks') {
+				const todos = parseClipboardTodos(text);
+				if (todos === null) {
+					alert('No tasks found in clipboard. Use [ ], [X] or [C] followed by a space and task text.');
+				} else if (todos.length > 0) {
+					createItemsFromExport(targetListId, todos, { addPosition, skipExisting: true });
+				}
+				return;
+			}
+
 			let parsed: unknown;
 			const trimmed = text.trim();
 			if (trimmed.startsWith('{')) {
@@ -580,11 +590,6 @@
 				}
 				createItemsFromExport(targetListId, parsed.items as ExportedItem[]);
 			} else {
-				const todos = parseClipboardTodos(text);
-				if (todos !== null) {
-					if (todos.length > 0) createItemsFromExport(targetListId, todos, { addPosition, skipExisting: true });
-					return;
-				}
 				// Plain text: one item per line, excluding blank lines and lines without letters.
 				const lines = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => /\p{L}/u.test(line));
 				if (lines.length === 0) {
@@ -1054,6 +1059,7 @@
 
 	// ── Copy as TSV (for pasting into Google Sheets) ──────────────────────────────
 	let showHeaderMenu = $state(false);
+	let showCopySubmenu = $state(false);
 	let menuStyle = $state('');
 
 	// ── Tree-order navigation ────────────────────────────────────────────────────
@@ -1433,6 +1439,7 @@
 		>{listMeta?.done ? '☑' : '☐'}</button>
 		<div class="header-menu-wrap">
 			<button class="type-btn" onclick={(e) => {
+				showCopySubmenu = false;
 				showHeaderMenu = !showHeaderMenu;
 				if (showHeaderMenu) {
 					const rect = e.currentTarget.getBoundingClientRect();
@@ -1443,7 +1450,7 @@
 						menuStyle = `top: ${rect.bottom + 4}px; left: ${rect.left}px; right: auto;`;
 					}
 				}
-			}} aria-label="More options">⋮</button>
+			}} aria-label="More options" aria-haspopup="menu" aria-expanded={showHeaderMenu}>⋮</button>
 		</div>
 		<div class="header-right">
 			{#if navTotal > 1}
@@ -2042,23 +2049,29 @@
 	{#if showHeaderMenu}
 		<!-- Render header menu absolute to the screen so it's not clipped by header overflow -->
 		<div class="header-menu" role="menu" style={menuStyle}>
-			{#if !commitState.isHistorical}
-			{#if selectionMode && selectedIds.size > 0}
-			<button role="menuitem" disabled={!canEditList || !canReparentItems(items, selectedIds, null)} onclick={() => { showHeaderMenu = false; reparentSelectedTo(null); }}>↳ Move selected to root</button>
+			{#if showCopySubmenu}
+				<button role="menuitem" onclick={() => showCopySubmenu = false}>← Back</button>
+				<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsTSV(); }}>📋 Copy as spreadsheet</button>
+				<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsJournal(); }}>📓 Copy as journal</button>
 			{:else}
-			<button role="menuitem" onclick={enterSelectionMode}>☑ Select items</button>
-			{/if}
-			{/if}
-			<button role="menuitem" onclick={() => { showHeaderMenu = false; exportToClipboard(); }}>📤 Export to clipboard (JSON)</button>
-			{#if !commitState.isHistorical}
-			<button role="menuitem" disabled={isPasting || !canEditList} onclick={() => { showHeaderMenu = false; importFromClipboard(); }}>{isPasting ? '📥 Reading clipboard…' : '📥 Import from clipboard'}</button>
-			{/if}
-			<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsTSV(); }}>📋 Copy as spreadsheet</button>
-			<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsJournal(); }}>📓 Copy as journal</button>
-			<button role="menuitem" disabled={!canEditList} onclick={() => { showHeaderMenu = false; toggleJournalMode(); }}>{journalMode ? '🗓 Hide dates (journal mode)' : '🗓 Show dates (journal mode)'}</button>
-			{#if !commitState.isHistorical}
-			<button role="menuitem" onclick={() => { showHeaderMenu = false; toggleType(); }}>{isPriced ? '📋 Switch to plain list' : '💰 Switch to priced list'}</button>
-			<button role="menuitem" onclick={() => { if (!commitState.isHistorical) { showHeaderMenu = false; showUndoConfirm = true; } }}>↩️ Undo last action</button>
+				{#if !commitState.isHistorical}
+					{#if selectionMode && selectedIds.size > 0}
+						<button role="menuitem" disabled={!canEditList || !canReparentItems(items, selectedIds, null)} onclick={() => { showHeaderMenu = false; reparentSelectedTo(null); }}>↳ Move selected to root</button>
+					{:else}
+						<button role="menuitem" onclick={enterSelectionMode}>☑ Select items</button>
+					{/if}
+				{/if}
+				<button role="menuitem" onclick={() => { showHeaderMenu = false; exportToClipboard(); }}>📤 Export to clipboard (JSON)</button>
+				{#if !commitState.isHistorical}
+					<button role="menuitem" disabled={isPasting || !canEditList} onclick={() => { showHeaderMenu = false; importFromClipboard(); }}>{isPasting ? '📥 Reading clipboard…' : '📥 Import from clipboard'}</button>
+					<button role="menuitem" disabled={isPasting || !canEditList} onclick={() => { showHeaderMenu = false; importFromClipboard('tasks'); }}>☑ Import as tasks</button>
+				{/if}
+				<button role="menuitem" aria-haspopup="menu" onclick={() => showCopySubmenu = true}>📋 Copy as… ›</button>
+				<button role="menuitem" disabled={!canEditList} onclick={() => { showHeaderMenu = false; toggleJournalMode(); }}>{journalMode ? '🗓 Hide dates (journal mode)' : '🗓 Show dates (journal mode)'}</button>
+				{#if !commitState.isHistorical}
+					<button role="menuitem" onclick={() => { showHeaderMenu = false; toggleType(); }}>{isPriced ? '📋 Switch to plain list' : '💰 Switch to priced list'}</button>
+					<button role="menuitem" onclick={() => { if (!commitState.isHistorical) { showHeaderMenu = false; showUndoConfirm = true; } }}>↩️ Undo last action</button>
+				{/if}
 			{/if}
 		</div>
 	{/if}
