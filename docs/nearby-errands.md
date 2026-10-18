@@ -169,6 +169,7 @@ Matching is case-insensitive and any matching tag is enough:
 | `#woolworths` | Woolworths and Woolworths Metro |
 | `#wooloworths`, `#woolworth`, `#woolies` | Aliases for Woolworths |
 | `#kmart` | Kmart |
+| `#bigw` | BIG W, including Epping and Queen Victoria Village (QV) |
 | `#hardware` | Bunnings and Mitre 10 (also custom Home Hardware locations) |
 | `#bunnings`, `#mitre10` | That hardware chain |
 | `#northland`, `#emporium` | Businesses in that shopping centre |
@@ -186,9 +187,10 @@ that can be edited by hand. It is bundled with the frontend, so lookups work off
 and do not need a running map API or an API key. Edit this file and rebuild/deploy to
 update the catalogue on every device. The original seed had 421 locations:
 43 Kmart, 177 Coles and 201 Woolworths/Metro in the original supermarket catalogue.
-The catalogue now has **4,766 locations**. The chain expansion checks all 323 original
+The catalogue now has **4,787 locations**. The chain expansion checks all 323 original
 brand tags, consolidating aliases into 316 brand identities. Officeworks was subsequently added as a new brand,
-with 44 active locations inside the metropolitan boundaries. The catalogue also includes
+with 44 active locations inside the metropolitan boundaries. BIG W adds 19 Melbourne
+branches, including Epping and Queen Victoria Village (QV). The catalogue also includes
 16 Scorptec/Centre Com/CPL/MSY branches matching `#pcparts`, four MUJI branches
 and eight DAISO branches. MUJI Highpoint/Knox use labelled shopping-centre pins;
 PC retailers use verified street addresses with labelled suburb fallbacks where needed.
@@ -270,6 +272,14 @@ Victorian addresses and the same metropolitan boundaries. Its catalogue tag is
 `officeworks`; all 44 imported branches have store coordinates. The collector saves
 `officeworks-official.json` in the source cache. Remove that cached file to fetch
 a fresh active-store list on the next run.
+
+BIG W's 19 Melbourne branches use store coordinates and addresses from the complete
+178-store snapshot embedded in its [official Epping store page](https://www.bigw.com.au/store/0398/BIG-W-Epping),
+retrieved on 2026-10-18. All Victorian points were checked against the same 31 council
+boundaries; nine regional stores are excluded. The selected records are preserved in
+`scripts/retail-chain-facts.json`, so chain refreshes retain the `bigw` hashtag and
+locations. Recheck the [official locator](https://www.bigw.com.au/store-finder) when
+refreshing that snapshot.
 
 ## Sources and collection
 

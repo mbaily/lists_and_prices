@@ -15467,5 +15467,271 @@
     "sourceDataset": "https://www.ikea.com/au/en/stores/",
     "coordinateAccuracy": "store",
     "collection": "chain-expansion"
+  },
+  {
+    "id": "chain-bigw-0394",
+    "name": "BIG W Altona Meadows",
+    "tags": [
+      "bigw"
+    ],
+    "latitude": -37.87158,
+    "longitude": 144.77715,
+    "address": "1-23 Central Avenue, Altona Meadows, VIC, 3028",
+    "source": "https://www.bigw.com.au/store/0394/BIG-W-Altona-Meadows",
+    "sourceDataset": "https://www.bigw.com.au/store/0398/BIG-W-Epping",
+    "coordinateAccuracy": "store",
+    "collection": "chain-expansion"
+  },
+  {
+    "id": "chain-bigw-0361",
+    "name": "BIG W Craigieburn",
+    "tags": [
+      "bigw"
+    ],
+    "latitude": -37.5939,
+    "longitude": 144.9103,
+    "address": "340 Craigieburn Road, Craigieburn, VIC, 3064",
+    "source": "https://www.bigw.com.au/store/0361/BIG-W-Craigieburn",
+    "sourceDataset": "https://www.bigw.com.au/store/0398/BIG-W-Epping",
+    "coordinateAccuracy": "store",
+    "collection": "chain-expansion"
+  },
+  {
+    "id": "chain-bigw-0368",
+    "name": "BIG W Doncaster",
+    "tags": [
+      "bigw"
+    ],
+    "latitude": -37.785,
+    "longitude": 145.12619,
+    "address": "619 Doncaster Road, Doncaster, VIC, 3108",
+    "source": "https://www.bigw.com.au/store/0368/BIG-W-Doncaster",
+    "sourceDataset": "https://www.bigw.com.au/store/0398/BIG-W-Epping",
+    "coordinateAccuracy": "store",
+    "collection": "chain-expansion"
+  },
+  {
+    "id": "chain-bigw-0384",
+    "name": "BIG W Eastland",
+    "tags": [
+      "bigw"
+    ],
+    "latitude": -37.812733,
+    "longitude": 145.23055,
+    "address": "171-175 Maroondah Highway, Ringwood, VIC, 3134",
+    "source": "https://www.bigw.com.au/store/0384/BIG-W-Eastland",
+    "sourceDataset": "https://www.bigw.com.au/store/0398/BIG-W-Epping",
+    "coordinateAccuracy": "store",
+    "collection": "chain-expansion"
+  },
+  {
+    "id": "chain-bigw-0398",
+    "name": "BIG W Epping",
+    "tags": [
+      "bigw"
+    ],
+    "latitude": -37.64667,
+    "longitude": 145.02612,
+    "address": "571-583 High Street, Epping, VIC, 3076",
+    "source": "https://www.bigw.com.au/store/0398/BIG-W-Epping",
+    "sourceDataset": "https://www.bigw.com.au/store/0398/BIG-W-Epping",
+    "coordinateAccuracy": "store",
+    "collection": "chain-expansion"
+  },
+  {
+    "id": "chain-bigw-0381",
+    "name": "BIG W Fountain Gate",
+    "tags": [
+      "bigw"
+    ],
+    "latitude": -38.018402,
+    "longitude": 145.30264,
+    "address": "352 Princes Highway, Fountain Gate, VIC, 3805",
+    "source": "https://www.bigw.com.au/store/0381/BIG-W-Fountain-Gate",
+    "sourceDataset": "https://www.bigw.com.au/store/0398/BIG-W-Epping",
+    "coordinateAccuracy": "store",
+    "collection": "chain-expansion"
+  },
+  {
+    "id": "chain-bigw-0373",
+    "name": "BIG W Highpoint",
+    "tags": [
+      "bigw"
+    ],
+    "latitude": -37.76912,
+    "longitude": 144.88646,
+    "address": "Rosamond Road, Maribyrnong, VIC, 3032",
+    "source": "https://www.bigw.com.au/store/0373/BIG-W-Highpoint",
+    "sourceDataset": "https://www.bigw.com.au/store/0398/BIG-W-Epping",
+    "coordinateAccuracy": "store",
+    "collection": "chain-expansion"
+  },
+  {
+    "id": "chain-bigw-0370",
+    "name": "BIG W Karingal",
+    "tags": [
+      "bigw"
+    ],
+    "latitude": -38.140575,
+    "longitude": 145.15565,
+    "address": "Karingal Road and Cranbourne Road, Karingal, VIC, 3199",
+    "source": "https://www.bigw.com.au/store/0370/BIG-W-Karingal",
+    "sourceDataset": "https://www.bigw.com.au/store/0398/BIG-W-Epping",
+    "coordinateAccuracy": "store",
+    "collection": "chain-expansion"
+  },
+  {
+    "id": "chain-bigw-0365",
+    "name": "BIG W Lilydale",
+    "tags": [
+      "bigw"
+    ],
+    "latitude": -37.75959,
+    "longitude": 145.34766,
+    "address": "33 Hutchinson Street, Lilydale, VIC, 3140",
+    "source": "https://www.bigw.com.au/store/0365/BIG-W-Lilydale",
+    "sourceDataset": "https://www.bigw.com.au/store/0398/BIG-W-Epping",
+    "coordinateAccuracy": "store",
+    "collection": "chain-expansion"
+  },
+  {
+    "id": "chain-bigw-0362",
+    "name": "BIG W Melton",
+    "tags": [
+      "bigw"
+    ],
+    "latitude": -37.68538,
+    "longitude": 144.56453,
+    "address": "533-555 High Street, Melton, VIC, 3337",
+    "source": "https://www.bigw.com.au/store/0362/BIG-W-Melton",
+    "sourceDataset": "https://www.bigw.com.au/store/0398/BIG-W-Epping",
+    "coordinateAccuracy": "store",
+    "collection": "chain-expansion"
+  },
+  {
+    "id": "chain-bigw-0364",
+    "name": "BIG W Pakenham",
+    "tags": [
+      "bigw"
+    ],
+    "latitude": -38.0763,
+    "longitude": 145.4836,
+    "address": "Corner of John Street and Henry Street, Pakenham, VIC, 3810",
+    "source": "https://www.bigw.com.au/store/0364/BIG-W-Pakenham",
+    "sourceDataset": "https://www.bigw.com.au/store/0398/BIG-W-Epping",
+    "coordinateAccuracy": "store",
+    "collection": "chain-expansion"
+  },
+  {
+    "id": "chain-bigw-0391",
+    "name": "BIG W Queen Victoria Village",
+    "tags": [
+      "bigw"
+    ],
+    "latitude": -37.81126,
+    "longitude": 144.9648,
+    "address": "Corner of Swanston Street and Lonsdale Street, Melbourne, VIC, 3000",
+    "source": "https://www.bigw.com.au/store/0391/BIG-W-Queen-Victoria-Village",
+    "sourceDataset": "https://www.bigw.com.au/store/0398/BIG-W-Epping",
+    "coordinateAccuracy": "store",
+    "collection": "chain-expansion"
+  },
+  {
+    "id": "chain-bigw-0367",
+    "name": "BIG W South Yarra",
+    "tags": [
+      "bigw"
+    ],
+    "latitude": -37.837227,
+    "longitude": 144.99629,
+    "address": "670 Chapel Street, South Yarra, VIC, 3141",
+    "source": "https://www.bigw.com.au/store/0367/BIG-W-South-Yarra",
+    "sourceDataset": "https://www.bigw.com.au/store/0398/BIG-W-Epping",
+    "coordinateAccuracy": "store",
+    "collection": "chain-expansion"
+  },
+  {
+    "id": "chain-bigw-0375",
+    "name": "BIG W Southland",
+    "tags": [
+      "bigw"
+    ],
+    "latitude": -37.95809,
+    "longitude": 145.05519,
+    "address": "1239 Nepean Highway, Cheltenham, VIC, 3192",
+    "source": "https://www.bigw.com.au/store/0375/BIG-W-Southland",
+    "sourceDataset": "https://www.bigw.com.au/store/0398/BIG-W-Epping",
+    "coordinateAccuracy": "store",
+    "collection": "chain-expansion"
+  },
+  {
+    "id": "chain-bigw-0383",
+    "name": "BIG W Sunbury",
+    "tags": [
+      "bigw"
+    ],
+    "latitude": -37.579906,
+    "longitude": 144.72676,
+    "address": "Horne Street, Sunbury, VIC, 3429",
+    "source": "https://www.bigw.com.au/store/0383/BIG-W-Sunbury",
+    "sourceDataset": "https://www.bigw.com.au/store/0398/BIG-W-Epping",
+    "coordinateAccuracy": "store",
+    "collection": "chain-expansion"
+  },
+  {
+    "id": "chain-bigw-0380",
+    "name": "BIG W Sunshine",
+    "tags": [
+      "bigw"
+    ],
+    "latitude": -37.78762,
+    "longitude": 144.83246,
+    "address": "80 Harvester Road, Sunshine, VIC, 3020",
+    "source": "https://www.bigw.com.au/store/0380/BIG-W-Sunshine",
+    "sourceDataset": "https://www.bigw.com.au/store/0398/BIG-W-Epping",
+    "coordinateAccuracy": "store",
+    "collection": "chain-expansion"
+  },
+  {
+    "id": "chain-bigw-0369",
+    "name": "BIG W Watergardens",
+    "tags": [
+      "bigw"
+    ],
+    "latitude": -37.69568,
+    "longitude": 144.77206,
+    "address": "399 Melton Highway, Taylors Lakes, VIC, 3038",
+    "source": "https://www.bigw.com.au/store/0369/BIG-W-Watergardens",
+    "sourceDataset": "https://www.bigw.com.au/store/0398/BIG-W-Epping",
+    "coordinateAccuracy": "store",
+    "collection": "chain-expansion"
+  },
+  {
+    "id": "chain-bigw-0399",
+    "name": "BIG W Waverley Gardens",
+    "tags": [
+      "bigw"
+    ],
+    "latitude": -37.93485,
+    "longitude": 145.18954,
+    "address": "Police Road and Jackson's Road, Mulgrave, VIC, 3170",
+    "source": "https://www.bigw.com.au/store/0399/BIG-W-Waverley-Gardens",
+    "sourceDataset": "https://www.bigw.com.au/store/0398/BIG-W-Epping",
+    "coordinateAccuracy": "store",
+    "collection": "chain-expansion"
+  },
+  {
+    "id": "chain-bigw-0386",
+    "name": "BIG W Werribee",
+    "tags": [
+      "bigw"
+    ],
+    "latitude": -37.8777,
+    "longitude": 144.6835,
+    "address": "250 Heath Road, Werribee, VIC, 3030",
+    "source": "https://www.bigw.com.au/store/0386/BIG-W-Werribee",
+    "sourceDataset": "https://www.bigw.com.au/store/0398/BIG-W-Epping",
+    "coordinateAccuracy": "store",
+    "collection": "chain-expansion"
   }
 ]

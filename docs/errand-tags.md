@@ -2,21 +2,23 @@
 
 Source: `mbaily@git23069.hopto.org`, app document `yjs/pnl-mb`.
 Snapshot: 2026-10-18 15:36:02 AEDT.
+Catalogue updated on 2026-10-18 with 19 verified Melbourne BIG W locations; saved-location and item-use counts retain the snapshot above.
 
-**912 usable hashtags:** 883 canonical tags and 29 accepted aliases.
-These come from the deployed catalogue of 4,768 retail locations, 549 suburbs, your 3 saved locations, and the built-in `#bank` and `#errand` tags.
+**913 usable hashtags:** 884 canonical tags and 29 accepted aliases.
+These come from the deployed catalogue of 4,787 retail locations, 549 suburbs, your 3 saved locations, and the built-in `#bank` and `#errand` tags.
 
 Tags are case-insensitive. Put a tag in a list name to apply it to its untagged items, or tag an individual item. An item with its own recognised errand tag uses that tag instead of inheriting the list tags. Folder hashtags are not inherited.
 
-This is every recognised tag in the server snapshot, regardless of distance, completion, dismissal or pause state. More tags can be registered by adding them to a saved location.
+This is every recognised tag in the updated catalogue and server snapshot, regardless of distance, completion, dismissal or pause state. More tags can be registered by adding them to a saved location.
 
 ## Errand tags already used in your lists and items
 
-12 distinct recognised tags appear directly in list or item text. Counts include completed and archived records; each record is counted once per tag. Inherited uses are not counted.
+13 distinct recognised tags appear directly in list or item text. Counts include completed and archived records; each record is counted once per tag. Inherited uses are not counted.
 
 | Tag | Lists | Items |
 | --- | ---: | ---: |
 | `#bank` | 0 | 1 |
+| `#bigw` | 0 | 1 |
 | `#bunnings` | 1 | 2 |
 | `#errand` | 0 | 2 |
 | `#hawkerst` | 0 | 2 |
@@ -33,7 +35,7 @@ Your saved locations support `#hawkerst`, `#loyolacrt` and `#northland`. `#north
 
 ## All usable errand tags, alphabetically
 
-912 unique hashtags, including accepted aliases. One hashtag per line.
+913 unique hashtags, including accepted aliases. One hashtag per line.
 
 ```text
 #1001optical
@@ -126,6 +128,7 @@ Your saved locations support `#hawkerst`, `#loyolacrt` and `#northland`. `#north
 #beveridge
 #bevilles
 #bigpatscreek
+#bigw
 #billini
 #bittern
 #blackburn
@@ -992,7 +995,6 @@ These hashtags currently have no registered location match and do not qualify as
 
 | Tag | Lists | Items |
 | --- | ---: | ---: |
-| `#bigw` | 0 | 1 |
 | `#supplies_photos` | 0 | 9 |
 
 ## Extraction notes

@@ -1,8 +1,8 @@
 {
   "retrievedAt": "2026-09-30",
-  "inventoryCount": 330,
-  "canonicalBrandCount": 323,
-  "locations": 4768,
+  "inventoryCount": 331,
+  "canonicalBrandCount": 324,
+  "locations": 4787,
   "coverageNote": "Source snapshots and official directories; not a claim that every chain is exhaustive. Directory-only entries still need a complete official locator.",
   "excludedOutsideMetro": [],
   "sources": {
@@ -11066,6 +11066,28 @@
         "https://mydaiso.com.au/pages/store-locator"
       ],
       "attempts": []
+    },
+    {
+      "tag": "bigw",
+      "canonicalTag": "bigw",
+      "name": "BIG W",
+      "metroLocations": 19,
+      "status": "expanded-source-snapshot",
+      "stats": {
+        "added": 19
+      },
+      "datasets": [],
+      "officialSources": [
+        "https://www.bigw.com.au/store/0398/BIG-W-Epping"
+      ],
+      "locatorCandidates": [
+        "https://www.bigw.com.au/store-finder",
+        "https://www.bigw.com.au/store/0398/BIG-W-Epping"
+      ],
+      "attempts": [],
+      "retrievedAt": "2026-10-18",
+      "coverageNote": "All 19 BIG W stores in the official 178-store snapshot whose Victorian coordinates fall inside the 31 metropolitan Melbourne councils. Nine regional Victorian stores are excluded."
     }
-  ]
+  ],
+  "updatedAt": "2026-10-18"
 }

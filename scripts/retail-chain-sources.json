@@ -7547,6 +7547,17 @@
       ],
       "officialLocatorChecked": true,
       "officialLocatorAttempt": "Public locator facts verified; suburb fallbacks labelled where store coordinates unavailable."
+    },
+    {
+      "tag": "bigw",
+      "name": "BIG W",
+      "locatorCandidates": [
+        "https://www.bigw.com.au/store-finder",
+        "https://www.bigw.com.au/store/0398/BIG-W-Epping"
+      ],
+      "officialLocatorChecked": true,
+      "officialLocatorAttempt": "Full retailer store snapshot extracted from __NEXT_DATA__; Victorian store coordinates filtered against the 31 metropolitan council boundaries.",
+      "addedAt": "2026-10-18"
     }
   ],
   "datasets": [
