@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createApp, componentFunctions, transpile } from './helpers/app.mjs';
 import { importNameKey } from '../server/import-text.ts';
+import { parseClipboardTodos } from '../src/lib/importText.ts';
 
 function uncheckProbe(selected = false, named = false) {
 	const calls = [];
@@ -116,7 +117,7 @@ function clipboardState(readText) {
 		settings: { addItemPosition: 'bottom' }, commitState: { isHistorical: false },
 		navigator: { clipboard: { readText } }, readLists: () => [{ id: 'list-a' }, { id: 'list-b' }],
 		readItems: () => [],
-		importNameKey,
+		importNameKey, parseClipboardTodos,
 		createItemsBatch: (...args) => calls.push(['text', ...args]),
 		createItemsFromExport: (...args) => calls.push(['json', ...args]),
 		alert: (message) => alerts.push(message), copyMessage: '', copyStatus: 'idle',
@@ -136,6 +137,113 @@ test('clipboard imports can be repeated after both plain text and JSON success',
 	assert.equal(probe.state.copyStatus, 'idle'); assert.equal(probe.state.copyMessage, '');
 	assert.equal(probe.calls.length, 2); assert.equal(probe.calls[1][0], 'json');
 });
+
+test('clipboard todos import completion and omit cancelled items', async () => {
+	const text = '[ ] Choc milk\n[X] Tomatoes\n[ ] Tuna can\n[ ] Zuchinni\n[C] Capsicum';
+	const probe = clipboardState(async () => text);
+	await probe.run();
+	assert.deepEqual(probe.calls, [['json', 'list-a', [
+		{ id: 'clipboard-0', name: 'Choc milk', checked: false, parentId: null },
+		{ id: 'clipboard-1', name: 'Tomatoes', checked: true, parentId: null },
+		{ id: 'clipboard-2', name: 'Tuna can', checked: false, parentId: null },
+		{ id: 'clipboard-3', name: 'Zuchinni', checked: false, parentId: null }
+	], { addPosition: 'bottom', skipExisting: true }]]);
+	assert.deepEqual(probe.alerts, []);
+	assert.equal(probe.state.isPasting, false);
+});
+
+test('ambiguous clipboard text preserves checkbox-like content verbatim', async () => {
+	for (const text of [
+		'[X] Tomatoes',
+		'Shopping\n[ ] Milk\n[X] Tomatoes\n[C] Capsicum',
+		'[ ] Milk\n[?] Tomatoes\n[C] Capsicum',
+		'[ ] Milk\n[X]Tomatoes\n[C] Capsicum',
+		'Write about [X] and [C]\n[C] Capsicum'
+	]) {
+		const probe = clipboardState(async () => text);
+		await probe.run();
+		assert.deepEqual(probe.calls, [['text', 'list-a', text.split('\n'), 'bottom']]);
+		assert.deepEqual(probe.alerts, []);
+	}
+});
+
+test('a cancelled clipboard subtree imports nothing and releases the guard', async () => {
+	const probe = clipboardState(async () => '[C] Cancelled parent\n  [X] Completed child\n    [ ] Grandchild');
+	await probe.run();
+	assert.deepEqual(probe.calls, []);
+	assert.deepEqual(probe.alerts, []);
+	assert.equal(probe.state.isPasting, false);
+	probe.state.navigator.clipboard.readText = async () => 'Next task';
+	await probe.run();
+	assert.equal(probe.calls.length, 1);
+});
+
+for (const position of ['top', 'bottom']) {
+	for (const named of [false, true]) {
+		test(`indented clipboard todos preserve deep hierarchy, ${position} order and ${named ? 'named' : 'plain'} completion with one undo`, async () => {
+			const c = createApp();
+			try {
+				const folderId = c.data.createFolder('Folder', null);
+				const listId = c.data.createList('Shopping', folderId, 'plain');
+				if (named) {
+					c.data.addFolderCheckbox(folderId, 'Bought');
+					c.data.addFolderCheckbox(folderId, 'Packed');
+				}
+				const rootId = c.data.createItem(listId, 'Existing root');
+				const childId = c.data.createItem(listId, 'Existing child', null, rootId);
+				const before = c.data.readItems(listId);
+				const otherList = c.data.createList('Other', folderId, 'plain');
+				c.data.createItem(otherList, 'Choc milk');
+				const text = [
+					'[ ] Existing root #shopping',
+					'  [ ] Choc milk',
+					'    [X] Tomatoes',
+					'      [ ] Great grandchild',
+					'  [C] Capsicum',
+					'    [ ] Cancelled descendant',
+					'      [X] Cancelled grandchild',
+					'  [ ] Tuna can',
+					'[X] Zuchinni',
+					'[ ] New root',
+					'[ ] New root'
+				].join('\n');
+				const probe = clipboardState(async () => text);
+				Object.assign(probe.state, {
+					listId, settings: { addItemPosition: position },
+					readLists: c.data.readLists, readItems: c.data.readItems,
+					createItemsFromExport: c.data.createItemsFromExport
+				});
+				c.store.getUndoManager().clear();
+				await probe.run();
+				assert.deepEqual(probe.alerts, []);
+				const items = c.data.readItems(listId);
+				const get = (name) => items.find((item) => item.name === name);
+				assert.equal(items.length, 9);
+				assert.equal(get('Choc milk').parentId, rootId);
+				assert.equal(get('Tomatoes').parentId, get('Choc milk').id);
+				assert.equal(get('Great grandchild').parentId, get('Tomatoes').id);
+				assert.equal(get('Tuna can').parentId, rootId);
+				assert.equal(get('Zuchinni').parentId, null);
+				assert.equal(get('Existing root').checked, false);
+				const folder = c.data.readFolders().find((entry) => entry.id === folderId);
+				for (const item of items) {
+					assert.equal(c.data.isItemDone(item, folder), ['Tomatoes', 'Zuchinni'].includes(item.name));
+					assert.equal(c.notes.readItemName(c.doc, c.doc.getArray('items').toArray().find((record) => record.get('id') === item.id)), item.name);
+				}
+				assert.equal(items.filter((item) => item.name === 'New root').length, 2);
+				assert.deepEqual(items.filter((item) => item.parentId === null).map((item) => item.name), position === 'top'
+					? ['Zuchinni', 'New root', 'New root', 'Existing root']
+					: ['Existing root', 'Zuchinni', 'New root', 'New root']);
+				assert.deepEqual(items.filter((item) => item.parentId === rootId).map((item) => item.name), position === 'top'
+					? ['Choc milk', 'Tuna can', 'Existing child']
+					: ['Existing child', 'Choc milk', 'Tuna can']);
+				assert.equal(c.store.getUndoCount(), 1);
+				c.store.undoLastAction();
+				assert.deepEqual(c.data.readItems(listId), before);
+			} finally { c.dispose(); }
+		});
+	}
+}
 
 test('plain text skips existing list names but retains repeated new names and case differences', async () => {
 	const probe = clipboardState(async () => ' Milk \nBread\nBread\nmilk\nChild task\n\n123');

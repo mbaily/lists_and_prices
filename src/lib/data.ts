@@ -15,6 +15,7 @@ import { validateLocations, normalizeLocationTag, type RetailLocation } from './
 import { isStartingLocation, type StartingLocation } from './startingLocation';
 import { defaultHotSuburbIds, isHotSuburbIds } from './hotSuburbs';
 import { checklistFingerprint, isNearbyChecklistState, NEARBY_CHECKLIST_MEMBERSHIP_ORIGIN, type NearbyChecklistState } from './nearbyChecklist';
+import { importNameKey } from './importText';
 
 export type { FolderCheckbox } from './folderCheckboxes';
 export type { FolderDefaultItem } from './folderDefaultItems';
@@ -718,19 +719,42 @@ export interface ExportedItem {
 	parentId?: string | null;
 }
 
-/** Import items from a JSON export, preserving all attributes and hierarchy.
- *  Items must be in tree order (parents before their children). */
-export function createItemsFromExport(listId: string, exportedItems: ExportedItem[]): void {
+/** Import exported items or parsed clipboard todos, preserving attributes and
+ *  hierarchy. Items must be in tree order (parents before their children). */
+export function createItemsFromExport(listId: string, exportedItems: ExportedItem[], options: { addPosition?: 'top' | 'bottom'; skipExisting?: boolean } = {}): void {
 	const doc = getMutableDoc();
 	validateRecords(exportedItems, 'items');
 	const idMap = new Map<string, string>(); // old id → new id
+	const existing = readItems(listId);
+	const existingNames = new Map<string, string>();
+	if (options.skipExisting) {
+		for (const item of existing) {
+			const key = importNameKey(item.name);
+			if (!existingNames.has(key)) existingNames.set(key, item.id);
+		}
+		// Children of a skipped duplicate still belong to the existing parent.
+		for (const ex of exportedItems) {
+			const existingId = existingNames.get(importNameKey(ex.name));
+			if (existingId) idMap.set(ex.id, existingId);
+		}
+	}
+	const nextOrders = new Map<string | null, number>();
 	const list = readLists().find((l) => l.id === listId);
 	const folder = list ? readFolders().find((f) => f.id === list.folderId) : undefined;
 	const checkboxes = folder?.checkboxes ?? [];
 	doc.transact(() => {
 		for (const ex of exportedItems) {
+			if (idMap.has(ex.id)) continue;
 			const resolvedParentId = ex.parentId ? (idMap.get(ex.parentId) ?? null) : null;
-			const newId = createItem(listId, ex.name, ex.price ?? null, resolvedParentId, ex.note ?? false, 'bottom');
+			let order: number | undefined;
+			if (options.addPosition === 'top') {
+				order = nextOrders.get(resolvedParentId);
+				if (order === undefined) {
+					order = getInsertionOrder(existing.filter((item) => item.parentId === resolvedParentId), 'top', exportedItems.length);
+				}
+				nextOrders.set(resolvedParentId, order + 1);
+			}
+			const newId = createItem(listId, ex.name, ex.price ?? null, resolvedParentId, ex.note ?? false, 'bottom', order);
 			idMap.set(ex.id, newId);
 			const patch: Partial<Omit<Item, 'id' | 'listId' | 'createdAt' | 'updatedAt' | 'checks'>> = {};
 			if (ex.qty != null) patch.qty = ex.qty;

@@ -260,7 +260,8 @@ export const helpTopics: HelpTopic[] = [
 				title: 'Copy or import list content',
 				paragraphs: [
 					'An item’s Copy & Link submenu offers Copy for its plain-text name and Copy JSON for its attributes. A list’s header ⋮ menu offers Export to clipboard (JSON), Copy as spreadsheet and Copy as journal. Use spreadsheet output for tabular pasting, or journal output when you want a text record.',
-					'Import from clipboard accepts supported app JSON or plain text. Plain-text import adds each non-empty line as an item and skips names already present in the destination list. JSON can carry attributes such as price, quantity, note status and parent relationships. Clipboard access may require browser permission; if it fails, check the browser’s clipboard settings.'
+					'Import from clipboard accepts supported app JSON or plain text. Plain-text import adds each non-empty line as an item and skips names already present in the destination list. JSON can carry attributes such as price, quantity, note status and parent relationships. Clipboard access may require browser permission; if it fails, check the browser’s clipboard settings.',
+					'A checklist is recognized when at least two non-empty lines all start with [ ], [X] or [C] followed by text. [X] imports as completed; [C] and its indented subtasks are omitted. Whitespace indentation preserves parent and subtask relationships at multiple levels. Other text keeps its brackets. Existing names are skipped; new subtasks can attach to an existing parent.'
 				]
 			},
 			{

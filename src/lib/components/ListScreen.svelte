@@ -32,7 +32,7 @@
 	} from '$lib/data';
 	import { settings, updateSettings } from '$lib/settings.svelte';
 	import { extractTags, splitWithTags, type NameSegment } from '$lib/tags';
-	import { importNameKey } from '$lib/importText';
+	import { importNameKey, parseClipboardTodos } from '$lib/importText';
 	import { DEFAULT_MARK_NAME, readDestinationMarks, getDestinationMark } from '$lib/destinationMarks';
 	import { planItemMove, resolveMarkedItemDestination } from '$lib/itemMove';
 	import NumericKeypad from './NumericKeypad.svelte';
@@ -580,6 +580,11 @@
 				}
 				createItemsFromExport(targetListId, parsed.items as ExportedItem[]);
 			} else {
+				const todos = parseClipboardTodos(text);
+				if (todos !== null) {
+					if (todos.length > 0) createItemsFromExport(targetListId, todos, { addPosition, skipExisting: true });
+					return;
+				}
 				// Plain text: one item per line, excluding blank lines and lines without letters.
 				const lines = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => /\p{L}/u.test(line));
 				if (lines.length === 0) {
