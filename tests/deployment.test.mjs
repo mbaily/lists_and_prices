@@ -20,6 +20,7 @@ function fixture(t) {
         for (const [file, content] of Object.entries({ 'build/index.html': base === source ? 'new app' : 'old app', 'build/sw.js': 'worker', 'server/index.ts': base === source ? 'new server' : 'old server', 'server/tsconfig.json': '{}', 'package.json': '{}', 'package-lock.json': '{}', 'node_modules/marker': base === source ? 'new deps' : 'old deps' })) writeFileSync(path.join(base, file), content);
         for (const file of ['server/yjs-data/notes', 'server/server.db', 'server/server.db-wal', 'server/server.db-shm', 'server/.htpasswd', 'server/cert.pem', 'server/key.pem', '.env']) writeFileSync(path.join(base, file), base === source ? 'checkout must never overwrite this' : 'live private data');
         writeFileSync(path.join(base, 'src/lib/folderDefaultItems.ts'), base === source ? 'new shared module' : 'old shared module');
+        writeFileSync(path.join(base, 'src/lib/syncProtocol.ts'), base === source ? 'new sync protocol' : 'old sync protocol');
     }
     writeFileSync(path.join(source, 'src/lib/unrelated.ts'), 'not deployed');
     writeFileSync(path.join(dest, 'build/old-hashed.js'), 'old asset');
@@ -53,6 +54,7 @@ test('runtime copy preserves live data, secrets and old frontend assets', t => {
     assert.equal(readFileSync(path.join(f.dest, 'node_modules/marker'), 'utf8'), 'new deps');
     assert.equal(readFileSync(path.join(f.dest, 'build/old-hashed.js'), 'utf8'), 'old asset');
     assert.equal(readFileSync(path.join(f.dest, 'src/lib/folderDefaultItems.ts'), 'utf8'), 'new shared module');
+    assert.equal(readFileSync(path.join(f.dest, 'src/lib/syncProtocol.ts'), 'utf8'), 'new sync protocol');
     assert.ok(!readdirSync(path.join(f.dest, 'src/lib')).includes('unrelated.ts'));
 });
 
@@ -61,6 +63,7 @@ test('preview changes no application or data files', t => {
     assert.equal(readFileSync(path.join(f.dest, 'build/index.html'), 'utf8'), 'old app');
     assert.equal(readFileSync(path.join(f.dest, 'node_modules/marker'), 'utf8'), 'old deps');
     assert.equal(readFileSync(path.join(f.dest, 'src/lib/folderDefaultItems.ts'), 'utf8'), 'old shared module');
+    assert.equal(readFileSync(path.join(f.dest, 'src/lib/syncProtocol.ts'), 'utf8'), 'old sync protocol');
 });
 
 test('runtime copy supports installations and rollback backups without shared modules', t => {
@@ -70,6 +73,7 @@ test('runtime copy supports installations and rollback backups without shared mo
     assert.ok(!readdirSync(f.dest).includes('src'));
     f.sync();
     assert.equal(readFileSync(path.join(f.dest, 'src/lib/folderDefaultItems.ts'), 'utf8'), 'new shared module');
+    assert.equal(readFileSync(path.join(f.dest, 'src/lib/syncProtocol.ts'), 'utf8'), 'new sync protocol');
     rmSync(path.join(f.source, 'src'), { recursive: true });
     f.sync();
     assertPrivateData(f.dest);
@@ -82,7 +86,7 @@ test('symlinked data/runtime directory is rejected before copying', t => {
     assert.equal(readFileSync(path.join(f.dest, 'build/index.html'), 'utf8'), 'old app');
 });
 
-for (const failure of ['none', 'build', 'dependencies', 'health']) {
+for (const failure of ['none', 'build', 'dependencies', 'health', 'sync-health']) {
     test(`deployment ${failure}: staged dependencies, consistent backup and rollback`, t => {
         const f = fixture(t);
         // Execute the real deploy script from an isolated checkout.
@@ -95,7 +99,7 @@ for (const failure of ['none', 'build', 'dependencies', 'health']) {
         f.command('sleep', 'exit 0\n');
         f.command('journalctl', 'exit 0\n');
         f.command('node', 'exit 0\n');
-        f.command('curl', 'if [[ "$TEST_FAILURE" = health ]]; then exit 22; fi\nargs="$*"\nwhile [[ "$1" != -o ]]; do shift; done\nif [[ "$args" = *api/session* ]]; then echo \'{"error":"Invalid session"}\' > "$2"; printf 401; else cp "$LISTS_DEPLOY_DIR/build/index.html" "$2"; fi\n');
+        f.command('curl', 'echo "curl $*" >> "$TEST_LOG"\nif [[ "$TEST_FAILURE" = health ]]; then exit 22; fi\nargs="$*"\nwhile [[ "$1" != -o ]]; do shift; done\nif [[ "$args" = *api/sync* && "$TEST_FAILURE" = sync-health ]]; then echo \'{"error":"Not found"}\' > "$2"; printf 404; elif [[ "$args" = *api/session* || "$args" = *api/sync* ]]; then echo \'{"error":"Invalid session"}\' > "$2"; printf 401; else cp "$LISTS_DEPLOY_DIR/build/index.html" "$2"; fi\n');
         const log = path.join(f.directory, 'commands.log'); writeFileSync(log, '');
         const backups = path.join(f.directory, 'backups');
         const env = { ...f.env, LISTS_DEPLOY_DIR: f.dest, LISTS_BACKUP_DIR: backups, LISTS_SERVICE_USER: userInfo().username, TEST_ROOT: f.directory, TEST_LOG: log, TEST_FAILURE: failure };
@@ -113,8 +117,11 @@ for (const failure of ['none', 'build', 'dependencies', 'health']) {
             assert.equal(readFileSync(path.join(f.dest, 'build/index.html'), 'utf8'), failure === 'none' ? 'new app' : 'old app');
             assert.equal(readFileSync(path.join(f.dest, 'node_modules/marker'), 'utf8').trim(), failure === 'none' ? 'prepared deps' : 'old deps');
             assert.equal(readFileSync(path.join(backups, backup, 'src/lib/folderDefaultItems.ts'), 'utf8'), 'old shared module');
+            assert.equal(readFileSync(path.join(backups, backup, 'src/lib/syncProtocol.ts'), 'utf8'), 'old sync protocol');
             assert.equal(readFileSync(path.join(f.dest, 'src/lib/folderDefaultItems.ts'), 'utf8'), failure === 'none' ? 'new shared module' : 'old shared module');
+            assert.equal(readFileSync(path.join(f.dest, 'src/lib/syncProtocol.ts'), 'utf8'), failure === 'none' ? 'new sync protocol' : 'old sync protocol');
             assert.match(commands, /systemctl start/);
+            if (failure === 'none' || failure === 'sync-health') assert.match(commands, /api\/sync/);
         }
     });
 }

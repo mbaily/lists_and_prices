@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Shared with deployment regression tests. Never sync a whole checkout.
+RUNTIME_SHARED_MODULES=(folderDefaultItems.ts syncProtocol.ts)
+
 sync_runtime() {
     local source=$1 destination=$2
     shift 2
@@ -17,13 +19,20 @@ sync_runtime() {
     sudo rsync -ac --chown="$SERVICE_USER:" "$@" "$source/build/" "$destination/build/" || return
     # Everything except source/config is protected, including data and secrets.
     sudo rsync -ac --chown="$SERVICE_USER:" "$@" --include='/*.ts' --include='/tsconfig.json' --exclude='*' "$source/server/" "$destination/server/" || return
-    # The API and frontend share the default-item reader. Copy only that module.
-    # Older backups have no shared module; their server does not import it.
-    if sudo test -f "$source/src/lib/folderDefaultItems.ts"; then
+    # Copy only the modules shared by the API and frontend. Older backups may
+    # lack some or all of them; their server does not import the missing files.
+    local module
+    local shared_includes=(--include='/lib/')
+    for module in "${RUNTIME_SHARED_MODULES[@]}"; do
+        if sudo test -f "$source/src/lib/$module"; then
+            shared_includes+=(--include="/lib/$module")
+        fi
+    done
+    if (( ${#shared_includes[@]} > 1 )); then
         if [[ " $* " != *' --dry-run '* ]]; then
             sudo install -d -o "$SERVICE_USER" -g "$(id -gn "$SERVICE_USER")" "$destination/src/lib" || return
         fi
-        sudo rsync -ac --chown="$SERVICE_USER:" "$@" --include='/lib/' --include='/lib/folderDefaultItems.ts' --exclude='*' "$source/src/" "$destination/src/" || return
+        sudo rsync -ac --chown="$SERVICE_USER:" "$@" "${shared_includes[@]}" --exclude='*' "$source/src/" "$destination/src/" || return
     fi
     sudo rsync -ac --chown="$SERVICE_USER:" "$@" "$source/package.json" "$source/package-lock.json" "$destination/" || return
     if "$with_dependencies"; then

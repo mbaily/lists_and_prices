@@ -17,6 +17,12 @@ export function transpile(source, module = ts.ModuleKind.CommonJS) {
 export class Provider {
 	handlers = new Map();
 	synced = false;
+	pendingSync = true;
+	lastSyncAt = null;
+	currentRevision = 0;
+	async flush() {}
+	async refresh() {}
+	async markSynced(at) { this.lastSyncAt = at; this.pendingSync = false; return true; }
 	on(event, handler) { const list = this.handlers.get(event) ?? []; list.push(handler); this.handlers.set(event, list); }
 	emit(event, value) { for (const handler of this.handlers.get(event) ?? []) handler(value); }
 	destroy() { this.destroyed = true; }
@@ -28,7 +34,7 @@ export class Provider {
  * replaced. A private module cache gives each fixture an independent client. */
 export function createApp(options = {}) {
 	const cache = new Map();
-	const storage = new Map(options.username ? [['pnl_user', options.username]] : []);
+	const storage = new Map([...(options.storage ?? []), ...(options.username ? [['pnl_user', options.username]] : [])]);
 	const localStorage = { getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: (key) => storage.delete(key) };
 	function load(file) {
 		const absolute = path.resolve(root, file);
@@ -44,6 +50,7 @@ export function createApp(options = {}) {
 			code = compileModule(transpile(code, ts.ModuleKind.ESNext), { filename: absolute, generate: 'client' }).js.code;
 		}
 		const localRequire = (specifier) => {
+			if (specifier === './localPersistence' && !options.realPersistence) return { LocalPersistence: options.IndexeddbPersistence ?? Provider };
 			if (specifier === 'y-indexeddb') return { IndexeddbPersistence: options.IndexeddbPersistence ?? Provider };
 			if (specifier === 'y-websocket') return { WebsocketProvider: options.WebsocketProvider ?? Provider };
 			if (specifier.startsWith('.')) {
@@ -61,9 +68,9 @@ export function createApp(options = {}) {
 		return module.exports;
 	}
 	const store = load('src/lib/yjsStore.svelte.ts');
-	const doc = store.initYjs('test-only', 'ws://unused');
+	const doc = store.initYjs(options.username ?? 'test-only', 'ws://unused');
 	return {
-		store, doc, load,
+		store, doc, load, storage,
 		data: load('src/lib/data.ts'), reports: load('src/lib/smartFolders.svelte.ts'),
 		notes: load('src/lib/noteText.ts'), editing: load('src/lib/noteEditing.ts'),
 		hierarchy: load('src/lib/hierarchy.ts'),

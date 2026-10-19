@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { auth, checkSession, logout } from '$lib/auth.svelte';
-	import { initYjs, destroyYjs, reconnectYjs } from '$lib/yjsStore.svelte';
+	import { initYjs, destroyYjs } from '$lib/yjsStore.svelte';
 	import { reconcileSessionDocument } from '$lib/sessionDocument';
 	import { reloadSettings } from '$lib/settings.svelte';
 	import LoginScreen from '$lib/components/LoginScreen.svelte';
@@ -29,18 +29,6 @@
 			ready = true;
 		});
 
-		// When the device comes back online (e.g. iPhone rejoins Wi-Fi after being
-		// offline), force the WebSocket provider to reconnect.
-		function handleOnline() {
-			if (auth.username) {
-				reconnectYjs();
-			}
-		}
-
-		window.addEventListener('online', handleOnline);
-
-		// Expose cleanup via onDestroy
-		return () => window.removeEventListener('online', handleOnline);
 	});
 
 	async function handleLogout() {

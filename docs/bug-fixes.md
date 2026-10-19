@@ -15,6 +15,7 @@
 - Svelte type errors, obsolete spreadsheet drag handling, Quill SSR loading, and pre-effect initialization-order crashes are fixed.
 - Local startup indexes items once when restoring note names, avoiding a full item-list scan for every note. The WebSocket handshake waits for IndexedDB restoration.
 - The local Yjs update log compacts automatically after loading and once a minute while edits arrive. Compaction merges persisted updates in an atomic IndexedDB transaction, retaining offline changes, other tabs' writes, missing-dependency updates and historical structs. Settings offers **Tidy local cache** and displays load time; the destructive reset has been removed.
+- Settings → Offline & sync requests persistent browser storage, distinguishes committed local saves from confirmed server syncs, and supports per-device/account manual synchronization. Session expiry keeps offline edits available; signing in again syncs the same document. See [offline storage and synchronization](offline-sync.md) for compatibility, deployment and iPhone verification.
 
 ### Local cache verification (2026-09-30)
 

@@ -37,7 +37,7 @@
 - **List summary:** The folder/home screen shows summary info for each list (e.g. item count, total for priced lists).
 - **Folder delete:** Deleting a folder cascade-deletes all contained lists and items; a confirmation prompt is required.
 - **Checked item appearance:** Checked items remain in place with a strikethrough; they are not hidden or moved.
-- **Logout:** An explicit logout button is provided; logging out clears local Yjs data.
+- **Logout:** Signing out closes the local document and revokes the server session; the per-account IndexedDB cache is retained.
 - **Plain list summary:** Plain lists show a count of checked and unchecked items on the folder/home screen.
 - **Yjs stack:** Server uses `y-websocket` as the sync provider with LevelDB for persistence.
 - **Item limit:** No limit on the number of items per list.
@@ -51,7 +51,7 @@
 - **Bulk action scope:** Bulk uncheck/delete-checked applies to the whole list if nothing is selected, or to the current selection if items are selected.
 - **Moving lists and folders:** Lists can be moved to a different folder; folders can be moved inside other folders.
 - **Currency position:** Currency symbol position follows the user's device locale.
-- **Offline without login:** A user must log in at least once while online; after that, full offline use is supported via Yjs — changes sync automatically when the server is reachable again.
+- **Offline without login:** Sign in and sync once while online. Local access continues through network loss and server-session expiry; sign in again in Settings to resume sync. Automatic sync is the default, with per-device/account manual mode and Sync now in Settings → Offline & sync. See [offline synchronization](offline-sync.md).
 - **User management CLI:** Server supports `--add-user`, `--remove-user`, and `--create-cert` command-line flags for managing `.htpasswd` and TLS certificates.
 - **PWA updates:** Updates are applied silently in the background; the current app version is visible in settings.
 - **Move validation:** Moving a folder into one of its own descendants is not permitted; the user is warned if they attempt it.

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { SyncStatus } from '$lib/yjsStore.svelte';
-	import { getDoc, docState } from '$lib/yjsStore.svelte';
+	import { getDoc, docState, syncState, localSaveState } from '$lib/yjsStore.svelte';
 	import { readFolders, readLists, readAllItems } from '$lib/data';
 	import * as Y from 'yjs';
 	import InfoDialog from './InfoDialog.svelte';
@@ -10,7 +10,10 @@
 	const color: Record<SyncStatus, string> = {
 		offline: '#ef4444',
 		connecting: '#f97316',
-		synced: '#22c55e'
+		synced: '#22c55e',
+		paused: '#94a3b8',
+		error: '#ef4444',
+		'auth-required': '#f97316'
 	};
 
 	let showDialog = $state(false);
@@ -65,6 +68,10 @@
 			};
 			
 			return [
+				{ label: 'Local save', value: localSaveState.status === 'saved' ? 'Saved on this device' : localSaveState.status },
+				{ label: 'Automatic sync', value: syncState.automatic ? 'On' : 'Off — use Sync now in Settings' },
+				{ label: 'Server confirmation', value: syncState.pending ? 'Changes waiting' : 'Confirmed at last sync' },
+				{ label: 'Last completed sync', value: syncState.lastSyncAt ? new Date(syncState.lastSyncAt).toLocaleString() : 'Not yet confirmed' },
 				{ label: 'Sync Checksum', value: checksum },
 				{ label: 'Total Sync Size', value: formatSize(totalSize) },
 				{ label: 'State Vector Size', value: formatSize(vectorSize) },
@@ -84,7 +91,7 @@
 
 </script>
 
-<button class="badge" style="--dot:{color[status]}" onclick={() => showDialog = true} aria-label="Show sync info" title="Sync: {status}">
+<button class="badge" style="--dot:{localSaveState.status === 'error' ? '#ef4444' : color[status]}" onclick={() => showDialog = true} aria-label="Show sync info" title="Sync: {status}; local save: {localSaveState.status}">
 	<span class="dot"></span>
 </button>
 

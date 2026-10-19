@@ -5,6 +5,7 @@
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import KeyboardSettingsScreen from './KeyboardSettingsScreen.svelte';
 	import HelpScreen from './HelpScreen.svelte';
+	import OfflineSettings from './OfflineSettings.svelte';
 	import { docState, commitState, exitCommitView, cacheState, idbSynced, compactLocalCache } from '$lib/yjsStore.svelte';
 
 	let { onBack, onLogout }: { onBack: () => void; onLogout: () => void } = $props();
@@ -167,6 +168,7 @@
 	{/if}
 
 	<div class="content">
+		<section><OfflineSettings /></section>
 		<section>
 			<h2>Help</h2>
 			<button class="action-btn" bind:this={helpButtonEl} onclick={() => (showHelp = true)}>❓ Help &amp; user guide</button>

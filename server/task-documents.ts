@@ -14,6 +14,7 @@ export interface TaskDocuments {
 export function createTaskDocuments(): TaskDocuments {
 	const persistence = getPersistence();
 	const ready = new WeakMap<Yjs.Doc, Promise<void>>();
+	const confirmedVectors = new WeakMap<Yjs.Doc, Uint8Array>();
 	if (persistence) {
 		setPersistence({
 			...persistence,
@@ -37,7 +38,18 @@ export function createTaskDocuments(): TaskDocuments {
 			try {
 				await ready.get(doc);
 				const result = operation(doc);
-				if (write) await persistence.provider.storeUpdate(name, Y.encodeStateAsUpdate(doc));
+				if (write) {
+					// Start with a full checkpoint, then persist differences from a
+					// confirmed checkpoint while the document remains live. Delete
+					// sets are included even when the state vector has not changed.
+					const update = Y.encodeStateAsUpdate(doc, confirmedVectors.get(doc));
+					const vector = Y.encodeStateVector(doc);
+					const clock = await persistence.provider.storeUpdate(name, update);
+					// y-leveldb logs some storage failures and resolves with null.
+					// Only its successful stored-update clock is an acknowledgement.
+					if (typeof clock !== 'number' || !Number.isSafeInteger(clock) || clock < 0) throw new Error('Document persistence was not confirmed');
+					confirmedVectors.set(doc, vector);
+				}
 				return result;
 			} finally {
 				doc.conns.delete(lease);

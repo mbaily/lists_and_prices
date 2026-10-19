@@ -93,23 +93,26 @@ backup=$(sudo mktemp -d "$BACKUP_ROOT/deploy-$(date -u +%Y%m%dT%H%M%SZ).XXXXXX")
 backup_entries=(build server node_modules package.json package-lock.json)
 while IFS= read -r -d '' env_file; do backup_entries+=("${env_file##*/}"); done < <(sudo find "$DEST_DIR" -maxdepth 1 -type f -name '.env*' -print0)
 sudo cp -a -- "${backup_entries[@]/#/$DEST_DIR/}" "$backup/"
-if sudo test -f "$DEST_DIR/src/lib/folderDefaultItems.ts"; then
-    sudo install -d "$backup/src/lib"
-    sudo cp -a -- "$DEST_DIR/src/lib/folderDefaultItems.ts" "$backup/src/lib/"
-fi
+for module in "${RUNTIME_SHARED_MODULES[@]}"; do
+    if sudo test -f "$DEST_DIR/src/lib/$module"; then
+        sudo install -d "$backup/src/lib"
+        sudo cp -a -- "$DEST_DIR/src/lib/$module" "$backup/src/lib/"
+    fi
+done
 printf 'Backup: %s\n' "$backup"
 
 changed=true
 sync_runtime "$stage" "$DEST_DIR"
 sudo systemctl start "$SERVICE_NAME"
-echo "Checking service, frontend and authentication endpoint..."
+echo "Checking service, frontend, authentication and sync endpoints..."
 healthy=false
 for attempt in {1..20}; do
     if sudo systemctl is-active --quiet "$SERVICE_NAME" &&
         sudo curl --insecure --silent --show-error --fail --max-time 3 "$HEALTH_URL/" -o "$stage/served.html" &&
         sudo cmp --silent "$DEST_DIR/build/index.html" "$stage/served.html" &&
         [[ "$(sudo curl --insecure --silent --show-error --max-time 3 -o "$stage/session.json" -w '%{http_code}' "$HEALTH_URL/api/session")" = 401 ]] &&
-        sudo node -e 'const fs=require("fs"); if(JSON.parse(fs.readFileSync(process.argv[1])).error!=="Invalid session")process.exit(1)' "$stage/session.json"; then
+        [[ "$(sudo curl --insecure --silent --show-error --request POST --max-time 3 -o "$stage/sync.json" -w '%{http_code}' "$HEALTH_URL/api/sync")" = 401 ]] &&
+        sudo node -e 'const fs=require("fs"); for(const file of process.argv.slice(1))if(JSON.parse(fs.readFileSync(file)).error!=="Invalid session")process.exit(1)' "$stage/session.json" "$stage/sync.json"; then
         healthy=true; break
     fi
     sleep 1

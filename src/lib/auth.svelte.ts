@@ -5,9 +5,12 @@
 
 const AUTH_KEY = 'pnl_user';
 
-export const auth = $state<{ username: string | null }>({
-	username: typeof localStorage !== 'undefined' ? (localStorage.getItem(AUTH_KEY) ?? null) : null
+export const auth = $state<{ username: string | null; needsLogin: boolean }>({
+	username: typeof localStorage !== 'undefined' ? (localStorage.getItem(AUTH_KEY) ?? null) : null,
+	needsLogin: false
 });
+
+let sessionVersion = 0;
 
 export async function login(
 	username: string,
@@ -24,7 +27,9 @@ export async function login(
 		return { ok: false, error: 'Network error — check your connection.' };
 	}
 	if (res.ok) {
+		sessionVersion++;
 		auth.username = username;
+		auth.needsLogin = false;
 		localStorage.setItem(AUTH_KEY, username);
 		return { ok: true };
 	}
@@ -43,11 +48,14 @@ export async function logout(): Promise<boolean> {
 		return false;
 	}
 	auth.username = null;
+	auth.needsLogin = false;
+	sessionVersion++;
 	localStorage.removeItem(AUTH_KEY);
 	return true;
 }
 
 export async function checkSession(): Promise<boolean> {
+	const version = sessionVersion;
 	// Fast-path: if the browser knows we're offline, trust the locally cached
 	// username rather than attempting a fetch that will either throw or return a
 	// SW-generated error response — either of which previously wiped the session.
@@ -62,15 +70,17 @@ export async function checkSession(): Promise<boolean> {
 		// Network failure (fetch threw) — keep existing auth state (app may be offline / PWA)
 		return auth.username !== null;
 	}
+	if (version !== sessionVersion) return auth.username !== null;
 
-	// Only an explicit authentication rejection should discard offline access.
 	// Gateway/server errors and malformed responses do not prove session expiry.
 	if (res.status !== 401 && res.status !== 403) {
 		if (res.ok) {
 			try {
 				const body = await res.json();
+				if (version !== sessionVersion) return auth.username !== null;
 				if (typeof body.username === 'string' && body.username) {
 					auth.username = body.username;
+					auth.needsLogin = false;
 					localStorage.setItem(AUTH_KEY, body.username);
 					return true;
 				}
@@ -79,7 +89,8 @@ export async function checkSession(): Promise<boolean> {
 		return auth.username !== null;
 	}
 
-	auth.username = null;
-	localStorage.removeItem(AUTH_KEY);
-	return false;
+	// Server access may expire while a device holds a week of unsynced edits.
+	// Keep its local account/document usable and request sign-in for sync only.
+	auth.needsLogin = auth.username !== null;
+	return auth.username !== null;
 }
