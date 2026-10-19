@@ -1,0 +1,309 @@
+PROJECT TECHNOLOGY VERSION COMPARISON
+=====================================
+
+Project: list-svelt5 (application version 0.0.4)
+Checked: 2026-10-20 06:08 AEDT (Australia/Melbourne)
+Scope: all 38 direct npm dependencies, major transitive build/runtime libraries,
+languages, native build tools, Python maintenance libraries and deployment tools.
+
+HOW TO READ THIS REPORT
+Project = the exact resolved version in package-lock.json, not the minimum in
+package.json. Declared = the requested semver range. All 38 direct packages in
+node_modules matched their locked versions when inspected.
+Latest stable for npm = the publisher's current "latest" dist-tag, checked against
+the public npm registry; all returned versions were non-prerelease releases.
+Latest versions are compared globally, even when outside the declared range.
+Runtime/system versions are observations from this development machine; they
+are not project pins or measurements of the deployed production server.
+Source references identify the upstream registry or official release page.
+
+AT A GLANCE
+===========
+
+Direct npm packages: 38 total; 16 current; 22 with a newer stable release.
+Eight direct packages have newer major versions: SvelteKit, adapter-static,
+adapter-auto, TypeScript, vite-plugin-pwa, Ink, y-websocket and
+@types/better-sqlite3. These counts include declared but unused tools/adapters.
+Node.js 24.22.0 matches the latest LTS; the latest Current release is 26.12.0.
+The application version 0.0.4 is project-specific and has no upstream comparison.
+
+LANGUAGES, RUNTIMES AND PACKAGE MANAGER
+=======================================
+
+Component            Project / observed  Latest stable     Comparison              Source
+-------------------  ------------------  ----------------  ----------------------  ------
+Node.js              24.22.0             26.12.0 Current   latest LTS = 24.22.0    [S01]
+npm / npx            11.19.1             12.2.0            major available         [S02]
+TypeScript / tsc     6.0.3               7.0.2             major available         [S03]
+Python / CPython     3.14.0              3.15.0            minor available         [S04]
+Bash                 5.2.37              5.3.20            minor available         [S05]
+JavaScript standard  ES2022 / ESNext     ECMAScript 2026   targets; see below      [S06]
+C++ addon language   C++20               C++23 (ISO 2024)  published ISO standard  [S07]
+
+Node/npm are not pinned by an engines or packageManager field, .nvmrc,
+.node-version or .tool-versions file. .npmrc enables engine-strict=true, so
+dependency engine constraints are enforced during installation.
+Python and Bash are selected by script shebangs; their versions are not pinned.
+Python 3.14.8 is also available in the installed interpreter's 3.14 branch.
+npx ships with npm; Node's built-in test runner follows the Node.js version.
+TypeScript checks Svelte/TS code; tsx executes server, TUI and TypeScript tests.
+The Svelte compiler is included in the svelte package (5.56.8 below).
+
+JavaScript target details: server/tsconfig.json specifies ES2022. The generated
+.svelte-kit/tsconfig.json and tui/tsconfig.json use ESNext. These are compilation
+targets, not installed language versions; ESNext changes with TypeScript.
+ECMAScript 2026 is the latest published annual standard (17th edition).
+Actual browser language/API support depends on the user's browser.
+better-sqlite3/binding.gyp selects C++20 for its native addon. C++23 is the latest
+published ISO edition verified here; ISO lists its successor as a draft.
+
+WEB FRAMEWORK, COMPILERS AND BUILD TOOLS
+========================================
+
+Package                       Declared  Project  Latest stable  Comparison       Source
+----------------------------  --------  -------  -------------  ---------------  ------
+svelte                        ^5.56.8   5.56.8   5.57.2         minor available  [S08]
+@sveltejs/kit                 ^2.70.1   2.70.1   3.1.0          major available  [S09]
+@sveltejs/adapter-static      ^3.0.10   3.0.10   4.0.0          major available  [S10]
+@sveltejs/adapter-auto        ^7.0.1    7.0.1    8.0.0          major available  [S11]
+@sveltejs/vite-plugin-svelte  ^7.2.0    7.2.0    7.3.1          minor available  [S12]
+vite                          ^8.1.5    8.1.5    8.3.4          minor available  [S13]
+typescript                    ^6.0.3    6.0.3    7.0.2          major available  [S03]
+svelte-check                  ^4.7.3    4.7.3    4.7.7          patch available  [S14]
+tsx                           ^4.23.1   4.23.1   4.23.15        patch available  [S15]
+ts-node                       ^10.9.2   10.9.2   10.9.2         current          [S16]
+
+PWA AND OFFLINE BUILD LIBRARIES
+===============================
+
+Package              Declared  Project  Latest stable  Comparison       Source
+-------------------  --------  -------  -------------  ---------------  ------
+@vite-pwa/sveltekit  ^1.1.0    1.1.0    1.1.0          current          [S17]
+vite-plugin-pwa      ^1.3.0    1.3.0    2.0.0          major available  [S18]
+workbox-window       ^7.4.1    7.4.1    7.4.1          current          [S19]
+
+SERVER, AUTHENTICATION AND DATABASE LIBRARIES
+=============================================
+
+Package           Declared  Project  Latest stable  Comparison       Source
+----------------  --------  -------  -------------  ---------------  ------
+express           ^5.2.1    5.2.1    5.3.0          minor available  [S20]
+better-sqlite3    ^13.0.1   13.0.1   13.0.3         patch available  [S21]
+bcryptjs          ^3.0.3    3.0.3    3.0.3          current          [S22]
+cookie-parser     ^1.4.7    1.4.7    1.4.7          current          [S23]
+cookie-signature  ^1.2.2    1.2.2    1.2.2          current          [S24]
+node-forge        ^1.4.0    1.4.0    1.4.0          current          [S25]
+ws                ^8.21.1   8.21.1   8.22.0         minor available  [S26]
+
+COLLABORATION, EDITOR AND LOCAL PERSISTENCE LIBRARIES
+=====================================================
+
+Package      Declared  Project  Latest stable  Comparison       Source
+-----------  --------  -------  -------------  ---------------  ------
+yjs          ^13.6.31  13.6.31  13.6.33        patch available  [S27]
+y-websocket  ^1.5.4    1.5.4    3.1.0          major available  [S28]
+y-indexeddb  ^9.0.12   9.0.12   9.0.12         current          [S29]
+y-quill      ^1.0.0    1.0.0    1.0.0          current          [S30]
+lib0         ^0.2.117  0.2.117  0.2.119        patch available  [S31]
+quill        ^2.0.3    2.0.3    2.0.3          current          [S32]
+
+TERMINAL UI AND TEST LIBRARIES
+==============================
+
+Package         Declared  Project  Latest stable  Comparison       Source
+--------------  --------  -------  -------------  ---------------  ------
+react           ^19.2.8   19.2.8   19.3.1         minor available  [S33]
+ink             ^7.1.1    7.1.1    8.0.0          major available  [S34]
+ink-text-input  ^6.0.0    6.0.0    6.0.0          current          [S35]
+fake-indexeddb  ^6.2.5    6.2.5    6.2.6          patch available  [S36]
+
+DIRECT TYPESCRIPT TYPE DEFINITIONS
+==================================
+
+Package                  Declared  Project  Latest stable  Comparison       Source
+-----------------------  --------  -------  -------------  ---------------  ------
+@types/bcryptjs          ^3.0.0    3.0.0    3.0.0          current          [S37]
+@types/better-sqlite3    ^7.6.13   7.6.13   9.6.0          major available  [S38]
+@types/cookie-parser     ^1.4.10   1.4.10   1.4.10         current          [S39]
+@types/cookie-signature  ^1.1.2    1.1.2    1.1.2          current          [S40]
+@types/express           ^5.0.6    5.0.6    5.0.6          current          [S41]
+@types/node-forge        ^1.3.14   1.3.14   1.3.14         current          [S42]
+@types/react             ^19.2.17  19.2.17  19.3.0         minor available  [S43]
+@types/ws                ^8.18.1   8.18.1   8.18.2         patch available  [S44]
+
+Packages are grouped by purpose regardless of whether package.json places them
+in dependencies or devDependencies. The active SvelteKit adapter is adapter-static;
+adapter-auto is declared but is not selected in svelte.config.js. The scripts
+use tsx rather than ts-node. React/Ink power the tui/ terminal client.
+@types/bcryptjs 3.0.0 is a deprecated stub: bcryptjs supplies its own definitions.
+
+MAJOR TRANSITIVE BUILD AND RUNTIME LIBRARIES
+============================================
+
+Package           Project  Latest stable  Comparison       Source
+----------------  -------  -------------  ---------------  ------
+rolldown          1.1.5    1.2.14         minor available  [S45]
+esbuild           0.28.1   0.28.2         patch available  [S46]
+rollup            4.62.2   4.64.10        minor available  [S47]
+@babel/core       7.29.7   8.0.7          major available  [S48]
+@babel/runtime    7.29.7   8.0.7          major available  [S49]
+lightningcss      1.33.0   1.33.0         current          [S50]
+workbox-build     7.4.1    7.4.1          current          [S51]
+react-reconciler  0.33.0   0.34.0         minor available  [S52]
+y-leveldb         0.1.2    0.2.0          minor available  [S53]
+@types/node       26.1.1   26.6.5         minor available  [S54]
+
+Rolldown is Vite's primary bundler; esbuild is present for tooling such as tsx.
+Rollup and Babel are also pulled in by the Workbox service-worker build pipeline.
+Lightning CSS is present in the installed build dependency tree. react-reconciler
+supports Ink; y-leveldb provides persistence for the existing y-websocket server.
+@types/node describes APIs and is not the installed Node.js runtime version.
+The lockfile also contains nested ws 6.2.6 and cookie-signature 1.0.6, in addition
+to the direct versions above. Their latest stable versions remain 8.22.0 and
+1.2.2 respectively; a current direct package does not imply current nested copies.
+This section selects major transitive tools rather than listing every utility
+and platform-specific binary in the dependency tree.
+
+NATIVE BUILD TOOLS AND EMBEDDED DATABASE
+========================================
+
+Component                    Observed  Latest stable  Comparison       Source
+---------------------------  --------  -------------  ---------------  ------
+node-gyp (bundled with npm)  12.4.0    13.1.0         major available  [S55]
+GCC / G++                    14.2.0    16.2.0         major available  [S56]
+GNU Make                     4.4.1     4.4.1          current          [S57]
+SQLite via better-sqlite3    3.53.3    3.54.1         minor available  [S58]
+
+GCC/G++, Make and node-gyp are machine tools relevant when better-sqlite3 must
+compile from source. Their versions are not locked by the application. The
+compiler originally used to produce an installed/prebuilt binary was not verified.
+node-gyp was read from the active npm installation, not the project lockfile.
+SQLite 3.53.3 was queried through better-sqlite3 using an in-memory database.
+Node also bundles SQLite 3.53.4, but that is separate from the database engine
+loaded by this application's better-sqlite3 dependency.
+
+PYTHON MAINTENANCE LIBRARIES
+============================
+
+Library   Observed       Latest stable  Project pin  Source
+--------  -------------  -------------  -----------  ------
+Requests  2.32.5         2.34.2         none         [S59]
+Shapely   not installed  2.2.0          none         [S60]
+
+scripts/update-melbourne-suburbs.py, update-melbourne-retail.py and
+update-melbourne-chains.py import requests and shapely. There is no Python
+dependency manifest or lockfile in the checkout; the Requests version above
+is installed on this machine and does not establish a reproducible project version.
+
+MAJOR DEVELOPMENT AND DEPLOYMENT SYSTEM TOOLS
+=============================================
+
+Tool                 Observed locally       Latest stable upstream  Source
+-------------------  ---------------------  ----------------------  ------
+Git                  2.47.3                 2.56.0                  [S61]
+rsync                3.5.0                  3.5.1                   [S62]
+curl                 8.14.1                 8.23.0                  [S63]
+flock / util-linux   2.41.5                 2.42.4                  [S64]
+systemd / systemctl  257.13 (Debian build)  262.1                   [S65]
+
+Deployment uses Bash, npm, rsync, curl, flock and systemctl; Git supports release
+version checks. System tools are not project-pinned. Comparisons use upstream
+release numbers; distribution packages can have backported fixes. The systemctl
+version is the installed executable's version, not a check of a running service.
+
+VERSION RELATIONSHIPS THAT AFFECT INTERPRETATION
+================================================
+
+1. Latest available does not establish compatibility with the existing project.
+   SvelteKit 3.1.0 currently declares a TypeScript ^6.0.0 peer requirement, while
+   TypeScript's latest stable is 7.0.2. The installed @vite-pwa/sveltekit 1.1.0
+   declares support for SvelteKit 1/2, and adapter-static 4.0.0 targets Kit 3.
+   Sources: [S09] [S17] [S10]
+2. The server imports y-websocket/bin/utils. y-websocket 3.1.0 does not export
+   that path, so its major-version difference entails server integration changes.
+   Source: [S28]
+3. Ink 8.0.0 requires React and @types/react >=19.3.0; the current terminal client
+   has React 19.2.8 and @types/react 19.2.17.
+   Source: [S34]
+4. HTML, CSS, IndexedDB, WebSocket and service workers are browser standards/APIs,
+   not separately installed project packages. LaTeX documentation is present, but
+   no TeX compiler/distribution is selected by project build scripts or installed
+   as pdflatex here, so a project TeX compiler version cannot be established.
+
+LOCAL EVIDENCE AND UPSTREAM SOURCES
+===================================
+
+Local evidence: package.json; package-lock.json (lockfile format 3); installed
+node_modules/*/package.json; vite.config.ts; svelte.config.js; tsconfig.json;
+.svelte-kit/tsconfig.json; server/tsconfig.json; tui/tsconfig.json; .npmrc;
+deploy.sh; scripts/deploy-runtime.sh; Python maintenance-script imports;
+better-sqlite3/binding.gyp; local version commands; active npm/node-gyp metadata.
+
+[S01] https://nodejs.org/dist/index.json
+[S02] https://registry.npmjs.org/npm/latest
+[S03] https://registry.npmjs.org/typescript/latest
+[S04] https://www.python.org/downloads/
+[S05] https://mirrors.kernel.org/gnu/bash/bash-5.3-patches/
+[S06] https://ecma-international.org/publications-and-standards/standards/ecma-262/
+[S07] https://www.iso.org/standard/83626.html
+[S08] https://registry.npmjs.org/svelte/latest
+[S09] https://registry.npmjs.org/@sveltejs%2Fkit/latest
+[S10] https://registry.npmjs.org/@sveltejs%2Fadapter-static/latest
+[S11] https://registry.npmjs.org/@sveltejs%2Fadapter-auto/latest
+[S12] https://registry.npmjs.org/@sveltejs%2Fvite-plugin-svelte/latest
+[S13] https://registry.npmjs.org/vite/latest
+[S14] https://registry.npmjs.org/svelte-check/latest
+[S15] https://registry.npmjs.org/tsx/latest
+[S16] https://registry.npmjs.org/ts-node/latest
+[S17] https://registry.npmjs.org/@vite-pwa%2Fsveltekit/latest
+[S18] https://registry.npmjs.org/vite-plugin-pwa/latest
+[S19] https://registry.npmjs.org/workbox-window/latest
+[S20] https://registry.npmjs.org/express/latest
+[S21] https://registry.npmjs.org/better-sqlite3/latest
+[S22] https://registry.npmjs.org/bcryptjs/latest
+[S23] https://registry.npmjs.org/cookie-parser/latest
+[S24] https://registry.npmjs.org/cookie-signature/latest
+[S25] https://registry.npmjs.org/node-forge/latest
+[S26] https://registry.npmjs.org/ws/latest
+[S27] https://registry.npmjs.org/yjs/latest
+[S28] https://registry.npmjs.org/y-websocket/latest
+[S29] https://registry.npmjs.org/y-indexeddb/latest
+[S30] https://registry.npmjs.org/y-quill/latest
+[S31] https://registry.npmjs.org/lib0/latest
+[S32] https://registry.npmjs.org/quill/latest
+[S33] https://registry.npmjs.org/react/latest
+[S34] https://registry.npmjs.org/ink/latest
+[S35] https://registry.npmjs.org/ink-text-input/latest
+[S36] https://registry.npmjs.org/fake-indexeddb/latest
+[S37] https://registry.npmjs.org/@types%2Fbcryptjs/latest
+[S38] https://registry.npmjs.org/@types%2Fbetter-sqlite3/latest
+[S39] https://registry.npmjs.org/@types%2Fcookie-parser/latest
+[S40] https://registry.npmjs.org/@types%2Fcookie-signature/latest
+[S41] https://registry.npmjs.org/@types%2Fexpress/latest
+[S42] https://registry.npmjs.org/@types%2Fnode-forge/latest
+[S43] https://registry.npmjs.org/@types%2Freact/latest
+[S44] https://registry.npmjs.org/@types%2Fws/latest
+[S45] https://registry.npmjs.org/rolldown/latest
+[S46] https://registry.npmjs.org/esbuild/latest
+[S47] https://registry.npmjs.org/rollup/latest
+[S48] https://registry.npmjs.org/@babel%2Fcore/latest
+[S49] https://registry.npmjs.org/@babel%2Fruntime/latest
+[S50] https://registry.npmjs.org/lightningcss/latest
+[S51] https://registry.npmjs.org/workbox-build/latest
+[S52] https://registry.npmjs.org/react-reconciler/latest
+[S53] https://registry.npmjs.org/y-leveldb/latest
+[S54] https://registry.npmjs.org/@types%2Fnode/latest
+[S55] https://registry.npmjs.org/node-gyp/latest
+[S56] https://gcc.gnu.org/
+[S57] https://mirrors.kernel.org/gnu/make/
+[S58] https://sqlite.org/changes.html
+[S59] https://pypi.org/pypi/requests/json
+[S60] https://pypi.org/pypi/shapely/json
+[S61] https://git-scm.com/
+[S62] https://rsync.samba.org/
+[S63] https://curl.se/download.html
+[S64] https://www.kernel.org/pub/linux/utils/util-linux/v2.42/
+[S65] https://github.com/systemd/systemd/releases/tag/v262.1
+
+This is a dated inventory. No dependencies or project configuration were changed;
+no build, test, upgrade or production deployment was performed for this report.
