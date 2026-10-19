@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { onDestroy, tick, untrack } from 'svelte';
 	import { settings, updateSettings } from '$lib/settings.svelte';
-	import { exportBackup, importBackup, readFolders, type BackupFile } from '$lib/data';
+	import { exportBackup, importBackup, parseBackup, readFolders, type BackupFile } from '$lib/data';
+	import { MAX_BACKUP_BYTES } from '$lib/jsonImport';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import KeyboardSettingsScreen from './KeyboardSettingsScreen.svelte';
 	import HelpScreen from './HelpScreen.svelte';
@@ -32,19 +33,30 @@
 	});
 
 	// ── Backup ──────────────────────────────────────────────────────────────────
+	let backupError = $state<string | null>(null);
 	function downloadBackup() {
-		const data = exportBackup();
-		const json = JSON.stringify(data, null, 2);
-		const blob = new Blob([json], { type: 'application/json' });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		const date = new Date().toISOString().slice(0, 10);
-		a.href = url;
-		a.download = `pnl-backup-${date}.json`;
-		document.body.appendChild(a);
-		a.click();
-		document.body.removeChild(a);
-		setTimeout(() => URL.revokeObjectURL(url), 10000);
+		if (!idbSynced.done) return;
+		backupError = null;
+		try {
+			const data = exportBackup();
+			const json = JSON.stringify(data, null, 2);
+			const blob = new Blob([json], { type: 'application/json' });
+			if (blob.size > MAX_BACKUP_BYTES) throw new Error('This backup exceeds the supported 100 MB restore limit.');
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+			a.href = url;
+			a.download = `pnl-backup-${timestamp}.json`;
+			try {
+				document.body.appendChild(a);
+				a.click();
+			} finally {
+				a.remove();
+				setTimeout(() => URL.revokeObjectURL(url), 10000);
+			}
+		} catch (error) {
+			backupError = `Backup failed: ${error instanceof Error ? error.message : String(error)}`;
+		}
 	}
 
 	// ── Restore ─────────────────────────────────────────────────────────────────
@@ -78,12 +90,16 @@
 
 	function onFileSelected(e: Event) {
 		const input = e.target as HTMLInputElement;
-		if (commitState.isHistorical || !isActive) { input.value = ''; return; }
+		if (commitState.isHistorical || !isActive || !idbSynced.done) { input.value = ''; return; }
 		const file = input.files?.[0];
 		if (!file) return;
 		cancelPendingRestore();
 		restoreStatus = null;
 		restoreError = null;
+		if (file.size > MAX_BACKUP_BYTES) {
+			restoreError = 'Backup files must be 100 MB or smaller.';
+			return;
+		}
 		const contextVersion = restoreContextVersion;
 		const reader = new FileReader();
 		activeRestoreReader = reader;
@@ -91,16 +107,10 @@
 		reader.onload = () => {
 			try {
 				if (!isCurrent()) return;
-				const backup = JSON.parse(reader.result as string) as BackupFile;
-				if (backup.version !== 1 || !Array.isArray(backup.folders) || !Array.isArray(backup.lists) || !Array.isArray(backup.items)) {
-					restoreError = 'Invalid backup file.';
-					restoreStatus = null;
-					return;
-				}
-				pendingBackup = backup;
+				pendingBackup = parseBackup(reader.result as string);
 				restoreError = null;
 			} catch (err) {
-				restoreError = `Failed to parse backup: ${err}`;
+				restoreError = `Invalid backup: ${err instanceof Error ? err.message : String(err)}`;
 				restoreStatus = null;
 			} finally {
 				if (activeRestoreReader === reader) {
@@ -120,10 +130,10 @@
 	}
 
 	function confirmRestore() {
-		if (commitState.isHistorical || !isActive || !pendingBackup) return;
+		if (commitState.isHistorical || !isActive || !idbSynced.done || !pendingBackup) return;
 		try {
 			importBackup(pendingBackup, restoreMode);
-			restoreStatus = `Restored ${pendingBackup.folders.length} folders, ${pendingBackup.lists.length} lists, ${pendingBackup.items.length} items${pendingBackup.sheets?.length ? `, ${pendingBackup.sheets.length} spreadsheets (names only — cell content is not included in backups)` : ''}.`;
+			restoreStatus = `Restored ${pendingBackup.folders.length} folders, ${pendingBackup.lists.length} lists, ${pendingBackup.items.length} items${pendingBackup.sheets?.length ? `, ${pendingBackup.sheets.length} spreadsheets` : ''}.${pendingBackup.version === 1 ? ' This older backup may not contain note formatting or spreadsheet cells.' : ''}`;
 			restoreError = null;
 		} catch (err) {
 			restoreError = `Restore failed: ${err}`;
@@ -375,7 +385,9 @@
 
 		<section>
 			<h2>Backup &amp; Restore</h2>
-			<button class="action-btn" onclick={downloadBackup}>⬇ Download backup</button>
+			<p class="hint">Includes formatted notes, folder templates, named checkboxes, journal settings, saved locations, errand state and stored spreadsheet cells. Device settings, destination marks and Version History are separate.</p>
+			<button class="action-btn" disabled={!idbSynced.done} onclick={downloadBackup}>⬇ Download backup</button>
+			{#if backupError}<p class="restore-err" role="alert">{backupError}</p>{/if}
 
 			<div class="restore-modes">
 				<label class="mode-label">
@@ -394,10 +406,10 @@
 				type="file"
 				accept=".json,application/json"
 				style="display:none"
-				disabled={commitState.isHistorical}
+				disabled={commitState.isHistorical || !idbSynced.done}
 				onchange={onFileSelected}
 			/>
-			<button class="action-btn restore-btn" disabled={commitState.isHistorical} onclick={() => { if (!commitState.isHistorical) restoreFileInput?.click(); }}>⬆ Restore from file</button>
+			<button class="action-btn restore-btn" disabled={commitState.isHistorical || !idbSynced.done} onclick={() => { if (!commitState.isHistorical && idbSynced.done) restoreFileInput?.click(); }}>⬆ Restore from file</button>
 
 			{#if restoreStatus}
 				<p class="restore-ok">{restoreStatus}</p>
@@ -416,7 +428,7 @@
 {#if pendingBackup && !commitState.isHistorical}
 	{@const modeLabel = restoreMode === 'replace' ? 'REPLACE ALL data with' : 'merge in'}
 	<ConfirmDialog
-		message={`Restore and ${modeLabel} ${pendingBackup.folders.length} folders, ${pendingBackup.lists.length} lists, ${pendingBackup.items.length} items${pendingBackup.sheets?.length ? `, ${pendingBackup.sheets.length} spreadsheets (cell content not included)` : ''}? This cannot be undone.`}
+		message={`Restore and ${modeLabel} ${pendingBackup.folders.length} folders, ${pendingBackup.lists.length} lists, ${pendingBackup.items.length} items${pendingBackup.sheets?.length ? `, ${pendingBackup.sheets.length} spreadsheets` : ''}?${pendingBackup.version === 1 ? ' This older backup may not contain note formatting or spreadsheet cells.' : ''} Download a backup first to keep a separate copy of your current data.`}
 		confirmLabel="Restore"
 		onConfirm={confirmRestore}
 		onCancel={() => pendingBackup = null}

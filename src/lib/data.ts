@@ -9,7 +9,8 @@ import { readFolderCheckboxes, addCheckbox, renameCheckbox, removeCheckbox, orde
 import { readFolderDefaultItems, isFolderDefaultItems, addDefaultItem, updateDefaultItem, removeDefaultItem, orderDefaultItems, replaceFolderDefaultItems, type FolderDefaultItem } from './folderDefaultItems';
 import { resolveParentLinks, compareOrder, getInsertionOrder } from './hierarchy';
 import { planItemMove, type ItemMoveDestination } from './itemMove';
-import { readItemName, getItemText, initializeItemText, replaceItemText } from './noteText';
+import { readItemName, getItemText, hasItemText, initializeItemText, replaceItemText, readItemRichText, replaceItemRichText, type RichTextOperation } from './noteText';
+import { validateRecords, orderParentFirst, isRecord, MAX_BACKUP_BYTES } from './jsonImport';
 import { readReportAssignments, restoreReportAssignments } from './reportAssignments';
 import { validateLocations, normalizeLocationTag, type RetailLocation } from './retailLocations';
 import { isStartingLocation, type StartingLocation } from './startingLocation';
@@ -716,11 +717,13 @@ export interface ExportedItem {
 	heading?: boolean;
 	note?: boolean;
 	pinned?: boolean;
+	fullScreen?: boolean;
+	richText?: RichTextOperation[];
 	parentId?: string | null;
 }
 
 /** Import exported items or parsed clipboard todos, preserving attributes and
- *  hierarchy. Items must be in tree order (parents before their children). */
+ * hierarchy even when children appear before their parents. */
 export function createItemsFromExport(listId: string, exportedItems: ExportedItem[], options: { addPosition?: 'top' | 'bottom'; skipExisting?: boolean } = {}): void {
 	const doc = getMutableDoc();
 	validateRecords(exportedItems, 'items');
@@ -740,10 +743,11 @@ export function createItemsFromExport(listId: string, exportedItems: ExportedIte
 	}
 	const nextOrders = new Map<string | null, number>();
 	const list = readLists().find((l) => l.id === listId);
+	if (!list) throw new Error('The destination list no longer exists.');
 	const folder = list ? readFolders().find((f) => f.id === list.folderId) : undefined;
 	const checkboxes = folder?.checkboxes ?? [];
 	doc.transact(() => {
-		for (const ex of exportedItems) {
+		for (const ex of orderParentFirst<ExportedItem>(exportedItems)) {
 			if (idMap.has(ex.id)) continue;
 			const resolvedParentId = ex.parentId ? (idMap.get(ex.parentId) ?? null) : null;
 			let order: number | undefined;
@@ -761,7 +765,9 @@ export function createItemsFromExport(listId: string, exportedItems: ExportedIte
 			if (ex.checked) patch.checked = true;
 			if (ex.heading) patch.heading = true;
 			if (ex.pinned) patch.pinned = true;
+			if (ex.fullScreen) patch.fullScreen = true;
 			if (Object.keys(patch).length > 0) updateItem(newId, patch);
+			if (ex.richText !== undefined) replaceItemRichText(doc, newId, ex.name, ex.richText);
 			if (ex.checkedNames && ex.checkedNames.length > 0 && checkboxes.length > 0) {
 				for (const name of ex.checkedNames) {
 					const box = checkboxes.find((c) => c.name.toLowerCase() === name.toLowerCase());
@@ -1186,13 +1192,16 @@ function removeYMap(arr: Y.Array<Y.Map<unknown>>, id: string) {
 
 // ─── Backup / Restore ─────────────────────────────────────────────────────────
 
+export interface BackupItem extends Item { richText?: RichTextOperation[] }
+export interface BackupSheet extends SheetMeta { cells?: Record<string, string> }
+
 export interface BackupFile {
 	version: number;
 	exported: string; // ISO timestamp
 	folders: Folder[];
 	lists: ListMeta[];
-	items: Item[];
-	sheets?: SheetMeta[];
+	items: BackupItem[];
+	sheets?: BackupSheet[];
 	smartFolders?: Record<string, string[]>;
 	customLocations?: RetailLocation[];
 	startingLocation?: StartingLocation | null;
@@ -1205,15 +1214,19 @@ export interface BackupFile {
 	pausedErrandItemIds?: string[];
 }
 
-/** Serialise the entire doc to a plain JS object ready to JSON.stringify. */
+/** Current application data. Device preferences and named history are separate. */
 export function exportBackup(): BackupFile {
-	return {
-		version: 1,
+	const doc = getDoc();
+	const backup: BackupFile = {
+		version: 2,
 		exported: new Date().toISOString(),
 		folders: readFolders(),
 		lists: readLists(),
-		items: readAllItems(),
-		sheets: readSheets(),
+		items: readAllItems().map(item => {
+			const richText = readItemRichText(doc, item.id, item.name);
+			return richText === undefined ? item : { ...item, richText };
+		}),
+		sheets: readSheets().map(sheet => ({ ...sheet, cells: readCells(sheet.id) })),
 		smartFolders: readReportAssignments(getDoc()),
 		customLocations: readCustomLocations(),
 		startingLocation: readStartingLocation(),
@@ -1225,42 +1238,24 @@ export function exportBackup(): BackupFile {
 		pausedErrandTags: readPausedErrandTags(),
 		pausedErrandItemIds: readPausedErrandItemIds()
 	};
+	validateBackup(backup);
+	return backup;
 }
 
-/** Yjs transactions do not roll back on an exception. Validate the entire
- * import before clearing or inserting anything, including optional sections. */
-function validateRecords(records: unknown, kind: string): asserts records is Record<string, unknown>[] {
-	if (!Array.isArray(records)) throw new Error(`Invalid ${kind} in import.`);
-	const ids = new Set<string>();
-	for (const record of records) {
-		if (!record || typeof record !== 'object' || Array.isArray(record) || typeof record.id !== 'string' || !record.id || typeof record.name !== 'string' || ids.has(record.id)) {
-			throw new Error(`Invalid or duplicate ${kind} record.`);
-		}
-		ids.add(record.id);
-		if (record.parentId != null && typeof record.parentId !== 'string') throw new Error('Invalid parent id.');
-		if (record.checks !== undefined && (!record.checks || typeof record.checks !== 'object' || Array.isArray(record.checks) || Object.values(record.checks).some((value) => typeof value !== 'boolean'))) throw new Error('Invalid checkbox states.');
-		if (record.checkboxes !== undefined && (!Array.isArray(record.checkboxes) || record.checkboxes.some((box: FolderCheckbox) => !box || typeof box.id !== 'string' || typeof box.name !== 'string'))) throw new Error('Invalid checkbox definitions.');
-		if (kind === 'folders' && record.defaultItems !== undefined && !isFolderDefaultItems(record.defaultItems)) throw new Error('Invalid default items.');
-		if (record.checkedNames !== undefined && (!Array.isArray(record.checkedNames) || record.checkedNames.some((name: unknown) => typeof name !== 'string'))) throw new Error('Invalid checkbox names.');
-		for (const key of ['price', 'qty', 'order', 'favouriteOrder']) {
-			if (record[key] != null && (typeof record[key] !== 'number' || !Number.isFinite(record[key]))) throw new Error(`Invalid ${key}.`);
-		}
-	}
-}
-
-/**
- * Restore from a BackupFile.
- * mode='replace' — wipe all existing data first, then insert everything from the backup.
- * mode='merge'   — upsert by ID: update matching records, insert new ones; nothing is deleted.
- */
-export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): void {
-	const doc = getMutableDoc();
-	if (!backup || backup.version !== 1 || (mode !== 'merge' && mode !== 'replace')) throw new Error('Invalid backup.');
+/** Shared by file preview, export and restore; this function never mutates Yjs. */
+export function validateBackup(value: unknown): asserts value is BackupFile {
+	if (!isRecord(value)) throw new Error('Invalid backup: expected a JSON object.');
+	if (value.version !== 1 && value.version !== 2) throw new Error(`Unsupported backup version: ${String(value.version)}. Update the app if this file came from a newer release.`);
+	const fields = new Set(['version', 'exported', 'folders', 'lists', 'items', 'sheets', 'smartFolders', 'customLocations', 'startingLocation', 'nearbyLocationFilterEnabled', 'hotSuburbIds', 'nearbyPreviewLimit', 'nearbyRecentlyModifiedFirst', 'nearbyChecklist', 'pausedErrandTags', 'pausedErrandItemIds']);
+	for (const key of Object.keys(value)) if (!fields.has(key)) throw new Error(`Unrecognized backup section: ${key}. This backup may require a newer app.`);
+	if (value.exported !== undefined && (typeof value.exported !== 'string' || !Number.isFinite(Date.parse(value.exported)))) throw new Error('Invalid backup export date.');
+	const backup = value as unknown as BackupFile;
 	validateRecords(backup.folders, 'folders');
 	validateRecords(backup.lists, 'lists');
 	validateRecords(backup.items, 'items');
-	validateRecords(backup.sheets ?? [], 'sheets');
-	validateLocations(backup.customLocations ?? []);
+	if (backup.items.some(item => typeof item.listId !== 'string' || !item.listId.trim())) throw new Error('Invalid item listId.');
+	validateRecords(backup.sheets === undefined ? [] : backup.sheets, 'sheets');
+	validateLocations(backup.customLocations === undefined ? [] : backup.customLocations);
 	if (backup.pausedErrandTags !== undefined && (!Array.isArray(backup.pausedErrandTags) || backup.pausedErrandTags.some(tag => typeof tag !== 'string' || !/^#?\w+$/.test(tag)))) throw new Error('Invalid paused errand tags.');
 	if (backup.pausedErrandItemIds !== undefined && (!Array.isArray(backup.pausedErrandItemIds) || backup.pausedErrandItemIds.some(id => typeof id !== 'string' || !id.trim()))) throw new Error('Invalid paused errand item ids.');
 	if (backup.startingLocation != null && !isStartingLocation(backup.startingLocation)) throw new Error('Invalid starting location.');
@@ -1270,19 +1265,42 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 	if (backup.nearbyRecentlyModifiedFirst !== undefined && typeof backup.nearbyRecentlyModifiedFirst !== 'boolean') throw new Error('Invalid nearby recently modified order.');
 	if (backup.nearbyChecklist !== undefined && (!backup.nearbyChecklist || typeof backup.nearbyChecklist !== 'object' || Array.isArray(backup.nearbyChecklist) || Object.entries(backup.nearbyChecklist).some(([id, state]) => !id || !isNearbyChecklistState(state)))) throw new Error('Invalid nearby checklist.');
 	if (backup.customLocations?.some(location => !location.id.startsWith('custom-'))) throw new Error('Custom location ids must start with custom-.');
-	if (backup.smartFolders != null && (typeof backup.smartFolders !== 'object' || Array.isArray(backup.smartFolders))) throw new Error('Invalid reports.');
+	if (backup.smartFolders !== undefined && !isRecord(backup.smartFolders)) throw new Error('Invalid reports.');
 	for (const ids of Object.values(backup.smartFolders ?? {})) {
 		if (!Array.isArray(ids) || ids.some((id) => typeof id !== 'string')) throw new Error('Invalid report assignments.');
 	}
+	const items = new Map(backup.items.map(item => [item.id, item]));
+	for (const item of backup.items) {
+		const parent = item.parentId ? items.get(item.parentId) : undefined;
+		if (parent && parent.listId !== item.listId) throw new Error('An item parent must belong to the same list.');
+	}
+}
+
+export function parseBackup(text: string): BackupFile {
+	if (new TextEncoder().encode(text).byteLength > MAX_BACKUP_BYTES) throw new Error('Backup files must be 100 MB or smaller.');
+	let value: unknown;
+	try { value = JSON.parse(text.replace(/^\uFEFF/, '')); }
+	catch { throw new Error('The file is not valid JSON. It may be incomplete or damaged.'); }
+	validateBackup(value);
+	return value;
+}
+
+/** Replace wipes current data; merge upserts by ID and retains other records. */
+export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): void {
+	if (mode !== 'merge' && mode !== 'replace') throw new Error('Invalid restore mode.');
+	validateBackup(backup);
+	const doc = getMutableDoc();
 	const fArr = getFolders(doc);
 	const lArr = getLists(doc);
 	const iArr = getItems(doc);
 	const sArr = getSpreadsheets(doc);
+	// Index once: scanning the full Y.Array for each record freezes large restores.
+	const indexes = new Map([fArr, lArr, iArr, sArr].map(arr => [arr, new Map(arr.toArray().map(record => [record.get('id') as string, record]))]));
 
 	// Undo needs an authoritative pre-import baseline even for legacy notes
 	// that have never been opened. Migration itself is not an undo action.
 	for (const item of backup.items) {
-		if (findYMap(iArr, item.id)) getItemText(doc, item.id);
+		if (indexes.get(iArr)!.has(item.id) && !hasItemText(doc, item.id)) getItemText(doc, item.id);
 	}
 
 	doc.transact(() => {
@@ -1299,15 +1317,18 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 			}
 			doc.getMap('note-text-initialized').clear();
 			if (sArr.length) sArr.delete(0, sArr.length);
+			for (const index of indexes.values()) index.clear();
 		}
 		function upsert(arr: Y.Array<Y.Map<unknown>>, record: Record<string, unknown>, kind: 'folder' | 'item' | 'other') {
-			let m = findYMap(arr, record.id as string);
+			const index = indexes.get(arr)!;
+			let m = index.get(record.id as string);
 			if (!m) {
 				m = new Y.Map<unknown>();
 				arr.push([m]);
+				index.set(record.id as string, m);
 			}
 			for (const [key, value] of Object.entries(record)) {
-				if (key !== 'checks' && key !== 'checkboxes' && !(kind === 'folder' && key === 'defaultItems')) m.set(key, value);
+				if (!['checks', 'checkboxes', 'richText', 'cells'].includes(key) && !(kind === 'folder' && key === 'defaultItems')) m.set(key, value);
 			}
 			if (kind === 'folder' && record.checkboxes !== undefined) replaceFolderCheckboxes(m, record.checkboxes as FolderCheckbox[]);
 			if (kind === 'folder' && record.defaultItems !== undefined) replaceFolderDefaultItems(m, record.defaultItems as FolderDefaultItem[]);
@@ -1317,13 +1338,19 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 					for (const key of [...m.keys()]) if (key.startsWith('chk_')) m.delete(key);
 					for (const [id, value] of Object.entries(record.checks as Record<string, boolean>)) m.set(`chk_${id}`, value);
 				}
-				replaceItemText(doc, record.id as string, record.name as string);
+				replaceItemRichText(doc, record.id as string, record.name as string, record.richText as RichTextOperation[] | undefined);
 			}
 		}
 		for (const record of backup.folders) upsert(fArr, record as unknown as Record<string, unknown>, 'folder');
 		for (const record of backup.lists) upsert(lArr, record as unknown as Record<string, unknown>, 'other');
 		for (const record of backup.items) upsert(iArr, record as unknown as Record<string, unknown>, 'item');
 		for (const record of backup.sheets ?? []) upsert(sArr, record as unknown as Record<string, unknown>, 'other');
+		for (const sheet of backup.sheets ?? []) {
+			if (sheet.cells === undefined) continue; // Legacy merge keeps existing cells.
+			const cells = getSheetCells(doc, sheet.id);
+			cells.clear();
+			for (const [key, value] of Object.entries(sheet.cells)) cells.set(key, value);
+		}
 		restoreReportAssignments(doc, backup.smartFolders ?? {}, mode === 'replace');
 		const locations = doc.getMap<RetailLocation>('custom-locations');
 		if (mode === 'replace') locations.clear();

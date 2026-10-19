@@ -6,6 +6,33 @@ export const NOTE_MIRROR_ORIGIN = Symbol('note-name-mirror');
 const INITIALIZED = 'note-text-initialized';
 const PREFIX = 'note_text_';
 
+/** Insert-only Quill/Y.Text content, including inline and paragraph formatting. */
+export interface RichTextOperation {
+	insert: string | Record<string, unknown>;
+	attributes?: Record<string, string | number | boolean | null>;
+}
+
+/** Plain names remain sufficient unless formatting, embeds or a final editor
+ * newline would otherwise be lost. Reading a backup never migrates the doc. */
+export function readItemRichText(doc: Y.Doc, id: string, name: string): RichTextOperation[] | undefined {
+	if (!hasItemText(doc, id)) return undefined;
+	const text = doc.getText(PREFIX + id);
+	const delta: RichTextOperation[] = text.toDelta();
+	return text.toString() !== name || delta.some(op => op.attributes || typeof op.insert !== 'string') ? structuredClone(delta) : undefined;
+}
+
+/** A restored document replaces formatting as well as characters. Applying a
+ * plain-text backup must not inherit formatting from the current document. */
+export function replaceItemRichText(doc: Y.Doc, id: string, name: string, delta?: RichTextOperation[]): void {
+	const text = doc.getText(PREFIX + id);
+	const content = delta ?? (name ? [{ insert: name }] : []);
+	if (JSON.stringify(text.toDelta()) !== JSON.stringify(content)) {
+		text.delete(0, text.length);
+		text.applyDelta(content);
+	}
+	doc.getMap<boolean>(INITIALIZED).set(id, true);
+}
+
 function findItem(doc: Y.Doc, id: string): Y.Map<unknown> | undefined {
 	return doc.getArray<Y.Map<unknown>>('items').toArray().find((item) => item.get('id') === id);
 }

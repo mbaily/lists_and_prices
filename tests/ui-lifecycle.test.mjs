@@ -59,6 +59,7 @@ function itemCopyProbe(item, folderCheckboxes = []) {
 	const writes = [], refs = [];
 	const state = {
 		folderCheckboxes, isChecked: (item, id) => !!item.checks?.[id],
+		getDoc: () => ({}), readItemRichText: () => undefined,
 		navigator: { clipboard: { writeText: async (text) => { writes.push(text); } } },
 		copyRefToClipboard: (id) => refs.push(id), copyStatus: 'idle', copyMessage: '', setTimeout: () => 1,
 		selectedIds: new Set(), selectedItems: [], treeItems: [{ item }], showHeaderMenu: true
@@ -95,6 +96,7 @@ test('Copy JSON uses the list export format and preserves item attributes and na
 		assert.equal(probe.writes[0], probe.writes[1]);
 		assert.deepEqual(JSON.parse(probe.writes[0]), {
 			__list_app__: true,
+			version: 2,
 			items: [{ id: item.id, name: item.name, price: 3.5, qty: 2,
 				...(named ? { checkedNames: ['Bought'] } : { checked: true }),
 				note: true, pinned: true, parentId: 'parent-a' }]
@@ -136,6 +138,22 @@ test('clipboard imports can be repeated after both plain text and JSON success',
 	await probe.run(); assert.equal(probe.state.isPasting, false);
 	assert.equal(probe.state.copyStatus, 'idle'); assert.equal(probe.state.copyMessage, '');
 	assert.equal(probe.calls.length, 2); assert.equal(probe.calls[1][0], 'json');
+});
+
+test('damaged, unsupported and full-backup JSON never becomes literal list items', async () => {
+	for (const text of [
+		'{"__list_app__":true,"items":[',
+		'{"__list_app__":false,"items":[{"id":"a","name":"Task"}]}',
+		'{"__list_app__":true,"version":99,"items":[{"id":"a","name":"Task"}]}',
+		'{"version":2,"folders":[],"lists":[],"items":[]}'
+	]) {
+		const probe = clipboardState(async () => text);
+		await probe.run();
+		assert.deepEqual(probe.calls, []);
+		assert.equal(probe.alerts.length, 1);
+		assert.match(probe.alerts[0], /Import failed/);
+		assert.equal(probe.state.isPasting, false);
+	}
 });
 
 test('clipboard todos import completion and omit cancelled items', async () => {
@@ -334,7 +352,7 @@ test('plain text checks current names after the clipboard read, while JSON still
 	await probe.run();
 	assert.deepEqual(probe.calls, [
 		['text', 'list-a', ['Bread'], 'bottom'],
-		['json', 'list-a', exportedItems]
+		['json', 'list-a', exportedItems, { addPosition: 'bottom' }]
 	]);
 });
 

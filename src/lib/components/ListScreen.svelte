@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { docState, commitState, undoLastAction, canUndo, getUndoCount, exitCommitView } from '$lib/yjsStore.svelte';
+	import { docState, commitState, undoLastAction, canUndo, getUndoCount, exitCommitView, getDoc } from '$lib/yjsStore.svelte';
+	import { readItemRichText } from '$lib/noteText';
 	import { onDestroy, tick, untrack } from 'svelte';
 	import { buildItemTreeOrder, canReparentItems } from '$lib/hierarchy';
 	import {
@@ -489,6 +490,7 @@
 	function serializeClipboardItems(source: Item[]): string {
 		const exportData = {
 			__list_app__: true,
+			version: 2,
 			items: source.map((item) => {
 				const ex: ExportedItem = { id: item.id, name: item.name };
 				if (item.price !== null) ex.price = item.price;
@@ -502,6 +504,9 @@
 				if (item.heading) ex.heading = true;
 				if (item.note) ex.note = true;
 				if (item.pinned) ex.pinned = true;
+				if (item.fullScreen) ex.fullScreen = true;
+				const richText = readItemRichText(getDoc(), item.id, item.name);
+				if (richText !== undefined) ex.richText = richText;
 				if (item.parentId !== null) ex.parentId = item.parentId;
 				return ex;
 			})
@@ -579,17 +584,20 @@
 				try {
 					parsed = JSON.parse(trimmed);
 				} catch {
-					// Only parsing failures fall back to plain text, never mutation failures.
+					if (/"__list_app__"\s*:/.test(trimmed)) throw new Error('The clipboard export is incomplete or invalid JSON.');
 				}
 			}
 
-			if (typeof parsed === 'object' && parsed !== null && '__list_app__' in parsed && parsed.__list_app__ === true) {
+			if (typeof parsed === 'object' && parsed !== null && '__list_app__' in parsed) {
+				if (parsed.__list_app__ !== true) throw new Error('Invalid clipboard export.');
+				if ('version' in parsed && parsed.version !== 1 && parsed.version !== 2) throw new Error('This clipboard export requires a newer app.');
 				if (!('items' in parsed) || !Array.isArray(parsed.items) || parsed.items.length === 0) {
 					alert('No valid items found in clipboard export.');
 					return;
 				}
-				createItemsFromExport(targetListId, parsed.items as ExportedItem[]);
+				createItemsFromExport(targetListId, parsed.items as ExportedItem[], { addPosition });
 			} else {
+				if (typeof parsed === 'object' && parsed !== null && 'version' in parsed && 'folders' in parsed && 'lists' in parsed && 'items' in parsed) throw new Error('Restore backup files through Settings → Backup & Restore.');
 				// Plain text: one item per line, excluding blank lines and lines without letters.
 				const lines = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => /\p{L}/u.test(line));
 				if (lines.length === 0) {

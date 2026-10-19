@@ -18,6 +18,8 @@ See [bug-fix and upgrade notes](docs/bug-fixes.md) before deploying the authenti
 
 See [safe deployment instructions](docs/deployment.md) for backups, dry runs and rollback.
 
+For downloadable app data, see [JSON backup coverage and restore behaviour](docs/json-backups.md).
+
 See [task integration API](docs/task-api.md) for authenticated server-to-server
 task imports, shared clipboard matching, list-scoped tokens, and retry behavior.
 

@@ -383,8 +383,8 @@ export const helpTopics: HelpTopic[] = [
 				title: 'Download a separate backup',
 				paragraphs: [
 					'Open Settings → Backup & Restore and choose Download backup. Save the JSON file somewhere you can find later. Its filename includes the download date. A downloaded file gives you a separate copy outside the browser’s working cache.',
-					'Backups include folders, lists, item text and attributes, favourite status and ordering, Smart Folder assignments, personal locations, your starting point, hot suburbs and saved errand state. They do not include browser settings, destination marks or the Version History collection. Rich-text note formatting is not preserved in this JSON export.',
-					'Spreadsheet records are backed up as names and metadata only; spreadsheet cell content is not included. The app’s spreadsheet screen directs you to an external spreadsheet application. The bundled public location catalogue is part of the app itself and is not duplicated into your backup.'
+					'Backups include folders and their named checkboxes and default items; lists and their journal and default-note settings; formatted item text and attributes; favourite status and ordering; Smart Folder assignments; personal locations; your starting point; hot suburbs; and saved errand state. Browser settings, destination marks and the Version History collection are separate and are not included.',
+					'New backups also preserve any stored spreadsheet cell values and formulas, although the app’s spreadsheet screen directs you to an external spreadsheet application. The bundled public location catalogue is part of the app itself and is not duplicated into your backup. A backup made while viewing history contains that historical view, rather than current live data.'
 				]
 			},
 			{
@@ -393,6 +393,7 @@ export const helpTopics: HelpTopic[] = [
 				bullets: [
 					'Merge updates records with matching IDs and adds records with new IDs, while keeping other existing records. This is not a merge by visible name: two differently identified lists with the same name can both remain.',
 					'Replace all deletes existing data and restores the selected file. Optional data absent from an older backup can be cleared, including personal locations and saved errand information.',
+					'Old version 1 backups still restore, but cannot recover note formatting or spreadsheet cells that were never exported. New version 2 backups require an updated app. Invalid or unsupported files are rejected before your data changes. Files must be 100 MB or smaller.',
 					'Restored changes affect the account’s shared data and can sync to other devices. Do not treat a restore as a private preview. Restore is disabled while viewing history.'
 				]
 			},
