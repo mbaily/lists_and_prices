@@ -1,5 +1,36 @@
 # Deploying safely
 
+## Release version policy
+
+Every production deployment must increase the web client's version, including
+deployments containing only server or deployment changes. Use `MAJOR.MINOR.PATCH`;
+increment PATCH by default, or deliberately choose a new minor/major release.
+The version at the bottom of Settings comes from `package.json` and is compiled
+into the web client. SvelteKit's `/_app/version.json` uses that same version.
+
+Before committing and pushing a release, run:
+
+```sh
+npm version patch --no-git-tag-version
+```
+
+Commit `package.json` and `package-lock.json` with the release changes, then push
+and deploy that exact commit. Do not bump versions only on the server or after
+building: the source, lockfile, client bundle and deployed version must agree.
+
+`deploy.sh` rejects unchanged/older versions and inconsistent lockfile versions
+before installing dependencies or stopping production. It verifies the built
+version before deployment and the served version during health checks. A dry
+run only previews file copies and does not require a version bump.
+
+A failed deployment can retry its version if the older release is still live.
+After a successful deployment, another deployment needs a new version. Automatic
+rollback restores the previous version along with its application; it does not
+increment the version. Offline PWA clients continue showing their cached version
+until they reconnect and load the update.
+
+## Deployment procedure
+
 Run `./deploy.sh --dry-run` in the server checkout to preview the frontend and
 server file copy (requires an existing build). Run `./deploy.sh` to deploy.
 The script requires Bash, sudo, rsync, flock, curl, Node/npm, and the existing
@@ -8,7 +39,7 @@ The script requires Bash, sudo, rsync, flock, curl, Node/npm, and the existing
 Deployment installs locked dependencies and builds before stopping production.
 Production dependencies are prepared separately and the native SQLite addon is
 checked against the server's Node version. It then stops the service, copies a
-consistent backup, updates the runtime, and checks the served frontend and the
+consistent backup, updates the runtime, and checks the served frontend/version and the
 unauthenticated session and sync endpoints. Concurrent deployments share a lock.
 
 Only `build/`, server TypeScript files, `server/tsconfig.json`, the shared

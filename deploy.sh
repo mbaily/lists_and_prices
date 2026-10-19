@@ -40,6 +40,9 @@ if "$dry_run"; then
     exit 0
 fi
 
+# Versions are bumped and committed before building or touching production.
+node "$SOURCE_DIR/scripts/check-release-version.mjs" "$SOURCE_DIR" "$DEST_DIR"
+
 stage=''
 backup=''
 stopped=false
@@ -74,6 +77,7 @@ echo "Installing locked dependencies and building before stopping production..."
 npm ci
 npm run build
 [[ -s build/index.html && -s build/sw.js ]] || { echo "Incomplete frontend build." >&2; exit 1; }
+node "$SOURCE_DIR/scripts/check-release-version.mjs" --built "$SOURCE_DIR"
 
 stage=$(sudo mktemp -d /opt/lists-deploy-stage.XXXXXX)
 sudo chown "$SERVICE_USER:" "$stage"
@@ -110,6 +114,8 @@ for attempt in {1..20}; do
     if sudo systemctl is-active --quiet "$SERVICE_NAME" &&
         sudo curl --insecure --silent --show-error --fail --max-time 3 "$HEALTH_URL/" -o "$stage/served.html" &&
         sudo cmp --silent "$DEST_DIR/build/index.html" "$stage/served.html" &&
+        sudo curl --insecure --silent --show-error --fail --max-time 3 "$HEALTH_URL/_app/version.json" -o "$stage/served-version.json" &&
+        sudo cmp --silent "$SOURCE_DIR/build/_app/version.json" "$stage/served-version.json" &&
         [[ "$(sudo curl --insecure --silent --show-error --max-time 3 -o "$stage/session.json" -w '%{http_code}' "$HEALTH_URL/api/session")" = 401 ]] &&
         [[ "$(sudo curl --insecure --silent --show-error --request POST --max-time 3 -o "$stage/sync.json" -w '%{http_code}' "$HEALTH_URL/api/sync")" = 401 ]] &&
         sudo node -e 'const fs=require("fs"); for(const file of process.argv.slice(1))if(JSON.parse(fs.readFileSync(file)).error!=="Invalid session")process.exit(1)' "$stage/session.json" "$stage/sync.json"; then

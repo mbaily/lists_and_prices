@@ -6,6 +6,7 @@ import { tmpdir, userInfo } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { root } from './helpers/app.mjs';
+import { checkReleaseVersion, checkBuiltVersion } from '../scripts/check-release-version.mjs';
 
 function fixture(t) {
     const directory = mkdtempSync(path.join(tmpdir(), 'lists deploy '));
@@ -16,9 +17,13 @@ function fixture(t) {
     const env = { ...process.env, PATH: bin + ':' + process.env.PATH, SERVICE_USER: userInfo().username };
     const source = path.join(directory, 'checkout'), dest = path.join(directory, 'live');
     for (const base of [source, dest]) {
-        for (const folder of ['build', 'server/yjs-data', 'node_modules', 'src/lib']) mkdirSync(path.join(base, folder), { recursive: true });
+        for (const folder of ['build/_app', 'server/yjs-data', 'node_modules', 'src/lib']) mkdirSync(path.join(base, folder), { recursive: true });
         for (const [file, content] of Object.entries({ 'build/index.html': base === source ? 'new app' : 'old app', 'build/sw.js': 'worker', 'server/index.ts': base === source ? 'new server' : 'old server', 'server/tsconfig.json': '{}', 'package.json': '{}', 'package-lock.json': '{}', 'node_modules/marker': base === source ? 'new deps' : 'old deps' })) writeFileSync(path.join(base, file), content);
         for (const file of ['server/yjs-data/notes', 'server/server.db', 'server/server.db-wal', 'server/server.db-shm', 'server/.htpasswd', 'server/cert.pem', 'server/key.pem', '.env']) writeFileSync(path.join(base, file), base === source ? 'checkout must never overwrite this' : 'live private data');
+        const version = base === source ? '0.0.2' : '0.0.1';
+        writeFileSync(path.join(base, 'package.json'), JSON.stringify({ name: 'test-deployment', version }));
+        writeFileSync(path.join(base, 'package-lock.json'), JSON.stringify({ version, packages: { '': { version } } }));
+        writeFileSync(path.join(base, 'build/_app/version.json'), JSON.stringify({ version }));
         writeFileSync(path.join(base, 'src/lib/folderDefaultItems.ts'), base === source ? 'new shared module' : 'old shared module');
         writeFileSync(path.join(base, 'src/lib/syncProtocol.ts'), base === source ? 'new sync protocol' : 'old sync protocol');
     }
@@ -31,6 +36,35 @@ function fixture(t) {
 function assertPrivateData(dest) {
     for (const file of ['server/yjs-data/notes', 'server/server.db', 'server/server.db-wal', 'server/server.db-shm', 'server/.htpasswd', 'server/cert.pem', 'server/key.pem', '.env']) assert.equal(readFileSync(path.join(dest, file), 'utf8'), 'live private data', file);
 }
+
+test('release versions compare numerically and require matching manifest and lockfile versions', t => {
+    const f = fixture(t);
+    const setSource = version => {
+        writeFileSync(path.join(f.source, 'package.json'), JSON.stringify({ version }));
+        writeFileSync(path.join(f.source, 'package-lock.json'), JSON.stringify({ version, packages: { '': { version } } }));
+    };
+    for (const [installed, next] of [['0.0.9', '0.0.10'], ['0.9.9', '0.10.0'], ['0.99.99', '1.0.0']]) {
+        writeFileSync(path.join(f.dest, 'package.json'), JSON.stringify({ version: installed }));
+        setSource(next);
+        assert.equal(checkReleaseVersion(f.source, f.dest).version, next);
+        setSource(installed);
+        assert.throws(() => checkReleaseVersion(f.source, f.dest), /must be newer/);
+    }
+    for (const version of ['0.0.1', '0.0.02', '0.0.2-beta', 'not-a-version']) {
+        setSource(version);
+        assert.throws(() => checkReleaseVersion(f.source, f.dest), /must be newer|MAJOR.MINOR.PATCH/);
+    }
+    setSource('2.0.0');
+    writeFileSync(path.join(f.source, 'package-lock.json'), JSON.stringify({ version: '2.0.0', packages: { '': { version: '1.0.0' } } }));
+    assert.throws(() => checkReleaseVersion(f.source, f.dest), /lock/);
+});
+
+test('a stale built client version cannot be released under a newer package version', t => {
+    const f = fixture(t);
+    assert.equal(checkBuiltVersion(f.source), '0.0.2');
+    writeFileSync(path.join(f.source, 'build/_app/version.json'), JSON.stringify({ version: '0.0.1' }));
+    assert.throws(() => checkBuiltVersion(f.source), /Built client version/);
+});
 
 test('native validation resolves the staged package without reading the caller’s package config', t => {
     const f = fixture(t);
@@ -97,28 +131,34 @@ test('symlinked data/runtime directory is rejected before copying', t => {
     assert.equal(readFileSync(path.join(f.dest, 'build/index.html'), 'utf8'), 'old app');
 });
 
-for (const failure of ['none', 'build', 'dependencies', 'health', 'sync-health']) {
+for (const failure of ['none', 'version', 'lock-version', 'build', 'built-version', 'dependencies', 'health', 'sync-health', 'served-version']) {
     test(`deployment ${failure}: staged dependencies, consistent backup and rollback`, t => {
         const f = fixture(t);
         // Execute the real deploy script from an isolated checkout.
         mkdirSync(path.join(f.source, 'scripts'));
         writeFileSync(path.join(f.source, 'deploy.sh'), readFileSync(path.join(root, 'deploy.sh')));
         writeFileSync(path.join(f.source, 'scripts/deploy-runtime.sh'), readFileSync(path.join(root, 'scripts/deploy-runtime.sh')));
+        writeFileSync(path.join(f.source, 'scripts/check-release-version.mjs'), readFileSync(path.join(root, 'scripts/check-release-version.mjs')));
+        if (failure === 'version') {
+            for (const file of ['package.json', 'package-lock.json']) writeFileSync(path.join(f.source, file), readFileSync(path.join(f.dest, file)));
+        }
+        if (failure === 'lock-version') writeFileSync(path.join(f.source, 'package-lock.json'), JSON.stringify({ version: '0.0.1', packages: { '': { version: '0.0.1' } } }));
+        if (failure === 'built-version') writeFileSync(path.join(f.source, 'build/_app/version.json'), JSON.stringify({ version: '0.0.1' }));
         f.command('npm', 'echo "npm $*" >> "$TEST_LOG"\nif [[ "$1" = run && "$TEST_FAILURE" = build ]]; then exit 1; fi\nif [[ "$*" = *--prefix* ]]; then\n if [[ "$TEST_FAILURE" = dependencies ]]; then exit 1; fi\n while [[ "$1" != --prefix ]]; do shift; done\n mkdir -p "$2/node_modules"; echo "prepared deps" > "$2/node_modules/marker"\nfi\n');
         f.command('mktemp', 'if [[ "$*" = *"/opt/lists-deploy-stage"* ]]; then exec /usr/bin/mktemp -d "$TEST_ROOT/stage.XXXXXX"; fi\nexec /usr/bin/mktemp "$@"\n');
         f.command('systemctl', 'echo "systemctl $*" >> "$TEST_LOG"\nexit 0\n');
         f.command('sleep', 'exit 0\n');
         f.command('journalctl', 'exit 0\n');
-        f.command('node', 'exit 0\n');
-        f.command('curl', 'echo "curl $*" >> "$TEST_LOG"\nif [[ "$TEST_FAILURE" = health ]]; then exit 22; fi\nargs="$*"\nwhile [[ "$1" != -o ]]; do shift; done\nif [[ "$args" = *api/sync* && "$TEST_FAILURE" = sync-health ]]; then echo \'{"error":"Not found"}\' > "$2"; printf 404; elif [[ "$args" = *api/session* || "$args" = *api/sync* ]]; then echo \'{"error":"Invalid session"}\' > "$2"; printf 401; else cp "$LISTS_DEPLOY_DIR/build/index.html" "$2"; fi\n');
+        f.command('node', "if [[ \"$1\" = */check-release-version.mjs ]]; then exec \"$TEST_NODE\" \"$@\"; fi\nexit 0\n");
+        f.command('curl', "echo \"curl $*\" >> \"$TEST_LOG\"\nif [[ \"$TEST_FAILURE\" = health ]]; then exit 22; fi\nargs=\"$*\"\nwhile [[ \"$1\" != -o ]]; do shift; done\nif [[ \"$args\" = */_app/version.json* ]]; then\n if [[ \"$TEST_FAILURE\" = served-version ]]; then printf '{\"version\":\"0.0.1\"}' > \"$2\"; else cp \"$LISTS_DEPLOY_DIR/build/_app/version.json\" \"$2\"; fi\n exit 0\nfi\nif [[ \"$args\" = *api/sync* && \"$TEST_FAILURE\" = sync-health ]]; then echo '{\"error\":\"Not found\"}' > \"$2\"; printf 404; elif [[ \"$args\" = *api/session* || \"$args\" = *api/sync* ]]; then echo '{\"error\":\"Invalid session\"}' > \"$2\"; printf 401; else cp \"$LISTS_DEPLOY_DIR/build/index.html\" \"$2\"; fi\n");
         const log = path.join(f.directory, 'commands.log'); writeFileSync(log, '');
         const backups = path.join(f.directory, 'backups');
-        const env = { ...f.env, LISTS_DEPLOY_DIR: f.dest, LISTS_BACKUP_DIR: backups, LISTS_SERVICE_USER: userInfo().username, TEST_ROOT: f.directory, TEST_LOG: log, TEST_FAILURE: failure };
+        const env = { ...f.env, LISTS_DEPLOY_DIR: f.dest, LISTS_BACKUP_DIR: backups, LISTS_SERVICE_USER: userInfo().username, TEST_ROOT: f.directory, TEST_LOG: log, TEST_FAILURE: failure, TEST_NODE: process.execPath };
         const run = () => execFileSync('bash', [path.join(f.source, 'deploy.sh')], { env, encoding: 'utf8', timeout: 15000, stdio: ['pipe', 'pipe', 'pipe'] });
         if (failure === 'none') run(); else assert.throws(run);
         assertPrivateData(f.dest);
         const commands = readFileSync(log, 'utf8');
-        if (failure === 'build' || failure === 'dependencies') {
+        if (['version', 'lock-version', 'build', 'built-version', 'dependencies'].includes(failure)) {
             assert.doesNotMatch(commands, /systemctl stop/);
             assert.equal(readFileSync(path.join(f.dest, 'build/index.html'), 'utf8'), 'old app');
         } else {
