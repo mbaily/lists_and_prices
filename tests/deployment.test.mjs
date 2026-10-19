@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync, symlinkSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir, userInfo } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -139,6 +139,7 @@ for (const failure of ['none', 'version', 'lock-version', 'build', 'built-versio
         writeFileSync(path.join(f.source, 'deploy.sh'), readFileSync(path.join(root, 'deploy.sh')));
         writeFileSync(path.join(f.source, 'scripts/deploy-runtime.sh'), readFileSync(path.join(root, 'scripts/deploy-runtime.sh')));
         writeFileSync(path.join(f.source, 'scripts/check-release-version.mjs'), readFileSync(path.join(root, 'scripts/check-release-version.mjs')));
+        writeFileSync(path.join(f.source, 'scripts/frontend-retention.mjs'), readFileSync(path.join(root, 'scripts/frontend-retention.mjs')));
         if (failure === 'version') {
             for (const file of ['package.json', 'package-lock.json']) writeFileSync(path.join(f.source, file), readFileSync(path.join(f.dest, file)));
         }
@@ -149,7 +150,7 @@ for (const failure of ['none', 'version', 'lock-version', 'build', 'built-versio
         f.command('systemctl', 'echo "systemctl $*" >> "$TEST_LOG"\nexit 0\n');
         f.command('sleep', 'exit 0\n');
         f.command('journalctl', 'exit 0\n');
-        f.command('node', "if [[ \"$1\" = */check-release-version.mjs ]]; then exec \"$TEST_NODE\" \"$@\"; fi\nexit 0\n");
+        f.command('node', "if [[ \"$1\" = */check-release-version.mjs || \"$1\" = */frontend-retention.mjs ]]; then exec \"$TEST_NODE\" \"$@\"; fi\nexit 0\n");
         f.command('curl', "echo \"curl $*\" >> \"$TEST_LOG\"\nif [[ \"$TEST_FAILURE\" = health ]]; then exit 22; fi\nargs=\"$*\"\nwhile [[ \"$1\" != -o ]]; do shift; done\nif [[ \"$args\" = */_app/version.json* ]]; then\n if [[ \"$TEST_FAILURE\" = served-version ]]; then printf '{\"version\":\"0.0.1\"}' > \"$2\"; else cp \"$LISTS_DEPLOY_DIR/build/_app/version.json\" \"$2\"; fi\n exit 0\nfi\nif [[ \"$args\" = *api/sync* && \"$TEST_FAILURE\" = sync-health ]]; then echo '{\"error\":\"Not found\"}' > \"$2\"; printf 404; elif [[ \"$args\" = *api/session* || \"$args\" = *api/sync* ]]; then echo '{\"error\":\"Invalid session\"}' > \"$2\"; printf 401; else cp \"$LISTS_DEPLOY_DIR/build/index.html\" \"$2\"; fi\n");
         const log = path.join(f.directory, 'commands.log'); writeFileSync(log, '');
         const backups = path.join(f.directory, 'backups');
@@ -173,6 +174,7 @@ for (const failure of ['none', 'version', 'lock-version', 'build', 'built-versio
             assert.equal(readFileSync(path.join(f.dest, 'src/lib/syncProtocol.ts'), 'utf8'), failure === 'none' ? 'new sync protocol' : 'old sync protocol');
             assert.match(commands, /systemctl start/);
             if (failure === 'none' || failure === 'sync-health') assert.match(commands, /api\/sync/);
+            assert.equal(existsSync(path.join(backups, 'frontend-assets/release-0.0.2.json')), failure === 'none', 'Only a healthy deployment records a new frontend release');
         }
     });
 }

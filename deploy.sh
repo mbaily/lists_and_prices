@@ -105,6 +105,7 @@ for module in "${RUNTIME_SHARED_MODULES[@]}"; do
 done
 printf 'Backup: %s\n' "$backup"
 
+sudo node "$SOURCE_DIR/scripts/frontend-retention.mjs" before "$DEST_DIR/build" "$BACKUP_ROOT/frontend-assets"
 changed=true
 sync_runtime "$stage" "$DEST_DIR"
 sudo systemctl start "$SERVICE_NAME"
@@ -125,4 +126,5 @@ for attempt in {1..20}; do
 done
 "$healthy" || { sudo journalctl -u "$SERVICE_NAME" -n 30 --no-pager; exit 1; }
 complete=true
+sudo node "$SOURCE_DIR/scripts/frontend-retention.mjs" after "$stage/build" "$DEST_DIR/build" "$BACKUP_ROOT/frontend-assets"
 echo "Deployment verified. Backup retained at $backup"

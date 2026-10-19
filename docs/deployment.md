@@ -46,8 +46,38 @@ Only `build/`, server TypeScript files, `server/tsconfig.json`, the shared
 `src/lib/folderDefaultItems.ts` and `src/lib/syncProtocol.ts` modules, package manifests, and prepared
 dependencies are installed. Checkout `.env` files, credentials,
 certificates, SQLite files and Yjs data are never copied into production. Existing
-hashed frontend assets are retained for open tabs. `--delete` is limited to the
+hashed frontend assets are retained for open tabs using the policy below. `--delete` is limited to the
 prepared `node_modules/` directory; the script refuses symlinked runtime directories.
+
+Frontend compiler, PWA tooling, TypeScript type checking, browser-only packages
+and terminal UI dependencies are development dependencies. Production still
+includes `tsx` because the backend executes TypeScript; removing the whole
+`node_modules` directory would break startup. Staging uses `npm ci --omit=dev`
+and validates the native SQLite addon before the service is stopped.
+
+## Frontend asset retention
+
+After successful health checks, deployment keeps immutable assets belonging to
+the latest three releases and all releases deployed in the last seven days.
+Shared assets stay while any retained release needs them. This provides a
+bounded compatibility window for open tabs and cached PWAs; older clients may
+need to refresh once that window expires.
+
+The first deployment with this policy records existing production assets as a
+legacy baseline, preserving them for a full seven days regardless of their
+build timestamps. A later successful deployment expires that baseline and any
+other eligible assets. Future deployments record the exact staged build, so
+old assets no longer accumulate indefinitely. History lives in the root-only
+`LISTS_BACKUP_DIR/frontend-assets/` directory. Keep that directory when moving
+deployment backups; it is retention metadata, not an application/data backup.
+
+Cleanup touches only tracked regular files below `build/_app/immutable/`, rejects
+symlinked asset paths, and never touches server state, credentials or databases.
+Failures before successful health checks do not prune assets. A cleanup error
+after activation is reported with a nonzero exit status and leaves the healthy
+application running.
+
+## Backups and rollback
 
 Backups are retained in `/var/backups/lists-and-prices/deploy-*`, inside a root-only
 directory. They include the old application/dependencies and shared modules, entire live `server/`
