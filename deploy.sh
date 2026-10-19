@@ -81,7 +81,7 @@ sudo chown "$SERVICE_USER:" "$stage"
 sync_runtime "$SOURCE_DIR" "$stage" --without-dependencies
 sudo -u "$SERVICE_USER" npm ci --prefix "$stage" --omit=dev --ignore-scripts
 sudo -u "$SERVICE_USER" npm rebuild --prefix "$stage" better-sqlite3
-sudo -u "$SERVICE_USER" node -e 'const D=require(process.argv[1]+"/node_modules/better-sqlite3"); const db=new D(":memory:"); db.close()' "$stage"
+validate_runtime "$stage"
 
 sudo systemctl is-active --quiet "$SERVICE_NAME" || { echo "Service must be running before deployment." >&2; exit 1; }
 echo "Stopping service for a consistent application and data backup..."

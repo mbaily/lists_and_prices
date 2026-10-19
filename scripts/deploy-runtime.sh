@@ -2,6 +2,12 @@
 # Shared with deployment regression tests. Never sync a whole checkout.
 RUNTIME_SHARED_MODULES=(folderDefaultItems.ts syncProtocol.ts)
 
+validate_runtime() {
+    local runtime=$1
+    # Resolve from staging rather than the caller's potentially private checkout.
+    sudo -u "$SERVICE_USER" node -e 'const req=require("node:module").createRequire(process.argv[1]+"/package.json"); const D=req("better-sqlite3"); const db=new D(":memory:"); db.close()' "$runtime"
+}
+
 sync_runtime() {
     local source=$1 destination=$2
     shift 2

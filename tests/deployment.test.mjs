@@ -32,6 +32,17 @@ function assertPrivateData(dest) {
     for (const file of ['server/yjs-data/notes', 'server/server.db', 'server/server.db-wal', 'server/server.db-shm', 'server/.htpasswd', 'server/cert.pem', 'server/key.pem', '.env']) assert.equal(readFileSync(path.join(dest, file), 'utf8'), 'live private data', file);
 }
 
+test('native validation resolves the staged package without reading the caller’s package config', t => {
+    const f = fixture(t);
+    // An unreadable/malformed caller package must not affect the staged runtime.
+    writeFileSync(path.join(f.source, 'package.json'), '{invalid checkout configuration');
+    const addon = path.join(f.dest, 'node_modules/better-sqlite3'); mkdirSync(addon);
+    writeFileSync(path.join(addon, 'index.js'), 'module.exports = class { constructor(name) { if (name !== ":memory:") throw new Error("Unexpected database"); } close() { console.log("Staged addon validated"); } };');
+    const result = execFileSync('bash', ['-c', 'set -euo pipefail; source "$1/scripts/deploy-runtime.sh"; cd "$2"; validate_runtime "$3"', 'probe', root, f.source, f.dest], { env: f.env, encoding: 'utf8' });
+    assert.match(result, /Staged addon validated/);
+    assertPrivateData(f.dest);
+});
+
 test('deployment lock blocks a second deployment before copying', async t => {
     const f = fixture(t);
     const backups = path.join(f.directory, 'backups'); mkdirSync(backups);
