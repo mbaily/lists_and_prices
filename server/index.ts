@@ -32,6 +32,7 @@ import { createTaskDocuments } from './task-documents.ts';
 import { bindTaskDestination, createTaskRouter, readTaskTokens } from './task-api.ts';
 import { createOfflineSyncRouter } from './offline-sync.ts';
 import { readPublicBasePath, secureCookies, tlsEnabled } from './deployment-config.ts';
+import { preparePersistentDocuments } from './persistence.ts';
 
 // better-sqlite3 is a CJS module; use createRequire to import it from ESM.
 const require = createRequire(import.meta.url);
@@ -207,6 +208,7 @@ async function cliRemoveUser() {
 // ── Express app ───────────────────────────────────────────────────────────────
 const useTls = tlsEnabled(process.env.LISTS_TLS, fs.existsSync(CERT_FILE) && fs.existsSync(KEY_FILE));
 const publicBasePath = readPublicBasePath(BUILD_DIR);
+await preparePersistentDocuments();
 const app = express();
 const documents = createTaskDocuments();
 app.use('/api/sync', createOfflineSyncRouter(sessions, documents));

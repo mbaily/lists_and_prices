@@ -1,5 +1,31 @@
 # Offline storage and manual synchronization
 
+## First load and server update logs
+
+After browser storage is cleared, an empty local database is not proof that the
+account is empty. The home screen displays a server-loading message until its
+first state exchange completes. Previously confirmed offline caches continue to
+open immediately. Automatic mode starts the HTTP exchange when local storage is
+ready, without waiting for a WebSocket sync event; a recovered WebSocket also
+brings the confirmation request ahead of a delayed retry.
+
+The server prepares old update logs before listening and merges them periodically
+after 64 appended records or 16 MiB of appended updates. This prevents repeated
+full checkpoints from making each cold load replay hundreds of megabytes.
+Merging uses the original binary updates, retains deleted structs and unresolved
+dependencies, and preserves historical snapshots. Replacing records and deleting
+duplicates commit atomically; metadata and the highest update clock are retained.
+The resulting files remain compatible with the existing y-leveldb format.
+The adapter in `server/persistence.ts` uses the pinned y-leveldb 0.1.2 transaction
+interface. Test its compatibility before changing that dependency.
+
+The first startup after upgrading a large old log may take several seconds to
+prepare it. Subsequent cold loads read the merged update. Tests cover failed
+atomic writes, concurrent writes, snapshot recovery, missing dependencies and
+legacy-reader compatibility.
+
+## Device storage and synchronization
+
 Use the existing Home Screen PWA. Settings → Offline & sync shows local-save
 completion, offline UI availability, browser storage protection, pending server
 confirmation and the last completed server sync. Automatic sync remains the

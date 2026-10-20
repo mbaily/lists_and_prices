@@ -925,7 +925,15 @@
 	});
 
 	// ── First-launch guard ───────────────────────────────────────────────────────
-	let showFirstLaunch = $derived(idbSynced.done && allFolders.length === 0 && !showNewFolder && !commitState.isHistorical);
+	let awaitingInitialSync = $derived(idbSynced.done && !syncState.hasServerState && allFolders.length === 0 && allLists.length === 0 && allItemsAll.length === 0 && !commitState.isHistorical);
+	let showFirstLaunch = $derived(idbSynced.done && syncState.hasServerState && allFolders.length === 0 && !showNewFolder && !commitState.isHistorical);
+	let initialSyncMessage = $derived(
+		auth.needsLogin ? 'Sign in again in Settings to load your data.' :
+		syncState.error ? 'Could not load your data. Check the connection and try Sync now in Settings.' :
+		!syncState.automatic ? 'No data is saved on this device yet. Use Sync now in Settings to load your account.' :
+		syncState.status === 'offline' ? 'No data is saved on this device yet. Reconnect to load your account.' :
+		'Loading your data from the server…'
+	);
 
 	// ── Quick Add actions ─────────────────────────────────────────────────────────
 	function toggleQuickAdd() {
@@ -1844,6 +1852,10 @@ ${bodyHtml}
 		{#if !idbSynced.done}
 			<div class="empty-prompt">
 				<p>Loading data from local storage...</p>
+			</div>
+		{:else if awaitingInitialSync}
+			<div class="empty-prompt" role="status" aria-live="polite">
+				<p>{initialSyncMessage}</p>
 			</div>
 		{/if}
 

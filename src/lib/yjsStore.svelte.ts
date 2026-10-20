@@ -48,7 +48,8 @@ const COMMIT_ORIGIN = Symbol('commit-management');
 export const syncState = $state<{
 	status: SyncStatus; automatic: boolean; syncing: boolean; pending: boolean;
 	lastSyncAt: number | null; error: string | null;
-}>({ status: 'offline', automatic: true, syncing: false, pending: true, lastSyncAt: null, error: null });
+	hasServerState: boolean;
+}>({ status: 'offline', automatic: true, syncing: false, pending: true, lastSyncAt: null, error: null, hasServerState: false });
 export const commitState = $state<{ isHistorical: boolean, commitId: string | null }>({ isHistorical: false, commitId: null });
 
 
@@ -78,6 +79,7 @@ export function initYjs(username: string, wsUrl: string) {
 	try { syncState.automatic = localStorage.getItem(syncKey(username)) !== 'manual'; }
 	catch { syncState.automatic = true; }
 	idbSynced.done = false;
+	syncState.hasServerState = false;
 	localSaveState.status = 'loading';
 	localSaveState.error = null;
 	const tIdbStart = performance.now();
@@ -90,11 +92,13 @@ export function initYjs(username: string, wsUrl: string) {
 		localSaveState.status = 'saved';
 		syncState.pending = persistence.pendingSync;
 		syncState.lastSyncAt = persistence.lastSyncAt;
+		syncState.hasServerState = persistence.lastSyncAt !== null;
 		docState.version++;
 		_stopCacheMaintenance = maintainCache(doc, compactLocalCache, error => {
 			if (_doc === doc) console.warn('Local cache compaction failed; stored data retained.', error);
 		});
 		reconnectYjs();
+		scheduleSync(0);
 	});
 	persistence.on('saving', () => {
 		if (_doc !== doc) return;
@@ -201,7 +205,7 @@ export function destroyYjs() {
 	_undoManager = null;
 	_wsProvider = null;
 	_idbProvider = null;
-	Object.assign(syncState, { status: 'offline', syncing: false, pending: true, lastSyncAt: null, error: null });
+	Object.assign(syncState, { status: 'offline', syncing: false, pending: true, lastSyncAt: null, error: null, hasServerState: false });
 	localSaveState.status = 'loading';
 	localSaveState.error = null;
 	docState.version = 0;
@@ -211,7 +215,12 @@ export function destroyYjs() {
 }
 
 function scheduleSync(delay = 1500) {
-	if (!syncState.automatic || auth.needsLogin || !idbSynced.done || _syncTimer !== undefined) return;
+	if (!syncState.automatic || auth.needsLogin || !idbSynced.done) return;
+	if (_syncTimer !== undefined) {
+		if (delay !== 0) return;
+		// A restored connection should confirm immediately, ahead of a retry delay.
+		clearTimeout(_syncTimer);
+	}
 	_syncTimer = setTimeout(() => {
 		_syncTimer = undefined;
 		void syncNow();
@@ -272,6 +281,8 @@ export function syncNow(): Promise<void> {
 		syncState.error = 'You are offline. Changes stay saved on this device.';
 		return Promise.resolve();
 	}
+	clearTimeout(_syncTimer);
+	_syncTimer = undefined;
 	const controller = new AbortController();
 	const timeout = setTimeout(() => controller.abort(new Error('Sync timed out. Your local changes are kept. Try again.')), 30_000);
 	_syncAbort = controller;
@@ -304,6 +315,7 @@ export function syncNow(): Promise<void> {
 			const remote = await exchange('/api/sync/state', Y.encodeStateVector(doc));
 			if (!current()) return;
 			Y.applyUpdate(doc, remote.update, NETWORK_ORIGIN);
+			syncState.hasServerState = true;
 			await persistence.flush();
 			if (!current()) return;
 			const revision = persistence.currentRevision;
