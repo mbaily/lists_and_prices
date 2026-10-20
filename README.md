@@ -48,6 +48,9 @@ See [bug-fix and upgrade notes](docs/bug-fixes.md) before deploying the authenti
 
 See [safe deployment instructions](docs/deployment.md) for backups, dry runs and rollback.
 
+See [HTTPS reverse proxy and subpath hosting](docs/reverse-proxy.md) to serve
+the app under `/lists/` with Caddy or NGINX. The default build still runs at `/`.
+
 For downloadable app data, see [JSON backup coverage and restore behaviour](docs/json-backups.md).
 
 See [task integration API](docs/task-api.md) for authenticated server-to-server

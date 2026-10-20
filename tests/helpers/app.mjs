@@ -50,6 +50,7 @@ export function createApp(options = {}) {
 			code = compileModule(transpile(code, ts.ModuleKind.ESNext), { filename: absolute, generate: 'client' }).js.code;
 		}
 		const localRequire = (specifier) => {
+			if (specifier === '$app/paths') return { base: options.basePath ?? '' };
 			if (specifier === './localPersistence' && !options.realPersistence) return { LocalPersistence: options.IndexeddbPersistence ?? Provider };
 			if (specifier === 'y-indexeddb') return { IndexeddbPersistence: options.IndexeddbPersistence ?? Provider };
 			if (specifier === 'y-websocket') return { WebsocketProvider: options.WebsocketProvider ?? Provider };

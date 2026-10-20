@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { appUrl } from '$lib/urls';
 	import { docState } from '$lib/yjsStore.svelte';
 	import { settings } from '$lib/settings.svelte';
 	import {
@@ -137,7 +138,7 @@
 		document.body.removeChild(a);
 	}
 
-	function navigateToList(listId: string) { navigate(`/#l/${listId}`); }
+	function navigateToList(listId: string) { navigate(appUrl(`/#l/${listId}`)); }
 	function navigateToFolder(folderId: string) {
 		// Build the full ancestor path so the breadcrumb is correct for nested folders
 		const allFolders = readFolders();
@@ -151,7 +152,7 @@
 			const f = allFolders.find((x) => x.id === fid);
 			fid = f?.parentId ?? null;
 		}
-		navigate(`/#f/${ancestors.join('/')}`);
+		navigate(appUrl(`/#f/${ancestors.join('/')}`));
 	}
 
 	function addItemLines(lines: string[], items: ItemEntry[], indent: string) {

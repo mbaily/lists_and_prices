@@ -1,5 +1,22 @@
 # Deploying safely
 
+For optional HTTPS termination and hosting under `/lists/`, see
+[reverse proxy setup](reverse-proxy.md). Root hosting remains the default.
+
+The Caddy installation on `git23069.hopto.org` serves the app at
+`https://git23069.hopto.org:9443/lists_and_prices/` and strips
+`/lists_and_prices` before forwarding to HTTP/WebSockets on `127.0.0.1:3101`.
+Its systemd override is recorded in
+[`deploy/lists-and-prices-proxy.conf`](../deploy/lists-and-prices-proxy.conf).
+Install it as `/etc/systemd/system/lists-and-prices.service.d/proxy.conf`,
+reload systemd, and use this deployment command from the server checkout:
+
+```sh
+APP_BASE_PATH=/lists_and_prices LISTS_HEALTH_URL=http://127.0.0.1:3101 ./deploy.sh
+```
+
+The default build and `run.sh` remain available for direct root hosting.
+
 ## Release version policy
 
 Every production deployment must increase the web client's version, including

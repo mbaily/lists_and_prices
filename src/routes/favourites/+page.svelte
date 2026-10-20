@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { yjsUrl } from '$lib/urls';
 	import { auth, checkSession } from '$lib/auth.svelte';
 	import { initYjs, destroyYjs } from '$lib/yjsStore.svelte';
 	import { reconcileSessionDocument } from '$lib/sessionDocument';
@@ -15,15 +16,13 @@
 		const loadedUsername = auth.username;
 		if (auth.username) {
 			reloadSettings();
-			const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-			initYjs(auth.username, `${wsProto}//${location.host}/yjs`);
+			initYjs(auth.username, yjsUrl());
 			authed = true;
 			ready = true;
 		}
 
 		checkSession().then((ok) => {
-			const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-			const signedIn = reconcileSessionDocument(loadedUsername, ok, `${wsProto}//${location.host}/yjs`);
+			const signedIn = reconcileSessionDocument(loadedUsername, ok, yjsUrl());
 			authed = signedIn;
 			ready = true;
 		});

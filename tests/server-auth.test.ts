@@ -380,10 +380,10 @@ test('socket validation failures close safely, and normal closure cancels monito
 
 type Setup = Parameters<typeof attachYjsServer>[2];
 
-async function httpFixture(t: TestContext, setup?: Setup, secure = false) {
+async function httpFixture(t: TestContext, setup?: Setup, secure = false, cookiePath = '/') {
 	const f = fixture(t);
 	const app = express();
-	app.use('/api', createAuthRouter(f.sessions, secure));
+	app.use('/api', createAuthRouter(f.sessions, secure, cookiePath));
 	const server = http.createServer(app);
 	const connections: { socket: SessionSocket; docName: string; gc: false }[] = [];
 	const wss = attachYjsServer(server, f.sessions, (socket, req, options) => {
@@ -442,6 +442,25 @@ async function httpFixture(t: TestContext, setup?: Setup, secure = false) {
 	};
 	return { ...f, wss, connections, request, makeClient, connect, upgradeStatus, login };
 }
+
+test('subpath cookies cover both API and WebSockets and clear legacy root cookies', async (t) => {
+	const f = await httpFixture(t, undefined, true, '/lists/');
+	const response = await f.request('/api/login', 'POST', undefined, { username: 'alice', password: PASSWORD });
+	assert.equal(response.status, 200);
+	const cookies = response.headers.getSetCookie();
+	assert.equal(cookies.length, 2);
+	assert.match(cookies[0], /Path=\/;/);
+	assert.match(cookies[0], /Expires=Thu, 01 Jan 1970/);
+	assert.match(cookies[1], /Path=\/lists\//);
+	assert.match(cookies[1], /; Secure;/);
+	const cookie = cookies[1].split(';', 1)[0];
+	assert.equal((await f.request('/api/session', 'GET', cookie)).status, 200);
+	assert.equal(await f.upgradeStatus('/lists/yjs/pnl-alice', cookie), 403, 'The proxy must strip the public prefix');
+	assert.equal((await f.connect('/yjs/pnl-alice', cookie)).readyState, 1);
+	const logout = await f.request('/api/logout', 'POST', cookie);
+	assert.deepEqual(logout.headers.getSetCookie().map(value => value.match(/Path=([^;]+)/)?.[1]), ['/', '/lists/']);
+	assert.equal((await f.request('/api/session', 'GET', cookie)).status, 401);
+});
 
 test('real HTTP routes validate credentials, cookie attributes, tampering, and expiry', { timeout: 10_000 }, async (t) => {
 	const f = await httpFixture(t, undefined, true);

@@ -37,6 +37,19 @@ function assertPrivateData(dest) {
     for (const file of ['server/yjs-data/notes', 'server/server.db', 'server/server.db-wal', 'server/server.db-shm', 'server/.htpasswd', 'server/cert.pem', 'server/key.pem', '.env']) assert.equal(readFileSync(path.join(dest, file), 'utf8'), 'live private data', file);
 }
 
+test('rollback to a legacy root build removes public-prefix metadata and retains old assets', t => {
+    const f = fixture(t);
+    writeFileSync(path.join(f.dest, 'build/deployment.json'), JSON.stringify({ basePath: '/lists' }));
+    f.sync('--dry-run');
+    assert.equal(existsSync(path.join(f.dest, 'build/deployment.json')), true, 'Preview cannot change metadata');
+    f.sync();
+    assert.equal(existsSync(path.join(f.dest, 'build/deployment.json')), false);
+    assert.equal(readFileSync(path.join(f.dest, 'build/old-hashed.js'), 'utf8'), 'old asset');
+    writeFileSync(path.join(f.source, 'build/deployment.json'), JSON.stringify({ basePath: '/tools/lists' }));
+    f.sync();
+    assert.deepEqual(JSON.parse(readFileSync(path.join(f.dest, 'build/deployment.json'), 'utf8')), { basePath: '/tools/lists' });
+});
+
 test('release versions compare numerically and require matching manifest and lockfile versions', t => {
     const f = fixture(t);
     const setSource = version => {

@@ -23,6 +23,16 @@ sync_runtime() {
     fi
     # Retain old hashed assets for already-open clients.
     sudo rsync -ac --chown="$SERVICE_USER:" "$@" "$source/build/" "$destination/build/" || return
+    # Older root builds predate this file. Do not retain a new prefix on rollback.
+    if ! sudo test -f "$source/build/deployment.json"; then
+        if [[ " $* " = *' --dry-run '* ]]; then
+            if sudo test -e "$destination/build/deployment.json"; then
+                echo "Would remove legacy-absent build/deployment.json"
+            fi
+        else
+            sudo rm -f -- "$destination/build/deployment.json" || return
+        fi
+    fi
     # Everything except source/config is protected, including data and secrets.
     sudo rsync -ac --chown="$SERVICE_USER:" "$@" --include='/*.ts' --include='/tsconfig.json' --exclude='*' "$source/server/" "$destination/server/" || return
     # Copy only the modules shared by the API and frontend. Older backups may

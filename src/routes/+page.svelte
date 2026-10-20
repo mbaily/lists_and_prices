@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { yjsUrl } from '$lib/urls';
 	import { auth, checkSession, logout } from '$lib/auth.svelte';
 	import { initYjs, destroyYjs } from '$lib/yjsStore.svelte';
 	import { reconcileSessionDocument } from '$lib/sessionDocument';
@@ -9,23 +10,17 @@
 
 	let ready = $state(false);
 
-	function getWsUrl(): string {
-		const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-		return `${wsProto}//${location.host}/yjs`;
-	}
-
 	onMount(() => {
 		const loadedUsername = auth.username;
 		// Optimistically load the app from local storage immediately so there's no delay
 		if (auth.username) {
 			reloadSettings();
-			initYjs(auth.username, getWsUrl());
+			initYjs(auth.username, yjsUrl());
 			ready = true;
 		}
 
 		checkSession().then((ok) => {
-			const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-			reconcileSessionDocument(loadedUsername, ok, `${wsProto}//${location.host}/yjs`);
+			reconcileSessionDocument(loadedUsername, ok, yjsUrl());
 			ready = true;
 		});
 
@@ -46,8 +41,7 @@
 	<LoginScreen
 		onLogin={(username: string) => {
 			reloadSettings(); // auth.username is set before this callback, load their settings
-			const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-			initYjs(username, `${wsProto}//${location.host}/yjs`);
+			initYjs(username, yjsUrl());
 		}}
 	/>
 {:else}

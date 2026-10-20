@@ -10,10 +10,14 @@ export function requireAuth(sessions: SessionStore): express.RequestHandler {
 	};
 }
 
-/** Mount under /api; callers supply the actual TLS policy. */
-export function createAuthRouter(sessions: SessionStore, secure: boolean) {
+/** Mount under /api; the cookie path is the external path before proxy stripping. */
+export function createAuthRouter(sessions: SessionStore, secure: boolean, cookiePath = '/') {
 	const router = express.Router();
-	const cookieOptions = { httpOnly: true, secure, sameSite: 'strict' as const, path: '/' };
+	const cookieOptions = { httpOnly: true, secure, sameSite: 'strict' as const, path: cookiePath };
+	const clearLegacyCookie = (res: express.Response) => {
+		// A previous root deployment would otherwise send two same-name cookies.
+		if (cookiePath !== '/') res.clearCookie(COOKIE_NAME, { ...cookieOptions, path: '/' });
+	};
 	router.use((_req: express.Request, res: express.Response, next: express.NextFunction) => {
 		res.set('Cache-Control', 'no-store');
 		next();
@@ -29,12 +33,14 @@ export function createAuthRouter(sessions: SessionStore, secure: boolean) {
 		if (!session) return res.status(401).json({ error: 'Invalid username or password' });
 		// Rotate any current browser session rather than leaving a replaced cookie usable.
 		sessions.revoke(readSessionCookie(req.headers.cookie));
+		clearLegacyCookie(res);
 		res.cookie(COOKIE_NAME, session.token, { ...cookieOptions, maxAge: sessions.ttlMs });
 		res.json({ ok: true });
 	});
 
 	router.post('/logout', (req: express.Request, res: express.Response) => {
 		sessions.revoke(readSessionCookie(req.headers.cookie));
+		clearLegacyCookie(res);
 		res.clearCookie(COOKIE_NAME, cookieOptions);
 		res.json({ ok: true });
 	});

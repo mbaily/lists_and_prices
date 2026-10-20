@@ -3,6 +3,8 @@
  * The actual session cookie is managed server-side (HttpOnly).
  */
 
+import { appUrl } from './urls';
+
 const AUTH_KEY = 'pnl_user';
 
 export const auth = $state<{ username: string | null; needsLogin: boolean }>({
@@ -18,7 +20,7 @@ export async function login(
 ): Promise<{ ok: boolean; error?: string }> {
 	let res: Response;
 	try {
-		res = await fetch('/api/login', {
+		res = await fetch(appUrl('/api/login'), {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ username, password })
@@ -40,7 +42,7 @@ export async function login(
 /** Only discard the working session after the server confirms revocation. */
 export async function logout(): Promise<boolean> {
 	try {
-		const response = await fetch('/api/logout', { method: 'POST' });
+		const response = await fetch(appUrl('/api/logout'), { method: 'POST' });
 		if (!response.ok && response.status !== 401) return false;
 	} catch {
 		// Keep the local document usable and let the user retry. Clearing only
@@ -65,7 +67,7 @@ export async function checkSession(): Promise<boolean> {
 
 	let res: Response;
 	try {
-		res = await fetch('/api/session');
+		res = await fetch(appUrl('/api/session'));
 	} catch {
 		// Network failure (fetch threw) — keep existing auth state (app may be offline / PWA)
 		return auth.username !== null;

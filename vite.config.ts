@@ -3,8 +3,12 @@ import { defineConfig } from 'vite';
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 import { readFileSync } from 'node:fs';
 import { VERSION as SVELTE_VERSION } from 'svelte/compiler';
+import { appBasePath } from './scripts/app-base-path.mjs';
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
+const basePath = appBasePath();
+const publicRoot = `${basePath}/`;
+const apiPattern = new RegExp(`^https?://[^/]+${basePath}/api(?:/|$)`);
 
 export default defineConfig(({ command }) => ({
 	define: {
@@ -14,20 +18,32 @@ export default defineConfig(({ command }) => ({
 	},
 	server: {
 		proxy: {
-			'/api': {
+			[`${basePath}/api`]: {
 				target: 'https://127.0.0.1:8080',
-				secure: false
+				secure: false,
+				rewrite: path => path.slice(basePath.length)
 			},
-			'/yjs': {
+			[`${basePath}/yjs`]: {
 				target: 'wss://127.0.0.1:8080',
 				ws: true,
-				secure: false
+				secure: false,
+				rewrite: path => path.slice(basePath.length)
 			}
 		}
 	},
 	plugins: [
 		sveltekit(),
+		{
+			name: 'lists-deployment-config',
+			apply: 'build',
+			generateBundle() {
+				// Keep the server's external cookie path in sync with this exact build.
+				this.emitFile({ type: 'asset', fileName: 'deployment.json', source: JSON.stringify({ basePath }) + '\n' });
+			}
+		},
 		SvelteKitPWA({
+			base: publicRoot,
+			scope: publicRoot,
 			registerType: 'autoUpdate',
 			// Register from the layout so SvelteKit uses the correct dev/build worker URL.
 			injectRegister: false,
@@ -40,16 +56,16 @@ export default defineConfig(({ command }) => ({
 				background_color: '#ffffff',
 				display: 'standalone',
 				orientation: 'portrait',
-				// Relative paths so the installed PWA works regardless of host/port changes.
-				scope: '/',
-				start_url: '/',
+				id: publicRoot,
+				scope: publicRoot,
+				start_url: publicRoot,
 				icons: [
 					// PNG icons required by iOS Safari (SVG icons are ignored for home-screen).
-					{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-					{ src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-					{ src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+					{ src: `${publicRoot}icons/icon-192.png`, sizes: '192x192', type: 'image/png', purpose: 'any' },
+					{ src: `${publicRoot}icons/icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'any' },
+					{ src: `${publicRoot}icons/icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
 					// SVG kept as fallback for modern browsers
-					{ src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }
+					{ src: `${publicRoot}favicon.svg`, sizes: 'any', type: 'image/svg+xml', purpose: 'any' }
 				]
 			},
 			workbox: {
@@ -64,10 +80,11 @@ export default defineConfig(({ command }) => ({
 				skipWaiting: true,
 				clientsClaim: true,
 				navigateFallback: command === 'serve' ? undefined : 'index.html',
+				navigateFallbackDenylist: [new RegExp(`^${basePath}/(?:api|yjs)(?:/|$)`)],
 				// Don't let the SW intercept non-GET API calls — let them go to network.
 				runtimeCaching: [
 					{
-						urlPattern: /^https?:\/\/[^/]+\/api\//,
+						urlPattern: apiPattern,
 						handler: 'NetworkOnly'
 					},
 					{

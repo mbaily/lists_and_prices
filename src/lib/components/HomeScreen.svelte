@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { appUrl } from '$lib/urls';
 	import { tick, untrack } from 'svelte';
 	import {
 		readFolders,
@@ -1561,7 +1562,7 @@ ${bodyHtml}
 								const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
 								showReportsMenu = false;
 								if (e.clientX < rect.left + rect.width / 2) {
-									window.open('/favourites', '_blank');
+									window.open(appUrl('/favourites'), '_blank');
 								} else {
 									generateReport('⭐ Favourites', 'favourites');
 								}
@@ -1578,7 +1579,7 @@ ${bodyHtml}
 							const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
 							showReportsMenu = false;
 							if (e.clientX < rect.left + rect.width / 2) {
-								window.open('/report/' + encodeURIComponent(rname), '_blank');
+									window.open(appUrl(`/report/${encodeURIComponent(rname)}`), '_blank');
 							} else {
 								generateReport(rname);
 							}

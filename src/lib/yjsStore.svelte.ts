@@ -6,6 +6,7 @@
 import * as Y from 'yjs';
 import { LocalPersistence } from './localPersistence';
 import { auth } from './auth.svelte';
+import { appUrl } from './urls';
 import { encodeSyncMessage, decodeSyncMessage } from './syncProtocol';
 import { WebsocketProvider } from 'y-websocket';
 import { observeNoteNames } from './noteText';
@@ -277,8 +278,8 @@ export function syncNow(): Promise<void> {
 	const current = () => _doc === doc && !controller.signal.aborted;
 	syncState.syncing = true;
 	syncState.error = null;
-	const exchange = async (path: string, vector: Uint8Array, update?: Uint8Array) => {
-		const response = await fetch(path, {
+	const exchange = async (path: `/${string}`, vector: Uint8Array, update?: Uint8Array) => {
+		const response = await fetch(appUrl(path), {
 			method: 'POST', headers: { 'Content-Type': 'application/octet-stream' },
 			body: encodeSyncMessage(username, vector, update), signal: controller.signal,
 			cache: 'no-store'

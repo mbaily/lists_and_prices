@@ -1,5 +1,6 @@
 import { parseArgs } from 'node:util';
 import fs from 'node:fs';
+import { appBasePath } from '../scripts/app-base-path.mjs';
 import * as readline from 'node:readline';
 import * as Y from 'yjs';
 import { initYjs, getLists, getItems, getFolders } from './store.js';
@@ -15,11 +16,13 @@ let hostname = 'localhost';
 let port = 8080;
 let tls = false;
 let insecure = false;
+let basePath = '';
 
 if (values.config) {
 	try {
 		const configStr = fs.readFileSync(values.config, 'utf8');
 		const config = JSON.parse(configStr);
+		basePath = appBasePath(config.basePath ?? '');
 		if (config.hostname) hostname = config.hostname;
 		if (config.port) port = config.port;
 		if (config.tls !== undefined) tls = config.tls;
@@ -43,8 +46,8 @@ if (insecure) {
 	}) as any;
 }
 
-const serverUrl = `${tls ? 'https' : 'http'}://${hostname}:${port}`;
-const wsUrl = `${tls ? 'wss' : 'ws'}://${hostname}:${port}/yjs`;
+const serverUrl = `${tls ? 'https' : 'http'}://${hostname}:${port}${basePath}`;
+const wsUrl = `${tls ? 'wss' : 'ws'}://${hostname}:${port}${basePath}/yjs`;
 
 // ── Data helpers ──────────────────────────────────────────────────────────────
 

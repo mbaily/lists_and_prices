@@ -1,6 +1,7 @@
 import adapter from '@sveltejs/adapter-static';
 import { relative, sep } from 'node:path';
 import { readFileSync } from 'node:fs';
+import { appBasePath } from './scripts/app-base-path.mjs';
 
 const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 
@@ -18,6 +19,7 @@ const config = {
 	},
 	kit: {
 		adapter: adapter({ fallback: 'index.html' }),
+		paths: { base: appBasePath() },
 		version: { name: version }
 	}
 };

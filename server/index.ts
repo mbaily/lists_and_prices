@@ -31,6 +31,7 @@ import { attachYjsServer } from './auth-websocket.ts';
 import { createTaskDocuments } from './task-documents.ts';
 import { bindTaskDestination, createTaskRouter, readTaskTokens } from './task-api.ts';
 import { createOfflineSyncRouter } from './offline-sync.ts';
+import { readPublicBasePath, secureCookies, tlsEnabled } from './deployment-config.ts';
 
 // better-sqlite3 is a CJS module; use createRequire to import it from ESM.
 const require = createRequire(import.meta.url);
@@ -204,7 +205,8 @@ async function cliRemoveUser() {
 }
 
 // ── Express app ───────────────────────────────────────────────────────────────
-const useTls = fs.existsSync(CERT_FILE) && fs.existsSync(KEY_FILE);
+const useTls = tlsEnabled(process.env.LISTS_TLS, fs.existsSync(CERT_FILE) && fs.existsSync(KEY_FILE));
+const publicBasePath = readPublicBasePath(BUILD_DIR);
 const app = express();
 const documents = createTaskDocuments();
 app.use('/api/sync', createOfflineSyncRouter(sessions, documents));
@@ -213,10 +215,10 @@ app.use('/api/tasks', createTaskRouter(sessions, documents, {
 	bindDestination: (tokenHash, listId) => bindTaskDestination(path.join(__dirname, 'task-tokens.json'), tokenHash, listId),
 	userExists: username => Boolean(readHtpasswdHash(fs.readFileSync(HTPASSWD_FILE, 'utf8'), username))
 }));
-app.use('/api', createAuthRouter(sessions, useTls));
+app.use('/api', createAuthRouter(sessions, secureCookies(process.env.SESSION_COOKIE_SECURE, useTls), `${publicBasePath}/`));
 
 // Serve built SPA
-app.use(express.static(BUILD_DIR));
+app.use(express.static(BUILD_DIR, { redirect: false }));
 app.get('/{*path}', (req, res) => {
 	if (req.path.match(/\.[a-zA-Z0-9]+$/)) {
 		return res.status(404).json({ error: 'Not found' });
@@ -232,7 +234,7 @@ const server = useTls
 // ── y-websocket ───────────────────────────────────────────────────────────────
 attachYjsServer(server, sessions, setupWSConnection);
 
-server.listen(portArg, () => {
+server.listen({ port: portArg, host: process.env.LISTS_HOST }, () => {
 	console.log(`Lists & Prices server running on ${useTls ? 'https' : 'http'}://localhost:${portArg}`);
-	if (!useTls) console.warn('TLS not configured — run with --create-cert for HTTPS.');
+	if (!useTls && process.env.SESSION_COOKIE_SECURE !== 'true') console.warn('TLS not configured — run with --create-cert for HTTPS, or configure an HTTPS reverse proxy.');
 });
