@@ -1,0 +1,136 @@
+LISTS & PRICES: CLEAN, REBUILD AND DEPLOY
+
+Run these commands in Bash, as the checkout owner, on the deployment server.
+Run the sections in order and stop if any command fails. These instructions
+update an existing installation; deploy.sh does not provision a new server.
+
+1. CHECK THE TOOLCHAIN AND INSTALLATION
+
+    cd /home/mbaily/other_git/list_svelt5
+    git status --short
+    node --version
+    npm --version
+    npx --version
+    sudo systemctl status lists-and-prices.service --no-pager
+    df -h . /opt /var/backups
+
+The project specifies Node.js 24 LTS (24.15.0 or newer in the 24.x line) and
+npm/npx 12.2.0. If npm needs updating, with the correct Node.js already active:
+
+    npm install --global npm@12.2.0
+    hash -r
+
+Deployment also requires sudo access, rsync, flock and curl. The existing
+lists-and-prices.service must be running before deployment. Leave space for
+a staging installation and a full backup of the current application and data.
+
+2. CLEAN GENERATED FILES AND REINSTALL LOCKED DEPENDENCIES
+
+Run this only from the checkout directory above:
+
+    rm -rf -- build .svelte-kit dev-dist node_modules
+    npm ci --include=dev
+
+This removes generated frontend/PWA output, caches and installed packages.
+Keep package-lock.json: npm ci uses it to reproduce the dependency versions.
+Keep .env files, server databases, server/yjs-data, credentials, certificates
+and personal TUI settings. Production files in /opt/lists_and_prices are
+managed by deploy.sh, including retention of older frontend assets.
+
+3. PREPARE THE RELEASE VERSION
+
+Every successful production deployment requires a newer MAJOR.MINOR.PATCH
+version, even when only server code has changed. Bump once for a new release,
+before building:
+
+    npm version patch --no-git-tag-version
+    git add package.json package-lock.json
+
+Also stage any intended application changes explicitly with git add, then
+review the release contents:
+
+    git diff --cached
+    git status --short
+
+Skip the bump if this checkout already contains the intended newer release
+version, or if retrying a failed deployment while the older release is live.
+An unchanged/older version is rejected by deploy.sh. If several releases have
+been deployed elsewhere, ensure this version is newer than production's.
+
+4. TEST AND REBUILD
+
+    npm test && npm run check && npm run build
+    node scripts/check-release-version.mjs --built "$PWD"
+
+Stage intended source changes before testing: the release-startup tests check
+Git's index. npm run build generates the production SPA/PWA in build/.
+The backend runs TypeScript through tsx; it has no separate compilation step.
+
+After validation succeeds, commit and push the release:
+
+    git commit -m "Prepare production release"
+    git push
+
+If the release was already committed, no additional commit is required.
+Deploy that exact release commit. If preparing it on a different machine,
+update the server checkout to that commit before building or deploying there.
+
+5. PREVIEW AND DEPLOY
+
+    ./deploy.sh --dry-run
+    ./deploy.sh
+
+The preview requires the build from step 4. It previews frontend/server file
+copies; it does not test dependency installation or enforce the version bump.
+It uses sudo and creates/uses deployment backup and lock infrastructure.
+Review the preview and proceed only if it succeeds.
+
+Run deploy.sh as the checkout owner, rather than with sudo ./deploy.sh.
+The real deployment repeats npm ci and npm run build automatically, prepares
+production dependencies and validates SQLite before stopping the service.
+It then backs up the stopped application and data, installs the frontend,
+backend and shared modules, starts the service and checks its HTTP endpoints.
+It restores the previous application on activation/health-check failure.
+
+6. VERIFY THE DEPLOYMENT
+
+    sudo systemctl status lists-and-prices.service --no-pager
+    sudo journalctl -u lists-and-prices.service -n 50 --no-pager
+    curl --insecure --fail --show-error https://127.0.0.1:8082/_app/version.json
+    node -p "JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).version"
+
+The served version should match package.json. Open the app, load the update
+on each device/PWA, and confirm sign-in and synchronization work.
+
+DEPLOYMENT DEFAULTS AND BACKUPS
+
+    Runtime:   /opt/lists_and_prices
+    Service:   lists-and-prices.service
+    User:      www-data
+    Health:    https://127.0.0.1:8082
+    Backups:   /var/backups/lists-and-prices/deploy-*
+
+The local health check uses --insecure for the existing self-signed TLS setup.
+For a different installation, set LISTS_DEPLOY_DIR, LISTS_BACKUP_DIR,
+LISTS_SERVICE_NAME, LISTS_SERVICE_USER and/or LISTS_HEALTH_URL before both
+deploy commands; adjust the status, log and curl commands accordingly.
+Backups must remain outside the deployment directory.
+
+If YPERSISTENCE is configured outside server/, arrange a stopped-service
+backup of that location as well. The older backup.sh does not stop the service;
+deploy.sh provides the consistent backup for this procedure. Rollback retains
+live data; see docs/deployment.md for recovery details and asset retention.
+
+TERMINAL CLIENT (OPTIONAL)
+
+The TUI runs from this checkout through tsx and has no separate build step.
+deploy.sh installs the web app and backend; it does not install the TUI into
+the production runtime. To use your existing personal connection settings:
+
+    ./run-tui.sh --config tui.config.real.json
+
+That personal configuration file must already exist and point to your server.
+The tracked tui.config.json is a localhost example.
+
+Sources: package.json, README.md, docs/deployment.md, deploy.sh,
+scripts/deploy-runtime.sh and scripts/check-release-version.mjs.
