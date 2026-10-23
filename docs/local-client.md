@@ -16,6 +16,7 @@ It installs missing project dependencies, builds a missing frontend, and generat
 the local executable launcher with that machine's paths. Generated files stay out
 of Git. Extra arguments are forwarded, for example
 `./local_client_run.sh --data-dir ./my-data` or `./local_client_run.sh --no-serve`.
+Use `./local_client_run.sh --export-yjs` to export existing local data and exit.
 When invoked by an absolute path from another directory, it still puts the
 generated launcher and default data directory in your working directory.
 
@@ -93,20 +94,58 @@ ignore rules yourself. Nothing is automatically committed.
 | File | Contents |
 | --- | --- |
 | `yjs.sqlite` | Original binary Yjs updates, account configuration, local sessions, upstream session cookie and local password hash |
-| `document.yjs` | An atomically replaced binary Yjs snapshot, with document identities and saved history retained |
+| `document.yjs` | Optional binary Yjs export, created only by `--export-yjs`, with document identities and saved history retained |
 | `.gitignore` | Keeps generated storage out of Git |
 
 SQLite transactions commit local updates before the client acknowledges them.
-Compaction merges original update bytes; it retains deletions, historical structs
-and updates whose dependencies have not yet arrived. Snapshot refreshes run after
-upstream exchange attempts and on clean shutdown. They can lag the database by
-the request timeout plus configured interval. Once upstream sign-in is required,
-snapshots continue refreshing at the configured interval.
+SQLite alone contains all document data needed for startup and synchronization.
+Startup, synchronization and shutdown do not create or update `document.yjs`.
+Existing exports from older versions are left untouched until explicitly exported
+again, and may therefore be older than the database.
+
+Consolidation groups 32 similarly sized update records, merging their original
+binary bytes atomically. Size groups grow in factors of four, starting at 4 KiB.
+A large existing record is kept while small new edits accumulate in separate
+groups, so crossing 16 MiB or adding 64 edits does not trigger a full-document
+rewrite. Each maintenance pass performs at most four merges; further work can
+continue at the next pass. Idle maintenance does not rewrite document records.
+Deletions, historical structs and unresolved updates are retained, and the highest
+stored revision is preserved so consolidation cannot mark unsynced work as synced.
+Existing SQLite databases load directly without a data-format migration.
+
+Repeated successful sync checks update the latest confirmation time in memory.
+The acknowledged revision and confirmation time are written to SQLite only when
+new document state is confirmed. Identical metadata values are not rewritten.
+After a restart the displayed time initially reflects that last persisted state
+confirmation, until another successful exchange updates it in memory.
+
+## Explicit Yjs export
+
+Stop the client, then create or refresh the default export:
+
+```sh
+./local_client_run.sh --export-yjs
+```
+
+Or choose a data directory and destination:
+
+```sh
+./local_client_run.sh --data-dir ./my-data --export-yjs --output ./backup.yjs
+```
+
+The default destination is `document.yjs` inside the selected data directory.
+An explicit `--output` path is relative to your working directory. The export
+reads only the local SQLite updates and exits; it needs no upstream sign-in,
+network access or frontend build. The data directory must already contain a local
+database, and no other client may be using it. The original update bytes are
+merged and written by atomic replacement, including pending updates and history.
+Exporting does not consolidate or change document records or sync confirmation.
+Start the client again normally when finished.
 
 **Stop the client before copying the entire data directory.** SQLite may also
 have a journal file while running; retain it with the database after an unexpected
-shutdown. You can copy `document.yjs` while running because it is replaced
-atomically. It is binary data, not a text file to edit manually.
+shutdown. An already exported `document.yjs` can be copied independently. It is
+binary data, not a text file to edit manually.
 
 To move the complete local client state, stop it, copy its entire data directory,
 then launch with `--data-dir` pointing to the copy. Local browser storage belongs
@@ -185,6 +224,9 @@ browser WebSocket replication, durable HTTP confirmation, offline writes and
 restart, upstream restart and concurrent changes, deletion propagation,
 upstream revocation without losing local login, snapshot/history preservation,
 pending dependencies, writer exclusion and launching from an arbitrary directory.
+Storage tests cover preservation of a large base during small edits, atomic
+consolidation rollback, unchanged revision identifiers, idle metadata writes,
+offline explicit export and retention of previous exports during normal runs.
 No production account or storage is used. Test trusted HTTPS and access from
 your actual LAN devices separately.
 

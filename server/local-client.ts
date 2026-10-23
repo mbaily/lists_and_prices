@@ -20,6 +20,8 @@ Later runs, including offline:
 
 Paths are relative to the directory you run the command from.
   --data-dir PATH       Local files (default ./lists-local-data)
+  --export-yjs          Export local document data and exit (stop the client first)
+  --output PATH         Export destination (default DATA-DIR/document.yjs)
   --server URL          Upstream URL, including any /lists prefix
   --username NAME       Upstream account; one account per data directory
   --login               Renew the upstream session (prompts for password)
@@ -53,25 +55,35 @@ function passwordPrompt(): Promise<string> {
 async function main() {
 	const { values } = parseArgs({ options: {
 		'data-dir': { type: 'string' }, server: { type: 'string' }, username: { type: 'string' },
+		'export-yjs': { type: 'boolean' }, output: { type: 'string' },
 		login: { type: 'boolean' }, 'password-file': { type: 'string' }, insecure: { type: 'boolean' }, host: { type: 'string' },
 		port: { type: 'string' }, cert: { type: 'string' }, key: { type: 'string' },
 		'build-dir': { type: 'string' }, 'no-serve': { type: 'boolean' }, interval: { type: 'string' }, help: { type: 'boolean' }
 	} });
 	if (values.help) { console.log(help); return; }
 	if (Number(process.versions.node.split('.')[0]) < 24) throw new Error('Use Node 24 or newer.');
+	if (values.output && !values['export-yjs']) throw new Error('--output requires --export-yjs.');
+	const dataDirectory = path.resolve(values['data-dir'] ?? 'lists-local-data');
+	process.umask(0o077);
+	if (values['export-yjs']) {
+		if (!existsSync(path.join(dataDirectory, 'yjs.sqlite'))) throw new Error(`No local database in ${dataDirectory}. Choose an existing --data-dir to export.`);
+		const storage = new LocalStorage(dataDirectory);
+		try { console.log(`Exported local document to ${storage.exportSnapshot(values.output && path.resolve(values.output))}`); }
+		finally { storage.close(); }
+		return;
+	}
 	const port = Number(values.port ?? 8081), interval = Number(values.interval ?? 5);
 	if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Port must be between 0 and 65535.');
 	if (!Number.isFinite(interval) || interval < 1 || interval > 3600) throw new Error('Interval must be between 1 and 3600 seconds.');
 	if (Boolean(values.cert) !== Boolean(values.key)) throw new Error('Supply both --cert and --key.');
 	const buildDirectory = values['no-serve'] ? undefined : path.resolve(values['build-dir'] ?? fileURLToPath(new URL('../build', import.meta.url)));
 	if (buildDirectory && !existsSync(path.join(buildDirectory, 'index.html'))) throw new Error('Frontend missing. Run npm run build, supply --build-dir, or use --no-serve.');
-	process.umask(0o077);
-	const storage = new LocalStorage(path.resolve(values['data-dir'] ?? 'lists-local-data'));
+	const storage = new LocalStorage(dataDirectory);
 	let host: ReturnType<typeof createLocalHost> | undefined;
 	let upstream: UpstreamSync | undefined;
 	let closing: Promise<void> | undefined;
 	const close = () => closing ??= (async () => {
-		try { await upstream?.close(); await host?.close(); storage.exportSnapshot(); }
+		try { await upstream?.close(); await host?.close(); }
 		finally { storage.close(); }
 	})();
 	try {
@@ -111,7 +123,6 @@ async function main() {
 				if (label !== lastStatus) { console.log(label); lastStatus = label; }
 			}
 		});
-		storage.exportSnapshot();
 		if (!values['no-serve']) {
 			await new Promise<void>((resolve, reject) => {
 				host!.server.once('error', reject);

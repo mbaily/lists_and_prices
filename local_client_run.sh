@@ -11,7 +11,7 @@ fi
 client_needs_frontend=true
 for client_arg in "$@"; do
   case "$client_arg" in
-    --no-serve|--help|--build-dir|--build-dir=*) client_needs_frontend=false ;;
+    --no-serve|--help|--export-yjs|--build-dir|--build-dir=*) client_needs_frontend=false ;;
   esac
 done
 if [[ "$client_needs_frontend" == true && ! -f "$client_checkout/build/index.html" ]]; then

@@ -66,7 +66,9 @@ export class UpstreamSync {
 	private stopped = false;
 	private needsLogin = false;
 	private error: string | null = null;
+	private lastSyncAt: number | null;
 	constructor(private readonly options: { server: string; username: string; cookie: string; doc: Doc; storage: LocalStorage; insecure?: boolean; intervalMs?: number; onStatus?: () => void }) {
+		this.lastSyncAt = Number(options.storage.get('lastSyncAt')) || null;
 		const cookie = options.cookie;
 		class CookieSocket extends WebSocket {
 			// Match browser receivers: the upstream can send a full historical
@@ -83,7 +85,7 @@ export class UpstreamSync {
 	get status() {
 		return { target: 'laptop', upstream: this.options.server, username: this.options.username,
 			pending: this.options.storage.get('ackRevision') !== String(this.options.storage.revision),
-			lastSyncAt: Number(this.options.storage.get('lastSyncAt')) || null,
+			lastSyncAt: this.lastSyncAt,
 			needsLogin: this.needsLogin, error: this.error, connected: this.provider.wsconnected };
 	}
 	start() {
@@ -94,7 +96,7 @@ export class UpstreamSync {
 	sync(): Promise<void> {
 		if (this.running) return this.running;
 		if (this.stopped) return Promise.resolve();
-		if (this.needsLogin) { this.maintainSnapshot(); return Promise.resolve(); }
+		if (this.needsLogin) { this.maintainStorage(); return Promise.resolve(); }
 		this.running = this.exchange().finally(() => { this.running = undefined; });
 		return this.running;
 	}
@@ -128,10 +130,14 @@ export class UpstreamSync {
 			const unchanged = storage.revision === revision;
 			Y.applyUpdate(doc, result.update, this);
 			if (unchanged && Buffer.from(Y.encodeStateVector(doc)).equals(Buffer.from(result.vector))) {
-				storage.db.transaction(() => {
-					storage.set('ackRevision', String(storage.revision));
-					storage.set('lastSyncAt', String(Date.now()));
-				})();
+				const acknowledgedRevision = String(storage.revision), confirmedAt = Date.now();
+				if (storage.get('ackRevision') !== acknowledgedRevision) {
+					storage.db.transaction(() => {
+						storage.set('ackRevision', acknowledgedRevision);
+						storage.set('lastSyncAt', String(confirmedAt));
+					})();
+				}
+				this.lastSyncAt = confirmedAt;
 			}
 			this.error = null;
 		} catch (error) {
@@ -139,14 +145,12 @@ export class UpstreamSync {
 		} finally {
 			clearTimeout(timeout);
 			this.controller = undefined;
-			// Snapshots also refresh after an offline attempt. Original bytes, rather
-			// than re-encoding a Doc, retain updates with missing dependencies.
-			this.maintainSnapshot();
+			this.maintainStorage();
 		}
 	}
-	private maintainSnapshot() {
-		try { this.options.storage.compact(); this.options.storage.exportSnapshot(); }
-		catch { this.error = 'Could not refresh the local snapshot; check disk space and permissions.'; }
+	private maintainStorage() {
+		try { this.options.storage.compact(); }
+		catch { this.error = 'Could not consolidate local updates; original updates are retained. Check disk space and permissions.'; }
 		this.options.onStatus?.();
 	}
 	async close() {

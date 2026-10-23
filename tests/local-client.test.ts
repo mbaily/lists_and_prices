@@ -152,6 +152,70 @@ test('local storage retains original updates, deletions, snapshots and pending d
 	storage.close(); original.destroy(); dependent.destroy(); restored.destroy(); history.destroy(); snapshotCopy.destroy();
 });
 
+test('small edits preserve a large existing record and consolidate without changing sync revisions', async t => {
+	const directory = await mkdtemp(path.join(tmpdir(), 'lists large SQLite base '));
+	let storage = new LocalStorage(directory);
+	const doc = new Y.Doc({ gc: false });
+	t.after(async () => { storage.close(); doc.destroy(); await rm(directory, { recursive: true, force: true }); });
+	doc.getText('large').insert(0, 'x'.repeat(17 * 1024 * 1024));
+	const base = Y.encodeStateAsUpdate(doc);
+	storage.append(base);
+	doc.on('update', update => storage.append(update));
+	storage.db.exec(`CREATE TRIGGER preserve_large_update BEFORE DELETE ON updates WHEN OLD.id = 1
+		BEGIN SELECT RAISE(ABORT, 'large base was unnecessarily rewritten'); END;
+		CREATE TRIGGER preserve_large_update_value BEFORE UPDATE ON updates WHEN OLD.id = 1
+		BEGIN SELECT RAISE(ABORT, 'large base was unnecessarily rewritten'); END;`);
+	let merges = 0;
+	for (let index = 0; index < 1100; index++) {
+		doc.getText('edits').insert(index, 'a');
+		const revision = storage.revision;
+		merges += storage.compact();
+		assert.equal(storage.revision, revision);
+	}
+	assert.ok(merges > 0, 'small updates should still be consolidated');
+	assert.ok((storage.db.prepare('SELECT count(*) AS count FROM updates').get() as { count: number }).count < 64);
+	assert.equal((storage.db.prepare('SELECT length(bytes) AS size FROM updates WHERE id = 1').get() as { size: number }).size, base.byteLength);
+	storage.set('ackRevision', String(storage.revision));
+	storage.close(); storage = new LocalStorage(directory);
+	const restored = new Y.Doc({ gc: false });
+	Y.applyUpdate(restored, storage.mergedUpdate());
+	assert.equal(restored.getText('large').length, 17 * 1024 * 1024);
+	assert.equal(restored.getText('edits').toString(), 'a'.repeat(1100));
+	assert.equal(storage.get('ackRevision'), String(storage.revision));
+	assert.equal(storage.compact(), 0);
+	assert.equal(storage.compact(), 0, 'idle maintenance must do no further consolidation');
+	restored.destroy();
+});
+
+test('a failed consolidation rolls back its replacements and retains every original update', async t => {
+	const directory = await mkdtemp(path.join(tmpdir(), 'lists failed consolidation '));
+	const storage = new LocalStorage(directory), doc = new Y.Doc({ gc: false });
+	t.after(async () => { storage.close(); doc.destroy(); await rm(directory, { recursive: true, force: true }); });
+	doc.on('update', update => storage.append(update));
+	for (let index = 0; index < 40; index++) doc.getText('note').insert(index, 'a');
+	const before = storage.db.prepare('SELECT id, bytes FROM updates ORDER BY id').all();
+	storage.db.exec(`CREATE TRIGGER fail_consolidation BEFORE DELETE ON updates
+		BEGIN SELECT RAISE(ABORT, 'simulated failed consolidation'); END;`);
+	assert.throws(() => storage.compact(), /simulated failed consolidation/);
+	assert.deepEqual(storage.db.prepare('SELECT id, bytes FROM updates ORDER BY id').all(), before);
+	storage.db.exec('DROP TRIGGER fail_consolidation');
+	assert.ok(storage.compact() > 0);
+	const restored = new Y.Doc({ gc: false });
+	Y.applyUpdate(restored, storage.mergedUpdate());
+	assert.equal(restored.getText('note').toString(), 'a'.repeat(40)); restored.destroy();
+});
+
+test('unchanged metadata values are not rewritten', async t => {
+	const directory = await mkdtemp(path.join(tmpdir(), 'lists idle metadata '));
+	const storage = new LocalStorage(directory);
+	t.after(async () => { storage.close(); await rm(directory, { recursive: true, force: true }); });
+	storage.set('ackRevision', '0');
+	const count = () => (storage.db.prepare('SELECT total_changes() AS count').get() as { count: number }).count;
+	const before = count(); storage.set('ackRevision', '0');
+	assert.equal(count(), before);
+	storage.set('ackRevision', '1'); assert.equal(count(), before + 1);
+});
+
 test('headless replica serves browser WebSockets, survives offline restarts, and merges both ways after reconnection', async t => {
 	const directory = await mkdtemp(path.join(tmpdir(), 'lists local replica '));
 	const hash = bcrypt.hashSync('test-only', 4);
@@ -202,6 +266,12 @@ test('headless replica serves browser WebSockets, survives offline restarts, and
 	if (upstream.status.pending) await upstream.sync();
 	await until(() => !upstream!.status.pending);
 	assert.ok(upstream.status.lastSyncAt);
+	const changes = () => (localStorage.db.prepare('SELECT total_changes() AS count').get() as { count: number }).count;
+	const beforeIdle = changes(), persistedConfirmation = localStorage.get('lastSyncAt');
+	await upstream.sync(); await upstream.sync();
+	assert.equal(changes(), beforeIdle, 'successful idle sync must not update SQLite rows');
+	assert.equal(localStorage.get('lastSyncAt'), persistedConfirmation);
+	assert.equal((await readdir(localDirectory)).includes('document.yjs'), false, 'sync does not create an export');
 	const response = await fetch(localBase + '/api/sync/state', { method: 'POST', headers: { Cookie: browserCookie, 'Content-Type': 'application/octet-stream' }, body: encodeSyncMessage('alice', Y.encodeStateVector(browser)) });
 	assert.equal(response.status, 200); assert.equal(response.headers.get('X-Lists-Sync-Target'), 'laptop');
 	assert.equal(decodeSyncMessage(new Uint8Array(await response.arrayBuffer())).username, 'alice');
@@ -213,7 +283,7 @@ test('headless replica serves browser WebSockets, survives offline restarts, and
 	await upstream.sync();
 	assert.equal(upstream.status.pending, true); assert.ok(upstream.status.error);
 	provider.destroy();
-	await upstream.close(); await local.close(); localStorage.exportSnapshot(); localStorage.close(); localClosed = true;
+	await upstream.close(); await local.close(); localStorage.close(); localClosed = true;
 	localStorage = new LocalStorage(localDirectory);
 	local = createLocalHost({ storage: localStorage, username: 'alice', buildDirectory: build, status: () => upstream!.status });
 	local.server.listen(0, '127.0.0.1'); await once(local.server, 'listening'); localClosed = false;
@@ -297,14 +367,31 @@ test('generated launcher starts from an arbitrary working directory and keeps al
 	await start(['--server', base, '--username', 'alice', '--password-file', password, '--no-serve', '--insecure']);
 	await until(() => output.includes('Upstream confirmed.'));
 	await stop();
-	assert.deepEqual((await readdir(path.join(directory, 'lists-local-data'))).sort(), ['.gitignore', 'document.yjs', 'yjs.sqlite']);
+	assert.deepEqual((await readdir(path.join(directory, 'lists-local-data'))).sort(), ['.gitignore', 'yjs.sqlite']);
+	// Export is local-only: it needs neither a reachable server nor credentials.
+	const exportCommand = (args: string[]) => new Promise<void>((resolve, reject) => {
+		const command = spawn(path.join(root, 'local_client_run.sh'), ['--export-yjs', ...args], { cwd: directory, stdio: ['ignore', 'pipe', 'pipe'] });
+		let result = '';
+		command.stdout.on('data', chunk => { result += chunk; }); command.stderr.on('data', chunk => { result += chunk; });
+		command.once('error', reject);
+		command.once('exit', code => code === 0 ? resolve() : reject(new Error(result)));
+	});
+	const snapshot = path.join(directory, 'lists-local-data', 'document.yjs');
+	await exportCommand([]);
+	const exported = await readFile(snapshot), restored = new Y.Doc({ gc: false });
+	Y.applyUpdate(restored, exported); restored.destroy();
+	await writeFile(snapshot, 'old export is left alone');
 	await start(['--no-serve', '--insecure']);
 	await until(() => output.includes('Upstream confirmed.'));
 	await stop();
+	assert.equal(await readFile(snapshot, 'utf8'), 'old export is left alone', 'startup, sync and shutdown leave previous exports untouched');
 	// A fresh pull has the checked-in run script but no generated executable.
 	await rm(executable);
 	await start(['--server', base, '--username', 'alice', '--no-serve', '--insecure'], path.join(root, 'local_client_run.sh'));
 	await until(() => output.includes('Upstream confirmed.'));
 	await stop();
 	assert.ok(!output.includes('password'), output);
+	await exportCommand(['--output', './custom-backup.yjs']);
+	assert.deepEqual(await readFile(path.join(directory, 'custom-backup.yjs')), exported);
+	await assert.rejects(exportCommand(['--output', './lists-local-data/yjs.sqlite']), /must not overwrite/);
 });
