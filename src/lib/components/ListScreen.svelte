@@ -42,6 +42,7 @@
 	import InfoDialog from './InfoDialog.svelte';
 	import CopyLinkDialog from './CopyLinkDialog.svelte';
 	import FullScreenEditor from './FullScreenEditor.svelte';
+	import Breadcrumb, { type BreadcrumbItem } from './Breadcrumb.svelte';
 
 	let {
 		listId,
@@ -179,12 +180,10 @@
 	});
 
 	// ── Breadcrumb ────────────────────────────────────────────────────────────────
-	// Build an ordered array of { id, name } entries from root down to current list.
-	// null id = root home.
-	type CrumbItem = { id: string | null; name: string };
-	let breadcrumbItems = $derived.by((): CrumbItem[] => {
-		if (!listMeta) return [];
-		const folders: CrumbItem[] = [];
+	let breadcrumbItems = $derived.by((): BreadcrumbItem[] => {
+		const home: BreadcrumbItem = { label: 'Home', home: true, onNavigate: onHome };
+		if (!listMeta) return [home];
+		const folders: BreadcrumbItem[] = [];
 		const visited = new Set<string>();
 		let fid: string | null = listMeta.folderId;
 		while (fid !== null) {
@@ -192,21 +191,15 @@
 			visited.add(fid);
 			const f = allFolders.find((x) => x.id === fid);
 			if (!f) break;
-			folders.unshift({ id: f.id, name: f.name });
+			folders.unshift({ label: f.name, onNavigate: () => onNavigateTo?.(f.id) });
 			fid = f.parentId;
 		}
 		return [
-			// null home crumb omitted — the 🏠 button in the header handles home navigation
+			home,
 			...folders,
-			{ id: 'LIST', name: listMeta.name }
+			{ label: listMeta.name }
 		];
 	});
-
-	function navigateToCrumb(crumb: CrumbItem) {
-		if (crumb.id !== 'LIST') {
-			onNavigateTo?.(crumb.id);
-		}
-	}
 
 	function listPath(list: ListMeta): string {
 		const parts: string[] = [];
@@ -1403,23 +1396,10 @@
 	<!-- Header -->
 	<header>
 		<div class="header-row1">
-		<button class="home-btn" onclick={onHome} aria-label="Home">🏠</button>
+		<Breadcrumb items={breadcrumbItems} searchLabel={savedSearch} {onRestoreSearch} />
 		{#if !highlightItemId && onReturnNearby && settings.showNearbyReturnLink}
 			<a class="nearby-return-link" href="#nearby" aria-label="Back to nearby errands"
 				title="Back to nearby errands" onclick={(e) => { e.preventDefault(); onReturnNearby?.(); }}>🚗</a>
-		{/if}
-		<div class="breadcrumb">
-			{#each breadcrumbItems as crumb, i}
-				<span class="sep">/</span>
-				{#if crumb.id === 'LIST'}
-					<span class="crumb current">{crumb.name}</span>
-				{:else}
-					<button class="crumb" onclick={() => navigateToCrumb(crumb)}>{crumb.name}</button>
-				{/if}
-			{/each}
-		</div>
-		{#if savedSearch && onRestoreSearch}
-			<button class="crumb search-crumb" onclick={onRestoreSearch} title="Back to search results">🔍 "{savedSearch}"</button>
 		{/if}
 		</div>
 		<div class="header-row2">
@@ -2159,40 +2139,6 @@
 	}
 	header::-webkit-scrollbar { display: none; }
 	.header-row1, .header-row2 { display: contents; }
-	.breadcrumb {
-		display: flex;
-		align-items: center;
-		gap: 0.25rem;
-		flex-wrap: nowrap;
-		flex-shrink: 0;
-		font-size: 1rem;
-		min-width: 0;
-		overflow-x: auto;
-		scrollbar-width: none;
-	}
-	.breadcrumb::-webkit-scrollbar { display: none; }
-	.crumb {
-		background: none;
-		border: none;
-		color: var(--accent);
-		cursor: pointer;
-		padding: 0;
-		font-size: inherit;
-		white-space: nowrap;
-		flex-shrink: 0;
-	}
-	.crumb.current {
-		color: var(--text);
-		font-weight: 600;
-		cursor: default;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		max-width: 160px;
-		display: inline-block;
-		vertical-align: bottom;
-	}
-	.sep { color: var(--text2); flex-shrink: 0; }
 	/* ── Pinned items bar ───────────────────────────────────────────────────── */
 	/* Lives inside .item-list before fav-bar — scrolls away naturally */
 	.pin-bar {
@@ -2319,24 +2265,6 @@
 		font-weight: 600;
 		font-size: 1rem;
 		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-	.home-btn {
-		background: none;
-		border: none;
-		font-size: 1.25rem;
-		cursor: pointer;
-		padding: 0;
-		line-height: 1;
-		flex-shrink: 0;
-	}
-	.search-crumb {
-		color: var(--accent);
-		opacity: 0.75;
-		font-size: 0.88rem;
-		white-space: nowrap;
-		max-width: 140px;
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}

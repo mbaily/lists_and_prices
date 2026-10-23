@@ -54,6 +54,7 @@
 	import CommitsScreen from './CommitsScreen.svelte';
 	import FavouritesOrderScreen from './FavouritesOrderScreen.svelte';
 	import NearbyErrandsScreen from './NearbyErrandsScreen.svelte';
+	import Breadcrumb from './Breadcrumb.svelte';
 
 	let { onLogout }: { onLogout: () => void } = $props();
 	let showUndoConfirm = $state(false);
@@ -648,6 +649,22 @@
 	function folderName(id: string | null): string {
 		if (id === null) return 'Home';		if (id === ARCHIVE_ID) return 'Archived';		return allFolders.find((f) => f.id === id)?.name ?? '…';
 	}
+
+	function navigateBreadcrumb(index: number) {
+		if (index === 0 && showSearch) {
+			savedSearch = searchQuery.trim() || null;
+			showSearch = false;
+			searchQuery = '';
+		}
+		breadcrumb = breadcrumb.slice(0, index + 1);
+	}
+
+	let breadcrumbItems = $derived(breadcrumb.map((id, index) => ({
+		label: folderName(id),
+		home: index === 0,
+		onNavigate: index < breadcrumb.length - 1 || (index === 0 && showSearch)
+			? () => navigateBreadcrumb(index) : undefined
+	})));
 
 	// ── Create folder ────────────────────────────────────────────────────────────
 	let newFolderName = $state('');
@@ -1516,26 +1533,7 @@ ${bodyHtml}
 				</div>
 			{/if}
 			<div class="header-left">
-				<div class="breadcrumb">
-					<!-- Home icon always first -->
-					{#if breadcrumb.length > 1 || showSearch}
-						<button class="crumb home-crumb" onclick={() => { if (showSearch) { savedSearch = searchQuery.trim() || null; showSearch = false; searchQuery = ''; } breadcrumb = [null]; }}>🏠</button>
-						{#if breadcrumb.length > 1}<span class="sep">/</span>{/if}
-					{:else}
-						<span class="crumb current home-crumb">🏠</span>
-					{/if}
-					<!-- Remaining folder crumbs (skip the null home entry) -->
-					{#each breadcrumb.slice(1) as crumbId, i}
-						{#if i < breadcrumb.length - 2}
-							<button class="crumb" onclick={() => (breadcrumb = breadcrumb.slice(0, i + 2))}>
-								{folderName(crumbId)}
-							</button>
-							<span class="sep">/</span>
-						{:else}
-							<span class="crumb current">{folderName(crumbId)}</span>
-						{/if}
-					{/each}
-				</div>
+				<Breadcrumb items={breadcrumbItems} searchLabel={!showSearch ? savedSearch : null} onRestoreSearch={restoreSearch} />
 				<button class="icon-btn search-btn" class:search-active={showSearch} onclick={toggleSearch} aria-label={showSearch ? 'Close search' : 'Search'}>
 					🔍
 				</button>
@@ -1543,9 +1541,6 @@ ${bodyHtml}
 					<button class="icon-btn quick-add-btn" class:quick-add-active={showQuickAdd} onclick={toggleQuickAdd} aria-label={showQuickAdd ? 'Close quick add' : 'Quick add'} title="Quick add">
 						⚡
 					</button>
-				{/if}
-				{#if savedSearch && !showSearch}
-					<button class="crumb search-crumb" onclick={restoreSearch} title="Back to search results">"{savedSearch}"</button>
 				{/if}
 			</div>
 
@@ -2346,40 +2341,6 @@ ${bodyHtml}
 		flex-wrap: nowrap;
 	}
 	header::-webkit-scrollbar { display: none; }
-	.breadcrumb {
-		display: flex;
-		align-items: center;
-		gap: 0.25rem;
-		flex-wrap: nowrap;
-		flex-shrink: 0;
-		min-width: 0;
-		overflow-x: auto;
-		scrollbar-width: none;
-		font-size: 1rem;
-	}
-	.breadcrumb::-webkit-scrollbar { display: none; }
-	.crumb {
-		background: none;
-		border: none;
-		color: var(--accent);
-		cursor: pointer;
-		padding: 0;
-		font-size: inherit;
-		white-space: nowrap;
-		flex-shrink: 0;
-	}
-	.crumb.current {
-		color: var(--text);
-		font-weight: 600;
-		cursor: default;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		max-width: 160px;
-		display: inline-block;
-		vertical-align: bottom;
-	}
-	.home-crumb { font-size: 1.25rem; }
-	.sep { color: var(--text2); flex-shrink: 0; }
 
 	/* Sheet row */
 	.sheet-row { gap: 0.5rem; }
@@ -2866,15 +2827,6 @@ ${bodyHtml}
 	/* ── Search ───────────────────────────────────────────────────────────────── */
 	.icon-btn.search-active { color: var(--accent); }
 	.search-btn { flex-shrink: 0; }
-	.search-crumb {
-		color: var(--accent);
-		opacity: 0.75;
-		font-size: 0.88rem;
-		white-space: nowrap;
-		max-width: 140px;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
 	.header-left {
 		display: flex;
 		align-items: center;
