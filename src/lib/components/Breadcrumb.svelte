@@ -142,6 +142,7 @@
 	}
 	button { cursor: pointer; }
 	button.crumb { color: var(--accent); }
+	.crumb:not(.current):not(.home) { padding-inline: 0.2rem; }
 	.label {
 		min-width: 0;
 		max-width: clamp(5rem, 18vw, 12rem);
@@ -156,7 +157,7 @@
 	}
 	.current .label { max-width: clamp(8rem, 28vw, 22rem); }
 	.home { min-width: 36px; padding-inline: 0.45rem; }
-	.expand { min-width: 36px; font-weight: 600; }
+	.expand { min-width: 24px; font-weight: 600; }
 	.home-icon { width: 19px; height: 19px; }
 	.visually-hidden {
 		position: absolute;
