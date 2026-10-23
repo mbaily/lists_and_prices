@@ -53,6 +53,9 @@ the app under `/lists/` with Caddy or NGINX. The default build still runs at `/`
 
 For downloadable app data, see [JSON backup coverage and restore behaviour](docs/json-backups.md).
 
+For a foreground Linux replica with files in the current directory and optional
+local/LAN frontend hosting, see [the local client](docs/local-client.md).
+
 See [task integration API](docs/task-api.md) for authenticated server-to-server
 task imports, shared clipboard matching, list-scoped tokens, and retry behavior.
 

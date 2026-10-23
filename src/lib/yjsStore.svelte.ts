@@ -49,7 +49,8 @@ export const syncState = $state<{
 	status: SyncStatus; automatic: boolean; syncing: boolean; pending: boolean;
 	lastSyncAt: number | null; error: string | null;
 	hasServerState: boolean;
-}>({ status: 'offline', automatic: true, syncing: false, pending: true, lastSyncAt: null, error: null, hasServerState: false });
+	target: 'server' | 'laptop';
+}>({ status: 'offline', automatic: true, syncing: false, pending: true, lastSyncAt: null, error: null, hasServerState: false, target: 'server' });
 export const commitState = $state<{ isHistorical: boolean, commitId: string | null }>({ isHistorical: false, commitId: null });
 
 
@@ -76,6 +77,8 @@ export function initYjs(username: string, wsUrl: string) {
 	_stopNoteNames = observeNoteNames(doc);
 
 	_username = username;
+	try { syncState.target = localStorage.getItem(`pnl_sync_target:${username}`) === 'laptop' ? 'laptop' : 'server'; }
+	catch { syncState.target = 'server'; }
 	try { syncState.automatic = localStorage.getItem(syncKey(username)) !== 'manual'; }
 	catch { syncState.automatic = true; }
 	idbSynced.done = false;
@@ -306,6 +309,8 @@ export function syncNow(): Promise<void> {
 		if (!response.ok) throw new Error('Server sync failed. Your local changes are kept.');
 		const message = decodeSyncMessage(new Uint8Array(await response.arrayBuffer()));
 		if (message.username !== username) throw new Error('The server returned a different account. Sync stopped.');
+		syncState.target = response.headers?.get('X-Lists-Sync-Target') === 'laptop' ? 'laptop' : 'server';
+		try { localStorage.setItem(`pnl_sync_target:${username}`, syncState.target); } catch { /* Optional display preference. */ }
 		return message;
 	};
 	_syncRequest = (async () => {

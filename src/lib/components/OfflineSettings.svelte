@@ -2,10 +2,12 @@
 	import { auth, login } from '$lib/auth.svelte';
 	import { storageState, checkBrowserStorage } from '$lib/browserStorage.svelte';
 	import { syncState, localSaveState, idbSynced, setAutomaticSync, syncNow, reconnectYjs, saveLocalData } from '$lib/yjsStore.svelte';
+	import LocalSyncStatus from './LocalSyncStatus.svelte';
 
 	let password = $state('');
 	let signingIn = $state(false);
 	let loginError = $state<string | null>(null);
+	const syncTarget = $derived(syncState.target === 'laptop' ? 'laptop' : 'server');
 	const savedLabels = { loading: 'Loading local data…', saving: 'Saving on this device…', saved: 'Saved on this device', error: 'Could not save on this device' };
 	const protectionLabels = { unknown: 'Checking…', persistent: 'Protected against automatic cleanup', 'best-effort': 'Browser may clear data when storage is low', unsupported: 'Storage protection unavailable in this browser' };
 
@@ -30,9 +32,10 @@
 		<p class:error={localSaveState.status === 'error'}>{savedLabels[localSaveState.status]}</p>
 		<p>Offline app launch: {storageState.offlineLaunch ? 'Ready' : 'Open the app online to finish preparing'}</p>
 		<p>Storage: {protectionLabels[storageState.persistence]}</p>
-		<p>Last completed server sync: {syncState.lastSyncAt ? new Date(syncState.lastSyncAt).toLocaleString() : 'Not yet confirmed'}</p>
-		<p>{syncState.pending ? 'Changes waiting for server confirmation.' : 'All changes confirmed by the server at the last sync.'}</p>
+		<p>Last completed {syncTarget} sync: {syncState.lastSyncAt ? new Date(syncState.lastSyncAt).toLocaleString() : 'Not yet confirmed'}</p>
+		<p>{syncState.pending ? `Changes waiting for ${syncTarget} confirmation.` : `All changes confirmed by the ${syncTarget} at the last sync.`}</p>
 	</div>
+	{#if syncState.target === 'laptop'}<LocalSyncStatus />{/if}
 	<label class="toggle">
 		<input type="checkbox" checked={syncState.automatic} onchange={event => setAutomaticSync(event.currentTarget.checked)} />
 		Sync automatically on this device

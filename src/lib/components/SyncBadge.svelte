@@ -70,7 +70,7 @@
 			return [
 				{ label: 'Local save', value: localSaveState.status === 'saved' ? 'Saved on this device' : localSaveState.status },
 				{ label: 'Automatic sync', value: syncState.automatic ? 'On' : 'Off — use Sync now in Settings' },
-				{ label: 'Server confirmation', value: syncState.pending ? 'Changes waiting' : 'Confirmed at last sync' },
+				{ label: syncState.target === 'laptop' ? 'Laptop confirmation' : 'Server confirmation', value: syncState.pending ? 'Changes waiting' : 'Confirmed at last sync' },
 				{ label: 'Last completed sync', value: syncState.lastSyncAt ? new Date(syncState.lastSyncAt).toLocaleString() : 'Not yet confirmed' },
 				{ label: 'Sync Checksum', value: checksum },
 				{ label: 'Total Sync Size', value: formatSize(totalSize) },
@@ -91,7 +91,7 @@
 
 </script>
 
-<button class="badge" style="--dot:{localSaveState.status === 'error' ? '#ef4444' : color[status]}" onclick={() => showDialog = true} aria-label="Show sync info" title="Sync: {status}; local save: {localSaveState.status}">
+<button class="badge" style="--dot:{localSaveState.status === 'error' ? '#ef4444' : color[status]}" onclick={() => showDialog = true} aria-label="Show sync info" title="Sync to {syncState.target}: {status}; local save: {localSaveState.status}">
 	<span class="dot"></span>
 </button>
 

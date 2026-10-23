@@ -23,6 +23,29 @@ function client(options = {}) {
 	return { ...app, locals, sockets };
 }
 
+test('browser confirmation identifies a laptop relay and preserves its label when reopened offline', async () => {
+	let app;
+	const remote = new Y.Doc({ gc: false });
+	app = client({ storage: [['pnl_sync:alice', 'manual']], fetch: async (_path, init) => {
+		const { encodeSyncMessage, decodeSyncMessage } = app.load('src/lib/syncProtocol.ts');
+		const message = decodeSyncMessage(init.body);
+		return new Response(encodeSyncMessage('alice', Y.encodeStateVector(remote), Y.encodeStateAsUpdate(remote, message.vector)), {
+			headers: { 'X-Lists-Sync-Target': 'laptop' }
+		});
+	} });
+	try {
+		await app.store.syncNow();
+		assert.equal(app.store.syncState.target, 'laptop');
+		assert.equal(app.storage.get('pnl_sync_target:alice'), 'laptop');
+		const offline = client({ storage: [...app.storage], navigator: { onLine: false } });
+		try {
+			assert.equal(offline.store.syncState.target, 'laptop');
+			offline.store.initYjs('bob', 'ws://unused');
+			assert.equal(offline.store.syncState.target, 'server', 'relay labels are isolated by account');
+		} finally { offline.dispose(); }
+	} finally { app.dispose(); remote.destroy(); }
+});
+
 test('fresh local storage starts the HTTP download without waiting for a WebSocket sync event', async () => {
 	let release, app;
 	const calls = [];

@@ -14,6 +14,10 @@ node_modules
 /.svelte-kit
 /build
 
+# Generated foreground local client and its default storage directory
+lists-local-client
+lists-local-data/
+
 # Personal connection settings and generated diagnostic logs
 /tui.config.real.json
 /check_output.txt
