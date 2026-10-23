@@ -4,6 +4,21 @@ The local client is a headless Yjs replica with optional frontend hosting. It ru
 in the foreground; no background service or system installation is created.
 The existing upstream server needs no configuration change.
 
+The checked-in `local_client_run.sh` provides the saved server, username, port
+8083 and `--insecure` settings. After pulling on a new machine with Node 24 and
+npm installed, run:
+
+```sh
+./local_client_run.sh
+```
+
+It installs missing project dependencies, builds a missing frontend, and generates
+the local executable launcher with that machine's paths. Generated files stay out
+of Git. Extra arguments are forwarded, for example
+`./local_client_run.sh --data-dir ./my-data` or `./local_client_run.sh --no-serve`.
+When invoked by an absolute path from another directory, it still puts the
+generated launcher and default data directory in your working directory.
+
 Use this checkout's Node 24 toolchain and install dependencies with `npm ci`.
 Build the frontend and create the executable launcher:
 

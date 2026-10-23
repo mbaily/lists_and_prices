@@ -283,9 +283,9 @@ test('generated launcher starts from an arbitrary working directory and keeps al
 	const password = path.join(directory, 'password'); await writeFile(password, 'test-only\n', { mode: 0o600 });
 	let child: ReturnType<typeof spawn>;
 	let output = '';
-	async function start(args: string[]) {
+	async function start(args: string[], command = executable) {
 		output = '';
-		child = spawn(executable, args, { cwd: directory, stdio: ['ignore', 'pipe', 'pipe'] });
+		child = spawn(command, args, { cwd: directory, stdio: ['ignore', 'pipe', 'pipe'] });
 		child.stdout!.on('data', chunk => { output += chunk; }); child.stderr!.on('data', chunk => { output += chunk; });
 		await until(() => { assert.equal(child.exitCode, null, output); return output.includes('Running in foreground'); }, 10_000);
 	}
@@ -299,6 +299,11 @@ test('generated launcher starts from an arbitrary working directory and keeps al
 	await stop();
 	assert.deepEqual((await readdir(path.join(directory, 'lists-local-data'))).sort(), ['.gitignore', 'document.yjs', 'yjs.sqlite']);
 	await start(['--no-serve', '--insecure']);
+	await until(() => output.includes('Upstream confirmed.'));
+	await stop();
+	// A fresh pull has the checked-in run script but no generated executable.
+	await rm(executable);
+	await start(['--server', base, '--username', 'alice', '--no-serve', '--insecure'], path.join(root, 'local_client_run.sh'));
 	await until(() => output.includes('Upstream confirmed.'));
 	await stop();
 	assert.ok(!output.includes('password'), output);
