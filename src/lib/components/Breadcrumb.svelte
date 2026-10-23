@@ -120,7 +120,7 @@
 	.home-item {
 		position: sticky;
 		inset-inline-start: -3px;
-		padding-inline: 3px;
+		padding-inline: 3px 0;
 		z-index: 1;
 		background: var(--bg2);
 		box-shadow: 4px 0 6px var(--bg2);
@@ -156,7 +156,7 @@
 		font-weight: 600;
 	}
 	.current .label { max-width: clamp(8rem, 28vw, 22rem); }
-	.home { min-width: 36px; padding-inline: 0.45rem; }
+	.home { min-width: 28px; padding-inline: 0.2rem; }
 	.expand { min-width: 24px; font-weight: 600; }
 	.home-icon { width: 19px; height: 19px; }
 	.visually-hidden {
@@ -189,6 +189,6 @@
 	}
 	@media (pointer: coarse) {
 		.crumb, .search-return { min-height: 44px; }
-		.home { min-width: 44px; }
+		.home { min-width: 32px; }
 	}
 </style>
