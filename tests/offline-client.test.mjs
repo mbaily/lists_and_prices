@@ -70,6 +70,38 @@ test('previously confirmed empty offline storage is ready without another networ
 	} finally { app.dispose(); }
 });
 
+test('cached confirmation cannot turn reconnection attempts green while the server is down', async () => {
+	let local, socket;
+	class Saved extends Provider {
+		constructor() {
+			super(); local = this;
+			this.pendingSync = false;
+			this.lastSyncAt = 1_800_000_000_000;
+		}
+	}
+	class Socket extends Provider {
+		constructor() { super(); socket = this; }
+		connect() { this.emit('status', { status: 'connecting' }); }
+	}
+	const app = createApp({ username: 'alice', IndexeddbPersistence: Saved, WebsocketProvider: Socket,
+		// Wi-Fi is available, but the old app server is not.
+		navigator: { onLine: true }, fetch: async () => { throw new TypeError('Failed to fetch'); } });
+	try {
+		local.emit('synced');
+		assert.equal(app.store.syncState.pending, false);
+		assert.equal(app.store.syncState.lastSyncAt, local.lastSyncAt);
+		assert.equal(app.store.syncState.status, 'connecting');
+		await app.store.syncNow();
+		assert.equal(app.store.syncState.status, 'error');
+		app.store.reconnectYjs();
+		assert.equal(app.store.syncState.status, 'connecting', 'Retries must not reuse the old confirmation');
+		socket.emit('status', { status: 'connected' });
+		assert.equal(app.store.syncState.status, 'connecting', 'An open socket still needs server confirmation');
+		socket.emit('status', { status: 'disconnected' });
+		assert.equal(app.store.syncState.status, 'offline');
+	} finally { app.dispose(); }
+});
+
 test('manual mode with fresh storage does not mistake a failed download for an empty account', async () => {
 	let calls = 0;
 	const app = client({ storage: [['pnl_sync:alice', 'manual']], fetch: async () => { calls++; return new Response('', { status: 503 }); } });

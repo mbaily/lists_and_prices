@@ -126,7 +126,9 @@ export function initYjs(username: string, wsUrl: string) {
 		if (auth.needsLogin) syncState.status = 'auth-required';
 		else if (!syncState.automatic) syncState.status = 'paused';
 		else if (status === 'disconnected') syncState.status = 'offline';
-		else syncState.status = syncState.pending ? 'connecting' : 'synced';
+		// Cached confirmation belongs to a previous exchange. Neither a connection
+		// attempt nor an open socket confirms that this server has our current data.
+		else syncState.status = 'connecting';
 	});
 	_wsProvider.on('sync', (synced: boolean) => {
 		if (_doc === doc && synced) scheduleSync(0);
