@@ -55,7 +55,7 @@ test('actual server entry point boots from Git release files and answers session
 	// production persistence/callback hooks, credentials, or Node preload hooks.
 	const env = { ...process.env };
 	for (const key of Object.keys(env)) {
-		if (/^(SESSION_|CALLBACK_)/.test(key) || ['YPERSISTENCE', 'GC', 'NODE_OPTIONS', 'NODE_PATH'].includes(key)) delete env[key];
+		if (/^(SESSION_|CALLBACK_|LISTS_)/.test(key) || ['YPERSISTENCE', 'GC', 'NODE_OPTIONS', 'NODE_PATH'].includes(key)) delete env[key];
 	}
 	const entry = pathToFileURL(path.join(directory, 'server/index.ts')).href;
 	const wrapper = `

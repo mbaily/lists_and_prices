@@ -88,15 +88,22 @@ sudo -u "$SERVICE_USER" npm rebuild --prefix "$stage" better-sqlite3
 validate_runtime "$stage"
 
 sudo systemctl is-active --quiet "$SERVICE_NAME" || { echo "Service must be running before deployment." >&2; exit 1; }
+# Capture the service's actual environment/cwd while its PID still exists; shell
+# overrides used to run deploy.sh need not match the installed service settings.
+sudo node "$SOURCE_DIR/scripts/backup-user-data.mjs" --capture-service "$SERVICE_NAME" --server-dir "$DEST_DIR/server" --output "$stage/storage-paths.json"
 echo "Stopping service for a consistent application and data backup..."
 stopped=true
 sudo systemctl stop "$SERVICE_NAME"
 backup=$(sudo mktemp -d "$BACKUP_ROOT/deploy-$(date -u +%Y%m%dT%H%M%SZ).XXXXXX")
-# The stopped service makes Yjs/SQLite copies consistent. Include sidecars,
-# credentials, TLS, environment files and the old application/dependencies.
-backup_entries=(build server node_modules package.json package-lock.json)
+# Rollback needs code/dependencies. Snapshot user data separately, using the
+# captured paths, including external SQLite/Yjs/token locations. Never copy
+# .htpasswd into either backup; deployment does not modify credentials.
+backup_entries=(build node_modules package.json package-lock.json)
 while IFS= read -r -d '' env_file; do backup_entries+=("${env_file##*/}"); done < <(sudo find "$DEST_DIR" -maxdepth 1 -type f -name '.env*' -print0)
 sudo cp -a -- "${backup_entries[@]/#/$DEST_DIR/}" "$backup/"
+sudo install -d "$backup/server"
+sudo rsync -a --include='/*.ts' --include='/tsconfig.json' --exclude='*' "$DEST_DIR/server/" "$backup/server/"
+sudo node "$SOURCE_DIR/scripts/backup-user-data.mjs" --manifest "$stage/storage-paths.json" --output "$backup/user-data"
 for module in "${RUNTIME_SHARED_MODULES[@]}"; do
     if sudo test -f "$DEST_DIR/src/lib/$module"; then
         sudo install -d "$backup/src/lib"

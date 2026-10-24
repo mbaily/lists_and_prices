@@ -153,6 +153,7 @@ for (const failure of ['none', 'version', 'lock-version', 'build', 'built-versio
         writeFileSync(path.join(f.source, 'scripts/deploy-runtime.sh'), readFileSync(path.join(root, 'scripts/deploy-runtime.sh')));
         writeFileSync(path.join(f.source, 'scripts/check-release-version.mjs'), readFileSync(path.join(root, 'scripts/check-release-version.mjs')));
         writeFileSync(path.join(f.source, 'scripts/frontend-retention.mjs'), readFileSync(path.join(root, 'scripts/frontend-retention.mjs')));
+        writeFileSync(path.join(f.source, 'scripts/backup-user-data.mjs'), readFileSync(path.join(root, 'scripts/backup-user-data.mjs')));
         if (failure === 'version') {
             for (const file of ['package.json', 'package-lock.json']) writeFileSync(path.join(f.source, file), readFileSync(path.join(f.dest, file)));
         }
@@ -163,7 +164,17 @@ for (const failure of ['none', 'version', 'lock-version', 'build', 'built-versio
         f.command('systemctl', 'echo "systemctl $*" >> "$TEST_LOG"\nexit 0\n');
         f.command('sleep', 'exit 0\n');
         f.command('journalctl', 'exit 0\n');
-        f.command('node', "if [[ \"$1\" = */check-release-version.mjs || \"$1\" = */frontend-retention.mjs ]]; then exec \"$TEST_NODE\" \"$@\"; fi\nexit 0\n");
+        f.command('node', `if [[ "$1" = */check-release-version.mjs || "$1" = */frontend-retention.mjs ]]; then exec "$TEST_NODE" "$@"; fi
+if [[ "$1" = */backup-user-data.mjs ]]; then
+ echo "data-backup $*" >> "$TEST_LOG"
+ args="$*"
+ while [[ "$1" != --output ]]; do shift; done
+ if [[ "$args" = *--capture-service* ]]; then echo '{}' > "$2"; else
+  mkdir -p "$2"; cp "$LISTS_DEPLOY_DIR/server/server.db" "$2/server.db"; cp -a "$LISTS_DEPLOY_DIR/server/yjs-data" "$2/yjs-data"
+ fi
+fi
+exit 0
+`);
         f.command('curl', "echo \"curl $*\" >> \"$TEST_LOG\"\nif [[ \"$TEST_FAILURE\" = health ]]; then exit 22; fi\nargs=\"$*\"\nwhile [[ \"$1\" != -o ]]; do shift; done\nif [[ \"$args\" = */_app/version.json* ]]; then\n if [[ \"$TEST_FAILURE\" = served-version ]]; then printf '{\"version\":\"0.0.1\"}' > \"$2\"; else cp \"$LISTS_DEPLOY_DIR/build/_app/version.json\" \"$2\"; fi\n exit 0\nfi\nif [[ \"$args\" = *api/sync* && \"$TEST_FAILURE\" = sync-health ]]; then echo '{\"error\":\"Not found\"}' > \"$2\"; printf 404; elif [[ \"$args\" = *api/session* || \"$args\" = *api/sync* ]]; then echo '{\"error\":\"Invalid session\"}' > \"$2\"; printf 401; else cp \"$LISTS_DEPLOY_DIR/build/index.html\" \"$2\"; fi\n");
         const log = path.join(f.directory, 'commands.log'); writeFileSync(log, '');
         const backups = path.join(f.directory, 'backups');
@@ -177,7 +188,13 @@ for (const failure of ['none', 'version', 'lock-version', 'build', 'built-versio
             assert.equal(readFileSync(path.join(f.dest, 'build/index.html'), 'utf8'), 'old app');
         } else {
             const backup = readdirSync(backups).find(name => name.startsWith('deploy-'));
-            assert.ok(backup); assertPrivateData(path.join(backups, backup));
+            assert.ok(backup);
+            assert.equal(existsSync(path.join(backups, backup, 'server/.htpasswd')), false);
+            assert.equal(existsSync(path.join(backups, backup, 'server/server.db')), false);
+            assert.equal(readFileSync(path.join(backups, backup, 'user-data/server.db'), 'utf8'), 'live private data');
+            assert.equal(readFileSync(path.join(backups, backup, 'user-data/yjs-data/notes'), 'utf8'), 'live private data');
+            assert.ok(commands.indexOf('data-backup') < commands.indexOf('systemctl stop'), 'Capture paths while the service still has a PID');
+            assert.match(commands.slice(commands.indexOf('systemctl stop')), /data-backup.*--manifest/);
             assert.ok(commands.indexOf('npm rebuild') < commands.indexOf('systemctl stop'));
             assert.equal(readFileSync(path.join(f.dest, 'build/index.html'), 'utf8'), failure === 'none' ? 'new app' : 'old app');
             assert.equal(readFileSync(path.join(f.dest, 'node_modules/marker'), 'utf8').trim(), failure === 'none' ? 'prepared deps' : 'old deps');

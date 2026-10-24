@@ -48,6 +48,9 @@ See [bug-fix and upgrade notes](docs/bug-fixes.md) before deploying the authenti
 
 See [safe deployment instructions](docs/deployment.md) for backups, dry runs and rollback.
 
+See [server storage](docs/storage.md) for external SQLite/Y-LevelDB/token paths
+and user-data backups that exclude `.htpasswd`.
+
 See [HTTPS reverse proxy and subpath hosting](docs/reverse-proxy.md) to serve
 the app under `/lists/` with Caddy or NGINX. The default build still runs at `/`.
 

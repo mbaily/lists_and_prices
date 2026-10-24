@@ -97,10 +97,17 @@ application running.
 ## Backups and rollback
 
 Backups are retained in `/var/backups/lists-and-prices/deploy-*`, inside a root-only
-directory. They include the old application/dependencies and shared modules, entire live `server/`
-directory (including SQLite sidecars and Yjs data), and root `.env*` files. Check
+directory. They include the old application/dependencies and shared modules,
+server TypeScript/configuration, root `.env*` files, and a separate `user-data/`
+snapshot of SQLite, Yjs and task-token state. The running service's environment
+and working directory are captured before shutdown, so explicit external storage
+paths are included without relying on the deploy shell's environment. SQLite
+backups incorporate outstanding WAL data. `.htpasswd` is excluded from both the
+application and user-data backups; preserve/reprovision login credentials separately.
+Check
 available disk space beforehand. Backups accumulate; remove old copies only after
-checking your retention needs. A backup contains credentials and private notes.
+checking your retention needs. A backup contains session/integration state and
+private notes, and root environment files may also contain secrets.
 
 On deployment or health-check failure, the previous application and dependencies
 are restored and restarted. Live data is preserved: rollback does not overwrite
@@ -116,11 +123,15 @@ must be outside the deployment directory. TLS verification is disabled for the
 local health check because the app uses a self-signed certificate. An HTTP
 service can set an `http://` health URL.
 
-The backup covers Yjs stored at `server/yjs-data`, as configured on this server.
-If `YPERSISTENCE` points outside `server/`, arrange a stopped-service backup of
-that location before deploying. This script is for an existing installation;
+Storage is configurable through `LISTS_DATA_DIR`, `LISTS_DB_PATH`, `YPERSISTENCE`
+and `LISTS_TASK_TOKENS_PATH`; see [server storage](storage.md), including migration
+and restore instructions. The data snapshot covers the paths selected by the
+installed service. This script is for an existing installation;
 it does not provision a service, certificates, credentials or a new database.
 
-The older `backup.sh` is separate and is not a consistent live backup: its
-service-stop commands are commented out. Use deployment's stopped-service backup
-or stop the service explicitly when taking a separate data backup.
+For a standalone user-data snapshot, use `bash backup.sh /absolute/new-backup-dir`.
+It discovers the installed service's storage paths, stops it, creates a private
+snapshot without `.htpasswd`, and starts it again on success or failure. Use
+`--offline` only when all writers are already stopped, supplying the same path
+environment as the server. Keep token-issuing commands stopped during either
+backup procedure. No existing backup directory is overwritten.

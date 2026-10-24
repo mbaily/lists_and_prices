@@ -69,8 +69,21 @@ With `--from-photos`, omit `--list` to start with an empty list scope and resolv
 the destination on the first send. Without `--from-photos`, omitting `--list`
 issues a user-wide token for explicit setup. The raw token
 is written once to a new file with mode 0600; it is never printed. Only its SHA-256
-hash and scope are stored in `server/task-tokens.json` (ignored by Git and protected
-from deployment overwrite). Use `Authorization: Bearer TOKEN` over HTTPS. Revoke
+hash and scope are stored in `task-tokens.json` under `LISTS_DATA_DIR`, or at
+`LISTS_TASK_TOKENS_PATH` if explicitly set. The legacy default is
+`server/task-tokens.json` (ignored by Git and protected from deployment overwrite).
+Run the issuer with the same storage environment as the service; it reads the
+deployment's `server/.htpasswd` and does not open the Yjs store. For example:
+
+```sh
+sudo -u www-data env LISTS_DATA_DIR=/encrypted/web_apps_data/lists_and_prices \
+  node --import tsx server/task-token.ts --user YOUR_USERNAME --from-photos \
+  --output /absolute/private/token-file
+```
+
+This JSON file is persistent integration state: destination recovery can update
+the bound list ID. It belongs in user-data backups, while `.htpasswd` does not.
+Use `Authorization: Bearer TOKEN` over HTTPS. Revoke
 a token by removing its entry from that file. Tokens do not expire with browser
 sessions; keep the caller's raw token private.
 

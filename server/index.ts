@@ -11,6 +11,8 @@
  *   --remove-user        Remove a user from .htpasswd (prompts for username)
  */
 
+// Configure persistence before any dependency imports y-websocket/bin/utils.
+import { storagePaths } from './storage-runtime.ts';
 import https from 'node:https';
 import http from 'node:http';
 import fs from 'node:fs';
@@ -42,8 +44,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BUILD_DIR = path.join(__dirname, '../build');
 const CERT_FILE = path.join(__dirname, 'cert.pem');
 const KEY_FILE = path.join(__dirname, 'key.pem');
-const HTPASSWD_FILE = path.join(__dirname, '.htpasswd');
-const DB_FILE = path.join(__dirname, 'server.db');
+const HTPASSWD_FILE = storagePaths.htpasswdFile;
+const DB_FILE = storagePaths.dbFile;
 
 // ── SQLite ──────────────────────────────────────────────────────────────
 // One DB for the persistent session secret and revocable, expiring sessions.
@@ -213,8 +215,8 @@ const app = express();
 const documents = createTaskDocuments();
 app.use('/api/sync', createOfflineSyncRouter(sessions, documents));
 app.use('/api/tasks', createTaskRouter(sessions, documents, {
-	readTokens: () => readTaskTokens(path.join(__dirname, 'task-tokens.json')),
-	bindDestination: (tokenHash, listId) => bindTaskDestination(path.join(__dirname, 'task-tokens.json'), tokenHash, listId),
+	readTokens: () => readTaskTokens(storagePaths.taskTokensFile),
+	bindDestination: (tokenHash, listId) => bindTaskDestination(storagePaths.taskTokensFile, tokenHash, listId),
 	userExists: username => Boolean(readHtpasswdHash(fs.readFileSync(HTPASSWD_FILE, 'utf8'), username))
 }));
 app.use('/api', createAuthRouter(sessions, secureCookies(process.env.SESSION_COOKIE_SECURE, useTls), `${publicBasePath}/`));
