@@ -144,6 +144,8 @@ test('user-data backup restores SQLite/WAL, Yjs and token scopes, excludes passw
 	fs.writeFileSync(path.join(f.paths.yjsDirectory!, '.htpasswd'), 'also excluded');
 	const destination = path.join(f.directory, 'backup');
 	await backupUserData(f.paths, destination);
+	assert.ok(fs.readdirSync(f.paths.yjsDirectory!).every(name => fs.statSync(path.join(f.paths.yjsDirectory!, name)).uid === fs.statSync(f.paths.yjsDirectory!).uid),
+		'Backup lock checking must not leave source files owned by a different user');
 	assert.deepEqual(fs.readdirSync(destination).sort(), ['manifest.json', 'server.db', 'task-tokens.json', 'yjs-data']);
 	assert.equal(fs.existsSync(path.join(destination, 'yjs-data/.htpasswd')), false);
 	assert.equal(fs.statSync(destination).mode & 0o777, 0o700);
@@ -197,4 +199,23 @@ if [ "$1" = show ]; then printf '%s\\n' '${child.pid}'; fi
 	const commands = fs.readFileSync(log, 'utf8');
 	assert.match(commands, /stop lists-and-prices.service\nstart lists-and-prices.service/);
 	assert.equal(fs.existsSync(destination), false);
+});
+
+test('privileged backup opens LevelDB as its non-root owner', {
+	skip: process.getuid?.() !== 0 || !process.env.SUDO_UID || process.env.SUDO_UID === '0'
+}, async t => {
+	const f = fixture(t);
+	const uid = Number(process.env.SUDO_UID), gid = Number(process.env.SUDO_GID);
+	for (const directory of [f.directory, f.app, path.join(f.app, 'server')]) fs.chmodSync(directory, 0o755);
+	fs.chmodSync(path.join(f.app, 'package.json'), 0o644);
+	fs.mkdirSync(f.data, { mode: 0o700 }); fs.chownSync(f.data, uid, gid);
+	fs.mkdirSync(f.paths.yjsDirectory!, { mode: 0o700 }); fs.chownSync(f.paths.yjsDirectory!, uid, gid);
+	const sqlite = new Database(f.paths.dbFile); sqlite.exec('CREATE TABLE records(value TEXT)'); sqlite.close();
+	const code = `const {createRequire}=require('node:module');const level=createRequire(process.argv[1])('leveldown')(process.argv[2]);
+level.open(error=>{if(error)throw error;level.close(error=>{if(error)throw error;});});`;
+	execFileSync(process.execPath, ['-e', code, path.join(f.app, 'package.json'), f.paths.yjsDirectory!], { uid, gid, cwd: '/' });
+	await backupUserData(f.paths, path.join(f.directory, 'privileged-backup'));
+	assert.ok(fs.readdirSync(f.paths.yjsDirectory!).every(name => fs.statSync(path.join(f.paths.yjsDirectory!, name)).uid === uid));
+	// The service/data owner can reopen the store after the root-run snapshot.
+	execFileSync(process.execPath, ['-e', code, path.join(f.app, 'package.json'), f.paths.yjsDirectory!], { uid, gid, cwd: '/' });
 });

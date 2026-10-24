@@ -28,17 +28,26 @@ export async function backupUserData(storage, destination) {
 	if (!inside || (!inside.startsWith('..' + path.sep) && inside !== '..' && !path.isAbsolute(inside))) {
 		throw new Error('Backup destination must be outside the Yjs directory');
 	}
-	// LOCK remains after shutdown. Check the native lock instead, and finish any
-	// recovery/close before copying the files. All other writers must stay stopped.
+	// Opening LevelDB can rewrite CURRENT, logs and manifests, even for a lock
+	// check. Run that open/close as the data owner so a root-run backup never
+	// leaves new root-owned private files in a service-owned store.
 	const require = createRequire(path.join(storage.serverDirectory, '../package.json'));
-	/** @type {{ open(options: {createIfMissing: boolean}, callback: (error?: Error) => void): void; close(callback: (error?: Error) => void): void }} */
-	const level = require('leveldown')(storage.yjsDirectory);
+	const owner = fs.statSync(storage.yjsDirectory);
+	const check = `
+const {createRequire}=require('node:module');
+const level=createRequire(process.argv[1])('leveldown')(process.argv[2]);
+level.open({createIfMissing:false}, error => {
+  if(error){process.stderr.write('LevelDB open failed\\n');process.exitCode=1;return;}
+  level.close(error => {if(error){process.stderr.write('LevelDB close failed\\n');process.exitCode=1;}});
+});`;
 	try {
-		await new Promise((resolve, reject) => level.open({ createIfMissing: false }, error => error ? reject(error) : resolve(undefined)));
+		execFileSync(process.execPath, ['-e', check, path.join(storage.serverDirectory, '../package.json'), storage.yjsDirectory], {
+			cwd: '/', stdio: 'pipe',
+			...(process.getuid?.() === 0 ? { uid: owner.uid, gid: owner.gid } : {})
+		});
 	} catch (error) {
 		throw new Error('Cannot lock Yjs data; stop the service and other writers before backup', { cause: error });
 	}
-	await new Promise((resolve, reject) => level.close(error => error ? reject(error) : resolve(undefined)));
 	fs.mkdirSync(path.dirname(destination), { recursive: true, mode: 0o700 });
 	fs.mkdirSync(destination, { mode: 0o700 }); // Refuse an existing destination.
 	try {
