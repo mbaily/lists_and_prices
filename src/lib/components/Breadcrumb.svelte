@@ -42,14 +42,15 @@
 </script>
 
 {#snippet separator()}
-	<svg class="separator" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+	<svg class="separator" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 		<path d="m6 4 4 4-4 4" />
 	</svg>
 {/snippet}
 
 {#snippet label(item: BreadcrumbItem)}
 	{#if item.home}
-		<svg class="home-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+		<!-- Keep intrinsic dimensions so the icon cannot expand before CSS loads. -->
+		<svg class="home-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 			<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z" />
 		</svg>
 		<span class="visually-hidden">{item.label}</span>
@@ -87,7 +88,7 @@
 	</ol>
 	{#if searchLabel && onRestoreSearch}
 		<button type="button" class="search-return" onclick={onRestoreSearch} aria-label={`Back to search results: ${searchLabel}`} title={`Back to search results: ${searchLabel}`}>
-			<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+			<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
 				<circle cx="8.5" cy="8.5" r="5" /><path d="m12.5 12.5 4 4" />
 			</svg>
 			<span class="label">“{searchLabel}”</span>
