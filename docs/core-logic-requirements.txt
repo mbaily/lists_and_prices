@@ -118,6 +118,8 @@ one enclosing root map:
   smart-folders                   Y.Map legacy report membership values
   smart-folder-memberships        Y.Map boolean per report/member pair
   custom-locations                Y.Map location object by location ID
+  location-optional-tags          Y.Map boolean overrides by normalized tag;
+                                 missing keys default to bank/errand membership
   nearby-preferences              Y.Map preference keys from section 18
   nearby-checklist                Y.Map checklist state by item ID
   paused-errand-tags              Y.Map boolean by normalized tag
@@ -902,8 +904,8 @@ location when this intersection is nonempty: multiple item tags are OR choices.
 15.5 Available-tag counts count distinct location IDs supporting each tag,
 including derived tags; return tag/count records alphabetically by locale
 comparison. These counts use the whole catalogue, not the selected radius.
-The location-optional tags bank and errand are always recognized, and may
-have count 0 when no stored location supports them.
+The user's location-optional tags are also recognized, and may have count 0
+when no stored location supports them. Their defaults are bank and errand.
 
 15.6 Derive each suburb location with ID 'suburb-'+suburb.id, label
 suburb.name+' (suburb centre)', its coordinates, coordinateAccuracy=suburb and
@@ -921,7 +923,7 @@ from reads so callers cannot mutate persisted plain-object values in place.
 16. ERRAND ELIGIBILITY AND EFFECTIVE TAGS
 
 16.1 Recognized errand tags are all supported tags from the entire effective
-catalogue, plus bank and errand. Recognition is independent of radius, starting
+catalogue, plus the user's location-optional tags. Recognition is independent of radius, starting
 point, or whether the task currently has a nearby match.
 
 16.2 Start with items grouped by first-seen source-list storage order, traversed
@@ -1002,7 +1004,7 @@ Within a stop, preserve the supplied errand sequence.
      sorted with 17.4; preserve their full matching errand sets.
   h. Unavailable errands are input errands whose IDs are absent from reachable.
 
-17.6 A bank/errand-tagged item is location-optional. For route planning, include
+17.6 An item with any enabled location-optional tag is location-optional. For route planning, include
 it only if a candidate location stop actually matches it. Otherwise retain it
 as an independent nearby reminder, without putting it in unavailable-location
 results. Group-level coverage counts consider a group covered only when every
@@ -1058,6 +1060,15 @@ obtain a location leaves the existing saved starting point intact.
 These preferences synchronize, participate in undo/history and JSON backups,
 and are read without writing defaults. The preview limit affects the summary
 text only, not eligibility, matching, date aggregation or stop coverage.
+
+18.8 Location-free errand hashtags are user-editable. Start with bank and errand
+without seeding writes. Apply boolean overrides from location-optional-tags:
+true adds a normalized ASCII word tag and false removes it. Independent tag
+keys merge independently; false entries prevent removed defaults reappearing.
+Commands trim, remove an optional leading #, lowercase and normalize aliases;
+reject empty tags, non-word characters and non-boolean enabled values. An empty
+effective list is valid. Reads, undo/history and sync use the shared document.
+Removing a tag preserves task text and registered location support.
 
 19. CHECKLIST MEMBERSHIP, DISMISSAL AND COMPLETION
 
@@ -1136,7 +1147,7 @@ changes list.done only, not its children; explicit errands can remain eligible.
 20.3 Determine nearby task matches by scanning ordered location stops and
 their errands. For each item ID keep only its first match, with the first
 matching normalized tag for that stop. Afterwards scan active errands for
-bank/errand tags; choose the first effective tag that normalizes to either.
+the user's location-optional tags; choose the first effective matching tag.
 Add it as a nearby task even without a stop. If the item was already matched,
 replace its selected tag without moving its existing insertion position.
 
@@ -1202,7 +1213,7 @@ search ranking and is not automatically reordered by search.
 22. JSON BACKUP, MERGE AND REPLACE
 
 22.1 The portable backup format has version=1, exported=current timestamp,
-folders, lists, items, and optional sheets, smartFolders, customLocations,
+folders, lists, items, and optional sheets, smartFolders, customLocations, locationOptionalTags,
 startingLocation, nearbyLocationFilterEnabled, hotSuburbIds, nearbyPreviewLimit,
 nearbyRecentlyModifiedFirst, nearbyChecklist, pausedErrandTags,
 pausedErrandItemIds. Export the current read document's materialized values.
@@ -1227,6 +1238,8 @@ plain names and per-ID completion projections.
     including the legacy 1..50 allowance.
   - Validate checklist as an ID-keyed object of valid states from 19.1.
   - Paused tags must be strings matching ^#?\w+$; paused item IDs nonblank strings.
+  - locationOptionalTags, if present, is an array of strings matching ^#?\w+$;
+    an empty array is valid. Normalize aliases and deduplicate on import.
   - Reports, when non-null, must be an object mapping names to arrays of strings;
     omitted or null smartFolders is treated as an empty assignment map.
 
@@ -1254,6 +1267,7 @@ Add supplied tag/item pauses. For optional nearby preferences, omission
 preserves the current value. An explicit startingLocation=null clears that
 selection even in merge mode. A supplied false preference is a real value,
 not equivalent to omission.
+Merge locationOptionalTags by adding supplied tags, retaining current tags.
 
 22.6 Replace first removes folder/list/item/sheet metadata array contents,
 empties all note_text_ roots, clears note-text-initialized and all sheet-cells-
@@ -1263,6 +1277,8 @@ before adding supplied entries. Omitted starting/filter/hot-suburb/preview/sort
 preferences are deleted so their read defaults apply. The operation does not
 clear history checkpoints or unknown root data. Replace is not destruction
 and recreation of the entire Y.Doc.
+Replace locationOptionalTags exactly, including explicit removals of defaults;
+an omitted field restores bank/errand defaults for legacy backups.
 
 22.7 Both import modes commit their domain replacement/merge as one ordinary
 undoable transaction. Preserve supplied record timestamps except for derived

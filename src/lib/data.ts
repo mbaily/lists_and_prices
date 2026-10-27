@@ -1204,6 +1204,7 @@ export interface BackupFile {
 	sheets?: BackupSheet[];
 	smartFolders?: Record<string, string[]>;
 	customLocations?: RetailLocation[];
+	locationOptionalTags?: string[];
 	startingLocation?: StartingLocation | null;
 	nearbyLocationFilterEnabled?: boolean;
 	hotSuburbIds?: string[];
@@ -1229,6 +1230,7 @@ export function exportBackup(): BackupFile {
 		sheets: readSheets().map(sheet => ({ ...sheet, cells: readCells(sheet.id) })),
 		smartFolders: readReportAssignments(getDoc()),
 		customLocations: readCustomLocations(),
+		locationOptionalTags: readLocationOptionalTags(),
 		startingLocation: readStartingLocation(),
 		nearbyLocationFilterEnabled: readNearbyLocationFilterEnabled(),
 		hotSuburbIds: readHotSuburbIds(),
@@ -1246,7 +1248,7 @@ export function exportBackup(): BackupFile {
 export function validateBackup(value: unknown): asserts value is BackupFile {
 	if (!isRecord(value)) throw new Error('Invalid backup: expected a JSON object.');
 	if (value.version !== 1 && value.version !== 2) throw new Error(`Unsupported backup version: ${String(value.version)}. Update the app if this file came from a newer release.`);
-	const fields = new Set(['version', 'exported', 'folders', 'lists', 'items', 'sheets', 'smartFolders', 'customLocations', 'startingLocation', 'nearbyLocationFilterEnabled', 'hotSuburbIds', 'nearbyPreviewLimit', 'nearbyRecentlyModifiedFirst', 'nearbyChecklist', 'pausedErrandTags', 'pausedErrandItemIds']);
+	const fields = new Set(['version', 'exported', 'folders', 'lists', 'items', 'sheets', 'smartFolders', 'customLocations', 'locationOptionalTags', 'startingLocation', 'nearbyLocationFilterEnabled', 'hotSuburbIds', 'nearbyPreviewLimit', 'nearbyRecentlyModifiedFirst', 'nearbyChecklist', 'pausedErrandTags', 'pausedErrandItemIds']);
 	for (const key of Object.keys(value)) if (!fields.has(key)) throw new Error(`Unrecognized backup section: ${key}. This backup may require a newer app.`);
 	if (value.exported !== undefined && (typeof value.exported !== 'string' || !Number.isFinite(Date.parse(value.exported)))) throw new Error('Invalid backup export date.');
 	const backup = value as unknown as BackupFile;
@@ -1256,6 +1258,7 @@ export function validateBackup(value: unknown): asserts value is BackupFile {
 	if (backup.items.some(item => typeof item.listId !== 'string' || !item.listId.trim())) throw new Error('Invalid item listId.');
 	validateRecords(backup.sheets === undefined ? [] : backup.sheets, 'sheets');
 	validateLocations(backup.customLocations === undefined ? [] : backup.customLocations);
+	if (backup.locationOptionalTags !== undefined && (!Array.isArray(backup.locationOptionalTags) || backup.locationOptionalTags.some(tag => typeof tag !== 'string' || !/^#?\w+$/.test(tag)))) throw new Error('Invalid location-free errand hashtags.');
 	if (backup.pausedErrandTags !== undefined && (!Array.isArray(backup.pausedErrandTags) || backup.pausedErrandTags.some(tag => typeof tag !== 'string' || !/^#?\w+$/.test(tag)))) throw new Error('Invalid paused errand tags.');
 	if (backup.pausedErrandItemIds !== undefined && (!Array.isArray(backup.pausedErrandItemIds) || backup.pausedErrandItemIds.some(id => typeof id !== 'string' || !id.trim()))) throw new Error('Invalid paused errand item ids.');
 	if (backup.startingLocation != null && !isStartingLocation(backup.startingLocation)) throw new Error('Invalid starting location.');
@@ -1355,6 +1358,15 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 		const locations = doc.getMap<RetailLocation>('custom-locations');
 		if (mode === 'replace') locations.clear();
 		for (const location of backup.customLocations ?? []) locations.set(location.id, { ...location, tags: [...location.tags] });
+		const optionalTags = doc.getMap<boolean>('location-optional-tags');
+		if (mode === 'replace') optionalTags.clear();
+		if (backup.locationOptionalTags !== undefined) {
+			const restored = new Set(backup.locationOptionalTags.map(normalizeLocationTag));
+			if (mode === 'replace') {
+				for (const tag of DEFAULT_LOCATION_OPTIONAL_TAGS) optionalTags.set(tag, restored.has(tag));
+			}
+			for (const tag of restored) optionalTags.set(tag, true);
+		}
 		const preferences = doc.getMap('nearby-preferences');
 		if (backup.startingLocation != null) preferences.set('starting-location', { ...backup.startingLocation });
 		else if (mode === 'replace' || backup.startingLocation === null) preferences.delete('starting-location');
@@ -1450,6 +1462,26 @@ export function setNearbyTodoDone(id: string, done: boolean): void {
 	const boxes = folder?.checkboxes ?? [];
 	if (boxes.length) setItemCheckboxState(id, boxes[boxes.length - 1].id, done);
 	else updateItem(id, { checked: done });
+}
+
+const DEFAULT_LOCATION_OPTIONAL_TAGS = ['bank', 'errand'];
+
+/** Missing entries retain the defaults; explicit false values make removals sync. */
+export function readLocationOptionalTags(): string[] {
+	const tags = new Set(DEFAULT_LOCATION_OPTIONAL_TAGS);
+	for (const [tag, enabled] of getDoc().getMap<boolean>('location-optional-tags')) {
+		if (!/^\w+$/.test(tag) || typeof enabled !== 'boolean') continue;
+		if (enabled) tags.add(tag);
+		else tags.delete(tag);
+	}
+	return [...tags].sort();
+}
+
+export function setLocationOptionalTag(tag: string, enabled: boolean): void {
+	if (typeof tag !== 'string' || typeof enabled !== 'boolean') throw new Error('Invalid location-free errand hashtag.');
+	const normalized = normalizeLocationTag(tag);
+	if (!/^\w+$/.test(normalized)) throw new Error('Use one hashtag with letters, numbers or underscores.');
+	getMutableDoc().getMap<boolean>('location-optional-tags').set(normalized, enabled);
 }
 
 export function readCustomLocations(): RetailLocation[] {

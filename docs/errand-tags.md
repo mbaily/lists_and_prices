@@ -9,7 +9,7 @@ These come from the deployed catalogue of 4,787 retail locations, 549 suburbs, y
 
 Tags are case-insensitive. Put a tag in a list name to apply it to its untagged items, or tag an individual item. An item with its own recognised errand tag uses that tag instead of inheriting the list tags. Folder hashtags are not inherited.
 
-This is every recognised tag in the updated catalogue and server snapshot, regardless of distance, completion, dismissal or pause state. More tags can be registered by adding them to a saved location.
+This is every recognised tag in the updated catalogue and server snapshot, regardless of distance, completion, dismissal or pause state. More tags can be registered by adding them to a saved location. The app now also has an editable **Location-free errand hashtags** list, initially `#bank` and `#errand`; adding a tag there makes it eligible without a saved location. The snapshot below predates that editor.
 
 ## Errand tags already used in your lists and items
 

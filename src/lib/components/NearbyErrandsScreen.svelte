@@ -5,10 +5,11 @@
     import { suburbLocations } from '$lib/suburbLocations';
     import { nearbyTaskPills, nearbyListPills } from '$lib/nearbyPills';
     import { readNearbyRecentlyModifiedFirst, saveNearbyRecentlyModifiedFirst } from '$lib/data';
+    import { readLocationOptionalTags, setLocationOptionalTag } from '$lib/data';
     import { groupErrands, errandPreview } from '$lib/errandGroups';
     import { docState, commitState } from '$lib/yjsStore.svelte';
     import { updateList, readFolders, readLists, readAllItems, readCustomLocations, saveCustomLocation, deleteCustomLocation, readStartingLocation, saveStartingLocation, readNearbyLocationFilterEnabled, saveNearbyLocationFilterEnabled, readHotSuburbIds, saveHotSuburbIds, readNearbyPreviewLimit, saveNearbyPreviewLimit, isItemDone, readNearbyChecklist, nearbyItemFingerprint, rememberNearbyChecklist, dismissNearbyChecklist, setNearbyTodoDone, readPausedErrandTags, setErrandTagPaused, readPausedErrandItemIds, setErrandItemPaused } from '$lib/data';
-    import { collectErrands, nearbyStops, suggestStops, isErrandPaused, isLocationOptionalErrand, locationOptionalTag, LOCATION_OPTIONAL_TAGS, type NearbyStop, type Errand } from '$lib/nearbyErrands';
+    import { collectErrands, nearbyStops, suggestStops, isErrandPaused, isLocationOptionalErrand, locationOptionalTag, type NearbyStop, type Errand } from '$lib/nearbyErrands';
     import { availableLocationTags, matchingLocationTags, validCoordinates, normalizeLocationTag, type Coordinates, type RetailLocation } from '$lib/retailLocations';
     import ConfirmDialog from './ConfirmDialog.svelte';
     import HelpText from './HelpText.svelte';
@@ -66,11 +67,27 @@
     });
 
     const customLocations = $derived.by(() => { void docState.version; return readCustomLocations(); });
+    const locationOptionalTags = $derived.by(() => { void docState.version; return readLocationOptionalTags(); });
+    let newOptionalTag = $state('');
+    let optionalTagError = $state('');
+    function addOptionalTag() {
+        if (commitState.isHistorical) return;
+        optionalTagError = '';
+        try {
+            setLocationOptionalTag(newOptionalTag, true);
+            newOptionalTag = '';
+        } catch (error) {
+            optionalTagError = error instanceof Error ? error.message : 'Could not add hashtag.';
+        }
+    }
+    function removeOptionalTag(tag: string) {
+        if (!commitState.isHistorical) setLocationOptionalTag(tag, false);
+    }
     const customStartingPoints = $derived(customLocations.filter(location => location.startingPoint === true));
     const locations = $derived([...catalogue.locations, ...suburbLocations, ...customLocations] as RetailLocation[]);
     const availableTags = $derived.by(() => {
         const tags = availableLocationTags(locations);
-        for (const tag of LOCATION_OPTIONAL_TAGS) {
+        for (const tag of locationOptionalTags) {
             if (!tags.some(entry => entry.tag === tag)) tags.push({ tag, count: 0 });
         }
         return tags.sort((a, b) => a.tag.localeCompare(b.tag));
@@ -287,7 +304,7 @@
         <button class="manage" onclick={() => showLocations = !showLocations}>{showLocations ? 'Errands' : 'Locations'}</button>
     </header>
     <main>
-        {#if commitState.isHistorical}<p class="notice">Viewing historical todos and custom locations. Exit history to make changes.</p>{/if}
+        {#if commitState.isHistorical}<p class="notice">Viewing historical todos, custom locations and errand hashtags. Exit history to make changes.</p>{/if}
         <section class="nearby-strip" aria-labelledby="nearby-strip-heading">
             <button class="recently-modified-toggle" class:active={recentlyModifiedFirst}
                 aria-label="Recently modified first" aria-pressed={recentlyModifiedFirst}
@@ -394,7 +411,7 @@
             {/if}
             <section class="task-checklist" aria-labelledby="matched-tasks-heading">
                 <div class="checklist-heading"><h2 id="matched-tasks-heading">Matched tasks ({checklistGroups.length})</h2>{#if completedChecklist.length}<button disabled={commitState.isHistorical} onclick={clearCompletedTasks}>Clear completed</button>{/if}</div>
-                <HelpText label="Help with matched tasks"><p class="hint">Ticks update the original todos. Completed tasks stay until cleared. Dismissed notes and unchecked tasks return when edited; checked todos stay completed. Expand a grouped errand to manage its individual tasks. Tasks using inherited hashtags share an errand; tasks with their own errand hashtags stay separate. The group checkbox completes only its parent list and hides inherited tasks; individual task checkboxes stay unchanged. Tasks with their own errand hashtags remain visible. The count is the number of errands. This checklist syncs across devices. Use #bank for banking or #errand for general errands with no set location.</p></HelpText>
+                <HelpText label="Help with matched tasks"><p class="hint">Ticks update the original todos. Completed tasks stay until cleared. Dismissed notes and unchecked tasks return when edited; checked todos stay completed. Expand a grouped errand to manage its individual tasks. Tasks using inherited hashtags share an errand; tasks with their own errand hashtags stay separate. The group checkbox completes only its parent list and hides inherited tasks; individual task checkboxes stay unchanged. Tasks with their own errand hashtags remain visible. The count is the number of errands. This checklist syncs across devices. Manage tags for tasks with no set location under Location-free errand hashtags below.</p></HelpText>
                 <ul class="errand-groups">{#each checklistGroups as group (group.id)}
                     {#snippet errandRows()}
                         {#each group.rows as row (row.errand.item.id)}
@@ -441,9 +458,27 @@
                 {/if}
             {/if}
         {/if}
+        <details class="location-free-tags" open>
+            <summary>Location-free errand hashtags ({locationOptionalTags.length})</summary>
+            <p class="hint">Tasks and lists with these hashtags appear in Nearby and Matched tasks without a saved destination or starting point. Add your own, such as #shopping. This list syncs across your devices and is included in backups.</p>
+            <form onsubmit={(event) => { event.preventDefault(); addOptionalTag(); }}>
+                <fieldset disabled={commitState.isHistorical}>
+                    <label>New location-free hashtag<input bind:value={newOptionalTag} required placeholder="#shopping" aria-describedby="optional-tag-format" /></label>
+                    <p class="hint" id="optional-tag-format">Use one hashtag with letters, numbers or underscores.</p>
+                    <button class="primary" type="submit">Add hashtag</button>
+                </fieldset>
+                {#if optionalTagError}<p class="error" role="alert">{optionalTagError}</p>{/if}
+            </form>
+            <ul class="optional-tag-list">
+                {#each locationOptionalTags as tag (tag)}
+                    <li><strong>#{tag}</strong><button disabled={commitState.isHistorical} onclick={() => removeOptionalTag(tag)} aria-label={`Remove #${tag} from location-free errands`}>Remove</button></li>
+                {:else}<li class="hint">No location-free hashtags. Add one above to include errands without a saved destination.</li>{/each}
+            </ul>
+            <p class="hint">Removing a hashtag stops it including tasks without a matching location. Existing tasks keep their hashtags.</p>
+        </details>
         <details class="available-tags">
             <summary>Available location hashtags</summary>
-            <HelpText label="Help with location hashtags"><p class="hint">Add these hashtags to a list name to match its todos and notes, or tag individual items. Item errand hashtags take precedence over list hashtags. Unrelated hashtags such as #urgent still inherit the list’s errand hashtags. #bank and #errand keep tasks nearby without a saved location. Counts cover all locations in the database, including your saved places. #supermarket matches Coles, Woolworths and Aldi.</p></HelpText>
+            <HelpText label="Help with location hashtags"><p class="hint">Add these hashtags to a list name to match its todos and notes, or tag individual items. Item errand hashtags take precedence over list hashtags. Unrelated hashtags such as #urgent still inherit the list’s errand hashtags. Your location-free errand hashtags also appear here. Counts cover all locations in the database, including your saved places. #supermarket matches Coles, Woolworths and Aldi.</p></HelpText>
             <HelpText label="Help with suburb hashtags"><p class="hint">Melbourne suburbs are also available: #brunswick, #richmond or #brunswickeast. Suburb hashtags point to approximate suburb centres; remove spaces from multi-word names.</p></HelpText>
             <label class="tag-search">Find a location hashtag<input type="search" bind:value={tagQuery} placeholder="e.g. bunnings, brunswick or st kilda" /></label>
             {#if selectedTag}
@@ -453,13 +488,13 @@
                     <ul class="tag-location-list">
                         {#each selectedTagLocations as location (location.id)}
                             <li><div><strong>{location.name}</strong>{#if location.address}<p>{location.address}</p>{/if}</div><a href={directions(location)} target="_blank" rel="noopener noreferrer" aria-label={`Directions to ${location.name}`}>Directions ↗</a></li>
-                        {:else}<li class="hint">{LOCATION_OPTIONAL_TAGS.includes(selectedTag) ? 'Choose the destination yourself. These tasks appear nearby without saved locations.' : 'No locations for this hashtag.'}</li>{/each}
+                        {:else}<li class="hint">{locationOptionalTags.includes(selectedTag) ? 'Choose the destination yourself. These tasks appear nearby without saved locations.' : 'No locations for this hashtag.'}</li>{/each}
                     </ul>
                 </section>
             {/if}
             <ul class="tag-list">
                 {#each visibleTags as entry (entry.tag)}
-                    <li><button class:chosen={selectedTag === entry.tag} aria-pressed={selectedTag === entry.tag} onclick={() => selectTag(entry.tag)}><strong>#{entry.tag}</strong><span>{#if LOCATION_OPTIONAL_TAGS.includes(entry.tag) && entry.count === 0}No location needed{:else}{entry.count} location{entry.count === 1 ? '' : 's'}{/if}</span></button></li>
+                    <li><button class:chosen={selectedTag === entry.tag} aria-pressed={selectedTag === entry.tag} onclick={() => selectTag(entry.tag)}><strong>#{entry.tag}</strong><span>{#if locationOptionalTags.includes(entry.tag)}No location needed{:else}{entry.count} location{entry.count === 1 ? '' : 's'}{/if}</span></button></li>
                 {:else}<li>{availableTags.length ? 'No matching hashtags.' : 'No location hashtags yet. Add a place in Locations.'}</li>{/each}
             </ul>
             {#if !tagQuery.trim() && availableTags.length > 12}<button onclick={() => showAllTags = !showAllTags}>{showAllTags ? 'Show fewer hashtags' : `Show all ${availableTags.length} hashtags`}</button>{/if}
@@ -544,6 +579,10 @@
     .pause-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
     .paused-errands { margin: 1rem auto; border: 1px solid var(--border); border-radius: 8px; padding: 0 .8rem .8rem; }
     .available-tags, .alternatives { margin-top: 1.2rem; }
+    .location-free-tags { margin-top: 1.2rem; border: 1px solid var(--border); border-radius: 8px; padding: 0 .8rem .8rem; }
+    .optional-tag-list li { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .5rem 0; overflow-wrap: anywhere; }
+    .optional-tag-list strong { min-width: 0; }
+    .optional-tag-list button { flex-shrink: 0; }
     summary { cursor: pointer; padding: .75rem 0; font-weight: 600; }
     .coverage { font-weight: 600; line-height: 1.5; }
     .match-count { color: var(--accent); font-size: .85rem; margin: .6rem 0 0; }

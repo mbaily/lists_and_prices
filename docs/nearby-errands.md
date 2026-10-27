@@ -72,23 +72,40 @@ Select a hashtag button to browse its matching locations, addresses and directio
 in a scrollable panel. Selecting another hashtag replaces the list; × closes it.
 
 **Matched tasks**, below the radius selector and Paused errands, is a persistent checklist of items
-with a location match in the database, `#bank` errands, plus previously seen tasks still active.
+with a location match in the database, location-free errands, plus previously seen tasks still active.
 Todos have checkboxes linked to their original completion state; notes are plain
 listings. With named folder checkboxes, the nearby checkbox controls the last
 completion checkbox and preserves the other checks. Each item appears once.
 Tasks outside the selected radius remain listed with an explanation.
 
-Use `Withdraw cash #bank` or name a list `Banking #bank` for bank and ATM
+### Location-free errand hashtags
+
+The **Location-free errand hashtags** section lets you add and remove hashtags
+that qualify without a saved destination or starting point. It starts with
+`#bank` and `#errand`. Add `#shopping`, for example, to include existing and future
+tasks tagged `#shopping`, or put it on a list to include its inheriting tasks.
+Enter one hashtag at a time, using letters, numbers or underscores; case and
+an optional leading `#` are normalized.
+
+Removing a hashtag removes its location-free behavior without editing any
+tasks. The tag can still qualify through a registered location, and tasks can
+inherit another recognized tag from their list. You can remove both defaults
+and leave the list empty. Changes sync across devices, support undo and history,
+and are included in JSON backups. Restoring replaces the list exactly, including
+an empty list; merging adds the supplied tags. Older backups without this field
+preserve the current list when merged and restore the defaults when replaced.
+
+With `#bank` in your list, use `Withdraw cash #bank` or name a list `Banking #bank` for bank and ATM
 reminders. These appear without a saved location or starting point, labelled
 **Choose a bank or ATM yourself**. Tick, dismiss, pause and resume them like other
 errands. They do not count as missing nearby matches or toward location coverage
 unless a saved matching location is inside the radius. You can optionally save a
-favourite bank with the `bank` tag. `#bank` is always available in the hashtag browser;
+favourite bank with the `bank` tag. `#bank` is available in the hashtag browser while enabled;
 no bank or ATM catalogue is required.
 Bank errands also appear as `#bank` pills in **Nearby**, and sort with nearby
 matches at the top of **Matched tasks**, even without a saved bank or ATM location.
 
-Use `#errand` for general tasks with no set location, such as `Post a letter #errand`,
+With `#errand` enabled, use it for general tasks with no set location, such as `Post a letter #errand`,
 or put it on a list to apply to its untagged todos and notes. Like `#bank`, it
 appears in **Nearby** and at the top of **Matched tasks** without a starting point
 or a saved destination. You can complete, dismiss or pause it, and it does not
@@ -148,12 +165,14 @@ keep their item hashtags and inherit hashtags from their list's name. For exampl
 `Milk #urgent` still matches supermarkets and shares the list's errand.
 An item qualifies only when its effective hashtags contain a recognised errand
 tag. Ordinary hashtags such as `#supplies_photos` or `#tools` do not introduce
-items into Nearby errands unless registered on a location. A remembered checklist
+items into Nearby errands unless registered on a location or added to your
+location-free errand hashtags. A remembered checklist
 entry or pause does not override this requirement. Removing the last location
 supporting a custom tag can remove its errands or cause them to inherit list tags.
 Recognised tags come from the whole location catalogue, suburbs and saved places,
-plus `#bank` and `#errand`, regardless of distance. Adding or deleting a saved
-place can change whether its hashtag overrides the list.
+plus your location-free errand hashtags, regardless of distance. Adding or deleting
+a saved place or changing your location-free tags can change whether a hashtag
+overrides the list.
 Folder hashtags are not inherited. Completing a list hides its inherited errands;
 incomplete items with their own recognised errand hashtags remain eligible.
 Headings, archived lists/folders and completed todos are excluded. Notes are included.

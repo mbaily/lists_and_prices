@@ -285,9 +285,9 @@ export const helpTopics: HelpTopic[] = [
 			{
 				title: 'Give your errands a location hashtag',
 				paragraphs: [
-					'Nearby errands matches tasks and notes to places using hashtags. Try Milk #supermarket, Paper #officeworks or Screws #hardware. A hashtag on a list name applies to items without their own recognised errand hashtags. Milk #urgent still inherits Shopping #supermarket; Bread #coles uses its own destination. Recognition uses the whole catalogue, suburbs and saved places, plus #bank and #errand, regardless of distance. Folder tags are not inherited.',
+					'Nearby errands matches tasks and notes to places using hashtags. Try Milk #supermarket, Paper #officeworks or Screws #hardware. A hashtag on a list name applies to items without their own recognised errand hashtags. Milk #urgent still inherits Shopping #supermarket; Bread #coles uses its own destination. Recognition uses the whole catalogue, suburbs and saved places, plus your location-free errand hashtags, regardless of distance. Folder tags are not inherited.',
 					'Open 🚗 in the home header. Expand Available location hashtags to discover supported brands, shopping centres and suburbs. Search for a brand or choose Show all hashtags, then select a hashtag to browse matching locations and addresses. Suburb tags such as #brunswick use approximate suburb centres.',
-					'Use #bank for a bank or ATM reminder and #errand for a general task without a fixed destination. These can appear without a starting point or saved place. Bank reminders ask you to choose the bank or ATM yourself.'
+					'Location-free errand hashtags starts with #bank and #errand. Add your own, such as #shopping, or remove tags in that section of Nearby errands. Matching tasks and lists appear without a starting point or saved destination. Removing a tag keeps the original task text and any matching locations. Your tag list syncs across devices, supports undo and history, and is included in backups. Bank reminders ask you to choose the bank or ATM yourself.'
 				]
 			},
 			{

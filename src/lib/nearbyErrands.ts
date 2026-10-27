@@ -1,4 +1,4 @@
-import { isItemDone, isListEffectivelyArchived, readCustomLocations, type Item, type ListMeta, type Folder } from './data';
+import { isItemDone, isListEffectivelyArchived, readCustomLocations, readLocationOptionalTags, type Item, type ListMeta, type Folder } from './data';
 import { extractTags } from './tags';
 import { availableLocationTags, distanceKm, matchingLocationTags, normalizeLocationTag, validCoordinates, type Coordinates, type RetailLocation } from './retailLocations';
 import catalogue from './locations/melbourne.json';
@@ -9,13 +9,12 @@ export interface Errand { item: Item; list: ListMeta; tags: string[]; inheritsLi
 export interface NearbyStop { location: RetailLocation; distanceKm: number | null; errands: Errand[] }
 export interface SuggestedStops { suggested: NearbyStop[]; alternatives: NearbyStop[]; unavailable: Errand[] }
 
-export const LOCATION_OPTIONAL_TAGS = ['bank', 'errand'];
-
 export function locationOptionalTag(errand: Errand): string | undefined {
-    return errand.tags.map(normalizeLocationTag).find(tag => LOCATION_OPTIONAL_TAGS.includes(tag));
+    const tags = readLocationOptionalTags();
+    return errand.tags.map(normalizeLocationTag).find(tag => tags.includes(tag));
 }
 
-/** General and banking errands work without a saved destination. */
+/** User-defined location-free errands work without a saved destination. */
 export function isLocationOptionalErrand(errand: Errand): boolean {
     return locationOptionalTag(errand) !== undefined;
 }
@@ -79,7 +78,7 @@ const defaultLocations: RetailLocation[] = [...catalogue.locations, ...suburbLoc
 
 /** Only recognized errand tags qualify; unrelated item tags still inherit list tags. */
 export function collectErrands(items: Item[], lists: ListMeta[], folders: Folder[], includeCompleted = false, locations: readonly RetailLocation[] = [...defaultLocations, ...readCustomLocations()]): Errand[] {
-    const errandTags = new Set([...LOCATION_OPTIONAL_TAGS, ...availableLocationTags(locations).map(entry => entry.tag)]);
+    const errandTags = new Set([...readLocationOptionalTags(), ...availableLocationTags(locations).map(entry => entry.tag)]);
     const availableLists = new Map(lists.filter(list => list.type !== 'divider' && !isListEffectivelyArchived(list, folders)).map(list => [list.id, list]));
     const folderMap = new Map(folders.map(folder => [folder.id, folder]));
     const itemsByList = new Map<string, Item[]>();
