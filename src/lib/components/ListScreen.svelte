@@ -1762,6 +1762,7 @@
 		{#each filteredTreeItems as {item, level, tlIdx, rootTlIdx, sibIdx}}
 			{@const canAddChildren = !item.heading && level < 2}
 			{@const linkParts = parseNameParts(item.name)}
+			{@const includedBillSections = item.heading ? [] : findBillSections(item.name)}
 			{@const itemLinks = linkParts.filter(p => p.type === 'url').map(p => p.value)}
 			{@const parentKey = item.parentId ?? '__top__'}
 			<div
@@ -1769,6 +1770,7 @@
 				class="item-row"
 				class:linked-item={highlightItemId === item.id}
 				class:journal-mode={journalMode}
+				class:has-bills={includedBillSections.length > 0}
 				class:cursored={activeCursorId === item.id}
 				class:heading={item.heading}
 				class:note={item.note}
@@ -1940,8 +1942,10 @@
 					<div class="journal-date">{formatJournalDate(item.createdAt)}</div>
 				{/if}
 			</div>
-			{#if !item.heading && findBillSections(item.name).length}
-				<BillsInclude sections={findBillSections(item.name)} />
+			{#if includedBillSections.length}
+				<div class="item-bills" style={level > 0 ? `padding-left:${level * 1.5}rem` : undefined}>
+					<BillsInclude sections={includedBillSections} />
+				</div>
 			{/if}
 		{/each}
 	</div>
@@ -2450,6 +2454,8 @@
 		transition: background 0.15s, opacity 0.15s;
 		line-height: var(--row-line-height, normal);
 	}
+	.item-row.has-bills { border-bottom: 0; }
+	.item-bills { border-bottom: 1px solid var(--border); }
 	.item-row.journal-mode {
 		flex-wrap: wrap;
 	}
