@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount } from 'svelte';
 	import { yjsUrl } from '$lib/urls';
 	import { auth, checkSession, logout } from '$lib/auth.svelte';
-	import { initYjs, destroyYjs } from '$lib/yjsStore.svelte';
+	import { initYjs, destroyYjs, idbSynced, localSaveState } from '$lib/yjsStore.svelte';
 	import { reconcileSessionDocument } from '$lib/sessionDocument';
 	import { reloadSettings } from '$lib/settings.svelte';
 	import LoginScreen from '$lib/components/LoginScreen.svelte';
@@ -12,7 +12,7 @@
 
 	onMount(() => {
 		const loadedUsername = auth.username;
-		// Optimistically load the app from local storage immediately so there's no delay
+		// Start restoring local data immediately, without waiting for the session check.
 		if (auth.username) {
 			reloadSettings();
 			initYjs(auth.username, yjsUrl());
@@ -35,7 +35,9 @@
 	}
 </script>
 
-{#if !ready}
+<!-- Render the first complete local view, including pins, once IndexedDB is restored.
+     Storage errors must still leave the app's settings and sync information accessible. -->
+{#if !ready || (auth.username && !idbSynced.done && localSaveState.status !== 'error')}
 	<div class="splash">Loading…</div>
 {:else if !auth.username}
 	<LoginScreen
