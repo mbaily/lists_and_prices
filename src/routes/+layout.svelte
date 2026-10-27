@@ -3,14 +3,12 @@
 	import { registerSW } from 'virtual:pwa-register';
 	import { applyTheme, applyItemSpacing } from '$lib/settings.svelte';
 	import { watchBrowserStorage } from '$lib/browserStorage.svelte';
-	import { installDataRefresh } from '$lib/dataRefresh';
-	import { getDocumentUsername, idbSynced, reconnectYjs, refreshSyncPreference, saveLocalData, syncNow } from '$lib/yjsStore.svelte';
+	import { reconnectYjs, refreshSyncPreference, saveLocalData } from '$lib/yjsStore.svelte';
 	import '../app.css';
 
 	let { children } = $props();
 
 	onMount(() => {
-		const stopDataRefresh = installDataRefresh(window, () => idbSynced.done && getDocumentUsername() !== null, syncNow);
 		registerSW({ immediate: true });
 		applyTheme();
 		applyItemSpacing();
@@ -28,7 +26,6 @@
 		window.addEventListener('storage', storage);
 		document.addEventListener('visibilitychange', visibility);
 		return () => {
-			stopDataRefresh();
 			stopStorage();
 			window.removeEventListener('online', reconnectYjs);
 			window.removeEventListener('storage', storage);
