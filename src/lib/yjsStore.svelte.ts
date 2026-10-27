@@ -50,7 +50,8 @@ export const syncState = $state<{
 	lastSyncAt: number | null; error: string | null;
 	hasServerState: boolean;
 	target: 'server' | 'laptop';
-}>({ status: 'offline', automatic: true, syncing: false, pending: true, lastSyncAt: null, error: null, hasServerState: false, target: 'server' });
+	download: { received: number; total: number | null } | null;
+}>({ download: null, status: 'offline', automatic: true, syncing: false, pending: true, lastSyncAt: null, error: null, hasServerState: false, target: 'server' });
 export const commitState = $state<{ isHistorical: boolean, commitId: string | null }>({ isHistorical: false, commitId: null });
 
 
@@ -210,7 +211,7 @@ export function destroyYjs() {
 	_undoManager = null;
 	_wsProvider = null;
 	_idbProvider = null;
-	Object.assign(syncState, { status: 'offline', syncing: false, pending: true, lastSyncAt: null, error: null, hasServerState: false });
+	Object.assign(syncState, { status: 'offline', syncing: false, pending: true, lastSyncAt: null, error: null, hasServerState: false, download: null });
 	localSaveState.status = 'loading';
 	localSaveState.error = null;
 	docState.version = 0;
@@ -303,7 +304,33 @@ export function syncNow(): Promise<void> {
 			throw new Error('Sign in again to sync. Your offline changes are kept.');
 		}
 		if (!response.ok) throw new Error('Server sync failed. Your local changes are kept.');
-		const message = decodeSyncMessage(new Uint8Array(await response.arrayBuffer()));
+		let bytes: Uint8Array;
+		if (path === '/api/sync/state' && response.body) {
+			const length = response.headers.get('Content-Length');
+			const size = length !== null && /^\d+$/.test(length) ? Number(length) : NaN;
+			// Fetch exposes decoded bytes, while Content-Length may describe compressed bytes.
+			const total = !response.headers.get('Content-Encoding') && Number.isSafeInteger(size) && size > 0 ? size : null;
+			syncState.download = { received: 0, total };
+			const reader = response.body.getReader();
+			const chunks: Uint8Array[] = [];
+			let received = 0;
+			try {
+				while (true) {
+					const { done, value } = await reader.read();
+					if (done) break;
+					if (!current()) throw new DOMException('Sync cancelled', 'AbortError');
+					chunks.push(value);
+					received += value.length;
+					syncState.download = { received, total: total !== null && received <= total ? total : null };
+				}
+			} finally { reader.releaseLock(); }
+			bytes = new Uint8Array(received);
+			let offset = 0;
+			for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+		} else {
+			bytes = new Uint8Array(await response.arrayBuffer());
+		}
+		const message = decodeSyncMessage(bytes);
 		if (message.username !== username) throw new Error('The server returned a different account. Sync stopped.');
 		syncState.target = response.headers?.get('X-Lists-Sync-Target') === 'laptop' ? 'laptop' : 'server';
 		try { localStorage.setItem(`pnl_sync_target:${username}`, syncState.target); } catch { /* Optional display preference. */ }
@@ -352,6 +379,7 @@ export function syncNow(): Promise<void> {
 			clearTimeout(timeout);
 			if (_doc === doc && _syncAbort === controller) {
 				syncState.syncing = false;
+				syncState.download = null;
 				_syncRequest = null;
 				_syncAbort = null;
 				if (syncState.pending && !auth.needsLogin && (typeof navigator === 'undefined' || navigator.onLine)) scheduleSync(syncState.error ? 30_000 : 1500);

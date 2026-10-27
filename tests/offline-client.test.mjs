@@ -317,3 +317,34 @@ test('a controlling worker with missing cached assets is not reported as offline
 		globalThis.caches = previous.caches;
 	}
 });
+
+test('initial server download reports streamed bytes and applies the complete update', async () => {
+	let app, finish, started;
+	const waiting = new Promise(resolve => { started = resolve; });
+	const remote = new Y.Doc({ gc: false });
+	remote.getMap('items').set('streamed', 'data');
+	app = client({ storage: [['pnl_sync:alice', 'manual']], fetch: async (path, init) => {
+		const { encodeSyncMessage, decodeSyncMessage } = app.load('src/lib/syncProtocol.ts');
+		const message = decodeSyncMessage(init.body);
+		const bytes = encodeSyncMessage('alice', Y.encodeStateVector(remote), Y.encodeStateAsUpdate(remote, message.vector));
+		if (path !== '/api/sync/state') return new Response(bytes);
+		const split = Math.floor(bytes.length / 2);
+		return new Response(new ReadableStream({
+			start(controller) {
+				controller.enqueue(bytes.slice(0, split));
+				finish = () => { controller.enqueue(bytes.slice(split)); controller.close(); };
+				started({ split, total: bytes.length });
+			}
+		}), { headers: { 'Content-Length': String(bytes.length) } });
+	} });
+	try {
+		const pending = app.store.syncNow();
+		const { split, total } = await waiting;
+		while (app.store.syncState.download?.received !== split) await new Promise(resolve => setTimeout(resolve, 0));
+		assert.deepEqual(app.store.syncState.download, { received: split, total });
+		finish();
+		await pending;
+		assert.equal(app.doc.getMap('items').get('streamed'), 'data');
+		assert.equal(app.store.syncState.download, null);
+	} finally { app.dispose(); remote.destroy(); }
+});

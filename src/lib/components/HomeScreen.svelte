@@ -935,6 +935,12 @@
 		'Loading your data from the server…'
 	);
 
+	function formatDownloadBytes(bytes: number) {
+		if (bytes < 1024) return `${bytes} B`;
+		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+	}
+
 	// ── Quick Add actions ─────────────────────────────────────────────────────────
 	function toggleQuickAdd() {
 		if (commitState.isHistorical) return;
@@ -1834,6 +1840,9 @@ ${bodyHtml}
 		{:else if awaitingInitialSync}
 			<div class="empty-prompt" role="status" aria-live="polite">
 				<p>{initialSyncMessage}</p>
+				{#if syncState.download && !syncState.error && !auth.needsLogin}
+					<p>Downloaded {formatDownloadBytes(syncState.download.received)}{#if syncState.download.total !== null} of {formatDownloadBytes(syncState.download.total)} ({Math.min(100, Math.floor(syncState.download.received / syncState.download.total * 100))}%){/if}</p>
+				{/if}
 			</div>
 		{/if}
 
