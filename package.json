@@ -1,7 +1,7 @@
 {
 	"name": "list-svelt5",
 	"private": true,
-	"version": "0.0.23",
+	"version": "0.0.24",
 	"type": "module",
 	"packageManager": "npm@12.2.0",
 	"scripts": {

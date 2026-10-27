@@ -41,7 +41,7 @@
 				{:else}<ul>{#each (data[section] as unknown[]) as row}{#if row && typeof row === 'object' && !Array.isArray(row)}<li>{billLine(row as Record<string, unknown>, section)}</li>{/if}{/each}</ul>{/if}
 			</section>
 		{/each}
-		<button onclick={refresh}>Refresh bills</button>
+		<button class="refresh" onclick={refresh} aria-label="Refresh bills" title="Refresh bills">↻</button>
 	{/if}
 </div>
 <style>
@@ -50,4 +50,5 @@
 	p, ul { margin: .25rem 0; }
 	ul { padding-left: 1.2rem; }
 	button { color: inherit; cursor: pointer; }
+	.refresh { border: 0; background: transparent; padding: .15rem .35rem; font-size: 1.2rem; line-height: 1; }
 </style>
