@@ -9,6 +9,7 @@
 	let { children } = $props();
 
 	onMount(() => {
+		document.getElementById('startup-loading')?.remove();
 		registerSW({ immediate: true });
 		applyTheme();
 		applyItemSpacing();

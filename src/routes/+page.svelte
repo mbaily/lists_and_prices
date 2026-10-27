@@ -50,4 +50,17 @@
 			<HomeScreen onLogout={handleLogout} />
 		{/key}
 	{/if}
+{:else}
+	<div class="startup-message" role="status">{ready ? 'Loading data from this device…' : 'Starting the app…'}</div>
 {/if}
+
+<style>
+	.startup-message {
+		position: fixed;
+		inset: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--text2);
+	}
+</style>
