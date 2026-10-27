@@ -37,28 +37,17 @@
 
 <!-- Render the first complete local view, including pins, once IndexedDB is restored.
      Storage errors must still leave the app's settings and sync information accessible. -->
-{#if !ready || (auth.username && !idbSynced.done && localSaveState.status !== 'error')}
-	<div class="splash">Loading…</div>
-{:else if !auth.username}
-	<LoginScreen
-		onLogin={(username: string) => {
-			reloadSettings(); // auth.username is set before this callback, load their settings
-			initYjs(username, yjsUrl());
-		}}
-	/>
-{:else}
-	{#key auth.username}
-		<HomeScreen onLogout={handleLogout} />
-	{/key}
+{#if ready && (!auth.username || idbSynced.done || localSaveState.status === 'error')}
+	{#if !auth.username}
+		<LoginScreen
+			onLogin={(username: string) => {
+				reloadSettings(); // auth.username is set before this callback, load their settings
+				initYjs(username, yjsUrl());
+			}}
+		/>
+	{:else}
+		{#key auth.username}
+			<HomeScreen onLogout={handleLogout} />
+		{/key}
+	{/if}
 {/if}
-
-<style>
-	.splash {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		height: 100dvh;
-		font-size: 1.1rem;
-		color: var(--text2);
-	}
-</style>
