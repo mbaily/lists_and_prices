@@ -33,6 +33,8 @@
 	} from '$lib/data';
 	import { settings, updateSettings } from '$lib/settings.svelte';
 	import { extractTags, splitWithTags, type NameSegment } from '$lib/tags';
+	import { findBillSections } from '$lib/billsInclude';
+	import BillsInclude from './BillsInclude.svelte';
 	import { importNameKey, parseClipboardTodos } from '$lib/importText';
 	import { DEFAULT_MARK_NAME, readDestinationMarks, getDestinationMark } from '$lib/destinationMarks';
 	import { planItemMove, resolveMarkedItemDestination } from '$lib/itemMove';
@@ -1924,6 +1926,9 @@
 					<div class="journal-date">{formatJournalDate(item.createdAt)}</div>
 				{/if}
 			</div>
+			{#if !item.heading && findBillSections(item.name).length}
+				<BillsInclude sections={findBillSections(item.name)} />
+			{/if}
 		{/each}
 	</div>
 

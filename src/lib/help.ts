@@ -73,6 +73,13 @@ export const helpTopics: HelpTopic[] = [
 				]
 			},
 			{
+				title: 'Include bills from Simple Todo',
+				paragraphs: [
+					'Add [[bills:upcoming]] to a todo or note to display upcoming bills beneath it. You can add several includes to the same item. The available sections are overdue, due_today, upcoming, covered_early, future_estimates, unscheduled, recent_payments, monthly_estimates and inactive_bills; use the same [[bills:section_name]] format for each.',
+					'The sections load from Simple Todo when the list is opened and can be refreshed. If authentication is enabled, sign in to Simple Todo in the same browser. Bills are displayed from the service and are not copied into your saved list.'
+				]
+			},
+			{
 				title: 'Break work into smaller pieces',
 				paragraphs: [
 					'Use Add Subtask or Add Subnote from an item’s menu to add a child beneath it. The input shows which parent you are adding to. Cancel that parent selection when you want to add a top-level item again. Child items are indented so their relationship is visible.',
