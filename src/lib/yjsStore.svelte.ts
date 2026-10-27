@@ -273,19 +273,15 @@ export async function saveLocalData() {
 	catch { /* The persistence error event supplies the visible save error. */ }
 }
 
-/** Explicit HTTP synchronization works with automatic WebSockets disabled.
+/** Refresh the live document from local storage, then explicitly sync online.
+ * The existing document and mounted UI remain available throughout the refresh.
+ * Explicit HTTP synchronization works with automatic WebSockets disabled.
  * A completed exchange includes a server persistence acknowledgement, not just
  * an open socket. Never upload one account's document under another session. */
 export function syncNow(): Promise<void> {
 	if (_syncRequest) return _syncRequest;
 	const doc = _doc, persistence = _idbProvider, username = _username;
 	if (!doc || !persistence || !username || !idbSynced.done) return Promise.resolve();
-	if (auth.needsLogin) { syncState.status = 'auth-required'; return Promise.resolve(); }
-	if (typeof navigator !== 'undefined' && !navigator.onLine) {
-		syncState.status = 'offline';
-		syncState.error = 'You are offline. Changes stay saved on this device.';
-		return Promise.resolve();
-	}
 	clearTimeout(_syncTimer);
 	_syncTimer = undefined;
 	const controller = new AbortController();
@@ -319,6 +315,13 @@ export function syncNow(): Promise<void> {
 			if (!current()) return;
 			syncState.pending = persistence.pendingSync;
 			syncState.lastSyncAt = persistence.lastSyncAt;
+			syncState.hasServerState ||= persistence.lastSyncAt !== null;
+			if (auth.needsLogin) { syncState.status = 'auth-required'; return; }
+			if (typeof navigator !== 'undefined' && !navigator.onLine) {
+				syncState.status = 'offline';
+				syncState.error = 'Local data refreshed. You are offline; changes stay saved on this device.';
+				return;
+			}
 			const remote = await exchange('/api/sync/state', Y.encodeStateVector(doc));
 			if (!current()) return;
 			Y.applyUpdate(doc, remote.update, NETWORK_ORIGIN);
@@ -351,7 +354,7 @@ export function syncNow(): Promise<void> {
 				syncState.syncing = false;
 				_syncRequest = null;
 				_syncAbort = null;
-				if (syncState.pending) scheduleSync(syncState.error ? 30_000 : 1500);
+				if (syncState.pending && !auth.needsLogin && (typeof navigator === 'undefined' || navigator.onLine)) scheduleSync(syncState.error ? 30_000 : 1500);
 			}
 		}
 	})();

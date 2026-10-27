@@ -225,19 +225,9 @@
 	let quickAddToastTimer: ReturnType<typeof setTimeout> | null = null;
 
 	// ── Live data (re-read on every Yjs change) ─────────────────────────────────
-	let snapFolders = $state<Folder[] | null>(null);
-	let snapLists = $state<ListMeta[] | null>(null);
-	
-	if (typeof localStorage !== 'undefined' && auth.username) {
-		try {
-			snapFolders = JSON.parse(localStorage.getItem(`pnl-snap-f-${auth.username}`) || 'null');
-			snapLists = JSON.parse(localStorage.getItem(`pnl-snap-l-${auth.username}`) || 'null');
-		} catch {}
-	}
-
 	// docState.version increments on every Yjs update, making these $derived re-run.
 	let allFolders = $derived.by(() => {
-		if (!idbSynced.done) return snapFolders || [];
+		if (!idbSynced.done) return [];
 		const t0 = performance.now();
 		void docState.version; // track version
 		try { 
@@ -248,7 +238,7 @@
 	});
 	
 	let allLists = $derived.by(() => {
-		if (!idbSynced.done) return snapLists || [];
+		if (!idbSynced.done) return [];
 		const t0 = performance.now();
 		void docState.version;
 		try { 
@@ -256,13 +246,6 @@
 			console.log(`[Perf] readLists took ${Math.round(performance.now() - t0)}ms`);
 			return res;
 		} catch { return []; }
-	});
-
-	$effect(() => {
-		if (idbSynced.done && auth.username && !commitState.isHistorical) {
-			if (allFolders.length > 0) localStorage.setItem(`pnl-snap-f-${auth.username}`, JSON.stringify(allFolders));
-			if (allLists.length > 0) localStorage.setItem(`pnl-snap-l-${auth.username}`, JSON.stringify(allLists));
-		}
 	});
 
 	let allItemsAll = $derived.by(() => {

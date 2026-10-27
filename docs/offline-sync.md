@@ -35,6 +35,16 @@ the foreground respect that preference. Other tabs on the same origin observe
 preference changes. Sync now performs one exchange without enabling automatic
 connections. Open the app to sync; background execution is not required.
 
+F5, Ctrl+R and Cmd+R refresh data in place once local storage is ready and the
+page has keyboard focus. The
+current screen, pinned items, scroll position and unfinished input stay mounted
+while the app rereads local updates and synchronizes online. Offline or expired
+sessions still reread local data without discarding edits. Browser toolbar
+Reload, pull-to-refresh and shortcuts used outside the page retain the browser's
+normal full-reload behavior; page code cannot intercept those browser actions.
+No separate saved view is used. Ctrl+Shift+R, Cmd+Shift+R and Ctrl+F5 perform a full
+reload, and service-worker updates still reload the application code normally.
+
 The client requests `navigator.storage.persist()` at startup and through Protect
 offline storage. A refusal is shown as best-effort storage, not as protection.
 Storage estimates cover the origin, including app assets and account caches.
