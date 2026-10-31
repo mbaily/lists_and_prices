@@ -163,22 +163,22 @@
 		return [...folders, ...lists].sort((a, b) => (a.order !== b.order ? a.order - b.order : a.type === 'folder' && b.type === 'list' ? -1 : a.type === 'list' && b.type === 'folder' ? 1 : 0));
 	});
 	function getFavouriteTarget(direction: -1 | 1) {
-		const count = favouriteItems.length;
+		const lists = favouriteItems.filter((favourite) => favourite.type === 'list');
+		const count = lists.length;
 		if (count === 0) return null;
-		const current = favouriteItems.findIndex((favourite) => favourite.type === 'list' && favourite.item.id === listId);
+		const current = lists.findIndex((favourite) => favourite.item.id === listId);
 		const index = current === -1
 			? (direction === 1 ? 0 : count - 1)
 			: (current + direction + count) % count;
-		const target = favouriteItems[index];
-		return target.type === 'list' && target.item.id === listId ? null : target;
+		const target = lists[index];
+		return target.item.id === listId ? null : target;
 	}
 	const previousFavourite = $derived(getFavouriteTarget(-1));
 	const nextFavourite = $derived(getFavouriteTarget(1));
 	function navigateFavourite(direction: -1 | 1) {
 		const target = getFavouriteTarget(direction);
 		if (!target) return;
-		if (target.type === 'list') onOpenList(target.item.id);
-		else if (onNavigateTo) onNavigateTo(target.item.id);
+		onOpenList(target.item.id);
 	}
 	let allItemsAll = $derived.by(() => {
 		void docState.version;
@@ -1576,7 +1576,7 @@
 							type="button"
 							onclick={() => navigateFavourite(-1)}
 							onkeydown={(e) => e.stopPropagation()}
-							disabled={!previousFavourite || (previousFavourite.type === 'folder' && !onNavigateTo)}
+							disabled={!previousFavourite}
 							aria-label="Previous favourite"
 							title={previousFavourite ? `Previous favourite: ${previousFavourite.item.name}` : 'No previous favourite'}
 						>‹</button>
@@ -1584,7 +1584,7 @@
 							type="button"
 							onclick={() => navigateFavourite(1)}
 							onkeydown={(e) => e.stopPropagation()}
-							disabled={!nextFavourite || (nextFavourite.type === 'folder' && !onNavigateTo)}
+							disabled={!nextFavourite}
 							aria-label="Next favourite"
 							title={nextFavourite ? `Next favourite: ${nextFavourite.item.name}` : 'No next favourite'}
 						>›</button>

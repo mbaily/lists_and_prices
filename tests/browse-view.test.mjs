@@ -84,7 +84,7 @@ test('list header adds no vertical padding around the breadcrumb', () => {
 	assert.match(css, /padding:\s*0\s+1rem\s*;/);
 });
 
-test('favourite navigation wraps through the ordered lists and folders', () => {
+test('favourite navigation skips folders and wraps through ordered lists', () => {
 	const functions = componentFunctions('src/lib/components/ListScreen.svelte', ['getFavouriteTarget', 'navigateFavourite']);
 	const visits = [];
 	const state = {
@@ -102,16 +102,17 @@ test('favourite navigation wraps through the ordered lists and folders', () => {
 		'state', `with (state) { ${transpile(functions)}; return { getFavouriteTarget, navigateFavourite }; }`
 	)(state);
 
-	assert.equal(getFavouriteTarget(-1).item.id, 'folder-a');
-	assert.equal(getFavouriteTarget(1).item.id, 'folder-b');
+	assert.equal(getFavouriteTarget(-1).item.id, 'list-b');
+	assert.equal(getFavouriteTarget(1).item.id, 'list-b');
 	navigateFavourite(-1);
 	navigateFavourite(1);
-	assert.deepEqual(visits, [['folder', 'folder-a'], ['folder', 'folder-b']]);
+	assert.deepEqual(visits, [['list', 'list-b'], ['list', 'list-b']]);
 	state.listId = 'list-b';
-	assert.equal(getFavouriteTarget(1).item.id, 'folder-a');
+	assert.equal(getFavouriteTarget(1).item.id, 'list-a');
+	assert.equal(getFavouriteTarget(-1).item.id, 'list-a');
 	state.listId = 'not-a-favourite';
 	assert.equal(getFavouriteTarget(-1).item.id, 'list-b');
-	assert.equal(getFavouriteTarget(1).item.id, 'folder-a');
+	assert.equal(getFavouriteTarget(1).item.id, 'list-a');
 	navigateFavourite(-1);
 	assert.deepEqual(visits.at(-1), ['list', 'list-b']);
 	state.favouriteItems = [{ type: 'list', item: { id: 'list-b' } }];
@@ -120,6 +121,11 @@ test('favourite navigation wraps through the ordered lists and folders', () => {
 	assert.equal(getFavouriteTarget(1), null);
 	state.listId = 'other';
 	assert.equal(getFavouriteTarget(1).item.id, 'list-b');
+	state.favouriteItems = [{ type: 'folder', item: { id: 'folder-a' } }];
+	assert.equal(getFavouriteTarget(-1), null);
+	assert.equal(getFavouriteTarget(1), null);
+	navigateFavourite(1);
+	assert.deepEqual(visits.at(-1), ['list', 'list-b']);
 	state.favouriteItems = [];
 	assert.equal(getFavouriteTarget(-1), null);
 	assert.equal(getFavouriteTarget(1), null);

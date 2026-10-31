@@ -10,9 +10,9 @@ summary, pinned items and favourites while keeping the breadcrumb and input
 bar visible. Toggle it again to restore them. Selection controls remain
 available in browse view. Pinned items scroll sideways; favourites wrap across
 rows. Both scroll away as you scroll down the list. In browse view, the arrows
-beside the input navigate through favourite lists and folders in their saved
-order, wrapping at either end. From a non-favourite list they open the last or
-first favourite respectively; opening a folder leaves the list view.
+beside the input navigate through favourite lists in their saved order, skipping
+folders and wrapping at either end. From a non-favourite list they open the
+last or first favourite list respectively.
 
 The terminal client's `tui.config.json` is a localhost example. Keep personal
 server settings in `tui.config.real.json`, which is ignored by Git.
