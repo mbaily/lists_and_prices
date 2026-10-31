@@ -2476,7 +2476,7 @@
 		transition: background 0.15s, opacity 0.15s;
 		line-height: var(--row-line-height, normal);
 	}
-	.item-row.has-bills { border-bottom: 0; }
+	.item-row.has-bills { border-bottom: 0; padding-bottom: 0; }
 	.item-bills { border-bottom: 1px solid var(--border); }
 	.item-row.journal-mode {
 		flex-wrap: wrap;
@@ -2497,6 +2497,7 @@
 			gap: 0;
 			padding: var(--item-spacing, 0.4rem) 0.75rem;
 		}
+		.item-row.priced-row.has-bills { padding-bottom: 0; }
 		.priced-top {
 			display: flex;
 			align-items: center;

@@ -86,9 +86,8 @@
 </div>
 
 <style>
-	.calendar-includes { padding: .4rem .75rem .7rem 2.5rem; color: var(--text2); font-size: .9rem; }
-	section { margin-bottom: .5rem; }
-	p, ul { margin: .25rem 0; }
+	.calendar-includes { padding: 0 .75rem 0 2.5rem; color: var(--text2); font-size: .9rem; }
+	p, ul { margin: 0; }
 	ul { padding-left: 1.2rem; }
 	a { color: inherit; }
 	.completed a { text-decoration: line-through; }
