@@ -80,6 +80,13 @@ export const helpTopics: HelpTopic[] = [
 				]
 			},
 			{
+				title: 'Include calendar events from Simple Todo',
+				paragraphs: [
+					'Add [[calendar:today]], [[calendar:today_tomorrow]], [[calendar:next_7_days]] or [[calendar:yesterday_today_tomorrow]] to a todo or note to display events beneath it. The next 7 days include today. You can combine calendar and bills includes in the same item.',
+					'Events include recurring and completed occurrences. Dates are based on your device’s local calendar day, and event times are shown as Simple Todo’s wall-clock times. Open an event link to visit the Simple Todo calendar. Refresh the include to load changes; if authentication is enabled, sign in to Simple Todo in the same browser. Events are not copied into your saved list.'
+				]
+			},
+			{
 				title: 'Break work into smaller pieces',
 				paragraphs: [
 					'Use Add Subtask or Add Subnote from an item’s menu to add a child beneath it. The input shows which parent you are adding to. Cancel that parent selection when you want to add a top-level item again. Child items are indented so their relationship is visible.',

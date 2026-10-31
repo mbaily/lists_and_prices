@@ -34,8 +34,10 @@
 	import { settings, updateSettings } from '$lib/settings.svelte';
 	import { extractTags, splitWithTags, type NameSegment } from '$lib/tags';
 	import { billSections, findBillSections, type BillSection } from '$lib/billsInclude';
+	import { calendarSections, findCalendarSections, type CalendarSection } from '$lib/calendarInclude';
 	import { base } from '$app/paths';
 	import BillsInclude from './BillsInclude.svelte';
+	import CalendarInclude from './CalendarInclude.svelte';
 	import { importNameKey, parseClipboardTodos } from '$lib/importText';
 	import { DEFAULT_MARK_NAME, readDestinationMarks, getDestinationMark } from '$lib/destinationMarks';
 	import { planItemMove, resolveMarkedItemDestination } from '$lib/itemMove';
@@ -320,16 +322,24 @@
 	);
 
 	// ── URL + tag detection ──────────────────────────────────────────────────────
-	function parseNameParts(name: string): (NameSegment | { type: 'bills'; value: BillSection })[] {
-		return splitWithTags(name).flatMap((part): (NameSegment | { type: 'bills'; value: BillSection })[] => {
+	type IncludePart = { type: 'bills'; value: BillSection } | { type: 'calendar'; value: CalendarSection };
+	function parseNameParts(name: string): (NameSegment | IncludePart)[] {
+		return splitWithTags(name).flatMap((part): (NameSegment | IncludePart)[] => {
 			if (part.type !== 'text') return [part];
-			const result: (NameSegment | { type: 'bills'; value: BillSection })[] = [];
+			const result: (NameSegment | IncludePart)[] = [];
 			let last = 0;
-			for (const match of part.value.matchAll(/\[\[bills:([a-z_]+)\]\]/gi)) {
-				const section = findBillSections(match[0])[0];
-				if (!section) continue;
+			for (const match of part.value.matchAll(/\[\[(bills|calendar):([a-z_0-9]+)\]\]/gi)) {
+				let include: IncludePart | undefined;
+				if (match[1].toLowerCase() === 'bills') {
+					const section = findBillSections(match[0])[0];
+					if (section) include = { type: 'bills', value: section };
+				} else {
+					const section = findCalendarSections(match[0])[0];
+					if (section) include = { type: 'calendar', value: section };
+				}
+				if (!include) continue;
 				if (match.index > last) result.push({ type: 'text', value: part.value.slice(last, match.index) });
-				result.push({ type: 'bills', value: section });
+				result.push(include);
 				last = match.index + match[0].length;
 			}
 			if (last < part.value.length) result.push({ type: 'text', value: part.value.slice(last) });
@@ -1763,6 +1773,7 @@
 			{@const canAddChildren = !item.heading && level < 2}
 			{@const linkParts = parseNameParts(item.name)}
 			{@const includedBillSections = item.heading ? [] : findBillSections(item.name)}
+			{@const includedCalendarSections = item.heading ? [] : findCalendarSections(item.name)}
 			{@const itemLinks = linkParts.filter(p => p.type === 'url').map(p => p.value)}
 			{@const parentKey = item.parentId ?? '__top__'}
 			<div
@@ -1770,7 +1781,7 @@
 				class="item-row"
 				class:linked-item={highlightItemId === item.id}
 				class:journal-mode={journalMode}
-				class:has-bills={includedBillSections.length > 0}
+				class:has-bills={includedBillSections.length > 0 || includedCalendarSections.length > 0}
 				class:cursored={activeCursorId === item.id}
 				class:heading={item.heading}
 				class:note={item.note}
@@ -1795,7 +1806,7 @@
 						class="item-name heading-name"
 						class:editing={editingId === item.id}
 						onclick={() => { if (!selectionMode) startEditName(item); else toggleSelectionItem(item.id); }}
-					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else if part.type === 'bills'}<a class="ref-pill" href={`${base || ''}/../simple_todo/bills`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>Bills: {billSections[part.value]}</a>{:else}{part.value}{/if}{/each}</button>
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else if part.type === 'bills'}<a class="ref-pill" href={`${base || ''}/../simple_todo/bills`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>Bills: {billSections[part.value]}</a>{:else if part.type === 'calendar'}<a class="ref-pill" href={`${base || ''}/../simple_todo/calendar`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>Calendar: {calendarSections[part.value]}</a>{:else}{part.value}{/if}{/each}</button>
 					{#if !commitState.isHistorical}
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
@@ -1833,7 +1844,7 @@
 						onpointermove={cancelLongPress}
 						onpointerup={cancelLongPress}
 						onpointercancel={cancelLongPress}
-					><span class="item-name-text" class:fullscreen-clamp={item.fullScreen}>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else if part.type === 'bills'}<a class="ref-pill" href={`${base || ''}/../simple_todo/bills`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>Bills: {billSections[part.value]}</a>{:else}{part.value}{/if}{/each}</span></button>
+					><span class="item-name-text" class:fullscreen-clamp={item.fullScreen}>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else if part.type === 'bills'}<a class="ref-pill" href={`${base || ''}/../simple_todo/bills`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>Bills: {billSections[part.value]}</a>{:else if part.type === 'calendar'}<a class="ref-pill" href={`${base || ''}/../simple_todo/calendar`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>Calendar: {calendarSections[part.value]}</a>{:else}{part.value}{/if}{/each}</span></button>
 					{#if !commitState.isHistorical}
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
@@ -1873,7 +1884,7 @@
 							onpointermove={cancelLongPress}
 							onpointerup={cancelLongPress}
 							onpointercancel={cancelLongPress}
-						><span class="item-name-text" class:fullscreen-clamp={item.fullScreen}>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else if part.type === 'bills'}<a class="ref-pill" href={`${base || ''}/../simple_todo/bills`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>Bills: {billSections[part.value]}</a>{:else}{part.value}{/if}{/each}</span></button>
+						><span class="item-name-text" class:fullscreen-clamp={item.fullScreen}>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else if part.type === 'bills'}<a class="ref-pill" href={`${base || ''}/../simple_todo/bills`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>Bills: {billSections[part.value]}</a>{:else if part.type === 'calendar'}<a class="ref-pill" href={`${base || ''}/../simple_todo/calendar`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>Calendar: {calendarSections[part.value]}</a>{:else}{part.value}{/if}{/each}</span></button>
 					</div>
 					<div class="priced-bottom">
 						<button
@@ -1920,7 +1931,7 @@
 						onpointermove={cancelLongPress}
 						onpointerup={cancelLongPress}
 						onpointercancel={cancelLongPress}
-					><span class="item-name-text" class:fullscreen-clamp={item.fullScreen}>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else if part.type === 'bills'}<a class="ref-pill" href={`${base || ''}/../simple_todo/bills`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>Bills: {billSections[part.value]}</a>{:else}{part.value}{/if}{/each}</span></button>
+					><span class="item-name-text" class:fullscreen-clamp={item.fullScreen}>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else if part.type === 'bills'}<a class="ref-pill" href={`${base || ''}/../simple_todo/bills`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>Bills: {billSections[part.value]}</a>{:else if part.type === 'calendar'}<a class="ref-pill" href={`${base || ''}/../simple_todo/calendar`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>Calendar: {calendarSections[part.value]}</a>{:else}{part.value}{/if}{/each}</span></button>
 					{#if !commitState.isHistorical}
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
@@ -1942,9 +1953,10 @@
 					<div class="journal-date">{formatJournalDate(item.createdAt)}</div>
 				{/if}
 			</div>
-			{#if includedBillSections.length}
+			{#if includedBillSections.length || includedCalendarSections.length}
 				<div class="item-bills" style={level > 0 ? `padding-left:${level * 1.5}rem` : undefined}>
-					<BillsInclude sections={includedBillSections} />
+					{#if includedBillSections.length}<BillsInclude sections={includedBillSections} />{/if}
+					{#if includedCalendarSections.length}<CalendarInclude sections={includedCalendarSections} />{/if}
 				</div>
 			{/if}
 		{/each}
