@@ -19,7 +19,9 @@ test('finds wrapped sections without also displaying them as vertical lists', ()
 });
 
 test('formats bill, payment and budget API fields', () => {
-	strictEqual(billLine({ name: 'Power', effective_amount: 25, currency_symbol: '$', next_due_date: '2026-11-01', is_estimated: true }, 'upcoming'), 'Power · ≈$25.00 · Due 2026-11-01');
-	strictEqual(billLine({ bill_name: 'Power', amount_paid: 0, currency_symbol: '$', paid_date: '2026-10-01' }, 'recent_payments'), 'Power · $0.00 · Paid 2026-10-01');
-	strictEqual(billLine({ currency: 'AUD', amount: 100, currency_symbol: '$' }, 'monthly_estimates'), 'AUD · $100.00');
+	strictEqual(billLine({ name: 'Power', effective_amount: 25, currency_symbol: '$', next_due_date: '2026-11-01', is_estimated: true }, 'upcoming'), 'Power, ≈$25.00, Due 2026-11-01');
+	strictEqual(billLine({ bill_name: 'Power', amount_paid: 0, currency_symbol: '$', paid_date: '2026-10-01' }, 'recent_payments'), 'Power, $0.00, Paid 2026-10-01');
+	strictEqual(billLine({ currency: 'AUD', amount: 100, currency_symbol: '$' }, 'monthly_estimates'), 'AUD, $100.00');
+	strictEqual(billLine({ name: 'Rent', next_due_date: '2026-11-02' }, 'upcoming'), 'Rent, Due 2026-11-02');
+	strictEqual(billLine({ name: 'Rent' }, 'upcoming'), 'Rent');
 });

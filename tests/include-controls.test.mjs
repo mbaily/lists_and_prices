@@ -151,7 +151,7 @@ test('wrapped bills surface loading, errors, empty sections and formatted entrie
 		state.data.upcoming = [{ name: 'Power', effective_amount: 25, currency_symbol: '$' }, null];
 		assert.deepEqual(sectionView('upcoming'), { status: 'error', message: 'Invalid bills response.' });
 		state.data.upcoming.pop();
-		assert.deepEqual(sectionView('upcoming'), { status: 'ready', entries: ['Power · $25.00'] });
+		assert.deepEqual(sectionView('upcoming'), { status: 'ready', entries: ['Power, $25.00'] });
 	} finally {
 		app.dispose();
 	}

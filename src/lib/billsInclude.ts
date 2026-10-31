@@ -23,6 +23,6 @@ export function billLine(row: Record<string, unknown>, section: BillSection): st
 	const parts = [name];
 	if (typeof amount === 'number' && Number.isFinite(amount)) parts.push(`${row.is_estimated ? '≈' : ''}${String(row.currency_symbol ?? row.currency ?? '')}${amount.toFixed(2)}`);
 	if (typeof date === 'string' && date) parts.push(`${section === 'recent_payments' ? 'Paid' : 'Due'} ${date}`);
-	return parts.join(' · ');
+	return parts.join(', ');
 }
 import { findIncludeTokens } from './includeTokens';
