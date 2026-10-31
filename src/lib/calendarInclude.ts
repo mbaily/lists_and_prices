@@ -14,7 +14,7 @@ export type CalendarOccurrence = {
 
 export function findCalendarSections(text: string): CalendarSection[] {
 	const found: CalendarSection[] = [];
-	for (const match of text.matchAll(/\[\[calendar:([a-z_0-9]+)\]\]/gi)) {
+	for (const match of text.matchAll(/\[\[calendar:([a-z_0-9]+)(?::icon)?\]\]/gi)) {
 		const section = match[1].toLowerCase() as CalendarSection;
 		if (Object.hasOwn(calendarSections, section) && !found.includes(section)) found.push(section);
 	}

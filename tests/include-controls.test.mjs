@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { parse } from 'svelte/compiler';
+import { componentFunctions, createApp, transpile } from './helpers/app.mjs';
 
 function elements(file) {
 	const root = parse(readFileSync(new URL(file, import.meta.url), 'utf8'), { modern: true }).fragment;
@@ -49,6 +50,8 @@ test('each non-heading item layout places refresh immediately after its include 
 		const [link, button] = wrapper.fragment.nodes;
 		assert.equal(wrapper.fragment.nodes.length, 2);
 		assert.equal(link.name, 'a');
+		assert.ok(attribute(link, 'aria-label'));
+		assert.ok(attribute(link, 'title'));
 		assert.equal(button.name, 'button');
 		assert.ok(attribute(button, 'onclick'));
 		assert.ok(attribute(button, 'onkeydown'));
@@ -75,9 +78,82 @@ for (const component of ['BillsInclude', 'CalendarInclude']) {
 		const selector = component === 'BillsInclude' ? '.bills-includes' : '.calendar-includes';
 		assert.match(rules.get(selector), /padding:\s*0\s+[^;]+\s+0\s+[^;]+;/);
 		assert.match(rules.get('p, ul'), /margin:\s*0\s*;/);
+		assert.match(rules.get('ul'), /padding-left:\s*0\s*;/);
 		assert.doesNotMatch(rules.get('section') ?? '', /margin/);
 	});
+
 }
+
+test('include containers align to the item text without a fixed nesting offset', () => {
+	const nodes = elements('../src/lib/components/ListScreen.svelte');
+	const container = nodes.find((node) => node.name === 'div' && attribute(node, 'class')?.value[0]?.data === 'item-bills');
+	assert.ok(container?.attributes.some((entry) => entry.type === 'UseDirective' && entry.name === 'alignIncludes'));
+	assert.equal(attribute(container, 'style'), undefined);
+});
+
+test('icon notation parses alongside regular includes and leaves unknown options as text', () => {
+	const app = createApp();
+	try {
+		const { splitWithTags } = app.load('src/lib/tags.ts');
+		const { findBillSections } = app.load('src/lib/billsInclude.ts');
+		const { findCalendarSections } = app.load('src/lib/calendarInclude.ts');
+		const source = componentFunctions('src/lib/components/ListScreen.svelte', ['parseNameParts']);
+		const parseNameParts = new Function('splitWithTags', 'findBillSections', 'findCalendarSections',
+			`${transpile(source)}; return parseNameParts;`)(splitWithTags, findBillSections, findCalendarSections);
+		assert.deepEqual(parseNameParts('[[bills:upcoming:icon]] [[CALENDAR:TODAY:ICON]] [[calendar:today]] [[bills:upcoming:other]]'), [
+			{ type: 'bills', value: 'upcoming', icon: true },
+			{ type: 'text', value: ' ' },
+			{ type: 'calendar', value: 'today', icon: true },
+			{ type: 'text', value: ' ' },
+			{ type: 'calendar', value: 'today', icon: false },
+			{ type: 'text', value: ' [[bills:upcoming:other]]' }
+		]);
+	} finally {
+		app.dispose();
+	}
+});
+
+test('include alignment follows text position changes and disconnects observers', () => {
+	class Element {
+		constructor(left) { this.left = left; this.style = {}; }
+		getBoundingClientRect() { return { left: this.left }; }
+	}
+	let resize, mutation;
+	class Resize {
+		constructor(callback) { this.callback = callback; this.targets = new Set(); resize = this; }
+		observe(target) { this.targets.add(target); }
+		unobserve(target) { this.targets.delete(target); }
+		disconnect() { this.disconnected = true; }
+	}
+	class Mutation {
+		constructor(callback) { this.callback = callback; mutation = this; }
+		observe(target, options) { this.target = target; this.options = options; }
+		disconnect() { this.disconnected = true; }
+	}
+	const source = componentFunctions('src/lib/components/ListScreen.svelte', ['alignIncludes']);
+	const alignIncludes = new Function('HTMLElement', 'ResizeObserver', 'MutationObserver',
+		`${transpile(source)}; return alignIncludes;`)(Element, Resize, Mutation);
+	const row = new Element(0);
+	let name = new Element(80);
+	row.querySelector = () => name;
+	const container = new Element(10);
+	container.previousElementSibling = row;
+	const action = alignIncludes(container);
+	assert.equal(container.style.paddingLeft, '70px');
+	assert.ok(resize.targets.has(name));
+	name.left = 105;
+	resize.callback();
+	assert.equal(container.style.paddingLeft, '95px');
+	const oldName = name;
+	name = new Element(55);
+	mutation.callback();
+	assert.equal(container.style.paddingLeft, '45px');
+	assert.equal(resize.targets.has(oldName), false);
+	assert.equal(resize.targets.has(name), true);
+	action.destroy();
+	assert.equal(resize.disconnected, true);
+	assert.equal(mutation.disconnected, true);
+});
 
 test('items with includes have no bottom padding, including priced touch layouts', () => {
 	const rules = cssRules('../src/lib/components/ListScreen.svelte');

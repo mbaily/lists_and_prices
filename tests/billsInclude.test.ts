@@ -6,6 +6,11 @@ test('selects only known, distinct bill sections alongside ordinary references',
 	deepStrictEqual(findBillSections('[[bills:upcoming]] [[item:123]] [[bills:DUE_TODAY]] [[bills:upcoming]] [[bills:unknown]]'), ['upcoming', 'due_today']);
 });
 
+test('accepts icon includes and ignores malformed or unknown options', () => {
+	deepStrictEqual(findBillSections('[[bills:upcoming:icon]] [[BILLS:DUE_TODAY:ICON]] [[bills:upcoming]] [[bills:overdue:other]] [[bills:unknown:icon]]'),
+		['upcoming', 'due_today']);
+});
+
 test('formats bill, payment and budget API fields', () => {
 	strictEqual(billLine({ name: 'Power', effective_amount: 25, currency_symbol: '$', next_due_date: '2026-11-01', is_estimated: true }, 'upcoming'), 'Power · ≈$25.00 · Due 2026-11-01');
 	strictEqual(billLine({ bill_name: 'Power', amount_paid: 0, currency_symbol: '$', paid_date: '2026-10-01' }, 'recent_payments'), 'Power · $0.00 · Paid 2026-10-01');

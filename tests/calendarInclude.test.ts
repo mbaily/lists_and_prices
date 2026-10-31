@@ -10,6 +10,11 @@ test('finds known distinct calendar includes without changing bill references', 
 		['today', 'next_7_days']);
 });
 
+test('accepts icon includes while rejecting unknown options and sections', () => {
+	deepStrictEqual(findCalendarSections('[[calendar:today:icon]] [[CALENDAR:NEXT_7_DAYS:ICON]] [[calendar:today]] [[calendar:today_tomorrow:other]] [[calendar:unknown:icon]]'),
+		['today', 'next_7_days']);
+});
+
 test('ranges include the requested days across month and year boundaries', () => {
 	const now = new Date(2026, 11, 31, 23, 55);
 	deepStrictEqual(calendarRange('today', now), { start: '2026-12-31', end: '2026-12-31' });

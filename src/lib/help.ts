@@ -76,6 +76,7 @@ export const helpTopics: HelpTopic[] = [
 				title: 'Include bills from Simple Todo',
 				paragraphs: [
 					'Add [[bills:upcoming]] to a todo or note to display upcoming bills beneath it. You can add several includes to the same item. The available sections are overdue, due_today, upcoming, covered_early, future_estimates, unscheduled, recent_payments, monthly_estimates and inactive_bills; use the same [[bills:section_name]] format for each.',
+					'To show just the bills icon instead of the full pill label, add :icon, for example [[bills:upcoming:icon]].',
 					'The sections load from Simple Todo when the list is opened and can be refreshed. If authentication is enabled, sign in to Simple Todo in the same browser. Bills are displayed from the service and are not copied into your saved list.'
 				]
 			},
@@ -83,6 +84,7 @@ export const helpTopics: HelpTopic[] = [
 				title: 'Include calendar events from Simple Todo',
 				paragraphs: [
 					'Add [[calendar:today]], [[calendar:today_tomorrow]], [[calendar:next_7_days]] or [[calendar:yesterday_today_tomorrow]] to a todo or note to display events beneath it. The next 7 days include today. You can combine calendar and bills includes in the same item.',
+					'To show just the calendar icon instead of the full pill label, add :icon, for example [[calendar:today:icon]].',
 					'Events include recurring and completed occurrences. Dates are based on your device’s local calendar day, and event times are shown as Simple Todo’s wall-clock times. Open an event link to visit the Simple Todo calendar. Refresh the include to load changes; if authentication is enabled, sign in to Simple Todo in the same browser. Events are not copied into your saved list.'
 				]
 			},

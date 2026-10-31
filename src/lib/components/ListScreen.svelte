@@ -322,7 +322,7 @@
 	);
 
 	// ── URL + tag detection ──────────────────────────────────────────────────────
-	type IncludePart = { type: 'bills'; value: BillSection } | { type: 'calendar'; value: CalendarSection };
+	type IncludePart = { type: 'bills'; value: BillSection; icon: boolean } | { type: 'calendar'; value: CalendarSection; icon: boolean };
 	const billIncludes = $state<Record<string, { refresh: () => Promise<void> } | undefined>>({});
 	const calendarIncludes = $state<Record<string, { refresh: () => Promise<void> } | undefined>>({});
 
@@ -338,14 +338,14 @@
 			if (part.type !== 'text') return [part];
 			const result: (NameSegment | IncludePart)[] = [];
 			let last = 0;
-			for (const match of part.value.matchAll(/\[\[(bills|calendar):([a-z_0-9]+)\]\]/gi)) {
+			for (const match of part.value.matchAll(/\[\[(bills|calendar):([a-z_0-9]+)(:icon)?\]\]/gi)) {
 				let include: IncludePart | undefined;
 				if (match[1].toLowerCase() === 'bills') {
 					const section = findBillSections(match[0])[0];
-					if (section) include = { type: 'bills', value: section };
+					if (section) include = { type: 'bills', value: section, icon: !!match[3] };
 				} else {
 					const section = findCalendarSections(match[0])[0];
-					if (section) include = { type: 'calendar', value: section };
+					if (section) include = { type: 'calendar', value: section, icon: !!match[3] };
 				}
 				if (!include) continue;
 				if (match.index > last) result.push({ type: 'text', value: part.value.slice(last, match.index) });
@@ -355,6 +355,32 @@
 			if (last < part.value.length) result.push({ type: 'text', value: part.value.slice(last) });
 			return result;
 		});
+	}
+
+	function alignIncludes(node: HTMLElement) {
+		const sibling = node.previousElementSibling;
+		if (!(sibling instanceof HTMLElement)) {
+			console.error('Cannot align includes: item row is missing.');
+			return;
+		}
+		const row: HTMLElement = sibling;
+		let name: HTMLElement | null = null;
+		const resizeObserver = new ResizeObserver(align);
+		function align() {
+			const currentName = row.querySelector<HTMLElement>('.item-name');
+			if (currentName !== name) {
+				if (name) resizeObserver.unobserve(name);
+				name = currentName;
+				if (name) resizeObserver.observe(name);
+			}
+			if (name) node.style.paddingLeft = `${Math.max(0, name.getBoundingClientRect().left - node.getBoundingClientRect().left)}px`;
+		}
+		const mutationObserver = new MutationObserver(align);
+		mutationObserver.observe(row, { childList: true, subtree: true });
+		resizeObserver.observe(row);
+		resizeObserver.observe(node);
+		align();
+		return { destroy: () => { resizeObserver.disconnect(); mutationObserver.disconnect(); } };
 	}
 
 	// ── All tags (for autocomplete) ───────────────────────────────────────────────
@@ -1816,7 +1842,7 @@
 						class="item-name heading-name"
 						class:editing={editingId === item.id}
 						onclick={() => { if (!selectionMode) startEditName(item); else toggleSelectionItem(item.id); }}
-					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else if part.type === 'bills'}<a class="ref-pill" href={`${base || ''}/../simple_todo/bills`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>Bills: {billSections[part.value]}</a>{:else if part.type === 'calendar'}<a class="ref-pill" href={`${base || ''}/../simple_todo/calendar`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>Calendar: {calendarSections[part.value]}</a>{:else}{part.value}{/if}{/each}</button>
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else if part.type === 'bills'}<a class="ref-pill" class:iconified={part.icon} aria-label={`Bills: ${billSections[part.value]}`} title={`Bills: ${billSections[part.value]}`} href={`${base || ''}/../simple_todo/bills`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{#if part.icon}<span aria-hidden="true">💰</span>{:else}Bills: {billSections[part.value]}{/if}</a>{:else if part.type === 'calendar'}<a class="ref-pill" class:iconified={part.icon} aria-label={`Calendar: ${calendarSections[part.value]}`} title={`Calendar: ${calendarSections[part.value]}`} href={`${base || ''}/../simple_todo/calendar`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{#if part.icon}<span aria-hidden="true">📅</span>{:else}Calendar: {calendarSections[part.value]}{/if}</a>{:else}{part.value}{/if}{/each}</button>
 					{#if !commitState.isHistorical}
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
@@ -1854,7 +1880,7 @@
 						onpointermove={cancelLongPress}
 						onpointerup={cancelLongPress}
 						onpointercancel={cancelLongPress}
-					><span class="item-name-text" class:fullscreen-clamp={item.fullScreen}>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else if part.type === 'bills'}<span class="include-pill"><a class="ref-pill" href={`${base || ''}/../simple_todo/bills`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>Bills: {billSections[part.value]}</a><button type="button" class="include-refresh" aria-label="Refresh bills" title="Refresh bills" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onkeydown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); void billIncludes[item.id]?.refresh(); }}>↻</button></span>{:else if part.type === 'calendar'}<span class="include-pill"><a class="ref-pill" href={`${base || ''}/../simple_todo/calendar`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>Calendar: {calendarSections[part.value]}</a><button type="button" class="include-refresh" aria-label="Refresh calendar" title="Refresh calendar" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onkeydown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); void calendarIncludes[item.id]?.refresh(); }}>↻</button></span>{:else}{part.value}{/if}{/each}</span></div>
+					><span class="item-name-text" class:fullscreen-clamp={item.fullScreen}>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else if part.type === 'bills'}<span class="include-pill"><a class="ref-pill" class:iconified={part.icon} aria-label={`Bills: ${billSections[part.value]}`} title={`Bills: ${billSections[part.value]}`} href={`${base || ''}/../simple_todo/bills`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{#if part.icon}<span aria-hidden="true">💰</span>{:else}Bills: {billSections[part.value]}{/if}</a><button type="button" class="include-refresh" aria-label="Refresh bills" title="Refresh bills" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onkeydown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); void billIncludes[item.id]?.refresh(); }}>↻</button></span>{:else if part.type === 'calendar'}<span class="include-pill"><a class="ref-pill" class:iconified={part.icon} aria-label={`Calendar: ${calendarSections[part.value]}`} title={`Calendar: ${calendarSections[part.value]}`} href={`${base || ''}/../simple_todo/calendar`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{#if part.icon}<span aria-hidden="true">📅</span>{:else}Calendar: {calendarSections[part.value]}{/if}</a><button type="button" class="include-refresh" aria-label="Refresh calendar" title="Refresh calendar" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onkeydown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); void calendarIncludes[item.id]?.refresh(); }}>↻</button></span>{:else}{part.value}{/if}{/each}</span></div>
 					{#if !commitState.isHistorical}
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
@@ -1894,7 +1920,7 @@
 							onpointermove={cancelLongPress}
 							onpointerup={cancelLongPress}
 							onpointercancel={cancelLongPress}
-						><span class="item-name-text" class:fullscreen-clamp={item.fullScreen}>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else if part.type === 'bills'}<span class="include-pill"><a class="ref-pill" href={`${base || ''}/../simple_todo/bills`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>Bills: {billSections[part.value]}</a><button type="button" class="include-refresh" aria-label="Refresh bills" title="Refresh bills" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onkeydown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); void billIncludes[item.id]?.refresh(); }}>↻</button></span>{:else if part.type === 'calendar'}<span class="include-pill"><a class="ref-pill" href={`${base || ''}/../simple_todo/calendar`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>Calendar: {calendarSections[part.value]}</a><button type="button" class="include-refresh" aria-label="Refresh calendar" title="Refresh calendar" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onkeydown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); void calendarIncludes[item.id]?.refresh(); }}>↻</button></span>{:else}{part.value}{/if}{/each}</span></div>
+						><span class="item-name-text" class:fullscreen-clamp={item.fullScreen}>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else if part.type === 'bills'}<span class="include-pill"><a class="ref-pill" class:iconified={part.icon} aria-label={`Bills: ${billSections[part.value]}`} title={`Bills: ${billSections[part.value]}`} href={`${base || ''}/../simple_todo/bills`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{#if part.icon}<span aria-hidden="true">💰</span>{:else}Bills: {billSections[part.value]}{/if}</a><button type="button" class="include-refresh" aria-label="Refresh bills" title="Refresh bills" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onkeydown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); void billIncludes[item.id]?.refresh(); }}>↻</button></span>{:else if part.type === 'calendar'}<span class="include-pill"><a class="ref-pill" class:iconified={part.icon} aria-label={`Calendar: ${calendarSections[part.value]}`} title={`Calendar: ${calendarSections[part.value]}`} href={`${base || ''}/../simple_todo/calendar`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{#if part.icon}<span aria-hidden="true">📅</span>{:else}Calendar: {calendarSections[part.value]}{/if}</a><button type="button" class="include-refresh" aria-label="Refresh calendar" title="Refresh calendar" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onkeydown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); void calendarIncludes[item.id]?.refresh(); }}>↻</button></span>{:else}{part.value}{/if}{/each}</span></div>
 					</div>
 					<div class="priced-bottom">
 						<button
@@ -1941,7 +1967,7 @@
 						onpointermove={cancelLongPress}
 						onpointerup={cancelLongPress}
 						onpointercancel={cancelLongPress}
-					><span class="item-name-text" class:fullscreen-clamp={item.fullScreen}>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else if part.type === 'bills'}<span class="include-pill"><a class="ref-pill" href={`${base || ''}/../simple_todo/bills`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>Bills: {billSections[part.value]}</a><button type="button" class="include-refresh" aria-label="Refresh bills" title="Refresh bills" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onkeydown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); void billIncludes[item.id]?.refresh(); }}>↻</button></span>{:else if part.type === 'calendar'}<span class="include-pill"><a class="ref-pill" href={`${base || ''}/../simple_todo/calendar`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>Calendar: {calendarSections[part.value]}</a><button type="button" class="include-refresh" aria-label="Refresh calendar" title="Refresh calendar" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onkeydown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); void calendarIncludes[item.id]?.refresh(); }}>↻</button></span>{:else}{part.value}{/if}{/each}</span></div>
+					><span class="item-name-text" class:fullscreen-clamp={item.fullScreen}>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref'}<span role="button" class="ref-pill" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else if part.type === 'bills'}<span class="include-pill"><a class="ref-pill" class:iconified={part.icon} aria-label={`Bills: ${billSections[part.value]}`} title={`Bills: ${billSections[part.value]}`} href={`${base || ''}/../simple_todo/bills`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{#if part.icon}<span aria-hidden="true">💰</span>{:else}Bills: {billSections[part.value]}{/if}</a><button type="button" class="include-refresh" aria-label="Refresh bills" title="Refresh bills" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onkeydown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); void billIncludes[item.id]?.refresh(); }}>↻</button></span>{:else if part.type === 'calendar'}<span class="include-pill"><a class="ref-pill" class:iconified={part.icon} aria-label={`Calendar: ${calendarSections[part.value]}`} title={`Calendar: ${calendarSections[part.value]}`} href={`${base || ''}/../simple_todo/calendar`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{#if part.icon}<span aria-hidden="true">📅</span>{:else}Calendar: {calendarSections[part.value]}{/if}</a><button type="button" class="include-refresh" aria-label="Refresh calendar" title="Refresh calendar" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onkeydown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); void calendarIncludes[item.id]?.refresh(); }}>↻</button></span>{:else}{part.value}{/if}{/each}</span></div>
 					{#if !commitState.isHistorical}
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
@@ -1964,7 +1990,7 @@
 				{/if}
 			</div>
 			{#if includedBillSections.length || includedCalendarSections.length}
-				<div class="item-bills" style={level > 0 ? `padding-left:${level * 1.5}rem` : undefined}>
+				<div class="item-bills" use:alignIncludes>
 					{#if includedBillSections.length}<BillsInclude bind:this={billIncludes[item.id]} sections={includedBillSections} />{/if}
 					{#if includedCalendarSections.length}<CalendarInclude bind:this={calendarIncludes[item.id]} sections={includedCalendarSections} />{/if}
 				</div>
@@ -2735,6 +2761,7 @@
 		vertical-align: middle;
 	}
 	.ref-pill::before { content: '→\00a0'; opacity: 0.7; }
+	.ref-pill.iconified::before { content: none; }
 	.include-pill { display: inline-flex; align-items: center; vertical-align: middle; }
 	.include-refresh {
 		border: 0;

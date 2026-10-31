@@ -44,8 +44,8 @@
 	{/if}
 </div>
 <style>
-	.bills-includes { padding: 0 .75rem 0 2.5rem; color: var(--text2); font-size: .9rem; }
+	.bills-includes { padding: 0 .75rem 0 0; color: var(--text2); font-size: .9rem; }
 	p, ul { margin: 0; }
-	ul { padding-left: 1.2rem; }
+	ul { padding-left: 0; }
 	button { color: inherit; cursor: pointer; }
 </style>

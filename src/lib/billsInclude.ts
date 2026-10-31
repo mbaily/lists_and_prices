@@ -8,7 +8,7 @@ export type BillSection = keyof typeof billSections;
 
 export function findBillSections(text: string): BillSection[] {
 	const found: BillSection[] = [];
-	for (const match of text.matchAll(/\[\[bills:([a-z_]+)\]\]/gi)) {
+	for (const match of text.matchAll(/\[\[bills:([a-z_]+)(?::icon)?\]\]/gi)) {
 		const section = match[1].toLowerCase() as BillSection;
 		if (Object.hasOwn(billSections, section) && !found.includes(section)) found.push(section);
 	}
