@@ -84,8 +84,11 @@ than repeatedly appending the entire history.
 
 The account in the message must match the current session before upload data is
 applied. Expired/revoked sessions and account mismatches request sign-in while
-retaining the local document. Settings reauthenticates the cached account and
-syncs that same document. Failed or timed-out exchanges keep work pending;
+retaining the local document. The login screen appears immediately and
+reauthenticates the cached account, then syncs that same document. Choose
+Continue offline to keep working locally and sign in later in Settings →
+Offline & sync. Network failures and temporary server errors keep cached access
+available without requesting sign-in. Failed or timed-out exchanges keep work pending;
 automatic mode retries while the app is open. Late responses cannot mutate a
 replacement document or mark edits made during the request as synchronized.
 Changes made during a manual exchange may require another Sync now.

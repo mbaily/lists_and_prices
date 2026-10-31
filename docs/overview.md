@@ -51,7 +51,7 @@
 - **Bulk action scope:** Bulk uncheck/delete-checked applies to the whole list if nothing is selected, or to the current selection if items are selected.
 - **Moving lists and folders:** Lists can be moved to a different folder; folders can be moved inside other folders.
 - **Currency position:** Currency symbol position follows the user's device locale.
-- **Offline without login:** Sign in and sync once while online. Local access continues through network loss and server-session expiry; sign in again in Settings to resume sync. Automatic sync is the default, with per-device/account manual mode and Sync now in Settings → Offline & sync. See [offline synchronization](offline-sync.md).
+- **Offline without login:** Sign in and sync once while online. Local access continues through network loss. A rejected session shows the login screen while retaining local edits; sign in to resume sync or choose Continue offline and sign in later in Settings. Automatic sync is the default, with per-device/account manual mode and Sync now in Settings → Offline & sync. See [offline synchronization](offline-sync.md).
 - **User management CLI:** Server supports `--add-user`, `--remove-user`, and `--create-cert` command-line flags for managing `.htpasswd` and TLS certificates.
 - **PWA updates:** Updates are applied silently in the background; the current app version is visible in settings.
 - **Move validation:** Moving a folder into one of its own descendants is not permitted; the user is warned if they attempt it.

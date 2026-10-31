@@ -1,9 +1,12 @@
 <script lang="ts">
-	import { login } from '$lib/auth.svelte';
+	import { auth, login } from '$lib/auth.svelte';
 
-	let { onLogin }: { onLogin: (username: string) => void } = $props();
+	let { onLogin, onContinueOffline }: {
+		onLogin: (username: string) => void;
+		onContinueOffline?: () => void;
+	} = $props();
 
-	let username = $state('');
+	let username = $state(auth.username ?? '');
 	let password = $state('');
 	let error = $state('');
 	let busy = $state(false);
@@ -26,6 +29,9 @@
 <div class="screen">
 	<div class="card">
 		<h1>Lists &amp; Prices</h1>
+		{#if auth.needsLogin}
+			<p class="session-message" role="alert">Your session has expired or is no longer valid. Sign in again to sync. Your local data and offline edits are kept.</p>
+		{/if}
 		<form onsubmit={handleSubmit}>
 			<label>
 				Username
@@ -35,6 +41,7 @@
 					autocapitalize="none"
 					bind:value={username}
 					disabled={busy}
+					readonly={auth.needsLogin}
 				/>
 			</label>
 			<label>
@@ -53,6 +60,9 @@
 				{busy ? 'Signing in…' : 'Sign in'}
 			</button>
 		</form>
+		{#if onContinueOffline}
+			<button class="offline" disabled={busy} onclick={onContinueOffline}>Continue offline</button>
+		{/if}
 	</div>
 </div>
 
@@ -116,5 +126,18 @@
 		color: #ef4444;
 		font-size: 0.85rem;
 		margin: 0;
+	}
+	.session-message {
+		color: var(--text2);
+		font-size: 0.9rem;
+		line-height: 1.5;
+		margin: 0 0 1rem;
+	}
+	.offline {
+		width: 100%;
+		margin-top: 1rem;
+		background: var(--bg2);
+		color: var(--text);
+		border: 1px solid var(--border);
 	}
 </style>

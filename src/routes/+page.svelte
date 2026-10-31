@@ -2,13 +2,19 @@
 	import { onMount } from 'svelte';
 	import { yjsUrl } from '$lib/urls';
 	import { auth, checkSession, logout } from '$lib/auth.svelte';
-	import { initYjs, destroyYjs, idbSynced, localSaveState } from '$lib/yjsStore.svelte';
+	import { initYjs, destroyYjs, getDocumentUsername, reconnectYjs, syncNow, idbSynced, localSaveState } from '$lib/yjsStore.svelte';
 	import { reconcileSessionDocument } from '$lib/sessionDocument';
 	import { reloadSettings } from '$lib/settings.svelte';
 	import LoginScreen from '$lib/components/LoginScreen.svelte';
 	import HomeScreen from '$lib/components/HomeScreen.svelte';
 
 	let ready = $state(false);
+	let continueOffline = $state(false);
+	const showLogin = $derived(!auth.username || (auth.needsLogin && !continueOffline));
+
+	$effect(() => {
+		if (!auth.needsLogin) continueOffline = false;
+	});
 
 	onMount(() => {
 		const loadedUsername = auth.username;
@@ -26,6 +32,18 @@
 
 	});
 
+	function handleLogin(username: string) {
+		continueOffline = false;
+		if (getDocumentUsername() === username) {
+			// Reauthentication resumes the live document, including unsynced edits.
+			reconnectYjs();
+			void syncNow();
+		} else {
+			reloadSettings();
+			initYjs(username, yjsUrl());
+		}
+	}
+
 	async function handleLogout() {
 		if (await logout()) {
 			destroyYjs();
@@ -37,13 +55,11 @@
 
 <!-- Render the first complete local view, including pins, once IndexedDB is restored.
      Storage errors must still leave the app's settings and sync information accessible. -->
-{#if ready && (!auth.username || idbSynced.done || localSaveState.status === 'error')}
-	{#if !auth.username}
+{#if ready && (showLogin || idbSynced.done || localSaveState.status === 'error')}
+	{#if showLogin}
 		<LoginScreen
-			onLogin={(username: string) => {
-				reloadSettings(); // auth.username is set before this callback, load their settings
-				initYjs(username, yjsUrl());
-			}}
+			onLogin={handleLogin}
+			onContinueOffline={auth.username ? () => { continueOffline = true; } : undefined}
 		/>
 	{:else}
 		{#key auth.username}
