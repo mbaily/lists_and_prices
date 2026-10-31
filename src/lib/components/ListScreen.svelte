@@ -162,6 +162,24 @@
 		const lists = favouriteLists.map((l) => ({ type: 'list' as const, item: l, order: l.favouriteOrder ?? l.order ?? 0 }));
 		return [...folders, ...lists].sort((a, b) => (a.order !== b.order ? a.order - b.order : a.type === 'folder' && b.type === 'list' ? -1 : a.type === 'list' && b.type === 'folder' ? 1 : 0));
 	});
+	function getFavouriteTarget(direction: -1 | 1) {
+		const count = favouriteItems.length;
+		if (count === 0) return null;
+		const current = favouriteItems.findIndex((favourite) => favourite.type === 'list' && favourite.item.id === listId);
+		const index = current === -1
+			? (direction === 1 ? 0 : count - 1)
+			: (current + direction + count) % count;
+		const target = favouriteItems[index];
+		return target.type === 'list' && target.item.id === listId ? null : target;
+	}
+	const previousFavourite = $derived(getFavouriteTarget(-1));
+	const nextFavourite = $derived(getFavouriteTarget(1));
+	function navigateFavourite(direction: -1 | 1) {
+		const target = getFavouriteTarget(direction);
+		if (!target) return;
+		if (target.type === 'list') onOpenList(target.item.id);
+		else if (onNavigateTo) onNavigateTo(target.item.id);
+	}
 	let allItemsAll = $derived.by(() => {
 		void docState.version;
 		try { return readAllItems(); } catch { return [] as Item[]; }
@@ -1552,6 +1570,26 @@
 				class="universal-row"
 				onsubmit={(e) => { e.preventDefault(); inputMode === 'edit' ? submitEditName() : addItem(); }}
 			>
+				{#if browseView}
+					<div class="favourite-nav" aria-label="Favourite navigation" role="group">
+						<button
+							type="button"
+							onclick={() => navigateFavourite(-1)}
+							onkeydown={(e) => e.stopPropagation()}
+							disabled={!previousFavourite || (previousFavourite.type === 'folder' && !onNavigateTo)}
+							aria-label="Previous favourite"
+							title={previousFavourite ? `Previous favourite: ${previousFavourite.item.name}` : 'No previous favourite'}
+						>‹</button>
+						<button
+							type="button"
+							onclick={() => navigateFavourite(1)}
+							onkeydown={(e) => e.stopPropagation()}
+							disabled={!nextFavourite || (nextFavourite.type === 'folder' && !onNavigateTo)}
+							aria-label="Next favourite"
+							title={nextFavourite ? `Next favourite: ${nextFavourite.item.name}` : 'No next favourite'}
+						>›</button>
+					</div>
+				{/if}
 				<div class="input-wrap">
 					<textarea
 						bind:this={universalInputEl}
@@ -2952,9 +2990,30 @@
 	}
 	.universal-row {
 		display: flex;
-		flex-direction: column;
+		align-items: flex-start;
 		gap: 0.4rem;
 	}
+	.favourite-nav {
+		display: flex;
+		flex-shrink: 0;
+		gap: 0.2rem;
+	}
+	.favourite-nav button {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 2.25rem;
+		min-height: 2.5rem;
+		padding: 0;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--bg);
+		color: var(--text);
+		font-size: 1.5rem;
+		line-height: 1;
+		cursor: pointer;
+	}
+	.favourite-nav button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 	.input-wrap {
 		position: relative;
 		flex: 1;

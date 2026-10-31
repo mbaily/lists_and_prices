@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { parse } from 'svelte/compiler';
+import { componentFunctions, transpile } from './helpers/app.mjs';
 
 const source = readFileSync(new URL('../src/lib/components/ListScreen.svelte', import.meta.url), 'utf8');
 const component = parse(source, { modern: true });
@@ -81,4 +82,60 @@ test('list header adds no vertical padding around the breadcrumb', () => {
 	assert.ok(rule);
 	const css = source.slice(rule.block.start, rule.block.end);
 	assert.match(css, /padding:\s*0\s+1rem\s*;/);
+});
+
+test('favourite navigation wraps through the ordered lists and folders', () => {
+	const functions = componentFunctions('src/lib/components/ListScreen.svelte', ['getFavouriteTarget', 'navigateFavourite']);
+	const visits = [];
+	const state = {
+		favouriteItems: [
+			{ type: 'folder', item: { id: 'folder-a' } },
+			{ type: 'list', item: { id: 'list-a' } },
+			{ type: 'folder', item: { id: 'folder-b' } },
+			{ type: 'list', item: { id: 'list-b' } }
+		],
+		listId: 'list-a',
+		onOpenList: (id) => visits.push(['list', id]),
+		onNavigateTo: (id) => visits.push(['folder', id])
+	};
+	const { getFavouriteTarget, navigateFavourite } = new Function(
+		'state', `with (state) { ${transpile(functions)}; return { getFavouriteTarget, navigateFavourite }; }`
+	)(state);
+
+	assert.equal(getFavouriteTarget(-1).item.id, 'folder-a');
+	assert.equal(getFavouriteTarget(1).item.id, 'folder-b');
+	navigateFavourite(-1);
+	navigateFavourite(1);
+	assert.deepEqual(visits, [['folder', 'folder-a'], ['folder', 'folder-b']]);
+	state.listId = 'list-b';
+	assert.equal(getFavouriteTarget(1).item.id, 'folder-a');
+	state.listId = 'not-a-favourite';
+	assert.equal(getFavouriteTarget(-1).item.id, 'list-b');
+	assert.equal(getFavouriteTarget(1).item.id, 'folder-a');
+	navigateFavourite(-1);
+	assert.deepEqual(visits.at(-1), ['list', 'list-b']);
+	state.favouriteItems = [{ type: 'list', item: { id: 'list-b' } }];
+	state.listId = 'list-b';
+	assert.equal(getFavouriteTarget(-1), null);
+	assert.equal(getFavouriteTarget(1), null);
+	state.listId = 'other';
+	assert.equal(getFavouriteTarget(1).item.id, 'list-b');
+	state.favouriteItems = [];
+	assert.equal(getFavouriteTarget(-1), null);
+	assert.equal(getFavouriteTarget(1), null);
+});
+
+test('favourite navigation appears before the input only in browse view', () => {
+	const guard = guardFor('favourite-nav');
+	assert.ok(guard);
+	assert.equal(evaluateGuard(guard, { browseView: true }), true);
+	assert.equal(evaluateGuard(guard, { browseView: false }), false);
+	const input = findNodes(component.fragment, (node) => hasClass(node, 'input-wrap'))[0];
+	assert.match(source.slice(guard.end, input.start), /^\s*$/);
+	const buttons = findNodes(guard.consequent, (node) => node.type === 'RegularElement' && node.name === 'button');
+	assert.equal(buttons.length, 2);
+	for (const button of buttons) {
+		assert.ok(button.attributes.some((attribute) => attribute.name === 'disabled'));
+		assert.ok(button.attributes.some((attribute) => attribute.name === 'aria-label'));
+	}
 });
