@@ -78,6 +78,7 @@
 	} = $props();
 
 	let showUndoConfirm = $state(false);
+	let browseView = $state(false);
 
 	let items = $derived.by(() => {
 		void docState.version;
@@ -1505,6 +1506,19 @@
 				}
 			}} aria-label="More options" aria-haspopup="menu" aria-expanded={showHeaderMenu}>⋮</button>
 		</div>
+		<button
+			type="button"
+			class="browse-view-btn"
+			class:active={browseView}
+			onclick={() => browseView = !browseView}
+			aria-label="Browse view"
+			aria-pressed={browseView}
+			title={browseView ? 'Turn browse view off' : 'Turn browse view on'}
+		>
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" />
+			</svg>
+		</button>
 		<div class="header-right">
 			{#if navTotal > 1}
 				<div class="nav-strip">
@@ -1619,7 +1633,7 @@
 			</button>
 			<button class="bulk-btn sel-done-btn" onclick={exitSelectionMode}>✕ Done</button>
 		</div>
-	{:else}
+	{:else if !browseView}
 	<div class="summary-bar">
 		{#if isPriced}
 			<span>Total: <strong>{formatPrice(total)}</strong></span>
@@ -1691,7 +1705,7 @@
 
 	<!-- Item list (pin-bar and fav-bar are first children — they scroll away naturally) -->
 	<div class="item-list" bind:this={itemListEl}>
-		{#if allPinnedItems.length > 0}
+		{#if !browseView && allPinnedItems.length > 0}
 			<!-- svelte-ignore a11y_no_noninteractive_tabindex: Make the scrollable region keyboard accessible. -->
 			<div class="pin-bar" role="region" aria-label="Pinned items" tabindex="0">
 				<span class="pin-label">📍</span>
@@ -1724,9 +1738,8 @@
 				{/each}
 			</div>
 		{/if}
-		{#if favouriteItems.length > 0}
-			<!-- svelte-ignore a11y_no_noninteractive_tabindex: Make the scrollable region keyboard accessible. -->
-			<div class="fav-bar" class:fav-bar-collapsed={settings.favouritesCollapsed} role="region" aria-label="Favourites" tabindex="0">
+		{#if !browseView && favouriteItems.length > 0}
+			<div class="fav-bar" class:fav-bar-collapsed={settings.favouritesCollapsed}>
 				<button
 					class="fav-label"
 					onclick={() => updateSettings({ favouritesCollapsed: !settings.favouritesCollapsed })}
@@ -2291,14 +2304,12 @@
 	/* Lives inside .item-list — scrolls away naturally, no JS needed */
 	.fav-bar {
 		display: flex;
-		flex-wrap: nowrap;
+		flex-wrap: wrap;
 		align-items: center;
 		gap: 0.4rem;
 		padding: 0.4rem 0.75rem;
 		background: var(--bg2);
 		border-bottom: 1px solid var(--border);
-		overflow-x: auto;
-		scrollbar-width: thin;
 	}
 	.fav-label {
 		background: none;
@@ -2341,7 +2352,6 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		max-width: 200px;
-		flex-shrink: 0;
 		transition: max-width 0.15s ease;
 	}
 	.fav-chip.fav-chip-active {
@@ -2396,6 +2406,23 @@
 		margin-left: 0.4rem;
 		flex-shrink: 0;
 	}
+	.browse-view-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		padding: 0.25rem;
+		border: 1px solid transparent;
+		border-radius: 6px;
+		background: transparent;
+		color: var(--text2);
+		cursor: pointer;
+	}
+	.browse-view-btn.active {
+		border-color: var(--accent);
+		color: var(--accent);
+	}
+	.browse-view-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 	.header-right {
 		margin-left: auto;
 		flex-shrink: 0;
