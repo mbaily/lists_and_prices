@@ -1692,7 +1692,8 @@
 	<!-- Item list (pin-bar and fav-bar are first children — they scroll away naturally) -->
 	<div class="item-list" bind:this={itemListEl}>
 		{#if allPinnedItems.length > 0}
-			<div class="pin-bar">
+			<!-- svelte-ignore a11y_no_noninteractive_tabindex: Make the scrollable region keyboard accessible. -->
+			<div class="pin-bar" role="region" aria-label="Pinned items" tabindex="0">
 				<span class="pin-label">📍</span>
 				{#each allPinnedItems as pItem}
 					{@const inThisList = pItem.listId === listId}
@@ -1724,7 +1725,8 @@
 			</div>
 		{/if}
 		{#if favouriteItems.length > 0}
-			<div class="fav-bar" class:fav-bar-collapsed={settings.favouritesCollapsed}>
+			<!-- svelte-ignore a11y_no_noninteractive_tabindex: Make the scrollable region keyboard accessible. -->
+			<div class="fav-bar" class:fav-bar-collapsed={settings.favouritesCollapsed} role="region" aria-label="Favourites" tabindex="0">
 				<button
 					class="fav-label"
 					onclick={() => updateSettings({ favouritesCollapsed: !settings.favouritesCollapsed })}
@@ -2228,12 +2230,14 @@
 	/* Lives inside .item-list before fav-bar — scrolls away naturally */
 	.pin-bar {
 		display: flex;
-		flex-wrap: wrap;
+		flex-wrap: nowrap;
 		align-items: center;
 		gap: 0.4rem;
 		padding: 0.4rem 0.75rem;
 		background: var(--bg2);
 		border-bottom: 1px solid var(--border);
+		overflow-x: auto;
+		scrollbar-width: thin;
 	}
 	.pin-label { font-size: 1rem; flex-shrink: 0; }
 	.pin-chip {
@@ -2244,6 +2248,7 @@
 		overflow: hidden;
 		max-width: 220px;
 		white-space: nowrap;
+		flex-shrink: 0;
 	}
 	.pin-chip-unpin {
 		background: none;
@@ -2286,12 +2291,14 @@
 	/* Lives inside .item-list — scrolls away naturally, no JS needed */
 	.fav-bar {
 		display: flex;
-		flex-wrap: wrap;
+		flex-wrap: nowrap;
 		align-items: center;
 		gap: 0.4rem;
 		padding: 0.4rem 0.75rem;
 		background: var(--bg2);
 		border-bottom: 1px solid var(--border);
+		overflow-x: auto;
+		scrollbar-width: thin;
 	}
 	.fav-label {
 		background: none;
@@ -2334,6 +2341,7 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		max-width: 200px;
+		flex-shrink: 0;
 		transition: max-width 0.15s ease;
 	}
 	.fav-chip.fav-chip-active {
