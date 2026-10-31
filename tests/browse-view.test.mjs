@@ -85,7 +85,7 @@ test('list header adds no vertical padding around the breadcrumb', () => {
 });
 
 test('favourite navigation skips folders and wraps through ordered lists', () => {
-	const functions = componentFunctions('src/lib/components/ListScreen.svelte', ['getFavouriteTarget', 'navigateFavourite']);
+	const functions = componentFunctions('src/lib/components/ListScreen.svelte', ['getFavouritePosition', 'getFavouriteTarget', 'navigateFavourite']);
 	const visits = [];
 	const state = {
 		favouriteItems: [
@@ -98,19 +98,22 @@ test('favourite navigation skips folders and wraps through ordered lists', () =>
 		onOpenList: (id) => visits.push(['list', id]),
 		onNavigateTo: (id) => visits.push(['folder', id])
 	};
-	const { getFavouriteTarget, navigateFavourite } = new Function(
-		'state', `with (state) { ${transpile(functions)}; return { getFavouriteTarget, navigateFavourite }; }`
+	const { getFavouritePosition, getFavouriteTarget, navigateFavourite } = new Function(
+		'state', `with (state) { ${transpile(functions)}; return { getFavouritePosition, getFavouriteTarget, navigateFavourite }; }`
 	)(state);
 
+	assert.equal(getFavouritePosition(), 2);
 	assert.equal(getFavouriteTarget(-1).item.id, 'list-b');
 	assert.equal(getFavouriteTarget(1).item.id, 'list-b');
 	navigateFavourite(-1);
 	navigateFavourite(1);
 	assert.deepEqual(visits, [['list', 'list-b'], ['list', 'list-b']]);
 	state.listId = 'list-b';
+	assert.equal(getFavouritePosition(), 4);
 	assert.equal(getFavouriteTarget(1).item.id, 'list-a');
 	assert.equal(getFavouriteTarget(-1).item.id, 'list-a');
 	state.listId = 'not-a-favourite';
+	assert.equal(getFavouritePosition(), 0);
 	assert.equal(getFavouriteTarget(-1).item.id, 'list-b');
 	assert.equal(getFavouriteTarget(1).item.id, 'list-a');
 	navigateFavourite(-1);
@@ -122,11 +125,13 @@ test('favourite navigation skips folders and wraps through ordered lists', () =>
 	state.listId = 'other';
 	assert.equal(getFavouriteTarget(1).item.id, 'list-b');
 	state.favouriteItems = [{ type: 'folder', item: { id: 'folder-a' } }];
+	assert.equal(getFavouritePosition(), 0);
 	assert.equal(getFavouriteTarget(-1), null);
 	assert.equal(getFavouriteTarget(1), null);
 	navigateFavourite(1);
 	assert.deepEqual(visits.at(-1), ['list', 'list-b']);
 	state.favouriteItems = [];
+	assert.equal(getFavouritePosition(), 0);
 	assert.equal(getFavouriteTarget(-1), null);
 	assert.equal(getFavouriteTarget(1), null);
 });
@@ -144,4 +149,7 @@ test('favourite navigation appears before the input only in browse view', () => 
 		assert.ok(button.attributes.some((attribute) => attribute.name === 'disabled'));
 		assert.ok(button.attributes.some((attribute) => attribute.name === 'aria-label'));
 	}
+	assert.ok(hasClass(buttons[1], 'favourite-position'));
+	assert.match(source.slice(buttons[1].start, buttons[1].end), /navigateFavourite\(1\)/);
+	assert.match(source.slice(buttons[1].start, buttons[1].end), /favouritePosition\s*\|\|\s*'–'/);
 });

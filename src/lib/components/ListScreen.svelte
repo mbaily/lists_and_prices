@@ -162,6 +162,10 @@
 		const lists = favouriteLists.map((l) => ({ type: 'list' as const, item: l, order: l.favouriteOrder ?? l.order ?? 0 }));
 		return [...folders, ...lists].sort((a, b) => (a.order !== b.order ? a.order - b.order : a.type === 'folder' && b.type === 'list' ? -1 : a.type === 'list' && b.type === 'folder' ? 1 : 0));
 	});
+	function getFavouritePosition() {
+		return favouriteItems.findIndex((favourite) => favourite.type === 'list' && favourite.item.id === listId) + 1;
+	}
+	const favouritePosition = $derived(getFavouritePosition());
 	function getFavouriteTarget(direction: -1 | 1) {
 		const lists = favouriteItems.filter((favourite) => favourite.type === 'list');
 		const count = lists.length;
@@ -1582,12 +1586,13 @@
 						>‹</button>
 						<button
 							type="button"
+							class="favourite-position"
 							onclick={() => navigateFavourite(1)}
 							onkeydown={(e) => e.stopPropagation()}
 							disabled={!nextFavourite}
-							aria-label="Next favourite"
+							aria-label={favouritePosition ? `Next favourite (current position ${favouritePosition} of ${favouriteItems.length})` : 'Next favourite (current list is not a favourite)'}
 							title={nextFavourite ? `Next favourite: ${nextFavourite.item.name}` : 'No next favourite'}
-						>›</button>
+						>{favouritePosition || '–'}</button>
 					</div>
 				{/if}
 				<div class="input-wrap">
@@ -3002,9 +3007,9 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		width: 2.25rem;
+		min-width: 2.25rem;
 		min-height: 2.5rem;
-		padding: 0;
+		padding: 0 0.4rem;
 		border: 1px solid var(--border);
 		border-radius: 8px;
 		background: var(--bg);
@@ -3013,6 +3018,7 @@
 		line-height: 1;
 		cursor: pointer;
 	}
+	.favourite-nav .favourite-position { font-size: 1rem; font-weight: 600; }
 	.favourite-nav button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 	.input-wrap {
 		position: relative;
