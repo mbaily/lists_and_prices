@@ -34,7 +34,7 @@
 	import { settings, updateSettings } from '$lib/settings.svelte';
 	import { extractTags, splitWithTags, type NameSegment } from '$lib/tags';
 	import { billSections, findBillSections, type BillSection } from '$lib/billsInclude';
-	import { calendarSections, findCalendarSections, type CalendarSection } from '$lib/calendarInclude';
+	import { calendarSections, calendarLine, findCalendarSections, type CalendarSection } from '$lib/calendarInclude';
 	import { findIncludeTokens } from '$lib/includeTokens';
 	import type { CalendarInlineEntry, IncludeView } from '$lib/includeView';
 	import { base } from '$app/paths';
@@ -1814,7 +1814,7 @@
 		{/snippet}
 		{#snippet wrappedCalendar(itemId: string, section: CalendarSection)}
 			{@const view = calendarIncludes[itemId]?.sectionView(section)}
-			<span class="include-inline">{#if !view || view.status === 'loading'}Loading calendar events…{:else if view.status === 'error'}{view.message}{:else if view.status === 'unavailable'}Section unavailable.{:else if view.entries.length === 0}No events.{:else}{#each view.entries as entry, index}{#if index > 0}{' • '}{/if}<a class:include-completed={entry.completed} href={`${base || ''}/../simple_todo/calendar`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{entry.label} · {entry.title}</a>{#if entry.completed}{' (Completed)'}{/if}{/each}{/if}</span>
+			<span class="include-inline">{#if !view || view.status === 'loading'}Loading calendar events…{:else if view.status === 'error'}{view.message}{:else if view.status === 'unavailable'}Section unavailable.{:else if view.entries.length === 0}No events.{:else}{#each view.entries as entry, index}{#if index > 0}{' • '}{/if}<a class:include-completed={entry.completed} href={`${base || ''}/../simple_todo/calendar`} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{calendarLine(entry.label, entry.title)}</a>{#if entry.completed}{' (Completed)'}{/if}{/each}{/if}</span>
 		{/snippet}
 		{#each filteredTreeItems as {item, level, tlIdx, rootTlIdx, sibIdx}}
 			{@const canAddChildren = !item.heading && level < 2}

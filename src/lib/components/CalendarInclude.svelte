@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { base } from '$app/paths';
 	import {
-		calendarSections, calendarRange, calendarOccurrenceLabel, parseCalendarResponse,
+		calendarSections, calendarRange, calendarOccurrenceLabel, calendarLine, parseCalendarResponse,
 		type CalendarOccurrence, type CalendarSection
 	} from '$lib/calendarInclude';
 	import type { CalendarInlineEntry, IncludeView } from '$lib/includeView';
@@ -92,7 +92,7 @@
 					<ul>
 						{#each rows as row}
 							<li class:completed={row.completed}>
-								<a href={calendarUrl} target="_blank" rel="noopener noreferrer">{calendarOccurrenceLabel(row, now)} · {row.event.title}</a>{#if row.completed}{' (Completed)'}{/if}
+								<a href={calendarUrl} target="_blank" rel="noopener noreferrer">{calendarLine(calendarOccurrenceLabel(row, now), row.event.title)}</a>{#if row.completed}{' (Completed)'}{/if}
 							</li>
 						{/each}
 					</ul>

@@ -12,6 +12,10 @@ export type CalendarOccurrence = {
 	completed: boolean;
 };
 
+export function calendarLine(label: string, title: string): string {
+	return `${label}, ${title}`;
+}
+
 export function findCalendarSections(text: string, includeWrapped = true): CalendarSection[] {
 	const found: CalendarSection[] = [];
 	for (const token of findIncludeTokens(text)) {

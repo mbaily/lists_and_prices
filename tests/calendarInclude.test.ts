@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import { deepStrictEqual, strictEqual, throws } from 'node:assert';
 import {
-	calendarOccurrenceLabel, calendarRange, findCalendarSections, parseCalendarResponse,
+	calendarLine, calendarOccurrenceLabel, calendarRange, findCalendarSections, parseCalendarResponse,
 	type CalendarOccurrence
 } from '../src/lib/calendarInclude';
 
@@ -45,6 +45,11 @@ test('labels relative days and shows wall-clock time only for timed events', () 
 		`${new Date(2026, 10, 3).toLocaleDateString(undefined, { dateStyle: 'medium' })} 14:30`);
 	strictEqual(calendarOccurrenceLabel({ ...occurrence, event: { ...occurrence.event, all_day: true }, occurrence_at: '2026-11-03T00:00:00' }, now),
 		new Date(2026, 10, 3).toLocaleDateString(undefined, { dateStyle: 'medium' }));
+});
+
+test('formats calendar date and title with a comma', () => {
+	strictEqual(calendarLine('Today 09:05', 'Meeting'), 'Today 09:05, Meeting');
+	strictEqual(calendarLine('Tomorrow', 'Dinner, then a movie'), 'Tomorrow, Dinner, then a movie');
 });
 
 test('accepts API occurrences including completed recurrence and rejects malformed data', () => {
