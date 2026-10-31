@@ -13,7 +13,7 @@
 	let controller: AbortController;
 	const calendarUrl = `${base || ''}/../simple_todo/calendar`;
 
-	async function refresh(selected: CalendarSection[]) {
+	async function refreshSelected(selected: CalendarSection[]) {
 		controller?.abort();
 		if (selected.length === 0) return;
 		controller = new AbortController();
@@ -44,14 +44,18 @@
 		}
 	}
 
+	export function refresh() {
+		return refreshSelected(sections);
+	}
+
 	$effect(() => {
 		const selected = [...sections];
-		void refresh(selected);
+		void refreshSelected(selected);
 		let timer: ReturnType<typeof setTimeout>;
 		function scheduleMidnight() {
 			const current = new Date();
 			const midnight = new Date(current.getFullYear(), current.getMonth(), current.getDate() + 1);
-			timer = setTimeout(() => { void refresh(selected); scheduleMidnight(); }, midnight.getTime() - current.getTime() + 100);
+			timer = setTimeout(() => { void refreshSelected(selected); scheduleMidnight(); }, midnight.getTime() - current.getTime() + 100);
 		}
 		scheduleMidnight();
 		return () => { controller?.abort(); clearTimeout(timer); };
@@ -60,13 +64,12 @@
 
 <div class="calendar-includes">
 	{#if loading}<p>Loading calendar events…</p>
-	{:else if error}<p>{error} <button onclick={() => refresh(sections)}>Retry</button></p>
+	{:else if error}<p>{error} <button onclick={refresh}>Retry</button></p>
 	{:else}
 		{#each sections as section}
 			{@const range = calendarRange(section, now)}
 			{@const rows = occurrences.filter((row) => row.occurrence_at.slice(0, 10) >= range.start && row.occurrence_at.slice(0, 10) <= range.end)}
 			<section aria-label={calendarSections[section]}>
-				<strong>{calendarSections[section]}</strong>
 				{#if rows.length === 0}<p>No events.</p>
 				{:else}
 					<ul>
@@ -79,7 +82,6 @@
 				{/if}
 			</section>
 		{/each}
-		<button class="refresh" onclick={() => refresh(sections)} aria-label="Refresh calendar" title="Refresh calendar">↻</button>
 	{/if}
 </div>
 
@@ -91,5 +93,4 @@
 	a { color: inherit; }
 	.completed a { text-decoration: line-through; }
 	button { color: inherit; cursor: pointer; }
-	.refresh { border: 0; background: transparent; padding: .15rem .35rem; font-size: 1.2rem; line-height: 1; }
 </style>

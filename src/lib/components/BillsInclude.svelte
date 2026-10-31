@@ -7,7 +7,7 @@
 	let error = $state('');
 	let loading = $state(true);
 	let controller: AbortController;
-	async function refresh() {
+	export async function refresh() {
 		controller?.abort();
 		controller = new AbortController();
 		const request = controller;
@@ -19,6 +19,7 @@
 			if (response.status === 401 || response.status === 403) throw new Error('Sign in to Simple Todo to view bills.');
 			if (!response.ok) throw new Error('Bills service is unavailable.');
 			const json: unknown = await response.json();
+			if (request.signal.aborted) return;
 			if (!json || typeof json !== 'object' || Array.isArray(json)) throw new Error('Invalid bills response.');
 			data = json as Record<string, unknown>;
 		} catch (e) {
@@ -35,13 +36,11 @@
 	{:else if data}
 		{#each sections as section}
 			<section aria-label={billSections[section]}>
-				<strong>{billSections[section]}</strong>
 				{#if !Array.isArray(data[section])}<p>Section unavailable.</p>
 				{:else if (data[section] as unknown[]).length === 0}<p>No entries.</p>
 				{:else}<ul>{#each (data[section] as unknown[]) as row}{#if row && typeof row === 'object' && !Array.isArray(row)}<li>{billLine(row as Record<string, unknown>, section)}</li>{/if}{/each}</ul>{/if}
 			</section>
 		{/each}
-		<button class="refresh" onclick={refresh} aria-label="Refresh bills" title="Refresh bills">↻</button>
 	{/if}
 </div>
 <style>
@@ -50,5 +49,4 @@
 	p, ul { margin: .25rem 0; }
 	ul { padding-left: 1.2rem; }
 	button { color: inherit; cursor: pointer; }
-	.refresh { border: 0; background: transparent; padding: .15rem .35rem; font-size: 1.2rem; line-height: 1; }
 </style>
