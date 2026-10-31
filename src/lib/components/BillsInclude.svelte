@@ -2,11 +2,25 @@
 	import { base } from '$app/paths';
 	import { onMount } from 'svelte';
 	import { billSections, billLine, type BillSection } from '$lib/billsInclude';
-	let { sections }: { sections: BillSection[] } = $props();
+	import type { IncludeView } from '$lib/includeView';
+	let { sections, displaySections = sections }: { sections: BillSection[]; displaySections?: BillSection[] } = $props();
 	let data = $state<Record<string, unknown> | null>(null);
 	let error = $state('');
 	let loading = $state(true);
 	let controller: AbortController;
+	export function sectionView(section: BillSection): IncludeView<string> {
+		if (loading) return { status: 'loading' };
+		if (error) return { status: 'error', message: error };
+		const rows: unknown = data?.[section];
+		if (!Array.isArray(rows)) return { status: 'unavailable' };
+		if (!rows.every((row: unknown) => row && typeof row === 'object' && !Array.isArray(row))) {
+			return { status: 'error', message: 'Invalid bills response.' };
+		}
+		return {
+			status: 'ready',
+			entries: rows.map((row: unknown) => billLine(row as Record<string, unknown>, section))
+		};
+	}
 	export async function refresh() {
 		controller?.abort();
 		controller = new AbortController();
@@ -30,11 +44,12 @@
 	}
 	onMount(() => { refresh(); return () => controller?.abort(); });
 </script>
+{#if displaySections.length}
 <div class="bills-includes">
 	{#if loading}<p>Loading bills…</p>
 	{:else if error}<p>{error} <button onclick={refresh}>Retry</button></p>
 	{:else if data}
-		{#each sections as section}
+		{#each displaySections as section}
 			<section aria-label={billSections[section]}>
 				{#if !Array.isArray(data[section])}<p>Section unavailable.</p>
 				{:else if (data[section] as unknown[]).length === 0}<p>No entries.</p>
@@ -43,6 +58,7 @@
 		{/each}
 	{/if}
 </div>
+{/if}
 <style>
 	.bills-includes { padding: 0 .75rem 0 0; color: var(--text2); font-size: .9rem; }
 	p, ul { margin: 0; }

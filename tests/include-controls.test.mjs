@@ -91,23 +91,90 @@ test('include containers align to the item text without a fixed nesting offset',
 	assert.equal(attribute(container, 'style'), undefined);
 });
 
+test('full-screen items do not clamp wrapped include entries', () => {
+	const nodes = elements('../src/lib/components/ListScreen.svelte');
+	const text = readFileSync(new URL('../src/lib/components/ListScreen.svelte', import.meta.url), 'utf8');
+	const clamped = nodes.flatMap((node) => node.attributes.filter((entry) => entry.type === 'ClassDirective' && entry.name === 'fullscreen-clamp'));
+	assert.equal(clamped.length, 3);
+	for (const directive of clamped) {
+		assert.match(text.slice(directive.expression.start, directive.expression.end), /!hasWrappedIncludes/);
+	}
+});
+
 test('icon notation parses alongside regular includes and leaves unknown options as text', () => {
 	const app = createApp();
 	try {
 		const { splitWithTags } = app.load('src/lib/tags.ts');
 		const { findBillSections } = app.load('src/lib/billsInclude.ts');
 		const { findCalendarSections } = app.load('src/lib/calendarInclude.ts');
+		const { findIncludeTokens } = app.load('src/lib/includeTokens.ts');
 		const source = componentFunctions('src/lib/components/ListScreen.svelte', ['parseNameParts']);
-		const parseNameParts = new Function('splitWithTags', 'findBillSections', 'findCalendarSections',
-			`${transpile(source)}; return parseNameParts;`)(splitWithTags, findBillSections, findCalendarSections);
-		assert.deepEqual(parseNameParts('[[bills:upcoming:icon]] [[CALENDAR:TODAY:ICON]] [[calendar:today]] [[bills:upcoming:other]]'), [
-			{ type: 'bills', value: 'upcoming', icon: true },
+		const parseNameParts = new Function('splitWithTags', 'findBillSections', 'findCalendarSections', 'findIncludeTokens',
+			`${transpile(source)}; return parseNameParts;`)(splitWithTags, findBillSections, findCalendarSections, findIncludeTokens);
+		assert.deepEqual(parseNameParts('[[bills:upcoming:icon:wrap]] [[CALENDAR:TODAY:WRAP:ICON]] [[calendar:today]] [[bills:upcoming:other]]'), [
+			{ type: 'bills', value: 'upcoming', icon: true, wrap: true },
 			{ type: 'text', value: ' ' },
-			{ type: 'calendar', value: 'today', icon: true },
+			{ type: 'calendar', value: 'today', icon: true, wrap: true },
 			{ type: 'text', value: ' ' },
-			{ type: 'calendar', value: 'today', icon: false },
+			{ type: 'calendar', value: 'today', icon: false, wrap: false },
 			{ type: 'text', value: ' [[bills:upcoming:other]]' }
 		]);
+	} finally {
+		app.dispose();
+	}
+});
+
+test('wrapped bills surface loading, errors, empty sections and formatted entries', () => {
+	const app = createApp();
+	try {
+		const { billLine } = app.load('src/lib/billsInclude.ts');
+		const source = componentFunctions('src/lib/components/BillsInclude.svelte', ['sectionView'])
+			.replace('export function ', 'function ');
+		const state = { loading: true, error: '', data: null, billLine };
+		const sectionView = new Function('state', `with (state) { ${transpile(source)}; return sectionView; }`)(state);
+		assert.deepEqual(sectionView('upcoming'), { status: 'loading' });
+		state.loading = false;
+		state.error = 'Unavailable';
+		assert.deepEqual(sectionView('upcoming'), { status: 'error', message: 'Unavailable' });
+		state.error = '';
+		state.data = { upcoming: [] };
+		assert.deepEqual(sectionView('upcoming'), { status: 'ready', entries: [] });
+		assert.deepEqual(sectionView('overdue'), { status: 'unavailable' });
+		state.data.upcoming = [{ name: 'Power', effective_amount: 25, currency_symbol: '$' }, null];
+		assert.deepEqual(sectionView('upcoming'), { status: 'error', message: 'Invalid bills response.' });
+		state.data.upcoming.pop();
+		assert.deepEqual(sectionView('upcoming'), { status: 'ready', entries: ['Power · $25.00'] });
+	} finally {
+		app.dispose();
+	}
+});
+
+test('wrapped calendar keeps the selected range and completed occurrence information', () => {
+	const app = createApp();
+	try {
+		const { calendarRange, calendarOccurrenceLabel } = app.load('src/lib/calendarInclude.ts');
+		const source = componentFunctions('src/lib/components/CalendarInclude.svelte', ['sectionRows', 'sectionView'])
+			.replace('export function ', 'function ');
+		const state = {
+			loading: false, error: '', now: new Date(2026, 10, 1, 12), calendarRange, calendarOccurrenceLabel,
+			occurrences: [
+				{ event: { title: 'Meeting', all_day: false }, occurrence_at: '2026-11-01T09:30:00', completed: false },
+				{ event: { title: 'Done', all_day: true }, occurrence_at: '2026-11-01T00:00:00', completed: true },
+				{ event: { title: 'Tomorrow', all_day: true }, occurrence_at: '2026-11-02T00:00:00', completed: false }
+			]
+		};
+		const sectionView = new Function('state', `with (state) { ${transpile(source)}; return sectionView; }`)(state);
+		assert.deepEqual(sectionView('today'), {
+			status: 'ready',
+			entries: [
+				{ label: 'Today 09:30', title: 'Meeting', completed: false },
+				{ label: 'Today', title: 'Done', completed: true }
+			]
+		});
+		state.error = 'Sign in';
+		assert.deepEqual(sectionView('today'), { status: 'error', message: 'Sign in' });
+		state.loading = true;
+		assert.deepEqual(sectionView('today'), { status: 'loading' });
 	} finally {
 		app.dispose();
 	}

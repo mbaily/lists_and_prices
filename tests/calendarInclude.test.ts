@@ -15,6 +15,13 @@ test('accepts icon includes while rejecting unknown options and sections', () =>
 		['today', 'next_7_days']);
 });
 
+test('finds wrapped ranges while excluding them from vertical lists', () => {
+	const text = '[[calendar:today:wrap]] [[calendar:next_7_days:icon:wrap]] [[calendar:today_tomorrow:wrap:icon]] [[calendar:yesterday_today_tomorrow]] [[calendar:today:wrap:wrap]]';
+	deepStrictEqual(findCalendarSections(text), ['today', 'next_7_days', 'today_tomorrow', 'yesterday_today_tomorrow']);
+	deepStrictEqual(findCalendarSections(text, false), ['yesterday_today_tomorrow']);
+	deepStrictEqual(findCalendarSections('[[calendar:today:wrap]] [[calendar:today]]', false), ['today']);
+});
+
 test('ranges include the requested days across month and year boundaries', () => {
 	const now = new Date(2026, 11, 31, 23, 55);
 	deepStrictEqual(calendarRange('today', now), { start: '2026-12-31', end: '2026-12-31' });

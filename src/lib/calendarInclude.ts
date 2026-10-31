@@ -12,10 +12,11 @@ export type CalendarOccurrence = {
 	completed: boolean;
 };
 
-export function findCalendarSections(text: string): CalendarSection[] {
+export function findCalendarSections(text: string, includeWrapped = true): CalendarSection[] {
 	const found: CalendarSection[] = [];
-	for (const match of text.matchAll(/\[\[calendar:([a-z_0-9]+)(?::icon)?\]\]/gi)) {
-		const section = match[1].toLowerCase() as CalendarSection;
+	for (const token of findIncludeTokens(text)) {
+		if (token.type !== 'calendar' || (!includeWrapped && token.wrap)) continue;
+		const section = token.section as CalendarSection;
 		if (Object.hasOwn(calendarSections, section) && !found.includes(section)) found.push(section);
 	}
 	return found;
@@ -71,3 +72,4 @@ export function calendarOccurrenceLabel(occurrence: CalendarOccurrence, now: Dat
 	if (!occurrence.event.all_day) label += ` ${occurrence.occurrence_at.slice(11, 16)}`;
 	return label;
 }
+import { findIncludeTokens } from './includeTokens';

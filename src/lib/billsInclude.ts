@@ -6,10 +6,11 @@ export const billSections = {
 } as const;
 export type BillSection = keyof typeof billSections;
 
-export function findBillSections(text: string): BillSection[] {
+export function findBillSections(text: string, includeWrapped = true): BillSection[] {
 	const found: BillSection[] = [];
-	for (const match of text.matchAll(/\[\[bills:([a-z_]+)(?::icon)?\]\]/gi)) {
-		const section = match[1].toLowerCase() as BillSection;
+	for (const token of findIncludeTokens(text)) {
+		if (token.type !== 'bills' || (!includeWrapped && token.wrap)) continue;
+		const section = token.section as BillSection;
 		if (Object.hasOwn(billSections, section) && !found.includes(section)) found.push(section);
 	}
 	return found;
@@ -24,3 +25,4 @@ export function billLine(row: Record<string, unknown>, section: BillSection): st
 	if (typeof date === 'string' && date) parts.push(`${section === 'recent_payments' ? 'Paid' : 'Due'} ${date}`);
 	return parts.join(' · ');
 }
+import { findIncludeTokens } from './includeTokens';

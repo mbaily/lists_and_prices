@@ -11,6 +11,13 @@ test('accepts icon includes and ignores malformed or unknown options', () => {
 		['upcoming', 'due_today']);
 });
 
+test('finds wrapped sections without also displaying them as vertical lists', () => {
+	const text = '[[bills:upcoming:wrap]] [[bills:due_today:icon:wrap]] [[bills:overdue:wrap:icon]] [[bills:unscheduled]] [[bills:upcoming:icon:icon]]';
+	deepStrictEqual(findBillSections(text), ['upcoming', 'due_today', 'overdue', 'unscheduled']);
+	deepStrictEqual(findBillSections(text, false), ['unscheduled']);
+	deepStrictEqual(findBillSections('[[bills:upcoming:wrap]] [[bills:upcoming]]', false), ['upcoming']);
+});
+
 test('formats bill, payment and budget API fields', () => {
 	strictEqual(billLine({ name: 'Power', effective_amount: 25, currency_symbol: '$', next_due_date: '2026-11-01', is_estimated: true }, 'upcoming'), 'Power · ≈$25.00 · Due 2026-11-01');
 	strictEqual(billLine({ bill_name: 'Power', amount_paid: 0, currency_symbol: '$', paid_date: '2026-10-01' }, 'recent_payments'), 'Power · $0.00 · Paid 2026-10-01');
