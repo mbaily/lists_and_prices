@@ -2229,7 +2229,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		padding: 0.5rem 1rem;
+		padding: 0 1rem;
 		background: var(--bg2);
 		border-bottom: 1px solid var(--border);
 		flex-shrink: 0;

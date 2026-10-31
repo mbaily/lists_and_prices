@@ -73,3 +73,12 @@ test('favourites wrap instead of scrolling horizontally', () => {
 	assert.match(css, /flex-wrap:\s*wrap\s*;/);
 	assert.doesNotMatch(css, /overflow-x:\s*(auto|scroll)/);
 });
+
+test('list header adds no vertical padding around the breadcrumb', () => {
+	const rule = findNodes(component.css, (node) =>
+		node.type === 'Rule' && source.slice(node.prelude.start, node.prelude.end) === 'header'
+	)[0];
+	assert.ok(rule);
+	const css = source.slice(rule.block.start, rule.block.end);
+	assert.match(css, /padding:\s*0\s+1rem\s*;/);
+});
