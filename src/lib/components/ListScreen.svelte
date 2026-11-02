@@ -1382,6 +1382,20 @@
 	let showWikiModal = $state(false);
 	let wikiInitialPage = $state('start');
 
+	const existingWikiPages = $derived.by(() => {
+		void docState.version;
+		try {
+			const wikiMap = getDoc().getMap('wiki');
+			const set = new Set<string>();
+			for (const key of wikiMap.keys()) {
+				set.add(key);
+			}
+			return set;
+		} catch {
+			return new Set<string>();
+		}
+	});
+
 	function openWikiPage(pageSlug: string) {
 		wikiInitialPage = slugifyWikiPage(pageSlug);
 		showWikiModal = true;
@@ -1393,7 +1407,18 @@
 		if (type === 'wiki-ref') {
 			try {
 				const p = readWikiPage(getDoc(), id);
-				return p ? `📖 ${p.title}` : `📖 ${id}`;
+				if (p?.title) return `📖 ${p.title}`;
+				if (id.startsWith('item:')) {
+					const itemId = id.slice(5).trim();
+					const name = allItemsById.get(itemId)?.name;
+					if (name) return `📖 ${name}`;
+				}
+				if (id.startsWith('list:')) {
+					const lid = id.slice(5).trim();
+					const name = allLists.find(l => l.id === lid)?.name;
+					if (name) return `📖 ${name}`;
+				}
+				return `📖 ${id}`;
 			} catch {
 				return `📖 ${id}`;
 			}
@@ -1536,9 +1561,10 @@
 		>{listMeta?.done ? '☑' : '☐'}</button>
 		<button
 			class="icon-btn wiki-nav-btn"
-			onclick={() => openWikiPage('start')}
-			aria-label="Mini Wiki"
-			title="Mini Wiki"
+			class:has-wiki={existingWikiPages.has('list:' + listId)}
+			onclick={() => openWikiPage(existingWikiPages.has('list:' + listId) ? 'list:' + listId : 'start')}
+			aria-label="Wiki"
+			title={existingWikiPages.has('list:' + listId) ? 'Open List Wiki Page' : 'Mini Wiki'}
 		>📖</button>
 		<div class="header-menu-wrap">
 			<button class="type-btn" onclick={(e) => {
@@ -1941,7 +1967,7 @@
 						class="item-name heading-name"
 						class:editing={editingId === item.id}
 						onclick={() => { if (!selectionMode) startEditName(item); else toggleSelectionItem(item.id); }}
-					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref' || part.type === 'wiki-ref'}<span role="button" class="ref-pill" class:wiki-pill={part.type === 'wiki-ref'} onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else if part.type === 'bills'}<a class="ref-pill" class:iconified={part.icon} aria-label={`Bills: ${billSections[part.value]}`} title={`Bills: ${billSections[part.value]}`} href={simpleTodoPageUrl('bills', base)} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{#if part.icon}<span aria-hidden="true">💰</span>{:else}Bills: {billSections[part.value]}{/if}</a>{:else if part.type === 'calendar'}<a class="ref-pill" class:iconified={part.icon} aria-label={`Calendar: ${calendarSections[part.value]}`} title={`Calendar: ${calendarSections[part.value]}`} href={simpleTodoPageUrl('calendar', base)} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{#if part.icon}<span aria-hidden="true">📅</span>{:else}Calendar: {calendarSections[part.value]}{/if}</a>{:else}{part.value}{/if}{/each}</button>
+					>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref' || part.type === 'wiki-ref'}<span role="button" class="ref-pill" class:wiki-pill={part.type === 'wiki-ref'} onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else if part.type === 'bills'}<a class="ref-pill" class:iconified={part.icon} aria-label={`Bills: ${billSections[part.value]}`} title={`Bills: ${billSections[part.value]}`} href={simpleTodoPageUrl('bills', base)} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{#if part.icon}<span aria-hidden="true">💰</span>{:else}Bills: {billSections[part.value]}{/if}</a>{:else if part.type === 'calendar'}<a class="ref-pill" class:iconified={part.icon} aria-label={`Calendar: ${calendarSections[part.value]}`} title={`Calendar: ${calendarSections[part.value]}`} href={simpleTodoPageUrl('calendar', base)} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{#if part.icon}<span aria-hidden="true">📅</span>{:else}Calendar: {calendarSections[part.value]}{/if}</a>{:else}{part.value}{/if}{/each}{#if existingWikiPages.has('item:' + item.id)}<button type="button" class="item-wiki-badge" onclick={(e) => { e.stopPropagation(); cancelLongPress(); openWikiPage('item:' + item.id); }} title="Open dedicated wiki page" aria-label="Wiki documentation">📖</button>{/if}</button>
 					{#if !commitState.isHistorical}
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
@@ -1949,9 +1975,9 @@
 						{ label: item.pinned ? '📍 Unpin' : '📍 Pin', action: () => { if (canEditList) updateItem(item.id, { pinned: !item.pinned }); } },
 						{ label: '📌 Unheading', action: () => { if (canEditList) updateItem(item.id, { heading: false }); } },
 						{ label: '🔗 Tag as Link', action: () => copyRefToClipboard(item.id) },
-						{ label: '📖 Open in Wiki', action: () => {
+						{ label: '📖 Wiki Page', action: () => {
 							const wikiPart = splitWithTags(item.name).find(p => p.type === 'wiki-ref');
-							openWikiPage(wikiPart ? wikiPart.value : item.name);
+							openWikiPage(wikiPart ? wikiPart.value : `item:${item.id}`);
 						} },
 						...(itemLinks.length > 0 ? [{ label: itemLinks.length === 1 ? '🔗 Copy Link' : '🔗 Copy Links', action: () => itemLinks.length === 1 ? copyItemLinks(itemLinks) : (copyLinksItemId = item.id) }] : []),
 						...getReparentMenuItem(item.id),
@@ -1983,7 +2009,7 @@
 						onpointermove={cancelLongPress}
 						onpointerup={cancelLongPress}
 						onpointercancel={cancelLongPress}
-					><span class="item-name-text" class:fullscreen-clamp={item.fullScreen && !hasWrappedIncludes}>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref' || part.type === 'wiki-ref'}<span role="button" class="ref-pill" class:wiki-pill={part.type === 'wiki-ref'} onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else if part.type === 'bills'}<span class="include-pill"><a class="ref-pill" class:iconified={part.icon} aria-label={`Bills: ${billSections[part.value]}`} title={`Bills: ${billSections[part.value]}`} href={simpleTodoPageUrl('bills', base)} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{#if part.icon}<span aria-hidden="true">💰</span>{:else}Bills: {billSections[part.value]}{/if}</a><button type="button" class="include-refresh" aria-label="Refresh bills" title="Refresh bills" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onkeydown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); void billIncludes[item.id]?.refresh(); }}>↻</button></span>{#if part.wrap}{' '}{@render wrappedBills(item.id, part.value)}{/if}{:else if part.type === 'calendar'}<span class="include-pill"><a class="ref-pill" class:iconified={part.icon} aria-label={`Calendar: ${calendarSections[part.value]}`} title={`Calendar: ${calendarSections[part.value]}`} href={simpleTodoPageUrl('calendar', base)} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{#if part.icon}<span aria-hidden="true">📅</span>{:else}Calendar: {calendarSections[part.value]}{/if}</a><button type="button" class="include-refresh" aria-label="Refresh calendar" title="Refresh calendar" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onkeydown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); void calendarIncludes[item.id]?.refresh(); }}>↻</button></span>{#if part.wrap}{' '}{@render wrappedCalendar(item.id, part.value)}{/if}{:else}{part.value}{/if}{/each}</span></div>
+					><span class="item-name-text" class:fullscreen-clamp={item.fullScreen && !hasWrappedIncludes}>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref' || part.type === 'wiki-ref'}<span role="button" class="ref-pill" class:wiki-pill={part.type === 'wiki-ref'} onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else if part.type === 'bills'}<span class="include-pill"><a class="ref-pill" class:iconified={part.icon} aria-label={`Bills: ${billSections[part.value]}`} title={`Bills: ${billSections[part.value]}`} href={simpleTodoPageUrl('bills', base)} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{#if part.icon}<span aria-hidden="true">💰</span>{:else}Bills: {billSections[part.value]}{/if}</a><button type="button" class="include-refresh" aria-label="Refresh bills" title="Refresh bills" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onkeydown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); void billIncludes[item.id]?.refresh(); }}>↻</button></span>{#if part.wrap}{' '}{@render wrappedBills(item.id, part.value)}{/if}{:else if part.type === 'calendar'}<span class="include-pill"><a class="ref-pill" class:iconified={part.icon} aria-label={`Calendar: ${calendarSections[part.value]}`} title={`Calendar: ${calendarSections[part.value]}`} href={simpleTodoPageUrl('calendar', base)} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{#if part.icon}<span aria-hidden="true">📅</span>{:else}Calendar: {calendarSections[part.value]}{/if}</a><button type="button" class="include-refresh" aria-label="Refresh calendar" title="Refresh calendar" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onkeydown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); void calendarIncludes[item.id]?.refresh(); }}>↻</button></span>{#if part.wrap}{' '}{@render wrappedCalendar(item.id, part.value)}{/if}{:else}{part.value}{/if}{/each}{#if existingWikiPages.has('item:' + item.id)}<button type="button" class="item-wiki-badge" onclick={(e) => { e.stopPropagation(); cancelLongPress(); openWikiPage('item:' + item.id); }} title="Open dedicated wiki page" aria-label="Wiki documentation">📖</button>{/if}</span></div>
 					{#if !commitState.isHistorical}
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
@@ -1999,9 +2025,9 @@
 						}},
 						...(canAddChildren ? [{ label: '↳ Parent here', action: () => setParentHere(item) }] : []),
 						getCopyMenuItem(item),
-						{ label: '📖 Open in Wiki', action: () => {
+						{ label: '📖 Wiki Page', action: () => {
 							const wikiPart = splitWithTags(item.name).find(p => p.type === 'wiki-ref');
-							openWikiPage(wikiPart ? wikiPart.value : item.name);
+							openWikiPage(wikiPart ? wikiPart.value : `item:${item.id}`);
 						} },
 						...(canAddChildren ? [
 							{ label: '➕ Add Subtask', action: () => { newItemParentId = item.id; newItemIsNote = false; focusInput(); } },
@@ -2027,7 +2053,7 @@
 							onpointermove={cancelLongPress}
 							onpointerup={cancelLongPress}
 							onpointercancel={cancelLongPress}
-						><span class="item-name-text" class:fullscreen-clamp={item.fullScreen && !hasWrappedIncludes}>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref' || part.type === 'wiki-ref'}<span role="button" class="ref-pill" class:wiki-pill={part.type === 'wiki-ref'} onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else if part.type === 'bills'}<span class="include-pill"><a class="ref-pill" class:iconified={part.icon} aria-label={`Bills: ${billSections[part.value]}`} title={`Bills: ${billSections[part.value]}`} href={simpleTodoPageUrl('bills', base)} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{#if part.icon}<span aria-hidden="true">💰</span>{:else}Bills: {billSections[part.value]}{/if}</a><button type="button" class="include-refresh" aria-label="Refresh bills" title="Refresh bills" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onkeydown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); void billIncludes[item.id]?.refresh(); }}>↻</button></span>{#if part.wrap}{' '}{@render wrappedBills(item.id, part.value)}{/if}{:else if part.type === 'calendar'}<span class="include-pill"><a class="ref-pill" class:iconified={part.icon} aria-label={`Calendar: ${calendarSections[part.value]}`} title={`Calendar: ${calendarSections[part.value]}`} href={simpleTodoPageUrl('calendar', base)} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{#if part.icon}<span aria-hidden="true">📅</span>{:else}Calendar: {calendarSections[part.value]}{/if}</a><button type="button" class="include-refresh" aria-label="Refresh calendar" title="Refresh calendar" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onkeydown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); void calendarIncludes[item.id]?.refresh(); }}>↻</button></span>{#if part.wrap}{' '}{@render wrappedCalendar(item.id, part.value)}{/if}{:else}{part.value}{/if}{/each}</span></div>
+						><span class="item-name-text" class:fullscreen-clamp={item.fullScreen && !hasWrappedIncludes}>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref' || part.type === 'wiki-ref'}<span role="button" class="ref-pill" class:wiki-pill={part.type === 'wiki-ref'} onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else if part.type === 'bills'}<span class="include-pill"><a class="ref-pill" class:iconified={part.icon} aria-label={`Bills: ${billSections[part.value]}`} title={`Bills: ${billSections[part.value]}`} href={simpleTodoPageUrl('bills', base)} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{#if part.icon}<span aria-hidden="true">💰</span>{:else}Bills: {billSections[part.value]}{/if}</a><button type="button" class="include-refresh" aria-label="Refresh bills" title="Refresh bills" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onkeydown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); void billIncludes[item.id]?.refresh(); }}>↻</button></span>{#if part.wrap}{' '}{@render wrappedBills(item.id, part.value)}{/if}{:else if part.type === 'calendar'}<span class="include-pill"><a class="ref-pill" class:iconified={part.icon} aria-label={`Calendar: ${calendarSections[part.value]}`} title={`Calendar: ${calendarSections[part.value]}`} href={simpleTodoPageUrl('calendar', base)} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{#if part.icon}<span aria-hidden="true">📅</span>{:else}Calendar: {calendarSections[part.value]}{/if}</a><button type="button" class="include-refresh" aria-label="Refresh calendar" title="Refresh calendar" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onkeydown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); void calendarIncludes[item.id]?.refresh(); }}>↻</button></span>{#if part.wrap}{' '}{@render wrappedCalendar(item.id, part.value)}{/if}{:else}{part.value}{/if}{/each}{#if existingWikiPages.has('item:' + item.id)}<button type="button" class="item-wiki-badge" onclick={(e) => { e.stopPropagation(); cancelLongPress(); openWikiPage('item:' + item.id); }} title="Open dedicated wiki page" aria-label="Wiki documentation">📖</button>{/if}</span></div>
 					</div>
 					<div class="priced-bottom">
 						<button
@@ -2049,9 +2075,9 @@
 							getInfoPinMenuItem(item),
 							...(canAddChildren ? [{ label: '↳ Parent here', action: () => setParentHere(item) }] : []),
 							getCopyMenuItem(item),
-							{ label: '📖 Open in Wiki', action: () => {
+							{ label: '📖 Wiki Page', action: () => {
 								const wikiPart = splitWithTags(item.name).find(p => p.type === 'wiki-ref');
-								openWikiPage(wikiPart ? wikiPart.value : item.name);
+								openWikiPage(wikiPart ? wikiPart.value : `item:${item.id}`);
 							} },
 							...(canAddChildren ? [
 								{ label: '➕ Add Subtask', action: () => { newItemParentId = item.id; newItemIsNote = false; focusInput(); } },
@@ -2078,16 +2104,16 @@
 						onpointermove={cancelLongPress}
 						onpointerup={cancelLongPress}
 						onpointercancel={cancelLongPress}
-					><span class="item-name-text" class:fullscreen-clamp={item.fullScreen && !hasWrappedIncludes}>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref' || part.type === 'wiki-ref'}<span role="button" class="ref-pill" class:wiki-pill={part.type === 'wiki-ref'} onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else if part.type === 'bills'}<span class="include-pill"><a class="ref-pill" class:iconified={part.icon} aria-label={`Bills: ${billSections[part.value]}`} title={`Bills: ${billSections[part.value]}`} href={simpleTodoPageUrl('bills', base)} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{#if part.icon}<span aria-hidden="true">💰</span>{:else}Bills: {billSections[part.value]}{/if}</a><button type="button" class="include-refresh" aria-label="Refresh bills" title="Refresh bills" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onkeydown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); void billIncludes[item.id]?.refresh(); }}>↻</button></span>{#if part.wrap}{' '}{@render wrappedBills(item.id, part.value)}{/if}{:else if part.type === 'calendar'}<span class="include-pill"><a class="ref-pill" class:iconified={part.icon} aria-label={`Calendar: ${calendarSections[part.value]}`} title={`Calendar: ${calendarSections[part.value]}`} href={simpleTodoPageUrl('calendar', base)} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{#if part.icon}<span aria-hidden="true">📅</span>{:else}Calendar: {calendarSections[part.value]}{/if}</a><button type="button" class="include-refresh" aria-label="Refresh calendar" title="Refresh calendar" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onkeydown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); void calendarIncludes[item.id]?.refresh(); }}>↻</button></span>{#if part.wrap}{' '}{@render wrappedCalendar(item.id, part.value)}{/if}{:else}{part.value}{/if}{/each}</span></div>
+					><span class="item-name-text" class:fullscreen-clamp={item.fullScreen && !hasWrappedIncludes}>{#each linkParts as part}{#if part.type === 'url'}<a class="item-url" href={part.value} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="tag-pill" role="button" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); onTagClick?.(part.value.slice(1)); }}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref' || part.type === 'wiki-ref'}<span role="button" class="ref-pill" class:wiki-pill={part.type === 'wiki-ref'} onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => { e.stopPropagation(); navigateToRef(part.type, part.value); }}>{resolveRefName(part.type, part.value)}</span>{:else if part.type === 'bills'}<span class="include-pill"><a class="ref-pill" class:iconified={part.icon} aria-label={`Bills: ${billSections[part.value]}`} title={`Bills: ${billSections[part.value]}`} href={simpleTodoPageUrl('bills', base)} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{#if part.icon}<span aria-hidden="true">💰</span>{:else}Bills: {billSections[part.value]}{/if}</a><button type="button" class="include-refresh" aria-label="Refresh bills" title="Refresh bills" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onkeydown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); void billIncludes[item.id]?.refresh(); }}>↻</button></span>{#if part.wrap}{' '}{@render wrappedBills(item.id, part.value)}{/if}{:else if part.type === 'calendar'}<span class="include-pill"><a class="ref-pill" class:iconified={part.icon} aria-label={`Calendar: ${calendarSections[part.value]}`} title={`Calendar: ${calendarSections[part.value]}`} href={simpleTodoPageUrl('calendar', base)} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{#if part.icon}<span aria-hidden="true">📅</span>{:else}Calendar: {calendarSections[part.value]}{/if}</a><button type="button" class="include-refresh" aria-label="Refresh calendar" title="Refresh calendar" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onkeydown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); void calendarIncludes[item.id]?.refresh(); }}>↻</button></span>{#if part.wrap}{' '}{@render wrappedCalendar(item.id, part.value)}{/if}{:else}{part.value}{/if}{/each}{#if existingWikiPages.has('item:' + item.id)}<button type="button" class="item-wiki-badge" onclick={(e) => { e.stopPropagation(); cancelLongPress(); openWikiPage('item:' + item.id); }} title="Open dedicated wiki page" aria-label="Wiki documentation">📖</button>{/if}</span></div>
 					{#if !commitState.isHistorical}
 					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, parentKey)}>☰</button>
 					<RowMenu items={[
 						getInfoPinMenuItem(item),
 						...(canAddChildren ? [{ label: '↳ Parent here', action: () => setParentHere(item) }] : []),
 						getCopyMenuItem(item),
-						{ label: '📖 Open in Wiki', action: () => {
+						{ label: '📖 Wiki Page', action: () => {
 							const wikiPart = splitWithTags(item.name).find(p => p.type === 'wiki-ref');
-							openWikiPage(wikiPart ? wikiPart.value : item.name);
+							openWikiPage(wikiPart ? wikiPart.value : `item:${item.id}`);
 						} },
 						...(canAddChildren ? [
 							{ label: '➕ Add Subtask', action: () => { newItemParentId = item.id; newItemIsNote = false; focusInput(); } },
@@ -2241,6 +2267,7 @@
 					<button role="menuitem" disabled={isPasting || !canEditList} onclick={() => { showHeaderMenu = false; importFromClipboard('tasks'); }}>☑ Import as tasks</button>
 				{/if}
 				<button role="menuitem" aria-haspopup="menu" onclick={() => showCopySubmenu = true}>📋 Copy as… ›</button>
+				<button role="menuitem" onclick={() => { showHeaderMenu = false; openWikiPage('list:' + listId); }}>📖 List Wiki Page</button>
 				<button role="menuitem" disabled={!canEditList} onclick={() => { showHeaderMenu = false; toggleJournalMode(); }}>{journalMode ? '🗓 Hide dates (journal mode)' : '🗓 Show dates (journal mode)'}</button>
 				{#if !commitState.isHistorical}
 					<button role="menuitem" onclick={() => { showHeaderMenu = false; toggleType(); }}>{isPriced ? '📋 Switch to plain list' : '💰 Switch to priced list'}</button>
@@ -2316,6 +2343,25 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
+	}
+	.wiki-nav-btn.has-wiki {
+		color: var(--accent);
+		filter: drop-shadow(0 0 2px var(--accent));
+	}
+	.item-wiki-badge {
+		background: none;
+		border: none;
+		cursor: pointer;
+		font-size: 0.85em;
+		padding: 0 0.25rem;
+		opacity: 0.8;
+		vertical-align: middle;
+		display: inline-flex;
+		align-items: center;
+	}
+	.item-wiki-badge:hover {
+		opacity: 1;
+		transform: scale(1.15);
 	}
 	.screen {
 		display: flex;

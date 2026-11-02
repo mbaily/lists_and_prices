@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getDoc, getMutableDoc, docState, commitState } from '$lib/yjsStore.svelte';
+	import { getDoc, getMutableDoc, getItems, getLists, docState, commitState } from '$lib/yjsStore.svelte';
 	import { readWikiPage, readWikiPages, saveWikiPage, deleteWikiPage, findWikiBacklinks, type WikiPage, type WikiRevision } from '$lib/wiki/data';
 	import { renderDokuWiki, slugifyWikiPage } from '$lib/wiki/dokuwiki';
 	import {
@@ -109,6 +109,104 @@
 	const pageBaseName = $derived(getPageBaseName(currentPageId));
 	const currentNamespace = $derived(getNamespace(currentPageId));
 
+	interface LinkedEntityInfo {
+		type: 'item' | 'list';
+		id: string;
+		name: string;
+		listId?: string;
+		listName?: string;
+		isNote?: boolean;
+	}
+
+	const linkedEntity = $derived.by<LinkedEntityInfo | null>(() => {
+		void docState.version;
+		if (currentPageId.startsWith('item:')) {
+			const itemId = currentPageId.slice(5).trim();
+			try {
+				const doc = getDoc();
+				const itemsArr = getItems(doc);
+				let foundItem: { id: string; name: string; listId: string; isNote: boolean } | null = null;
+				for (let i = 0; i < itemsArr.length; i++) {
+					const m = itemsArr.get(i);
+					if (m.get('id') === itemId) {
+						foundItem = {
+							id: itemId,
+							name: (m.get('name') as string) || 'Untitled',
+							listId: (m.get('listId') as string) || '',
+							isNote: Boolean(m.get('isNote') || m.get('note'))
+						};
+						break;
+					}
+				}
+				if (foundItem) {
+					let listName = '';
+					const listsArr = getLists(doc);
+					for (let i = 0; i < listsArr.length; i++) {
+						const lm = listsArr.get(i);
+						if (lm.get('id') === foundItem.listId) {
+							listName = (lm.get('name') as string) || 'Untitled List';
+							break;
+						}
+					}
+					return {
+						type: 'item',
+						id: itemId,
+						name: foundItem.name,
+						listId: foundItem.listId,
+						listName,
+						isNote: foundItem.isNote
+					};
+				}
+			} catch {}
+			return { type: 'item', id: itemId, name: `Todo ${itemId.slice(0, 8)}…`, listId: '', listName: '', isNote: false };
+		}
+		if (currentPageId.startsWith('list:')) {
+			const listId = currentPageId.slice(5).trim();
+			try {
+				const doc = getDoc();
+				const listsArr = getLists(doc);
+				let listName = '';
+				listsArr.forEach((lm) => {
+					if (lm.get('id') === listId) {
+						listName = (lm.get('name') as string) || 'Untitled List';
+					}
+				});
+				if (listName) {
+					return {
+						type: 'list',
+						id: listId,
+						name: listName,
+						listId,
+						listName,
+						isNote: false
+					};
+				}
+			} catch {}
+			return { type: 'list', id: listId, name: `List ${listId.slice(0, 8)}…`, listId, listName: '', isNote: false };
+		}
+		return null;
+	});
+
+	const defaultPageTitle = $derived.by(() => {
+		if (currentPage?.title) return currentPage.title;
+		if (linkedEntity?.name) return linkedEntity.name;
+		if (currentPageId === 'start') return 'Start Page';
+		return pageBaseName || currentPageId;
+	});
+
+	const defaultPageContent = $derived.by(() => {
+		if (currentPage?.content) return currentPage.content;
+		if (linkedEntity) {
+			if (linkedEntity.type === 'item') {
+				return `====== ${linkedEntity.name} ======\n\nDedicated wiki documentation for [[item:${linkedEntity.id}|${linkedEntity.name}]].\n\n`;
+			}
+			if (linkedEntity.type === 'list') {
+				return `====== ${linkedEntity.name} ======\n\nDedicated wiki documentation for list [[list:${linkedEntity.id}|${linkedEntity.name}]].\n\n`;
+			}
+		}
+		return `====== ${defaultPageTitle} ======\n\nWrite your content here...`;
+	});
+
 	const filteredPages = $derived(
 		allPages.filter(
 			(p) =>
@@ -125,7 +223,35 @@
 		if (!currentPage) return '';
 		return renderDokuWiki(currentPage.content, {
 			currentSlug: currentPage.id,
-			resolveWikiTitle: (slug) => allPages.find((p) => p.id === slug)?.title,
+			resolveWikiTitle: (slug) => {
+				const page = allPages.find((p) => p.id === slug);
+				if (page?.title) return page.title;
+				if (slug.startsWith('item:')) {
+					const id = slug.slice(5).trim();
+					try {
+						const doc = getDoc();
+						const itemsArr = getItems(doc);
+						let foundName = '';
+						itemsArr.forEach((m) => {
+							if (m.get('id') === id) foundName = (m.get('name') as string) || '';
+						});
+						if (foundName) return foundName;
+					} catch {}
+				}
+				if (slug.startsWith('list:')) {
+					const id = slug.slice(5).trim();
+					try {
+						const doc = getDoc();
+						const listsArr = getLists(doc);
+						let foundName = '';
+						listsArr.forEach((m) => {
+							if (m.get('id') === id) foundName = (m.get('name') as string) || '';
+						});
+						if (foundName) return foundName;
+					} catch {}
+				}
+				return undefined;
+			},
 			pageExists: (slug) => allPages.some((p) => p.id === slug)
 		});
 	});
@@ -188,6 +314,21 @@
 						onNavigateToFolder(refId);
 					}
 				}
+			}
+		}
+	}
+
+	function jumpToLinkedEntity() {
+		if (!linkedEntity) return;
+		if (linkedEntity.type === 'item') {
+			if (onNavigateToItem) {
+				onClose();
+				onNavigateToItem(linkedEntity.id, linkedEntity.listId);
+			}
+		} else if (linkedEntity.type === 'list') {
+			if (onNavigateToList) {
+				onClose();
+				onNavigateToList(linkedEntity.id);
 			}
 		}
 	}
@@ -321,7 +462,7 @@
 
 			<div class="hdr-title" title="Slug: {currentPageId}">
 				<span class="wiki-icon">📖</span>
-				<span class="title-text">{currentPage?.title || currentPageId}</span>
+				<span class="title-text">{currentPage?.title || linkedEntity?.name || currentPageId}</span>
 			</div>
 
 			<div class="hdr-right">
@@ -372,8 +513,8 @@
 					</button>
 				{/each}
 				<span class="bc-sep">:</span>
-				<span class="bc-current" title="Page: {currentPage?.title || pageBaseName}">
-					📄 <span class="bc-name">{pageBaseName}</span>
+				<span class="bc-current" title="Page: {currentPage?.title || linkedEntity?.name || pageBaseName}">
+					📄 <span class="bc-name">{currentPage?.title || linkedEntity?.name || pageBaseName}</span>
 				</span>
 			</nav>
 
@@ -539,6 +680,26 @@
 				<!-- Current Page Content View -->
 				<div class="wiki-content-scroll" onclick={handleContentClick}>
 					<div class="wiki-article-card">
+						{#if linkedEntity}
+							<div class="wiki-entity-banner">
+								<div class="entity-banner-info">
+									<span class="entity-kind-badge">{linkedEntity.type === 'item' ? (linkedEntity.isNote ? '📝 Note' : '☑️ Todo') : '📋 List'}</span>
+									<span class="entity-title">"{linkedEntity.name}"</span>
+									{#if linkedEntity.listName}
+										<span class="entity-list-tag">in <strong>{linkedEntity.listName}</strong></span>
+									{/if}
+								</div>
+								<button
+									type="button"
+									class="entity-jump-btn"
+									onclick={jumpToLinkedEntity}
+									title="Open in app"
+								>
+									Jump to {linkedEntity.type === 'item' ? (linkedEntity.isNote ? 'Note' : 'Todo') : 'List'} →
+								</button>
+							</div>
+						{/if}
+
 						{#if currentPage}
 							<!-- Page Title & Meta -->
 							<div class="article-meta-header">
@@ -605,14 +766,20 @@
 							<!-- Page Does Not Exist State -->
 							<div class="empty-page-state">
 								<h2>Topic does not exist yet</h2>
-								<p>There is currently no wiki page for <code>{currentPageId}</code>.</p>
+								<p>
+									{#if linkedEntity}
+										There is currently no wiki page for this {linkedEntity.type === 'item' ? (linkedEntity.isNote ? 'note' : 'todo') : 'list'} (<code>{currentPageId}</code>).
+									{:else}
+										There is currently no wiki page for <code>{currentPageId}</code>.
+									{/if}
+								</p>
 								{#if !commitState.isHistorical}
 									<button
 										type="button"
 										class="primary-btn create-page-btn"
 										onclick={() => (isEditing = true)}
 									>
-										✏️ Create "{currentPageId}" Page
+										✏️ Create "{linkedEntity?.name || currentPageId}" Page
 									</button>
 								{/if}
 							</div>
@@ -681,8 +848,8 @@
 	{#if isEditing}
 		<WikiEditor
 			pageId={currentPageId}
-			initialTitle={currentPage?.title || (currentPageId === 'start' ? 'Start Page' : currentPageId)}
-			initialContent={currentPage?.content || `====== ${currentPage?.title || currentPageId} ======\n\nWrite your content here...`}
+			initialTitle={defaultPageTitle}
+			initialContent={defaultPageContent}
 			readOnly={commitState.isHistorical}
 			onSave={handleSavePage}
 			onClose={() => (isEditing = false)}
@@ -1114,6 +1281,58 @@
 		margin: 0 auto;
 		padding-bottom: 4rem;
 	}
+	/* Linked Entity Banner */
+	.wiki-entity-banner {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+		padding: 0.65rem 1rem;
+		margin-bottom: 1.25rem;
+		background: var(--bg2);
+		border: 1px solid var(--accent);
+		border-left: 4px solid var(--accent);
+		border-radius: 6px;
+	}
+	.entity-banner-info {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.45rem;
+		font-size: 0.95rem;
+	}
+	.entity-kind-badge {
+		font-size: 0.78rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		background: var(--bg3);
+		color: var(--accent);
+		padding: 0.15rem 0.4rem;
+		border-radius: 4px;
+	}
+	.entity-title {
+		font-weight: 600;
+	}
+	.entity-list-tag {
+		font-size: 0.85rem;
+		color: var(--text2);
+	}
+	.entity-jump-btn {
+		background: var(--accent);
+		color: #fff;
+		border: none;
+		border-radius: 4px;
+		padding: 0.3rem 0.7rem;
+		font-size: 0.85rem;
+		font-weight: 600;
+		cursor: pointer;
+		margin-left: auto;
+	}
+	.entity-jump-btn:hover {
+		opacity: 0.9;
+	}
+
 	.article-meta-header {
 		margin-bottom: 1.5rem;
 		padding-bottom: 0.75rem;

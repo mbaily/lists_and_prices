@@ -2030,6 +2030,7 @@ ${bodyHtml}
 						{ label: '✏ Rename', action: () => startRename(list.id, list.name, 'list', list.color) },
 						{ label: list.archived ? '📤 Unarchive' : '📥 Archive', action: () => { if (!commitState.isHistorical) { list.archived ? unarchiveList(list.id) : archiveList(list.id); } } },
 						{ label: '🔗 Tag as Link', action: () => writeClipboard(`[[list:${list.id}]]`) },
+						{ label: '📖 Wiki Page', action: () => { wikiInitialPage = `list:${list.id}`; showWikiModal = true; } },
 						...(hasTag
 							? [{ label: '✕ Clear Tag', action: clearTag }]
 							: [{ label: '🏷 Tag (to move)', action: () => tagList(list.id) }]),
