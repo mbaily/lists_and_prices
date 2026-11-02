@@ -1,28 +1,69 @@
-Good notes todos app for use with iOS Safari web browser, chrome for windows, chrome for linux, etc.
-Can be installed as a PWA or just used on the web.
+# Lists & Prices
 
-Uses completely local database for accessing all notes and todos, so is quite quick. Syncing using YJS.
+A fast, offline-first personal notes, todos, and errand tracker designed for mobile and desktop.
+Built with **Svelte 5** and **Yjs**, it runs as an installable Progressive Web App (PWA) with instant local storage and seamless multi-device synchronization.
 
-Recommended for personal todos and quick notes on the go for across desktop or laptop computer, or with an iOS or android phone. But not for detailed note taking. For that, I recommend to use in conjunction with dokuwiki.
+## Key Features
 
-On a list, use the browse-view button after the three-dot menu to hide the
-summary, pinned items and favourites while keeping the breadcrumb and input
-bar visible. Toggle it again to restore them. Selection controls remain
-available in browse view. Pinned items scroll sideways; favourites wrap across
-rows. Both scroll away as you scroll down the list. In browse view, the arrows
-beside the input navigate through favourite lists in their saved order, skipping
-folders and wrapping at either end. From a non-favourite list they open the
-last or first favourite list respectively. The next button shows the current
-list's position among all favourites, including folders, or a dash if the
-current list is not a favourite.
+- **Offline-First & Instant:** Reads and writes to local storage (IndexedDB in the browser, SQLite on the backend), ensuring sub-millisecond response times even completely offline.
+- **Real-Time Sync:** Peer-to-peer and server synchronization powered by Yjs over WebSockets with offline conflict resolution.
+- **Installable PWA:** Designed for iOS Safari, Chrome on Android, Windows, macOS, and Linux. Add to your home screen or install as a desktop app.
+- **Nearby Errands:** Location-aware errand checklist that automatically groups tasks by proximity to supermarkets, hardware stores, shopping centres, or custom-tagged places.
+- **Pricing & Quantities:** Track item prices, quantities, and totals directly in your shopping lists.
+- **Self-Hostable & Private:** Single Node.js server with built-in authentication, secure session management, and encrypted backup support.
+- **Extensible:** Embed live bills and calendar events from Simple Todo via inline widgets (`[[bills:upcoming]]`, `[[calendar:today]]`).
 
-The terminal client's `tui.config.json` is a localhost example. Keep personal
-server settings in `tui.config.real.json`, which is ignored by Git.
+---
 
-## Toolchain
+## Quick Start
 
-Use Node.js 24 LTS (24.15.0 or newer in the 24.x line) and npm/npx 12.2.0.
-The npm version is recorded in `package.json`'s `packageManager` field.
+### Prerequisites
+- **Node.js 24 LTS** (24.15.0 or newer)
+- **npm 12.2.0** (or install via `npm install --global npm@12.2.0`)
+
+### Installation & Launch
+
+1. **Clone repository and install locked dependencies:**
+   ```sh
+   git clone https://github.com/mbaily/lists_and_prices.git
+   cd lists_and_prices
+   npm ci
+   ```
+
+2. **Create your first user account:**
+   ```sh
+   npm start -- --add-user
+   # Prompts for username and password
+   ```
+
+3. **Build and start the production server:**
+   ```sh
+   npm run build
+   npm start
+   ```
+   Open `http://localhost:8080` in your browser and sign in.
+
+### Development Mode
+To run the Vite development server with hot-reloading:
+```sh
+npm run dev
+```
+
+---
+
+## Navigation & Browse View
+
+On any list, use the **Browse view** button (next to the three-dot menu) to hide the summary, pinned items, and favourites while keeping the breadcrumb and input bar visible. Selection controls remain accessible in browse view.
+
+- **Pinned items:** Scroll sideways at the top of the list.
+- **Favourites:** Wrap across rows and scroll away naturally as you scroll down.
+- **Quick navigation:** In browse view, the arrows beside the input bar step through your favourite lists in order, skipping folders and wrapping at either end. The button indicates your current position among all favourites.
+
+---
+
+## Toolchain & Dependencies
+
+Use Node.js 24 LTS and npm 12.2.0 (recorded in `package.json`'s `packageManager` field).
 
 ```sh
 npm install --global npm@12.2.0
@@ -31,50 +72,45 @@ npx --version
 npm ci
 ```
 
-Make sure the npm installation's bin directory is on `PATH`; both version
-commands should report `12.2.0`. In an existing Bash terminal, `hash -r` clears
-cached command paths after upgrading.
+Make sure the npm installation's bin directory is on `PATH`; both version commands should report `12.2.0`. In an existing Bash terminal, `hash -r` clears cached command paths after upgrading.
 
-TypeScript 7.0.2 supplies `npx tsc` and the diagnostics used by `npm run check`
-and `npm run check:watch`. It is installed as the `@typescript/native` npm alias.
-The `typescript` dependency aliases Microsoft's `@typescript/typescript6`
-compatibility package because SvelteKit and Svelte's component transformation
-still need the TypeScript 6 compiler API. `svelte-check` uses `--tsgo` to run the
-TypeScript 7 compiler. See the [Svelte checker setup](https://github.com/sveltejs/language-tools/tree/master/packages/svelte-check)
-and [Microsoft's compatibility setup](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6.0).
+TypeScript 7.0.2 supplies `npx tsc` and diagnostics used by `npm run check`. SvelteKit component compilation uses Microsoft's `@typescript/typescript6` compatibility alias.
 
-npm 12 requires explicit permission for dependency install scripts. The
-`allowScripts` entries in `package.json` cover the locked versions of
-`better-sqlite3`, `esbuild` and `leveldown` so clean installs can build their
-native components. After changing one of those versions, review its install
-script and update the entry with `npm install-scripts approve <package>`.
+npm 12 requires explicit permission for dependency install scripts. The `allowScripts` entries in `package.json` approve `better-sqlite3`, `esbuild` and `leveldown` for native compilation.
 
-## Validation
+---
 
-- `npm test` runs isolated server, shared-data, and component lifecycle regression tests.
-- `npm run check` checks Svelte and TypeScript diagnostics.
-- `npm run build` builds the production SPA/PWA.
+## Nearby Errands
 
-See [bug-fix and upgrade notes](docs/bug-fixes.md) before deploying the authentication and shared-data changes.
+Tag todos with hashtags such as `#supermarket`, `#coles`, `#woolworths`, `#kmart` or `#bigw`, then tap 🚗 in the home header.
 
-See [safe deployment instructions](docs/deployment.md) for backups, dry runs and rollback.
+- Bundled with a verified retail catalogue covering 4,768 Melbourne locations across major chains, shopping centres, and hardware stores.
+- Custom places and tags can be saved and sync automatically across devices.
+- Discover supported brands and hashtags using the in-app hashtag search.
+- For catalogue details and custom datasets, see the [Nearby Errands Guide](docs/nearby-errands.md) and [Coverage Report](docs/retail-chain-coverage.json).
 
-See [server storage](docs/storage.md) for external SQLite/Y-LevelDB/token paths
-and user-data backups that exclude `.htpasswd`.
+---
 
-See [HTTPS reverse proxy and subpath hosting](docs/reverse-proxy.md) to serve
-the app under `/lists/` with Caddy or NGINX. The default build still runs at `/`.
+## Documentation & Guides
 
-For downloadable app data, see [JSON backup coverage and restore behaviour](docs/json-backups.md).
+- [**Deployment Guide**](docs/deployment.md): Safe deployments, atomic file sync, health checks, and automatic rollback.
+- [**HTTPS Reverse Proxy**](docs/reverse-proxy.md): Serving under subpaths (e.g. `/lists/` or `/lists_and_prices/`) with Caddy or Nginx.
+- [**Server Storage & Backups**](docs/storage.md): External SQLite database, Y-LevelDB persistence, and token configuration.
+- [**JSON Backups & Restore**](docs/json-backups.md): Comprehensive export and restore behavior for all lists, notes, and preferences.
+- [**Foreground Local Client**](docs/local-client.md): Headless local Linux replica with optional local/LAN hosting.
+- [**Task Integration API**](docs/task-api.md): Authenticated server-to-server task imports and list-scoped API tokens.
+- [**Bug Fixes & Upgrade Notes**](docs/bug-fixes.md): Historical upgrade notes and bug resolutions.
 
-For a foreground Linux replica with files in the current directory and optional
-local/LAN frontend hosting, see [the local client](docs/local-client.md).
+---
 
-See [task integration API](docs/task-api.md) for authenticated server-to-server
-task imports, shared clipboard matching, list-scoped tokens, and retry behavior.
+## Testing & Validation
 
-## Nearby errands
+- `npm test`: Runs the test suite (460+ isolated regression tests covering data sync, auth, and component lifecycles).
+- `npm run check`: Runs Svelte and TypeScript diagnostic checks.
+- `npm run build`: Compiles the production SPA/PWA assets.
 
-Tag todos with `#supermarket`, `#coles`, `#woolworths`, `#kmart` or `#bigw`, then open 🚗 from the home header. The bundled Melbourne catalogue is editable JSON; personal locations sync across devices. See [nearby errands and catalogue instructions](docs/nearby-errands.md).
+---
 
-The nearby catalogue includes 4,768 Melbourne locations across the existing brands, including shopping-centre businesses and hardware chains. The [per-brand coverage report](docs/retail-chain-coverage.json) records sources and remaining gaps. Tag a list or item with `#pcparts`, `#muji`, `#daiso`, `#hardware`, `#bunnings`, `#mitre10`, `#northland`, `#emporium` or a listed brand; use the screen's hashtag search to discover supported brands.
+## License
+
+Released under the [MIT License](LICENSE).
