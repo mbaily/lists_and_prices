@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount, onDestroy } from 'svelte';
 	import { getDoc, getMutableDoc, getItems, getLists, docState, commitState } from '$lib/yjsStore.svelte';
 	import { readWikiPage, readWikiPages, saveWikiPage, deleteWikiPage, findWikiBacklinks, type WikiPage, type WikiRevision } from '$lib/wiki/data';
 	import { renderDokuWiki, slugifyWikiPage } from '$lib/wiki/dokuwiki';
@@ -46,6 +47,77 @@
 
 	let viewportHeight = $state('100vh');
 	let viewportTop = $state('0px');
+
+	let previousHash = '';
+
+	function getWikiSlugFromHash(rawHash: string): string | null {
+		const clean = rawHash.startsWith('#') ? rawHash.slice(1) : rawHash;
+		if (clean.startsWith('wiki:')) return decodeURIComponent(clean.slice(5));
+		if (clean.startsWith('wiki/')) return decodeURIComponent(clean.slice(5));
+		if (clean.startsWith('wiki=')) return decodeURIComponent(clean.slice(5));
+		if (clean.startsWith('w/')) return decodeURIComponent(clean.slice(2));
+		if (clean.startsWith('w:')) return decodeURIComponent(clean.slice(2));
+		return null;
+	}
+
+	function handleClose() {
+		if (typeof window !== 'undefined') {
+			const currentHash = window.location.hash;
+			if (currentHash.startsWith('#wiki') || currentHash.startsWith('#w/')) {
+				const cleanUrl = window.location.pathname + window.location.search + (previousHash || '');
+				window.history.replaceState(null, '', cleanUrl || '#');
+			}
+		}
+		onClose();
+	}
+
+	onMount(() => {
+		if (typeof window !== 'undefined') {
+			const initialHash = window.location.hash;
+			if (!initialHash.startsWith('#wiki') && !initialHash.startsWith('#w/')) {
+				previousHash = initialHash;
+			}
+			const targetHash = `#wiki:${encodeURI(currentPageId)}`;
+			if (window.location.hash !== targetHash) {
+				window.history.pushState(null, '', targetHash);
+			}
+
+			function onHashChange() {
+				const slug = getWikiSlugFromHash(window.location.hash);
+				if (slug) {
+					const normalized = slugifyWikiPage(slug);
+					if (normalized !== currentPageId) {
+						currentPageId = normalized;
+						if (!history.includes(normalized)) {
+							history = [...history, normalized];
+						}
+						showIndex = false;
+						showHistory = false;
+						selectedRevision = null;
+					}
+				} else {
+					onClose();
+				}
+			}
+
+			window.addEventListener('popstate', onHashChange);
+			window.addEventListener('hashchange', onHashChange);
+			return () => {
+				window.removeEventListener('popstate', onHashChange);
+				window.removeEventListener('hashchange', onHashChange);
+			};
+		}
+	});
+
+	onDestroy(() => {
+		if (typeof window !== 'undefined') {
+			const currentHash = window.location.hash;
+			if (currentHash.startsWith('#wiki') || currentHash.startsWith('#w/')) {
+				const cleanUrl = window.location.pathname + window.location.search + (previousHash || '');
+				window.history.replaceState(null, '', cleanUrl || '#');
+			}
+		}
+	});
 
 	$effect(() => {
 		const updateHeight = () => {
@@ -263,6 +335,12 @@
 		if (slug !== currentPageId) {
 			currentPageId = slug;
 			history = [...history, slug];
+			if (typeof window !== 'undefined') {
+				const targetHash = `#wiki:${encodeURI(slug)}`;
+				if (window.location.hash !== targetHash) {
+					window.history.pushState(null, '', targetHash);
+				}
+			}
 		}
 		showIndex = false;
 		showHistory = false;
@@ -276,8 +354,14 @@
 			const prevPage = nextHistory[nextHistory.length - 1];
 			history = nextHistory;
 			currentPageId = prevPage;
+			if (typeof window !== 'undefined') {
+				const targetHash = `#wiki:${encodeURI(prevPage)}`;
+				if (window.location.hash !== targetHash) {
+					window.history.pushState(null, '', targetHash);
+				}
+			}
 		} else {
-			onClose();
+			handleClose();
 		}
 	}
 
@@ -298,19 +382,17 @@
 			const refType = target.getAttribute('data-ref-type');
 			const refId = target.getAttribute('data-ref-id');
 			if (refType && refId) {
+				handleClose();
 				if (refType === 'item') {
 					if (onNavigateToItem) {
-						onClose();
 						onNavigateToItem(refId);
 					}
 				} else if (refType === 'list') {
 					if (onNavigateToList) {
-						onClose();
 						onNavigateToList(refId);
 					}
 				} else if (refType === 'folder') {
 					if (onNavigateToFolder) {
-						onClose();
 						onNavigateToFolder(refId);
 					}
 				}
@@ -320,14 +402,13 @@
 
 	function jumpToLinkedEntity() {
 		if (!linkedEntity) return;
+		handleClose();
 		if (linkedEntity.type === 'item') {
 			if (onNavigateToItem) {
-				onClose();
 				onNavigateToItem(linkedEntity.id, linkedEntity.listId);
 			}
 		} else if (linkedEntity.type === 'list') {
 			if (onNavigateToList) {
-				onClose();
 				onNavigateToList(linkedEntity.id);
 			}
 		}
@@ -417,11 +498,13 @@
 	}
 
 	function copyLink() {
-		const pageTitle = currentPage?.title || currentPageId;
-		const text = `[[wiki:${currentPageId}|${pageTitle}]]`;
-		navigator.clipboard.writeText(text).catch(() => {
+		const url = typeof window !== 'undefined'
+			? `${window.location.origin}${window.location.pathname}#wiki:${encodeURI(currentPageId)}`
+			: `[[wiki:${currentPageId}]]`;
+		navigator.clipboard.writeText(url).catch(() => {
 			const ta = document.createElement('textarea');
-			ta.value = text;
+			ta.value = url;
+			ta.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
 			document.body.appendChild(ta);
 			ta.select();
 			document.execCommand('copy');
@@ -516,8 +599,8 @@
 						type="button"
 						class="hdr-btn"
 						onclick={copyLink}
-						title={copyFeedback ? 'Copied link to clipboard!' : 'Copy Link'}
-						aria-label="Copy Link"
+						title={copyFeedback ? 'Copied URL to clipboard!' : `Copy Web URL (#wiki:${currentPageId})`}
+						aria-label="Copy Web URL"
 					>
 						{copyFeedback ? '✓' : '🔗'}
 					</button>

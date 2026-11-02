@@ -82,3 +82,26 @@ test('saveWikiPage, readWikiPage, readWikiPages and deleteWikiPage work on Y.Doc
 	strictEqual(deleted, true);
 	strictEqual(readWikiPages(doc).length, 1);
 });
+
+test('wiki hash formats parse consistently', () => {
+	function parseWikiHash(hash: string): string | null {
+		const clean = hash.startsWith('#') ? hash.slice(1) : hash;
+		if (clean.startsWith('wiki:')) return decodeURIComponent(clean.slice(5));
+		if (clean.startsWith('wiki/')) return decodeURIComponent(clean.slice(5));
+		if (clean.startsWith('wiki=')) return decodeURIComponent(clean.slice(5));
+		if (clean.startsWith('w/')) return decodeURIComponent(clean.slice(2));
+		if (clean.startsWith('w:')) return decodeURIComponent(clean.slice(2));
+		return null;
+	}
+
+	strictEqual(parseWikiHash('#wiki:start'), 'start');
+	strictEqual(parseWikiHash('#wiki:recipes:pasta_sauce'), 'recipes:pasta_sauce');
+	strictEqual(parseWikiHash('#wiki/recipes:pasta_sauce'), 'recipes:pasta_sauce');
+	strictEqual(parseWikiHash('#wiki=item:abc-123'), 'item:abc-123');
+	strictEqual(parseWikiHash('#w/list:456'), 'list:456');
+	strictEqual(parseWikiHash('#w:start'), 'start');
+	strictEqual(parseWikiHash('#l/123'), null);
+	strictEqual(parseWikiHash('#f/abc'), null);
+	strictEqual(parseWikiHash('#nearby'), null);
+	strictEqual(parseWikiHash(''), null);
+});

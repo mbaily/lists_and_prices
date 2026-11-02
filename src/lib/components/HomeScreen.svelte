@@ -74,7 +74,7 @@
 		return ids.length ? `#f/${ids.join('/')}` : '#';
 	}
 
-	function parseHash(): { breadcrumb: (string | null)[], openListId: string | null, nearby?: boolean } {
+	function parseHash(): { breadcrumb: (string | null)[], openListId: string | null, nearby?: boolean, wikiPage?: string } {
 		if (typeof window === 'undefined') return { breadcrumb: [null], openListId: null };
 		const hash = window.location.hash.slice(1); // strip '#'
 		if (hash === 'nearby') return { breadcrumb: [null], openListId: null, nearby: true };
@@ -84,6 +84,12 @@
 		if (hash.startsWith('f/')) {
 			const parts = hash.slice(2).split('/').filter(Boolean);
 			return { breadcrumb: [null, ...parts], openListId: null };
+		}
+		if (hash.startsWith('wiki:') || hash.startsWith('wiki/') || hash.startsWith('wiki=') || hash.startsWith('w/')) {
+			const slug = hash.startsWith('wiki:') ? hash.slice(5) :
+			             hash.startsWith('wiki/') ? hash.slice(5) :
+			             hash.startsWith('wiki=') ? hash.slice(5) : hash.slice(2);
+			return { breadcrumb: [null], openListId: null, wikiPage: decodeURIComponent(slug) };
 		}
 		return { breadcrumb: [null], openListId: null };
 	}
@@ -107,8 +113,8 @@
 	let showFavouritesOrder = $state(false);
 	let previousListId = $state<string | null>(null);
 	let showCommitsModal = $state(false);
-	let showWikiModal = $state(false);
-	let wikiInitialPage = $state('start');
+	let showWikiModal = $state(Boolean(_init.wikiPage));
+	let wikiInitialPage = $state(_init.wikiPage || 'start');
 
 	function openFromWiki(listId: string, itemId: string | null = null) {
 		showWikiModal = false;
@@ -1390,6 +1396,9 @@ ${bodyHtml}
 	// Use pushState so the browser back button works between navigations.
 	let _lastHash = typeof window !== 'undefined' ? window.location.hash : '';
 	$effect(() => {
+		if (typeof window !== 'undefined' && (window.location.hash.startsWith('#wiki') || window.location.hash.startsWith('#w/'))) {
+			return;
+		}
 		const hash = buildHash(breadcrumb, openListId, showNearby);
 		if (hash !== _lastHash) {
 			history.pushState(null, '', hash || '#');
@@ -1401,7 +1410,16 @@ ${bodyHtml}
 	$effect(() => {
 		if (typeof window === 'undefined') return;
 		function onPopState() {
-			const { breadcrumb: crumbs, openListId: listId, nearby } = parseHash();
+			const { breadcrumb: crumbs, openListId: listId, nearby, wikiPage } = parseHash();
+			if (wikiPage) {
+				wikiInitialPage = wikiPage;
+				showWikiModal = true;
+				_lastHash = window.location.hash;
+				return;
+			}
+			if (showWikiModal) {
+				showWikiModal = false;
+			}
 			showNearby = nearby ?? false;
 			breadcrumb = crumbs;
 			openListId = listId;
