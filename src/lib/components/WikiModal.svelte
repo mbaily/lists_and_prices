@@ -451,7 +451,7 @@
 	<div class="visual-viewport-container" style="height: {viewportHeight}; top: {viewportTop};">
 		<!-- Navigation & Action Header -->
 		<header class="wiki-header">
-			<div class="hdr-left">
+			<div class="wiki-toolbar">
 				<button type="button" class="hdr-btn" onclick={handleBack} title={history.length > 1 ? 'Go Back' : 'Close Wiki'}>
 					{history.length > 1 ? '← Back' : '✕ Close'}
 				</button>
@@ -469,14 +469,6 @@
 				<button type="button" class="hdr-btn index-toggle-btn" class:active={showIndex} onclick={() => (showIndex = !showIndex)} title="All Wiki Pages">
 					📑 Pages
 				</button>
-			</div>
-
-			<div class="hdr-title" title="Slug: {currentPageId}">
-				<span class="wiki-icon">📖</span>
-				<span class="title-text">{currentPage?.title || linkedEntity?.name || currentPageId}</span>
-			</div>
-
-			<div class="hdr-right">
 				{#if !showIndex && !showHistory && !commitState.isHistorical}
 					<button type="button" class="hdr-btn" onclick={() => (isEditing = true)} title="Edit this page">
 						✏️ Edit
@@ -491,6 +483,9 @@
 							📜 History{currentPage.revisions?.length ? ` (${currentPage.revisions.length})` : ''}
 						</button>
 					{/if}
+					<button type="button" class="hdr-btn new-page-btn" onclick={() => openNewPageModal()} title="Create New Page">
+						➕ New
+					</button>
 					<button type="button" class="hdr-btn" onclick={copyLink} title="Copy link to this wiki page">
 						{copyFeedback ? '✓ Copied' : '🔗 Link'}
 					</button>
@@ -503,10 +498,19 @@
 					<button type="button" class="hdr-btn" onclick={() => { showHistory = false; selectedRevision = null; }}>
 						← Current Version
 					</button>
+					<button type="button" class="hdr-btn new-page-btn" onclick={() => openNewPageModal()} title="Create New Page">
+						➕ New
+					</button>
+				{:else}
+					<button type="button" class="hdr-btn new-page-btn" onclick={() => openNewPageModal()} title="Create New Page">
+						➕ New
+					</button>
 				{/if}
-				<button type="button" class="hdr-btn new-page-btn" onclick={() => openNewPageModal()} title="Create New Page">
-					➕ New
-				</button>
+			</div>
+
+			<div class="hdr-title" title="Slug: {currentPageId}">
+				<span class="wiki-icon">📖</span>
+				<span class="title-text">{currentPage?.title || linkedEntity?.name || currentPageId}</span>
 			</div>
 		</header>
 
@@ -984,16 +988,28 @@
 	.wiki-header {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
-		padding: 0.5rem 1rem;
+		padding: 0.5rem 0.75rem;
 		background: var(--bg2);
 		border-bottom: 1px solid var(--border);
 		min-height: 52px;
+		gap: 0.75rem;
 	}
-	.hdr-left, .hdr-right {
+	.wiki-toolbar {
 		display: flex;
 		align-items: center;
 		gap: 0.4rem;
+		overflow-x: auto;
+		white-space: nowrap;
+		flex-shrink: 0;
+		-webkit-overflow-scrolling: touch;
+		scrollbar-width: none;
+		-ms-overflow-style: none;
+	}
+	.wiki-toolbar::-webkit-scrollbar {
+		display: none;
+	}
+	.wiki-toolbar .hdr-btn {
+		flex-shrink: 0;
 	}
 	.hdr-title {
 		display: flex;
@@ -1001,18 +1017,38 @@
 		gap: 0.4rem;
 		font-weight: 600;
 		font-size: 1.05rem;
-		max-width: 40%;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+		min-width: 0;
+		flex: 1;
 	}
 	.wiki-icon {
 		font-size: 1.15rem;
+		flex-shrink: 0;
 	}
 	.title-text {
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+	@media (max-width: 640px) {
+		.wiki-header {
+			flex-direction: column;
+			align-items: stretch;
+			padding: 0.4rem 0.5rem;
+			gap: 0.35rem;
+			min-height: auto;
+		}
+		.wiki-toolbar {
+			width: 100%;
+			padding-bottom: 0.15rem;
+		}
+		.hdr-title {
+			font-size: 0.95rem;
+			padding: 0.25rem 0.25rem 0.1rem;
+			border-top: 1px solid var(--border);
+		}
 	}
 	.hdr-btn {
 		background: none;
