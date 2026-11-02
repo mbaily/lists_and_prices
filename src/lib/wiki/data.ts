@@ -4,7 +4,10 @@
  */
 import * as Y from 'yjs';
 import { extractWikiLinks, slugifyWikiPage } from './dokuwiki';
+import { thinRevisions, type WikiRevision } from './revisions';
 import { splitWithTags } from '$lib/tags';
+
+export type { WikiRevision } from './revisions';
 
 export interface WikiPage {
 	id: string; // slug, e.g. "start"
@@ -14,6 +17,7 @@ export interface WikiPage {
 	updatedAt: string;
 	lastSummary?: string;
 	isMinor?: boolean;
+	revisions?: WikiRevision[];
 }
 
 export interface BacklinksResult {
@@ -27,6 +31,16 @@ export function getWiki(doc: Y.Doc): Y.Map<Y.Map<unknown>> {
 }
 
 function yMapToWikiPage(m: Y.Map<unknown>): WikiPage {
+	let revisions: WikiRevision[] = [];
+	const rawRevs = m.get('revisions');
+	if (typeof rawRevs === 'string') {
+		try {
+			revisions = JSON.parse(rawRevs);
+		} catch {}
+	} else if (Array.isArray(rawRevs)) {
+		revisions = rawRevs as WikiRevision[];
+	}
+
 	return {
 		id: (m.get('id') as string) || 'start',
 		title: (m.get('title') as string) || (m.get('id') as string) || 'Untitled',
@@ -34,7 +48,8 @@ function yMapToWikiPage(m: Y.Map<unknown>): WikiPage {
 		createdAt: (m.get('createdAt') as string) || new Date().toISOString(),
 		updatedAt: (m.get('updatedAt') as string) || new Date().toISOString(),
 		lastSummary: (m.get('lastSummary') as string | undefined) ?? '',
-		isMinor: (m.get('isMinor') as boolean | undefined) ?? false
+		isMinor: (m.get('isMinor') as boolean | undefined) ?? false,
+		revisions
 	};
 }
 
@@ -76,6 +91,7 @@ export function readWikiPage(doc: Y.Doc, id: string): WikiPage | null {
 
 /**
  * Create or save changes to a wiki page.
+ * Automatically saves previous version to revisions and applies thinning over time.
  */
 export function saveWikiPage(
 	doc: Y.Doc,
@@ -102,12 +118,42 @@ export function saveWikiPage(
 	}
 
 	const targetMap = pageMap as Y.Map<unknown>;
+	const prevContent = (targetMap.get('content') as string) || '';
+	const prevTitle = (targetMap.get('title') as string) || normalizedId;
+	const prevSummary = (targetMap.get('lastSummary') as string) || '';
+	const prevIsMinor = Boolean(targetMap.get('isMinor'));
+	const prevUpdatedAt = (targetMap.get('updatedAt') as string) || createdAt;
+
+	let thinnedRevs: WikiRevision[] = [];
+	const rawRevs = targetMap.get('revisions');
+	if (typeof rawRevs === 'string') {
+		try {
+			thinnedRevs = JSON.parse(rawRevs);
+		} catch {}
+	} else if (Array.isArray(rawRevs)) {
+		thinnedRevs = [...rawRevs];
+	}
+
+	// If page previously had content and was modified, record a snapshot in revisions
+	if (prevContent.trim() && (prevContent !== data.content || prevTitle !== data.title.trim())) {
+		const newRev: WikiRevision = {
+			timestamp: prevUpdatedAt,
+			title: prevTitle,
+			content: prevContent,
+			summary: prevSummary,
+			isMinor: prevIsMinor
+		};
+		thinnedRevs.push(newRev);
+		thinnedRevs = thinRevisions(thinnedRevs, new Date(now));
+	}
+
 	doc.transact(() => {
 		targetMap.set('title', data.title.trim() || normalizedId);
 		targetMap.set('content', data.content);
 		targetMap.set('updatedAt', now);
 		targetMap.set('lastSummary', data.summary?.trim() ?? '');
 		targetMap.set('isMinor', Boolean(data.isMinor));
+		targetMap.set('revisions', JSON.stringify(thinnedRevs));
 	});
 
 	return {
@@ -117,7 +163,8 @@ export function saveWikiPage(
 		createdAt,
 		updatedAt: now,
 		lastSummary: data.summary?.trim() ?? '',
-		isMinor: Boolean(data.isMinor)
+		isMinor: Boolean(data.isMinor),
+		revisions: thinnedRevs
 	};
 }
 

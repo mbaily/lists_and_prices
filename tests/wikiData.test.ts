@@ -35,6 +35,20 @@ test('saveWikiPage, readWikiPage, readWikiPages and deleteWikiPage work on Y.Doc
 	strictEqual(page?.title, 'Home / Start');
 	strictEqual(page?.lastSummary, 'Initial page creation');
 	strictEqual(page?.isMinor, false);
+	strictEqual(page?.revisions?.length ?? 0, 0);
+
+	// Edit page: should record previous version into revisions
+	saveWikiPage(doc, 'start', {
+		title: 'Home / Start (Updated)',
+		content: '====== Start Page ======\nWelcome to the wiki!\nNew section here.',
+		summary: 'Added new section',
+		isMinor: false
+	});
+
+	const updated = readWikiPage(doc, 'start');
+	strictEqual(updated?.revisions?.length, 1);
+	strictEqual(updated?.revisions?.[0].content, '====== Start Page ======\nWelcome to the wiki!');
+	strictEqual(updated?.revisions?.[0].summary, 'Initial page creation');
 
 	// Create second page
 	saveWikiPage(doc, 'tasks', {

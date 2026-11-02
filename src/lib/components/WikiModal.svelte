@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { getDoc, getMutableDoc, docState, commitState } from '$lib/yjsStore.svelte';
-	import { readWikiPage, readWikiPages, saveWikiPage, deleteWikiPage, findWikiBacklinks, type WikiPage } from '$lib/wiki/data';
+	import { readWikiPage, readWikiPages, saveWikiPage, deleteWikiPage, findWikiBacklinks, type WikiPage, type WikiRevision } from '$lib/wiki/data';
 	import { renderDokuWiki, slugifyWikiPage } from '$lib/wiki/dokuwiki';
 	import WikiEditor from './WikiEditor.svelte';
 	import ConfirmDialog from './ConfirmDialog.svelte';
@@ -23,6 +23,10 @@
 	let history = $state<string[]>([slugifyWikiPage(initialPageId)]);
 	let isEditing = $state(false);
 	let showIndex = $state(false);
+	let showHistory = $state(false);
+	let selectedRevision = $state<WikiRevision | null>(null);
+	let showRestoreConfirm = $state(false);
+	let revisionToRestore = $state<WikiRevision | null>(null);
 	let indexSearch = $state('');
 	let showNewPageModal = $state(false);
 	let newPageTitle = $state('');
@@ -99,6 +103,8 @@
 		});
 	});
 
+	const sortedRevisions = $derived((currentPage?.revisions ?? []).slice().reverse());
+
 	function navigateToPage(id: string) {
 		const slug = slugifyWikiPage(id);
 		if (slug !== currentPageId) {
@@ -106,6 +112,8 @@
 			history = [...history, slug];
 		}
 		showIndex = false;
+		showHistory = false;
+		selectedRevision = null;
 	}
 
 	function handleBack() {
@@ -236,10 +244,20 @@
 			</div>
 
 			<div class="hdr-right">
-				{#if !showIndex && !commitState.isHistorical}
+				{#if !showIndex && !showHistory && !commitState.isHistorical}
 					<button type="button" class="hdr-btn" onclick={() => (isEditing = true)} title="Edit this page">
 						✏️ Edit
 					</button>
+					{#if currentPage}
+						<button
+							type="button"
+							class="hdr-btn history-toggle-btn"
+							onclick={() => { showHistory = true; selectedRevision = null; }}
+							title="View Page Revision History"
+						>
+							📜 History{currentPage.revisions?.length ? ` (${currentPage.revisions.length})` : ''}
+						</button>
+					{/if}
 					<button type="button" class="hdr-btn" onclick={copyLink} title="Copy link to this wiki page">
 						{copyFeedback ? '✓ Copied' : '🔗 Link'}
 					</button>
@@ -248,6 +266,10 @@
 							🗑️
 						</button>
 					{/if}
+				{:else if showHistory}
+					<button type="button" class="hdr-btn" onclick={() => { showHistory = false; selectedRevision = null; }}>
+						← Current Version
+					</button>
 				{/if}
 				<button type="button" class="hdr-btn new-page-btn" onclick={() => (showNewPageModal = true)} title="Create New Page">
 					➕ New
@@ -293,6 +315,94 @@
 							{/each}
 						{/if}
 					</div>
+				</div>
+			{:else if showHistory}
+				<!-- Revision History View -->
+				<div class="wiki-history-pane">
+					{#if selectedRevision}
+						<div class="rev-preview-header">
+							<div class="rev-banner">
+								<span>Revision from <strong>{formatDate(selectedRevision.timestamp)}</strong></span>
+								{#if selectedRevision.summary}
+									<span class="rev-banner-summary">"{selectedRevision.summary}"</span>
+								{/if}
+								{#if selectedRevision.isMinor}
+									<span class="minor-badge">minor</span>
+								{/if}
+							</div>
+							<div class="rev-preview-actions">
+								{#if !commitState.isHistorical}
+									<button
+										type="button"
+										class="primary-btn restore-btn"
+										onclick={() => { revisionToRestore = selectedRevision; showRestoreConfirm = true; }}
+									>
+										↩️ Restore This Version
+									</button>
+								{/if}
+								<button type="button" class="hdr-btn" onclick={() => (selectedRevision = null)}>
+									✕ Close Preview
+								</button>
+							</div>
+						</div>
+						<div class="wiki-content-scroll">
+							<div class="wiki-article-card wiki-rendered">
+								<h1 class="page-main-heading">{selectedRevision.title}</h1>
+								{@html renderDokuWiki(selectedRevision.content)}
+							</div>
+						</div>
+					{:else}
+						<div class="history-list-header">
+							<h2>Revision History for "{currentPage?.title || currentPageId}"</h2>
+							<p class="history-hint">Revisions are automatically preserved and thinned over time to keep history compact.</p>
+						</div>
+						<div class="history-page-list">
+							<!-- Current live version -->
+							<div class="history-item current-rev">
+								<div class="rev-main">
+									<span class="rev-badge-current">CURRENT</span>
+									<span class="rev-time">{formatDate(currentPage?.updatedAt ?? '')}</span>
+									{#if currentPage?.isMinor}<span class="minor-badge">minor</span>{/if}
+								</div>
+								<div class="rev-meta">
+									<span class="rev-summary">{currentPage?.lastSummary ? `"${currentPage.lastSummary}"` : '(Current active version)'}</span>
+								</div>
+							</div>
+
+							{#if sortedRevisions.length === 0}
+								<div class="empty-revs-msg">
+									<p>No earlier revisions recorded yet for this page.</p>
+								</div>
+							{:else}
+								{#each sortedRevisions as rev, i}
+									<div class="history-item">
+										<div class="rev-main">
+											<span class="rev-index">#{sortedRevisions.length - i}</span>
+											<span class="rev-time">{formatDate(rev.timestamp)}</span>
+											{#if rev.isMinor}<span class="minor-badge">minor</span>{/if}
+										</div>
+										<div class="rev-meta">
+											<span class="rev-summary">{rev.summary ? `"${rev.summary}"` : '(No edit summary)'}</span>
+										</div>
+										<div class="rev-actions">
+											<button type="button" class="rev-btn view-btn" onclick={() => (selectedRevision = rev)}>
+												👁️ View
+											</button>
+											{#if !commitState.isHistorical}
+												<button
+													type="button"
+													class="rev-btn restore-btn"
+													onclick={() => { revisionToRestore = rev; showRestoreConfirm = true; }}
+												>
+													↩️ Restore
+												</button>
+											{/if}
+										</div>
+									</div>
+								{/each}
+							{/if}
+						</div>
+					{/if}
 				</div>
 			{:else}
 				<!-- Current Page Content View -->
@@ -424,6 +534,35 @@
 			isDanger={true}
 			onConfirm={handleDeleteCurrentPage}
 			onCancel={() => (showDeleteConfirm = false)}
+		/>
+	{/if}
+
+	<!-- Restore Revision Confirm Dialog -->
+	{#if showRestoreConfirm && revisionToRestore}
+		<ConfirmDialog
+			message={`Are you sure you want to restore "${currentPage?.title || currentPageId}" to the revision from ${formatDate(revisionToRestore.timestamp)}?`}
+			confirmLabel="Restore Revision"
+			cancelLabel="Cancel"
+			isDanger={false}
+			onConfirm={() => {
+				if (revisionToRestore) {
+					handleSavePage({
+						id: currentPageId,
+						title: revisionToRestore.title,
+						content: revisionToRestore.content,
+						summary: `Restored to revision from ${formatDate(revisionToRestore.timestamp)}`,
+						isMinor: false
+					});
+				}
+				showRestoreConfirm = false;
+				revisionToRestore = null;
+				showHistory = false;
+				selectedRevision = null;
+			}}
+			onCancel={() => {
+				showRestoreConfirm = false;
+				revisionToRestore = null;
+			}}
 		/>
 	{/if}
 </div>
@@ -776,6 +915,147 @@
 		color: #fff;
 		border: none;
 		font-weight: 600;
+	}
+
+	/* History Pane */
+	.wiki-history-pane {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		padding: 1rem;
+		max-width: 800px;
+		margin: 0 auto;
+		width: 100%;
+		overflow: hidden;
+	}
+	.history-list-header {
+		margin-bottom: 1rem;
+	}
+	.history-list-header h2 {
+		margin: 0 0 0.25rem;
+		font-size: 1.4rem;
+	}
+	.history-hint {
+		font-size: 0.85rem;
+		color: var(--text2);
+		margin: 0;
+	}
+	.history-page-list {
+		flex: 1;
+		overflow-y: auto;
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+		padding-bottom: 2rem;
+	}
+	.history-item {
+		padding: 0.75rem 1rem;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--bg2);
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.history-item.current-rev {
+		border-color: var(--accent);
+		background: var(--bg3);
+	}
+	.rev-main {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	.rev-badge-current {
+		background: var(--accent);
+		color: #fff;
+		font-size: 0.72rem;
+		font-weight: 700;
+		padding: 0.1rem 0.4rem;
+		border-radius: 4px;
+		letter-spacing: 0.03em;
+	}
+	.rev-index {
+		font-size: 0.82rem;
+		font-weight: 600;
+		color: var(--text2);
+		font-family: monospace;
+	}
+	.rev-time {
+		font-size: 0.9rem;
+		font-weight: 600;
+	}
+	.rev-meta {
+		font-size: 0.85rem;
+		color: var(--text2);
+	}
+	.rev-summary {
+		font-style: italic;
+	}
+	.rev-actions {
+		display: flex;
+		gap: 0.5rem;
+		margin-top: 0.3rem;
+	}
+	.rev-btn {
+		padding: 0.25rem 0.65rem;
+		border-radius: 4px;
+		border: 1px solid var(--border);
+		background: var(--bg);
+		color: var(--text);
+		font-size: 0.85rem;
+		cursor: pointer;
+	}
+	.rev-btn:hover {
+		background: var(--bg2);
+		border-color: var(--accent);
+	}
+	.rev-btn.restore-btn {
+		color: var(--accent);
+		font-weight: 600;
+	}
+	.empty-revs-msg {
+		text-align: center;
+		padding: 2.5rem 1rem;
+		color: var(--text2);
+	}
+	.rev-preview-header {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: space-between;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.6rem 1rem;
+		background: var(--bg2);
+		border-bottom: 1px solid var(--border);
+	}
+	.rev-banner {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.9rem;
+	}
+	.rev-banner-summary {
+		color: var(--text2);
+		font-style: italic;
+	}
+	.rev-preview-actions {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	.restore-btn {
+		background: var(--accent);
+		color: #fff;
+		border: none;
+		padding: 0.35rem 0.75rem;
+		border-radius: 4px;
+		font-size: 0.88rem;
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.restore-btn:hover {
+		opacity: 0.9;
 	}
 </style>
 
