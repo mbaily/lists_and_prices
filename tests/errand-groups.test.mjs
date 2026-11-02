@@ -64,8 +64,8 @@ test('only inherited tasks share an errand across pills, checklist, stops and un
         const milk = app.data.createItem(list, 'Milk');
         const bread = app.data.createItem(list, 'Bread');
         const bank = app.data.createItem(list, 'Deposit money $110 #bank');
-        app.data.saveCustomLocation({ id: 'custom-court', name: 'Loyola Court', tags: ['loyolacrt'], latitude: -37.8, longitude: 145 });
-        const bag = app.data.createItem(list, 'washing bag #loyolacrt', null, null, true);
+        app.data.saveCustomLocation({ id: 'custom-court', name: 'Sample Court', tags: ['samplecourt'], latitude: -37.8, longitude: 145 });
+        const bag = app.data.createItem(list, 'washing bag #samplecourt', null, null, true);
         const separate = app.data.createItem(list, 'Separate purchase #supermarket', null, milk);
         const unmatched = app.data.createItem(list, 'Far away #pharmacy');
         const nearby = app.load('src/lib/nearbyErrands.ts');
@@ -73,13 +73,13 @@ test('only inherited tasks share an errand across pills, checklist, stops and un
         const { groupErrands } = app.load('src/lib/errandGroups.ts');
         const errands = nearby.collectErrands(app.data.readAllItems(), app.data.readLists(), app.data.readFolders());
         const shop = { id: 'shop', name: 'Shop', tags: ['supermarket'], latitude: -37.8, longitude: 145 };
-        const court = { ...shop, id: 'court', name: 'Loyola Court', tags: ['loyolacrt'] };
+        const court = { ...shop, id: 'court', name: 'Sample Court', tags: ['samplecourt'] };
         const stops = nearby.nearbyStops([shop, court], shop, 5, errands);
         const pills = nearbyListPills(stops, errands, 9);
         assert.equal(pills.length, 4);
         assert.equal(new Set(pills.map(pill => pill.id)).size, 4, 'same parent list uses unique UI keys');
         assert.deepEqual(pills.find(pill => pill.id === `list:${list}`).errands.map(errand => errand.item.id), [milk, bread]);
-        for (const [id, tag] of [[bank, 'bank'], [bag, 'loyolacrt'], [separate, 'supermarket']]) {
+        for (const [id, tag] of [[bank, 'bank'], [bag, 'samplecourt'], [separate, 'supermarket']]) {
             const pill = pills.find(pill => pill.id === `item:${id}`);
             assert.deepEqual(pill.errands.map(errand => errand.item.id), [id]);
             assert.deepEqual(pill.tags, [tag]);
@@ -102,8 +102,8 @@ test('group checkbox completes only its parent, preserves all child data, and ke
         a.data.createItem(list, 'Bread', null, milk);
         a.data.createItem(list, 'Voucher', null, null, true);
         const bank = a.data.createItem(list, 'Deposit money $110 #bank');
-        a.data.saveCustomLocation({ id: 'custom-court', name: 'Loyola Court', tags: ['loyolacrt'], latitude: -37.8, longitude: 145 });
-        const bag = a.data.createItem(list, 'washing bag #loyolacrt', null, null, true);
+        a.data.saveCustomLocation({ id: 'custom-court', name: 'Sample Court', tags: ['samplecourt'], latitude: -37.8, longitude: 145 });
+        const bag = a.data.createItem(list, 'washing bag #samplecourt', null, null, true);
         const done = a.data.createItem(list, 'Already done #bank');
         const box = a.data.addFolderCheckbox(folder, 'Finished');
         a.data.setItemCheckboxState(done, box, true);

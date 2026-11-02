@@ -21,8 +21,8 @@ fi
 # Generate machine-specific paths locally, keeping runtime files in the caller's pwd.
 node "$client_checkout/scripts/build-local-client.mjs" --output ./lists-local-client
 exec ./lists-local-client \
-  --server https://git23069.hopto.org:9443/lists_and_prices \
-  --username mb \
+  --server "${LISTS_SERVER:-https://your-host.example.com/lists_and_prices}" \
+  --username "${LISTS_USER:-user}" \
   --port 8083 \
   --insecure \
   "$@"

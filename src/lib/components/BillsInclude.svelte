@@ -2,6 +2,7 @@
 	import { base } from '$app/paths';
 	import { onMount } from 'svelte';
 	import { billSections, billLine, type BillSection } from '$lib/billsInclude';
+	import { simpleTodoApiUrl } from '$lib/simpleTodo';
 	import type { IncludeView } from '$lib/includeView';
 	let { sections, displaySections = sections }: { sections: BillSection[]; displaySections?: BillSection[] } = $props();
 	let data = $state<Record<string, unknown> | null>(null);
@@ -28,8 +29,9 @@
 		loading = true;
 		error = '';
 		try {
-			const url = new URL('../simple_todo/api/bills?show_inactive=1', `${location.origin}${base || ''}/`);
-			const response = await fetch(url, { credentials: 'same-origin', cache: 'no-store', signal: request.signal });
+			const url = simpleTodoApiUrl('api/bills?show_inactive=1', base);
+			const credentials = typeof location !== 'undefined' && url.origin !== location.origin ? 'include' : 'same-origin';
+			const response = await fetch(url, { credentials, cache: 'no-store', signal: request.signal });
 			if (response.status === 401 || response.status === 403) throw new Error('Sign in to Simple Todo to view bills.');
 			if (!response.ok) throw new Error('Bills service is unavailable.');
 			const json: unknown = await response.json();

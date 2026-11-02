@@ -10,6 +10,7 @@ declare global {
 		// interface Platform {}
 	}
 	const __APP_VERSION__: string;
+	const __SIMPLE_TODO_URL__: string;
 }
 
 export {};

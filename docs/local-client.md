@@ -46,8 +46,8 @@ For an upstream server with an untrusted or self-signed certificate, add
 connections, including login and HTTP sync:
 
 ```sh
-./lists-local-client --server https://git23069.hopto.org:9443/lists_and_prices \
-  --username mb --insecure
+./lists-local-client --server https://your-host.example.com/lists_and_prices \
+  --username user --insecure
 ```
 
 Supply `--insecure` on subsequent runs too; it is not saved in the data directory.

@@ -1,6 +1,6 @@
 # Errand tags from your server
 
-Source: `mbaily@git23069.hopto.org`, app document `yjs/pnl-mb`.
+Source: `user@example.com`, app document `yjs/pnl-user`.
 Snapshot: 2026-10-18 15:36:02 AEDT.
 Catalogue updated on 2026-10-18 with 19 verified Melbourne BIG W locations; saved-location and item-use counts retain the snapshot above.
 
@@ -21,17 +21,17 @@ This is every recognised tag in the updated catalogue and server snapshot, regar
 | `#bigw` | 0 | 1 |
 | `#bunnings` | 1 | 2 |
 | `#errand` | 0 | 2 |
-| `#hawkerst` | 0 | 2 |
+| `#customloc1` | 0 | 2 |
 | `#ikea` | 0 | 1 |
 | `#ivanhoe` | 0 | 1 |
 | `#kmart` | 0 | 2 |
-| `#loyolacrt` | 0 | 18 |
+| `#customloc2` | 0 | 18 |
 | `#northland` | 0 | 2 |
 | `#officeworks` | 0 | 2 |
 | `#pcparts` | 0 | 1 |
 | `#supermarket` | 4 | 0 |
 
-Your saved locations support `#hawkerst`, `#loyolacrt` and `#northland`. `#northland` is also supported by the retail catalogue.
+Your saved locations support `#customloc1`, `#customloc2` and `#northland`. `#northland` is also supported by the retail catalogue.
 
 ## All usable errand tags, alphabetically
 
@@ -408,7 +408,7 @@ Your saved locations support `#hawkerst`, `#loyolacrt` and `#northland`. `#north
 #harkness
 #harliharpa
 #hastings
-#hawkerst
+#customloc1
 #hawthorn
 #hawthorneast
 #healesville
@@ -516,7 +516,7 @@ Your saved locations support `#hawkerst`, `#loyolacrt` and `#northland`. `#north
 #lovisa
 #lowerplenty
 #lowes
-#loyolacrt
+#customloc2
 #lskd
 #lukfookjewellery
 #lululemon

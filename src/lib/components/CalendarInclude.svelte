@@ -4,6 +4,7 @@
 		calendarSections, calendarRange, calendarOccurrenceLabel, calendarLine, parseCalendarResponse,
 		type CalendarOccurrence, type CalendarSection
 	} from '$lib/calendarInclude';
+	import { simpleTodoPageUrl, simpleTodoApiUrl } from '$lib/simpleTodo';
 	import type { CalendarInlineEntry, IncludeView } from '$lib/includeView';
 
 	let { sections, displaySections = sections }: { sections: CalendarSection[]; displaySections?: CalendarSection[] } = $props();
@@ -12,7 +13,7 @@
 	let error = $state('');
 	let loading = $state(true);
 	let controller: AbortController;
-	const calendarUrl = `${base || ''}/../simple_todo/calendar`;
+	const calendarUrl = simpleTodoPageUrl('calendar', base);
 
 	function sectionRows(section: CalendarSection): CalendarOccurrence[] {
 		const range = calendarRange(section, now);
@@ -43,10 +44,11 @@
 		const start = ranges.map((range) => range.start).sort()[0];
 		const end = ranges.map((range) => range.end).sort().reverse()[0];
 		try {
-			const url = new URL('../simple_todo/api/calendar/events', `${location.origin}${base || ''}/`);
+			const url = simpleTodoApiUrl('api/calendar/events', base);
 			url.searchParams.set('start_date', start);
 			url.searchParams.set('end_date', end);
-			const response = await fetch(url, { credentials: 'same-origin', cache: 'no-store', signal: request.signal });
+			const credentials = typeof location !== 'undefined' && url.origin !== location.origin ? 'include' : 'same-origin';
+			const response = await fetch(url, { credentials, cache: 'no-store', signal: request.signal });
 			if (response.status === 401 || response.status === 403) throw new Error('Sign in to Simple Todo to view calendar events.');
 			if (!response.ok) throw new Error('Calendar service is unavailable.');
 			const data: unknown = await response.json();

@@ -3,8 +3,8 @@
 For optional HTTPS termination and hosting under `/lists/`, see
 [reverse proxy setup](reverse-proxy.md). Root hosting remains the default.
 
-The Caddy installation on `git23069.hopto.org` serves the app at
-`https://git23069.hopto.org:9443/lists_and_prices/` and strips
+The Caddy installation on `your-host.example.com` serves the app at
+`https://your-host.example.com:9443/lists_and_prices/` and strips
 `/lists_and_prices` before forwarding to HTTP/WebSockets on `127.0.0.1:3101`.
 Its systemd override is recorded in
 [`deploy/lists-and-prices-proxy.conf`](../deploy/lists-and-prices-proxy.conf).

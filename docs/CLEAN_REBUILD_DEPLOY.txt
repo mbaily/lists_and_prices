@@ -6,7 +6,7 @@ update an existing installation; deploy.sh does not provision a new server.
 
 1. CHECK THE TOOLCHAIN AND INSTALLATION
 
-    cd /home/mbaily/other_git/list_svelt5
+    cd /path/to/list_svelt5
     git status --short
     node --version
     npm --version

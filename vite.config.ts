@@ -1,5 +1,5 @@
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 import { readFileSync } from 'node:fs';
 import { VERSION as SVELTE_VERSION } from 'svelte/compiler';
@@ -10,12 +10,17 @@ const basePath = appBasePath();
 const publicRoot = `${basePath}/`;
 const apiPattern = new RegExp(`^https?://[^/]+${basePath}/api(?:/|$)`);
 
-export default defineConfig(({ command }) => ({
-	define: {
-		__APP_VERSION__: JSON.stringify(pkg.version),
-		__SVELTE_VERSION__: JSON.stringify(SVELTE_VERSION),
-		__YJS_VERSION__: JSON.stringify(pkg.dependencies.yjs.replace(/[\^~]/g, ''))
-	},
+export default defineConfig(({ command, mode }) => {
+	const env = loadEnv(mode, process.cwd(), '');
+	const simpleTodoUrl = (process.env.SIMPLE_TODO_URL ?? env.SIMPLE_TODO_URL ?? process.env.PUBLIC_SIMPLE_TODO_URL ?? env.PUBLIC_SIMPLE_TODO_URL ?? '').trim();
+
+	return {
+		define: {
+			__APP_VERSION__: JSON.stringify(pkg.version),
+			__SVELTE_VERSION__: JSON.stringify(SVELTE_VERSION),
+			__YJS_VERSION__: JSON.stringify(pkg.dependencies.yjs.replace(/[\^~]/g, '')),
+			__SIMPLE_TODO_URL__: JSON.stringify(simpleTodoUrl)
+		},
 	server: {
 		proxy: {
 			[`${basePath}/api`]: {
@@ -95,4 +100,5 @@ export default defineConfig(({ command }) => ({
 			}
 		})
 	]
-}));
+};
+});
