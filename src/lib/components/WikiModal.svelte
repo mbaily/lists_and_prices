@@ -452,8 +452,14 @@
 		<!-- Navigation & Action Header -->
 		<header class="wiki-header">
 			<div class="wiki-toolbar">
-				<button type="button" class="hdr-btn" onclick={handleBack} title={history.length > 1 ? 'Go Back' : 'Close Wiki'}>
-					{history.length > 1 ? '← Back' : '✕ Close'}
+				<button
+					type="button"
+					class="hdr-btn"
+					onclick={handleBack}
+					title={history.length > 1 ? 'Go Back' : 'Close Wiki'}
+					aria-label={history.length > 1 ? 'Go Back' : 'Close Wiki'}
+				>
+					{history.length > 1 ? '←' : '✕'}
 				</button>
 				{#if linkedEntity}
 					<button
@@ -466,44 +472,91 @@
 						{linkedEntity.type === 'item' ? (linkedEntity.isNote ? '📝' : '☑️') : '📋'}
 					</button>
 				{/if}
-				<button type="button" class="hdr-btn index-toggle-btn" class:active={showIndex} onclick={() => (showIndex = !showIndex)} title="All Wiki Pages">
-					📑 Pages
+				<button
+					type="button"
+					class="hdr-btn index-toggle-btn"
+					class:active={showIndex}
+					onclick={() => (showIndex = !showIndex)}
+					title={showIndex ? 'Close Page Index' : 'All Wiki Pages'}
+					aria-label="All Wiki Pages"
+				>
+					📑
 				</button>
 				{#if !showIndex && !showHistory && !commitState.isHistorical}
-					<button type="button" class="hdr-btn" onclick={() => (isEditing = true)} title="Edit this page">
-						✏️ Edit
+					<button
+						type="button"
+						class="hdr-btn"
+						onclick={() => (isEditing = true)}
+						title="Edit Page"
+						aria-label="Edit Page"
+					>
+						✏️
 					</button>
 					{#if currentPage}
 						<button
 							type="button"
 							class="hdr-btn history-toggle-btn"
 							onclick={() => { showHistory = true; selectedRevision = null; }}
-							title="View Page Revision History"
+							title={`Revision History${currentPage.revisions?.length ? ` (${currentPage.revisions.length} revisions)` : ''}`}
+							aria-label="Revision History"
 						>
-							📜 History{currentPage.revisions?.length ? ` (${currentPage.revisions.length})` : ''}
+							📜
 						</button>
 					{/if}
-					<button type="button" class="hdr-btn new-page-btn" onclick={() => openNewPageModal()} title="Create New Page">
-						➕ New
+					<button
+						type="button"
+						class="hdr-btn new-page-btn"
+						onclick={() => openNewPageModal()}
+						title="Create New Page"
+						aria-label="Create New Page"
+					>
+						➕
 					</button>
-					<button type="button" class="hdr-btn" onclick={copyLink} title="Copy link to this wiki page">
-						{copyFeedback ? '✓ Copied' : '🔗 Link'}
+					<button
+						type="button"
+						class="hdr-btn"
+						onclick={copyLink}
+						title={copyFeedback ? 'Copied link to clipboard!' : 'Copy Link'}
+						aria-label="Copy Link"
+					>
+						{copyFeedback ? '✓' : '🔗'}
 					</button>
 					{#if currentPage && currentPageId !== 'start'}
-						<button type="button" class="hdr-btn delete-btn" onclick={() => (showDeleteConfirm = true)} title="Delete page">
+						<button
+							type="button"
+							class="hdr-btn delete-btn"
+							onclick={() => (showDeleteConfirm = true)}
+							title="Delete Page"
+							aria-label="Delete Page"
+						>
 							🗑️
 						</button>
 					{/if}
 				{:else if showHistory}
-					<button type="button" class="hdr-btn" onclick={() => { showHistory = false; selectedRevision = null; }}>
-						← Current Version
+					<button
+						type="button"
+						class="hdr-btn"
+						onclick={() => { showHistory = false; selectedRevision = null; }}>
+						↩️
 					</button>
-					<button type="button" class="hdr-btn new-page-btn" onclick={() => openNewPageModal()} title="Create New Page">
-						➕ New
+					<button
+						type="button"
+						class="hdr-btn new-page-btn"
+						onclick={() => openNewPageModal()}
+						title="Create New Page"
+						aria-label="Create New Page"
+					>
+						➕
 					</button>
 				{:else}
-					<button type="button" class="hdr-btn new-page-btn" onclick={() => openNewPageModal()} title="Create New Page">
-						➕ New
+					<button
+						type="button"
+						class="hdr-btn new-page-btn"
+						onclick={() => openNewPageModal()}
+						title="Create New Page"
+						aria-label="Create New Page"
+					>
+						➕
 					</button>
 				{/if}
 			</div>
@@ -1055,27 +1108,34 @@
 		border: 1px solid var(--border);
 		border-radius: 6px;
 		color: var(--text);
-		font-size: 0.9rem;
-		padding: 0.35rem 0.65rem;
+		font-size: 1.05rem;
+		min-width: 32px;
+		height: 32px;
+		padding: 0 0.4rem;
 		cursor: pointer;
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
+		line-height: 1;
+		transition: background 0.15s, border-color 0.15s, transform 0.1s;
 	}
 	.hdr-btn:hover {
 		background: var(--bg3);
+		border-color: var(--accent);
+		transform: scale(1.05);
+	}
+	.hdr-btn:active {
+		transform: scale(0.96);
 	}
 	.index-toggle-btn.active {
 		background: var(--bg3);
 		border-color: var(--accent);
 		color: var(--accent);
-		font-weight: 600;
 	}
 	.new-page-btn {
 		background: #6366f1;
 		color: #fff;
 		border-color: #6366f1;
-		font-weight: 600;
 	}
 	.new-page-btn:hover {
 		background: #4f46e5;
