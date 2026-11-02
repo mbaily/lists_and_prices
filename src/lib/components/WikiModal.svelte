@@ -455,6 +455,17 @@
 				<button type="button" class="hdr-btn" onclick={handleBack} title={history.length > 1 ? 'Go Back' : 'Close Wiki'}>
 					{history.length > 1 ? '← Back' : '✕ Close'}
 				</button>
+				{#if linkedEntity}
+					<button
+						type="button"
+						class="hdr-btn entity-hdr-jump-btn"
+						onclick={jumpToLinkedEntity}
+						title="Jump to {linkedEntity.type === 'item' ? (linkedEntity.isNote ? 'Note' : 'Todo') : 'List'}: {linkedEntity.name}"
+						aria-label="Jump to {linkedEntity.type === 'item' ? (linkedEntity.isNote ? 'Note' : 'Todo') : 'List'}"
+					>
+						{linkedEntity.type === 'item' ? (linkedEntity.isNote ? '📝' : '☑️') : '📋'}
+					</button>
+				{/if}
 				<button type="button" class="hdr-btn index-toggle-btn" class:active={showIndex} onclick={() => (showIndex = !showIndex)} title="All Wiki Pages">
 					📑 Pages
 				</button>
@@ -680,30 +691,23 @@
 				<!-- Current Page Content View -->
 				<div class="wiki-content-scroll" onclick={handleContentClick}>
 					<div class="wiki-article-card">
-						{#if linkedEntity}
-							<div class="wiki-entity-banner">
-								<div class="entity-banner-info">
-									<span class="entity-kind-badge">{linkedEntity.type === 'item' ? (linkedEntity.isNote ? '📝 Note' : '☑️ Todo') : '📋 List'}</span>
-									<span class="entity-title">"{linkedEntity.name}"</span>
-									{#if linkedEntity.listName}
-										<span class="entity-list-tag">in <strong>{linkedEntity.listName}</strong></span>
-									{/if}
-								</div>
-								<button
-									type="button"
-									class="entity-jump-btn"
-									onclick={jumpToLinkedEntity}
-									title="Open in app"
-								>
-									Jump to {linkedEntity.type === 'item' ? (linkedEntity.isNote ? 'Note' : 'Todo') : 'List'} →
-								</button>
-							</div>
-						{/if}
-
 						{#if currentPage}
 							<!-- Page Title & Meta -->
 							<div class="article-meta-header">
-								<h1 class="page-main-heading">{currentPage.title}</h1>
+								<div class="article-title-row">
+									<h1 class="page-main-heading">{currentPage.title}</h1>
+									{#if linkedEntity}
+										<button
+											type="button"
+											class="entity-jump-icon-btn"
+											onclick={jumpToLinkedEntity}
+											title="Jump to {linkedEntity.type === 'item' ? (linkedEntity.isNote ? 'Note' : 'Todo') : 'List'}: {linkedEntity.name}"
+											aria-label="Jump to {linkedEntity.type === 'item' ? (linkedEntity.isNote ? 'Note' : 'Todo') : 'List'}"
+										>
+											{linkedEntity.type === 'item' ? (linkedEntity.isNote ? '📝' : '☑️') : '📋'}
+										</button>
+									{/if}
+								</div>
 								<div class="page-metadata-bar">
 									<span class="page-slug-badge">{currentPage.id}</span>
 									<span class="meta-dot">•</span>
@@ -765,7 +769,20 @@
 						{:else}
 							<!-- Page Does Not Exist State -->
 							<div class="empty-page-state">
-								<h2>Topic does not exist yet</h2>
+								<div class="article-title-row">
+									<h2>Topic does not exist yet</h2>
+									{#if linkedEntity}
+										<button
+											type="button"
+											class="entity-jump-icon-btn"
+											onclick={jumpToLinkedEntity}
+											title="Jump to {linkedEntity.type === 'item' ? (linkedEntity.isNote ? 'Note' : 'Todo') : 'List'}: {linkedEntity.name}"
+											aria-label="Jump to {linkedEntity.type === 'item' ? (linkedEntity.isNote ? 'Note' : 'Todo') : 'List'}"
+										>
+											{linkedEntity.type === 'item' ? (linkedEntity.isNote ? '📝' : '☑️') : '📋'}
+										</button>
+									{/if}
+								</div>
 								<p>
 									{#if linkedEntity}
 										There is currently no wiki page for this {linkedEntity.type === 'item' ? (linkedEntity.isNote ? 'note' : 'todo') : 'list'} (<code>{currentPageId}</code>).
@@ -1281,56 +1298,43 @@
 		margin: 0 auto;
 		padding-bottom: 4rem;
 	}
-	/* Linked Entity Banner */
-	.wiki-entity-banner {
+	/* Linked Entity Jump Icons */
+	.article-title-row {
 		display: flex;
-		flex-wrap: wrap;
 		align-items: center;
-		justify-content: space-between;
-		gap: 0.5rem;
-		padding: 0.65rem 1rem;
-		margin-bottom: 1.25rem;
-		background: var(--bg2);
-		border: 1px solid var(--accent);
-		border-left: 4px solid var(--accent);
+		gap: 0.6rem;
+		flex-wrap: wrap;
+		margin-bottom: 0.5rem;
+	}
+	.article-title-row .page-main-heading,
+	.article-title-row h2 {
+		margin: 0;
+	}
+	.entity-jump-icon-btn {
+		background: none;
+		border: 1px solid var(--border);
 		border-radius: 6px;
-	}
-	.entity-banner-info {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 0.45rem;
-		font-size: 0.95rem;
-	}
-	.entity-kind-badge {
-		font-size: 0.78rem;
-		font-weight: 700;
-		text-transform: uppercase;
-		background: var(--bg3);
-		color: var(--accent);
-		padding: 0.15rem 0.4rem;
-		border-radius: 4px;
-	}
-	.entity-title {
-		font-weight: 600;
-	}
-	.entity-list-tag {
-		font-size: 0.85rem;
-		color: var(--text2);
-	}
-	.entity-jump-btn {
-		background: var(--accent);
-		color: #fff;
-		border: none;
-		border-radius: 4px;
-		padding: 0.3rem 0.7rem;
-		font-size: 0.85rem;
-		font-weight: 600;
+		padding: 0.2rem 0.5rem;
+		font-size: 1.2rem;
+		line-height: 1;
 		cursor: pointer;
-		margin-left: auto;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		transition: background 0.15s, border-color 0.15s, transform 0.1s;
 	}
-	.entity-jump-btn:hover {
-		opacity: 0.9;
+	.entity-jump-icon-btn:hover {
+		background: var(--bg3);
+		border-color: var(--accent);
+		transform: scale(1.08);
+	}
+	.entity-jump-icon-btn:active {
+		transform: scale(0.96);
+	}
+	.entity-hdr-jump-btn {
+		border-color: var(--accent);
+		padding: 0.25rem 0.5rem;
+		font-size: 1.05rem;
 	}
 
 	.article-meta-header {
