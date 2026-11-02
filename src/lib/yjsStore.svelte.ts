@@ -511,6 +511,11 @@ export function getSpreadsheets(doc: Y.Doc): Y.Array<Y.Map<unknown>> {
         return doc.getArray('spreadsheets');
 }
 
+/** Returns the top-level Y.Map holding all wiki pages. */
+export function getWiki(doc: Y.Doc): Y.Map<Y.Map<unknown>> {
+	return doc.getMap('wiki');
+}
+
 /** Returns the Y.Map<string> holding all cell values for a given spreadsheet.
  *  Key format: "R,C" (0-based row, col).  Values are raw cell strings (formula or literal). */
 export function getSheetCells(doc: Y.Doc, sheetId: string): Y.Map<string> {

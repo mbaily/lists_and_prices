@@ -10,27 +10,36 @@ export function extractTags(name: string): string[] {
 	return [...name.matchAll(TAG_RE)].map((m) => m[1].toLowerCase());
 }
 
-export type NameSegment = { type: 'text' | 'url' | 'tag' | 'item-ref' | 'list-ref' | 'folder-ref'; value: string };
+export type NameSegment = {
+	type: 'text' | 'url' | 'tag' | 'item-ref' | 'list-ref' | 'folder-ref' | 'wiki-ref';
+	value: string;
+	label?: string;
+};
 
 /**
  * Split a name string into text, URL, hashtag, and internal-ref segments for inline rendering.
- * Internal refs use the syntax [[item:UUID]], [[list:UUID]], [[folder:UUID]].
+ * Internal refs use the syntax [[item:UUID]], [[list:UUID]], [[folder:UUID]], [[wiki:slug]].
  * URLs are matched before # so a URL containing # isn't misread as a tag.
  */
 export function splitWithTags(name: string): NameSegment[] {
-	const combined = /\[\[(item|list|folder):([^\]]+)\]\]|https?:\/\/[^\s]+(?<![.,!?;:'")])|#\w+/g;
+	const combined = /\[\[(item|list|folder|wiki):([^\]]+)\]\]|https?:\/\/[^\s]+(?<![.,!?;:'")])|#\w+/g;
 	const result: NameSegment[] = [];
 	let last = 0;
 	let m: RegExpExecArray | null;
 	while ((m = combined.exec(name)) !== null) {
 		if (m.index > last) result.push({ type: 'text', value: name.slice(last, m.index) });
 		if (m[1]) {
-			// [[item:UUID]], [[list:UUID]], or [[folder:UUID]]
+			// [[item:UUID]], [[list:UUID]], [[folder:UUID]], or [[wiki:slug]]
 			const ns = m[1];
-			const id = m[2];
-			if (ns === 'item') result.push({ type: 'item-ref', value: id });
-			else if (ns === 'list') result.push({ type: 'list-ref', value: id });
-			else result.push({ type: 'folder-ref', value: id });
+			const raw = m[2];
+			const pipeIdx = raw.indexOf('|');
+			const id = (pipeIdx !== -1 ? raw.slice(0, pipeIdx) : raw).trim();
+			const label = pipeIdx !== -1 ? raw.slice(pipeIdx + 1).trim() : undefined;
+
+			if (ns === 'item') result.push({ type: 'item-ref', value: id, ...(label ? { label } : {}) });
+			else if (ns === 'list') result.push({ type: 'list-ref', value: id, ...(label ? { label } : {}) });
+			else if (ns === 'folder') result.push({ type: 'folder-ref', value: id, ...(label ? { label } : {}) });
+			else result.push({ type: 'wiki-ref', value: id, ...(label ? { label } : {}) });
 		} else if (m[0].startsWith('#')) {
 			result.push({ type: 'tag', value: m[0] });
 		} else {

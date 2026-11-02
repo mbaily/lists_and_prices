@@ -55,6 +55,9 @@
 	import FavouritesOrderScreen from './FavouritesOrderScreen.svelte';
 	import NearbyErrandsScreen from './NearbyErrandsScreen.svelte';
 	import Breadcrumb from './Breadcrumb.svelte';
+	import WikiModal from './WikiModal.svelte';
+	import { readWikiPage } from '$lib/wiki/data';
+	import { getDoc } from '$lib/yjsStore.svelte';
 
 	let { onLogout }: { onLogout: () => void } = $props();
 	let showUndoConfirm = $state(false);
@@ -104,6 +107,14 @@
 	let showFavouritesOrder = $state(false);
 	let previousListId = $state<string | null>(null);
 	let showCommitsModal = $state(false);
+	let showWikiModal = $state(false);
+	let wikiInitialPage = $state('start');
+
+	function openFromWiki(listId: string, itemId: string | null = null) {
+		showWikiModal = false;
+		openListId = listId;
+		openItemId = itemId;
+	}
 
 	function openFromNearby(listId: string, itemId: string | null = null) {
 		showNearby = false;
@@ -1165,6 +1176,14 @@
 		function resolveRef(type: string, id: string): string {
 			if (type === 'list-ref') return listById.get(id)?.name ?? '…';
 			if (type === 'folder-ref') return folderById.get(id)?.name ?? '…';
+			if (type === 'wiki-ref') {
+				try {
+					const p = readWikiPage(getDoc(), id);
+					return p ? `📖 ${p.title}` : `📖 ${id}`;
+				} catch {
+					return `📖 ${id}`;
+				}
+			}
 			return itemById.get(id)?.name ?? '…';
 		}
 
@@ -1238,7 +1257,7 @@
 			for (const item of items) {
 				const prefix = item.isNote ? '↳ ' : '• ';
 				const resolved = splitWithTags(item.name)
-					.map((p) => (p.type === 'item-ref' || p.type === 'list-ref' || p.type === 'folder-ref')
+					.map((p) => (p.type === 'item-ref' || p.type === 'list-ref' || p.type === 'folder-ref' || p.type === 'wiki-ref')
 						? resolveRef(p.type, p.value) : p.value)
 					.join('');
 				lines.push(`${indent}${prefix}${resolved}${item.date ? `  (${item.date})` : ''}`);
@@ -1273,7 +1292,7 @@
 				.map((p) => {
 					if (p.type === 'url') return `<a class="ref-url" href="${esc(p.value)}" target="_blank" rel="noopener noreferrer">${esc(p.value)}</a>`;
 					if (p.type === 'tag') return `<span class="ref-tag">${esc(p.value)}</span>`;
-					if (p.type === 'item-ref' || p.type === 'list-ref' || p.type === 'folder-ref') return `<span class="ref-pill">${esc(resolveRef(p.type, p.value))}</span>`;
+					if (p.type === 'item-ref' || p.type === 'list-ref' || p.type === 'folder-ref' || p.type === 'wiki-ref') return `<span class="ref-pill">${esc(resolveRef(p.type, p.value))}</span>`;
 					return esc(p.value);
 				})
 				.join('');
@@ -1511,6 +1530,20 @@ ${bodyHtml}
 	<SettingsScreen onBack={() => (showSettings = false)} {onLogout} />
 {:else if showCommitsModal}
 	<CommitsScreen onBack={() => (showCommitsModal = false)} />
+{:else if showWikiModal}
+	<WikiModal
+		initialPageId={wikiInitialPage}
+		onClose={() => (showWikiModal = false)}
+		onNavigateToList={(listId) => openFromWiki(listId)}
+		onNavigateToItem={(itemId) => {
+			const item = readAllItems().find((i) => i.id === itemId);
+			if (item) openFromWiki(item.listId, item.id);
+		}}
+		onNavigateToFolder={(folderId) => {
+			showWikiModal = false;
+			breadcrumb = [folderId];
+		}}
+	/>
 {:else}
 	<div class="screen">
 		<!-- Header -->
@@ -1537,6 +1570,7 @@ ${bodyHtml}
 			<!-- {#if !isInArchiveView && currentFolderId !== ARCHIVE_ID} -->
 
 			<div class="header-actions">
+				<button class="icon-btn" onclick={() => { showReportsMenu = false; showWikiModal = true; wikiInitialPage = 'start'; }} aria-label="Mini Wiki" title="Mini Wiki">📖</button>
 				<button class="icon-btn" onclick={() => { showReportsMenu = false; showNearby = true; }} aria-label="Nearby errands" title="Nearby errands">🚗</button>
 				{#if currentFolderId === null && hasArchived}
 					<button class="icon-btn" onclick={() => (breadcrumb = [...breadcrumb, ARCHIVE_ID])} aria-label="Archived">
