@@ -193,9 +193,10 @@ export function findWikiBacklinks(doc: Y.Doc, targetSlug: string): BacklinksResu
 	try {
 		// 1. Backlinks from other wiki pages
 		const allPages = readWikiPages(doc);
+		const allSlugs = new Set(allPages.map((p) => p.id));
 		for (const page of allPages) {
 			if (page.id === normalizedTarget) continue;
-			const links = extractWikiLinks(page.content);
+			const links = extractWikiLinks(page.content, page.id, (s) => allSlugs.has(s));
 			if (links.some((l) => l.type === 'wiki' && l.target === normalizedTarget)) {
 				result.wikiPages.push({ id: page.id, title: page.title });
 			}

@@ -14,6 +14,8 @@
  * - External links: [[url|Title]] and bare URLs
  */
 
+import { cleanNamespaceSlug, resolveNamespaceLink } from './namespaces';
+
 export interface WikiLinkRef {
 	raw: string;
 	type: 'wiki' | 'item' | 'list' | 'folder' | 'external';
@@ -22,25 +24,24 @@ export interface WikiLinkRef {
 }
 
 export interface RenderOptions {
+	currentSlug?: string;
 	resolveWikiTitle?: (slug: string) => string | undefined;
 	resolveRefName?: (type: string, id: string) => string | undefined;
 	pageExists?: (slug: string) => boolean;
 }
 
 export function slugifyWikiPage(name: string): string {
-	const trimmed = name.trim().toLowerCase();
-	// Replace whitespace and special punctuation with underscore
-	const slug = trimmed
-		.replace(/[\s/\\?#%&]+/g, '_')
-		.replace(/[^a-z0-9_\-:]/g, '')
-		.replace(/^_+|_+$/g, '');
-	return slug || 'start';
+	return cleanNamespaceSlug(name);
 }
 
 /**
  * Extract all links from DokuWiki markup.
  */
-export function extractWikiLinks(markup: string): WikiLinkRef[] {
+export function extractWikiLinks(
+	markup: string,
+	currentSlug = 'start',
+	pageExists?: (slug: string) => boolean
+): WikiLinkRef[] {
 	const results: WikiLinkRef[] = [];
 	const linkRegex = /\[\[([^\]]+)\]\]/g;
 	let match: RegExpExecArray | null;
@@ -65,9 +66,11 @@ export function extractWikiLinks(markup: string): WikiLinkRef[] {
 		} else if (target.startsWith('folder:')) {
 			results.push({ raw: match[0], type: 'folder', target: target.slice(7).trim(), label });
 		} else if (target.startsWith('wiki:')) {
-			results.push({ raw: match[0], type: 'wiki', target: slugifyWikiPage(target.slice(5)), label });
+			const resolved = resolveNamespaceLink(target.slice(5), currentSlug, pageExists);
+			results.push({ raw: match[0], type: 'wiki', target: resolved, label });
 		} else {
-			results.push({ raw: match[0], type: 'wiki', target: slugifyWikiPage(target), label });
+			const resolved = resolveNamespaceLink(target, currentSlug, pageExists);
+			results.push({ raw: match[0], type: 'wiki', target: resolved, label });
 		}
 	}
 
@@ -422,14 +425,14 @@ function renderLink(target: string, label: string | undefined, options: RenderOp
 		return `<a href="#" class="wiki-link wiki-ref-link wiki-ref-folder" data-ref-type="folder" data-ref-id="${escapeAttribute(id)}"><span class="wiki-ref-icon">📁</span> ${display}</a>`;
 	}
 
-	// Explicit wiki link: wiki:slug
-	let pageSlug = target;
-	if (pageSlug.startsWith('wiki:')) {
-		pageSlug = pageSlug.slice(5).trim();
+	// Wiki link (explicit wiki: or ordinary page target)
+	let pageTarget = target;
+	if (pageTarget.startsWith('wiki:')) {
+		pageTarget = pageTarget.slice(5).trim();
 	}
-	const normalizedSlug = slugifyWikiPage(pageSlug);
+	const normalizedSlug = resolveNamespaceLink(pageTarget, options.currentSlug || 'start', options.pageExists);
 	const resolvedTitle = options.resolveWikiTitle ? options.resolveWikiTitle(normalizedSlug) : undefined;
-	const display = label || resolvedTitle || pageSlug;
+	const display = label || resolvedTitle || pageTarget;
 	const exists = options.pageExists ? options.pageExists(normalizedSlug) : true;
 	const missingClass = exists ? '' : ' wiki-link-missing';
 

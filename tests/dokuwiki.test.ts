@@ -110,3 +110,17 @@ test('renderDokuWiki handles links with custom labels and missing pages', () => 
 	strictEqual(html.includes('My Task'), true);
 });
 
+test('renderDokuWiki and extractWikiLinks resolve relative namespace links', () => {
+	const markup = `Check [[.:specs|Specifications]], [[..:overview]], and [[:start]].`;
+	const currentSlug = 'work:projects:client_a:notes';
+	const links = extractWikiLinks(markup, currentSlug);
+	strictEqual(links[0].target, 'work:projects:client_a:specs');
+	strictEqual(links[1].target, 'work:projects:overview');
+	strictEqual(links[2].target, 'start');
+
+	const html = renderDokuWiki(markup, { currentSlug });
+	strictEqual(html.includes('data-wiki-page="work:projects:client_a:specs"'), true);
+	strictEqual(html.includes('data-wiki-page="work:projects:overview"'), true);
+	strictEqual(html.includes('data-wiki-page="start"'), true);
+});
+

@@ -197,8 +197,9 @@
 			const url = linkSearch.trim().startsWith('http') ? linkSearch.trim() : `https://${linkSearch.trim()}`;
 			insertSnippet(`[[${url}|${linkSearch.trim()}]]`);
 		} else {
-			const slug = slugifyWikiPage(linkSearch);
-			insertSnippet(`[[${slug}|${linkSearch.trim()}]]`);
+			const raw = linkSearch.trim();
+			const target = (raw.startsWith('.') || raw.startsWith(':')) ? raw : slugifyWikiPage(raw);
+			insertSnippet(`[[${target}|${raw}]]`);
 		}
 		showLinkModal = false;
 		linkSearch = '';
@@ -279,7 +280,7 @@
 				<div class="preview-scroll">
 					<div class="preview-card wiki-rendered">
 						<h1 class="wiki-heading">{title || pageId}</h1>
-						{@html renderDokuWiki(content)}
+						{@html renderDokuWiki(content, { currentSlug: pageId })}
 					</div>
 				</div>
 			{:else}

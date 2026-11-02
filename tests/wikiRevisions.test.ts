@@ -72,3 +72,4 @@ test('thinRevisions respects max cap', () => {
 	strictEqual(thinned[0].title, 'Title 0'); // first kept
 	strictEqual(thinned[thinned.length - 1].title, 'Title 49'); // last kept
 });
+
