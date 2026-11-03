@@ -8,4 +8,5 @@ export type CalendarInlineEntry = {
 	label: string;
 	title: string;
 	completed: boolean;
+	isImportant?: boolean;
 };

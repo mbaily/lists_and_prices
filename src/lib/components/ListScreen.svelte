@@ -1925,7 +1925,7 @@
 		{/snippet}
 		{#snippet wrappedCalendar(itemId: string, section: CalendarSection)}
 			{@const view = calendarIncludes[itemId]?.sectionView(section)}
-			<span class="include-inline">{#if !view || view.status === 'loading'}Loading calendar events…{:else if view.status === 'error'}{view.message}{:else if view.status === 'unavailable'}Section unavailable.{:else if view.entries.length === 0}No events.{:else}{#each view.entries as entry, index}{#if index > 0}{' • '}{/if}<a class:include-completed={entry.completed} href={simpleTodoPageUrl('calendar', base)} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{calendarLine(entry.label, entry.title)}</a>{#if entry.completed}{' (Completed)'}{/if}{/each}{/if}</span>
+			<span class="include-inline">{#if !view || view.status === 'loading'}Loading calendar events…{:else if view.status === 'error'}{view.message}{:else if view.status === 'unavailable'}Section unavailable.{:else if view.entries.length === 0}No events.{:else}{#each view.entries as entry, index}{#if index > 0}{' • '}{/if}<a class:include-completed={entry.completed} class:include-important={entry.isImportant} href={simpleTodoPageUrl('calendar', base)} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{calendarLine(entry.label, entry.title)}</a>{#if entry.isImportant}{' '}<span class="calendar-important-badge" title="Important (late and unchecked)">⚠️ Important</span>{/if}{#if entry.completed}{' (Completed)'}{/if}{/each}{/if}</span>
 		{/snippet}
 		{#each filteredTreeItems as {item, level, tlIdx, rootTlIdx, sibIdx}}
 			{@const canAddChildren = !item.heading && level < 2}
@@ -2983,6 +2983,25 @@
 	.include-inline { color: var(--text2); font-size: .9rem; }
 	.include-inline a { color: inherit; }
 	.include-inline a.include-completed { text-decoration: line-through; }
+	.calendar-important-badge {
+		display: inline-block;
+		background-color: #fee2e2;
+		color: #991b1b;
+		font-size: 0.75rem;
+		font-weight: 600;
+		padding: 1px 6px;
+		border-radius: 10px;
+		border: 1px solid #fca5a5;
+		margin-left: 4px;
+		vertical-align: middle;
+	}
+	@media (prefers-color-scheme: dark) {
+		.calendar-important-badge {
+			background-color: #450a0a;
+			color: #fca5a5;
+			border-color: #991b1b;
+		}
+	}
 	.include-refresh {
 		border: 0;
 		background: transparent;

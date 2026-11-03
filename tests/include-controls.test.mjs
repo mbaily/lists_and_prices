@@ -183,6 +183,27 @@ test('wrapped calendar keeps the selected range and completed occurrence informa
 		assert.deepEqual(sectionView('today'), { status: 'error', message: 'Sign in' });
 		state.loading = true;
 		assert.deepEqual(sectionView('today'), { status: 'loading' });
+
+		// Late important occurrences remain indefinitely until completed
+		state.loading = false;
+		state.error = '';
+		state.occurrences = [
+			// Past uncompleted important event (from yesterday)
+			{ event: { title: 'Overdue bill review', all_day: false, important_if_late: true }, occurrence_at: '2026-10-31T09:00:00', completed: false, is_late: true, is_important: true },
+			// Past uncompleted normal event (should NOT be retained in 'today')
+			{ event: { title: 'Old normal meeting', all_day: false, important_if_late: false }, occurrence_at: '2026-10-31T10:00:00', completed: false, is_late: true, is_important: false },
+			// Past completed important event (checked in calendar - should NOT be retained)
+			{ event: { title: 'Done task', all_day: false, important_if_late: true }, occurrence_at: '2026-10-31T11:00:00', completed: true, is_late: false, is_important: false },
+			// Today normal event
+			{ event: { title: 'Today call', all_day: false }, occurrence_at: '2026-11-01T14:00:00', completed: false }
+		];
+		assert.deepEqual(sectionView('today'), {
+			status: 'ready',
+			entries: [
+				{ label: 'Yesterday 09:00', title: 'Overdue bill review', completed: false, isImportant: true },
+				{ label: 'Today 14:00', title: 'Today call', completed: false }
+			]
+		});
 	} finally {
 		app.dispose();
 	}

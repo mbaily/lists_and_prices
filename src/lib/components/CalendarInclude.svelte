@@ -2,6 +2,7 @@
 	import { base } from '$app/paths';
 	import {
 		calendarSections, calendarRange, calendarOccurrenceLabel, calendarLine, parseCalendarResponse,
+		calendarQueryRange, isImportantOccurrence,
 		type CalendarOccurrence, type CalendarSection
 	} from '$lib/calendarInclude';
 	import { simpleTodoPageUrl, simpleTodoApiUrl } from '$lib/simpleTodo';
@@ -17,17 +18,37 @@
 
 	function sectionRows(section: CalendarSection): CalendarOccurrence[] {
 		const range = calendarRange(section, now);
-		return occurrences.filter((row) => row.occurrence_at.slice(0, 10) >= range.start && row.occurrence_at.slice(0, 10) <= range.end);
+		const todayStart = calendarRange('today', now).start;
+		return occurrences.filter((row) => {
+			const date = row.occurrence_at.slice(0, 10);
+			if (date >= range.start && date <= range.end) return true;
+			if (date < range.start && !row.completed) {
+				if (row.is_important !== undefined) return Boolean(row.is_important);
+				return Boolean(row.event.important_if_late && date < todayStart);
+			}
+			return false;
+		});
 	}
 
 	export function sectionView(section: CalendarSection): IncludeView<CalendarInlineEntry> {
 		if (loading) return { status: 'loading' };
 		if (error) return { status: 'error', message: error };
+		const todayStart = calendarRange('today', now).start;
 		return {
 			status: 'ready',
-			entries: sectionRows(section).map((row) => ({
-				label: calendarOccurrenceLabel(row, now), title: row.event.title, completed: row.completed
-			}))
+			entries: sectionRows(section).map((row) => {
+				const isImportant = !row.completed && (
+					row.is_important !== undefined
+						? Boolean(row.is_important)
+						: Boolean(row.event.important_if_late && row.occurrence_at.slice(0, 10) < todayStart)
+				);
+				return {
+					label: calendarOccurrenceLabel(row, now),
+					title: row.event.title,
+					completed: row.completed,
+					...(isImportant ? { isImportant: true } : {})
+				};
+			})
 		};
 	}
 
@@ -40,9 +61,7 @@
 		now = today;
 		loading = true;
 		error = '';
-		const ranges = selected.map((section) => calendarRange(section, today));
-		const start = ranges.map((range) => range.start).sort()[0];
-		const end = ranges.map((range) => range.end).sort().reverse()[0];
+		const { start, end } = calendarQueryRange(selected, today);
 		try {
 			const url = simpleTodoApiUrl('api/calendar/events', base);
 			url.searchParams.set('start_date', start);
@@ -93,8 +112,9 @@
 				{:else}
 					<ul>
 						{#each rows as row}
-							<li class:completed={row.completed}>
-								<a href={calendarUrl} target="_blank" rel="noopener noreferrer">{calendarLine(calendarOccurrenceLabel(row, now), row.event.title)}</a>{#if row.completed}{' (Completed)'}{/if}
+							{@const important = isImportantOccurrence(row, now)}
+							<li class:completed={row.completed} class:important={important}>
+								<a href={calendarUrl} target="_blank" rel="noopener noreferrer">{calendarLine(calendarOccurrenceLabel(row, now), row.event.title)}</a>{#if important}{' '}<span class="calendar-important-badge" title="Important (late and unchecked)">⚠️ Important</span>{/if}{#if row.completed}{' (Completed)'}{/if}
 							</li>
 						{/each}
 					</ul>
@@ -112,4 +132,33 @@
 	a { color: inherit; }
 	.completed a { text-decoration: line-through; }
 	button { color: inherit; cursor: pointer; }
+	.important {
+		background-color: rgba(220, 38, 38, 0.1);
+		border-left: 3px solid #dc2626;
+		padding-left: 4px;
+		border-radius: 2px;
+	}
+	.calendar-important-badge {
+		display: inline-block;
+		background-color: #fee2e2;
+		color: #991b1b;
+		font-size: 0.75rem;
+		font-weight: 600;
+		padding: 1px 6px;
+		border-radius: 10px;
+		border: 1px solid #fca5a5;
+		margin-left: 4px;
+		vertical-align: middle;
+	}
+	@media (prefers-color-scheme: dark) {
+		.important {
+			background-color: rgba(220, 38, 38, 0.2);
+			border-left: 3px solid #f87171;
+		}
+		.calendar-important-badge {
+			background-color: #450a0a;
+			color: #fca5a5;
+			border-color: #991b1b;
+		}
+	}
 </style>
