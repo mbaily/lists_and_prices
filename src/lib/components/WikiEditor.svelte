@@ -2,6 +2,7 @@
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import { renderDokuWiki, slugifyWikiPage } from '$lib/wiki/dokuwiki';
 	import { readWikiPages } from '$lib/wiki/data';
+	import { handleWikiEditorKeydown } from '$lib/wiki/editorKeyHandler';
 	import { getDoc, getItems, getLists, getFolders } from '$lib/yjsStore.svelte';
 
 	let {
@@ -130,6 +131,76 @@
 			summary: editSummary.trim(),
 			isMinor
 		});
+	}
+
+	function applyReplaceAction(
+		start: number,
+		end: number,
+		replacement: string,
+		selStart: number,
+		selEnd: number
+	) {
+		if (!textareaEl) return;
+		const el = textareaEl;
+		const scroll = el.scrollHeight;
+		const oldScrollTop = el.scrollTop;
+
+		el.focus();
+		el.setSelectionRange(start, end);
+
+		let success = false;
+		try {
+			// In modern browsers, execCommand preserves undo/redo history
+			success = document.execCommand('insertText', false, replacement);
+		} catch {
+			success = false;
+		}
+
+		if (!success) {
+			const val = el.value;
+			el.value = val.slice(0, start) + replacement + val.slice(end);
+			content = el.value;
+		} else {
+			content = el.value;
+		}
+
+		el.setSelectionRange(selStart, selEnd);
+		const scrollDiff = el.scrollHeight - scroll;
+		if (scrollDiff > 0) {
+			el.scrollTop = oldScrollTop + scrollDiff;
+		}
+	}
+
+	function handleKeydown(e: KeyboardEvent) {
+		if (readOnly || !textareaEl) return;
+		const action = handleWikiEditorKeydown(
+			content,
+			textareaEl.selectionStart,
+			textareaEl.selectionEnd,
+			e
+		);
+		if (!action) return;
+
+		e.preventDefault();
+		if (action.type === 'save') {
+			handleSave();
+		} else if (action.type === 'format') {
+			if (action.format === 'bold') wrapSelection('**', '**', 'bold text');
+			else if (action.format === 'italic') wrapSelection('//', '//', 'italic text');
+			else if (action.format === 'underline') wrapSelection('__', '__', 'underlined text');
+			else if (action.format === 'link') {
+				showLinkModal = true;
+				linkSearch = '';
+			}
+		} else if (action.type === 'replace') {
+			applyReplaceAction(
+				action.start,
+				action.end,
+				action.replacement,
+				action.selectionStart,
+				action.selectionEnd
+			);
+		}
 	}
 
 	function requestCancel() {
@@ -308,6 +379,7 @@
 					spellcheck="false"
 					onfocus={() => (isTextareaFocused = true)}
 					onblur={() => (isTextareaFocused = false)}
+					onkeydown={handleKeydown}
 				></textarea>
 			{/if}
 		</div>
