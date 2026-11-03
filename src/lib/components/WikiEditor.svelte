@@ -210,7 +210,7 @@
 	<div class="visual-viewport-container" style="height: {viewportHeight}; top: {viewportTop};">
 		<!-- Header -->
 		<div class="editor-header">
-			<div class="header-left">
+			<div class="editor-toolbar">
 				<button
 					type="button"
 					class="hdr-btn cancel-btn"
@@ -220,9 +220,6 @@
 				>
 					✕
 				</button>
-				<span class="page-badge">wiki:{pageId}</span>
-			</div>
-			<div class="header-right">
 				<button
 					type="button"
 					class="hdr-btn preview-btn"
@@ -245,17 +242,17 @@
 					</button>
 				{/if}
 			</div>
-		</div>
 
-		<!-- Page Title Bar -->
-		<div class="title-bar">
-			<input
-				type="text"
-				class="title-input"
-				bind:value={title}
-				placeholder="Page Title"
-				disabled={readOnly}
-			/>
+			<div class="editor-title-wrap">
+				<input
+					type="text"
+					class="title-input"
+					bind:value={title}
+					placeholder="Page Title"
+					disabled={readOnly}
+				/>
+				<span class="page-badge" title="Slug: {pageId}">wiki:{pageId}</span>
+			</div>
 		</div>
 
 		<!-- DokuWiki Toolbar (visible in Edit mode) -->
@@ -421,16 +418,46 @@
 	}
 	.editor-header {
 		display: flex;
-		justify-content: space-between;
 		align-items: center;
-		padding: 0.5rem 1rem;
+		padding: 0.5rem 0.75rem;
 		background: var(--bg2);
 		border-bottom: 1px solid var(--border);
+		min-height: 52px;
+		gap: 0.75rem;
 	}
-	.header-left, .header-right {
+	.editor-toolbar {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		flex-shrink: 0;
+	}
+	.editor-title-wrap {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
+		flex: 1;
+		min-width: 0;
+	}
+	.title-input {
+		flex: 1;
+		min-width: 0;
+		font-size: 1.15rem;
+		font-weight: 600;
+		border: 1px solid transparent;
+		border-radius: 6px;
+		padding: 0.25rem 0.5rem;
+		background: transparent;
+		color: var(--text);
+		outline: none;
+		transition: border-color 0.15s, background-color 0.15s;
+	}
+	.title-input:hover {
+		border-color: var(--border);
+		background: var(--bg);
+	}
+	.title-input:focus {
+		border-color: var(--accent);
+		background: var(--bg);
 	}
 	.page-badge {
 		font-size: 0.8rem;
@@ -439,6 +466,8 @@
 		border-radius: 4px;
 		background: var(--bg3);
 		color: var(--text2);
+		flex-shrink: 0;
+		white-space: nowrap;
 	}
 	.hdr-btn {
 		background: none;
@@ -478,20 +507,25 @@
 		background: #4f46e5;
 		border-color: #4f46e5;
 	}
-
-	.title-bar {
-		padding: 0.5rem 1rem;
-		border-bottom: 1px solid var(--border);
-		background: var(--bg);
-	}
-	.title-input {
-		width: 100%;
-		font-size: 1.25rem;
-		font-weight: 600;
-		border: none;
-		background: transparent;
-		color: var(--text);
-		outline: none;
+	@media (max-width: 640px) {
+		.editor-header {
+			flex-direction: column;
+			align-items: stretch;
+			padding: 0.4rem 0.5rem;
+			gap: 0.35rem;
+			min-height: auto;
+		}
+		.editor-toolbar {
+			width: 100%;
+		}
+		.editor-title-wrap {
+			width: 100%;
+			border-top: 1px solid var(--border);
+			padding-top: 0.25rem;
+		}
+		.title-input {
+			font-size: 1rem;
+		}
 	}
 
 	.wiki-toolbar {
