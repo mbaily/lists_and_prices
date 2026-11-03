@@ -638,23 +638,6 @@
 
 		<!-- Main Area -->
 		<div class="wiki-body">
-			<!-- Namespace Breadcrumbs -->
-			<nav class="wiki-breadcrumbs" aria-label="Namespace breadcrumbs">
-				<button type="button" class="bc-item bc-root" onclick={() => navigateToPage('start')} title="Start / Root">
-					🏠 <span class="bc-name">root</span>
-				</button>
-				{#each namespaceSegments as seg}
-					<span class="bc-sep">:</span>
-					<button type="button" class="bc-item bc-ns" onclick={() => navigateToNamespace(seg.fullPath)} title="Namespace: {seg.fullPath}">
-						📁 <span class="bc-name">{seg.name}</span>
-					</button>
-				{/each}
-				<span class="bc-sep">:</span>
-				<span class="bc-current" title="Page: {currentPage?.title || linkedEntity?.name || pageBaseName}">
-					📄 <span class="bc-name">{currentPage?.title || linkedEntity?.name || pageBaseName}</span>
-				</span>
-			</nav>
-
 			{#if showIndex}
 				<!-- All Pages Index View -->
 				<div class="wiki-index-pane">
@@ -820,6 +803,23 @@
 				<!-- Current Page Content View -->
 				<div class="wiki-content-scroll" onclick={handleContentClick}>
 					<div class="wiki-article-card">
+						<!-- Namespace Breadcrumbs (scrolls with content) -->
+						<nav class="wiki-breadcrumbs" aria-label="Namespace breadcrumbs">
+							<button type="button" class="bc-item bc-root" onclick={() => navigateToPage('start')} title="Start / Root">
+								🏠 <span class="bc-name">root</span>
+							</button>
+							{#each namespaceSegments as seg}
+								<span class="bc-sep">:</span>
+								<button type="button" class="bc-item bc-ns" onclick={() => navigateToNamespace(seg.fullPath)} title="Namespace: {seg.fullPath}">
+									📁 <span class="bc-name">{seg.name}</span>
+								</button>
+							{/each}
+							<span class="bc-sep">:</span>
+							<span class="bc-current" title="Page: {currentPage?.title || linkedEntity?.name || pageBaseName}">
+								📄 <span class="bc-name">{currentPage?.title || linkedEntity?.name || pageBaseName}</span>
+							</span>
+						</nav>
+
 						{#if currentPage}
 							<!-- Page Title & Meta -->
 							<div class="article-meta-header">
@@ -1157,20 +1157,16 @@
 	}
 	@media (max-width: 640px) {
 		.wiki-header {
-			flex-direction: column;
-			align-items: stretch;
-			padding: 0.4rem 0.5rem;
+			padding: 0.35rem 0.5rem;
 			gap: 0.35rem;
 			min-height: auto;
 		}
 		.wiki-toolbar {
 			width: 100%;
-			padding-bottom: 0.15rem;
+			padding-bottom: 0;
 		}
 		.hdr-title {
-			font-size: 0.95rem;
-			padding: 0.25rem 0.25rem 0.1rem;
-			border-top: 1px solid var(--border);
+			display: none;
 		}
 	}
 	.hdr-btn {
@@ -1229,10 +1225,9 @@
 		align-items: center;
 		flex-wrap: wrap;
 		gap: 0.35rem;
-		padding: 0.45rem 1rem;
-		background: var(--bg2);
-		border-bottom: 1px solid var(--border);
+		padding: 0 0 0.75rem;
 		font-size: 0.85rem;
+		color: var(--text2);
 	}
 	.bc-item {
 		display: inline-flex;

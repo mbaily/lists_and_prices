@@ -33,6 +33,7 @@
 	let viewportHeight = $state('100vh');
 	let viewportTop = $state('0px');
 	let textareaEl: HTMLTextAreaElement | null = null;
+	let isTextareaFocused = $state(false);
 
 	const isDirty = $derived(content !== initialContent || title !== (initialTitle || pageId));
 
@@ -305,13 +306,15 @@
 					placeholder="Enter DokuWiki markup here...&#10;&#10;====== Page Title ======&#10;Write text with **bold**, //italic//, [[links]], etc."
 					disabled={readOnly}
 					spellcheck="false"
+					onfocus={() => (isTextareaFocused = true)}
+					onblur={() => (isTextareaFocused = false)}
 				></textarea>
 			{/if}
 		</div>
 
 		<!-- Bottom Bar: Edit summary & Minor changes -->
 		{#if !readOnly}
-			<div class="editor-footer">
+			<div class="editor-footer" class:typing-mode={isTextareaFocused}>
 				<div class="footer-left">
 					<input
 						type="text"
@@ -509,34 +512,39 @@
 	}
 	@media (max-width: 640px) {
 		.editor-header {
-			flex-direction: column;
-			align-items: stretch;
-			padding: 0.4rem 0.5rem;
+			padding: 0.35rem 0.5rem;
 			gap: 0.35rem;
-			min-height: auto;
+			min-height: 40px;
 		}
-		.editor-toolbar {
-			width: 100%;
-		}
-		.editor-title-wrap {
-			width: 100%;
-			border-top: 1px solid var(--border);
-			padding-top: 0.25rem;
+		.page-badge {
+			display: none;
 		}
 		.title-input {
-			font-size: 1rem;
+			font-size: 0.95rem;
+			padding: 0.15rem 0.35rem;
+		}
+		.editor-footer.typing-mode {
+			display: none;
 		}
 	}
 
 	.wiki-toolbar {
 		display: flex;
-		flex-wrap: wrap;
+		flex-wrap: nowrap;
 		align-items: center;
 		gap: 0.25rem;
-		padding: 0.4rem 0.8rem;
+		padding: 0.25rem 0.5rem;
 		background: var(--bg2);
 		border-bottom: 1px solid var(--border);
 		overflow-x: auto;
+		white-space: nowrap;
+		-webkit-overflow-scrolling: touch;
+		scrollbar-width: none;
+		-ms-overflow-style: none;
+		flex-shrink: 0;
+	}
+	.wiki-toolbar::-webkit-scrollbar {
+		display: none;
 	}
 	.btn-group {
 		display: flex;
