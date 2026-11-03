@@ -980,21 +980,19 @@
 		{/each}
 
 		{#each node.pages as p}
-			<div class="ns-page-row" style="padding-left: {(node.isRoot ? 0.3 : (depth + 1) * 1.1)}rem">
+			<div class="ns-page-row" style="padding-left: {(node.isRoot ? 0.3 : (depth + 1) * 1.15)}rem">
 				<button
 					type="button"
-					class="index-page-item ns-page-item"
+					class="ns-page-link"
 					class:current={p.id === currentPageId}
 					onclick={() => navigateToPage(p.id)}
+					title="Open {p.title || p.id}"
 				>
 					<span class="page-icon">📄</span>
-					<div class="ns-item-main">
-						<span class="page-title">{p.title || getPageBaseName(p.id)}</span>
+					<span class="page-title">{p.title || getPageBaseName(p.id)}</span>
+					{#if p.title && p.title !== getPageBaseName(p.id)}
 						<span class="page-basename">({getPageBaseName(p.id)})</span>
-					</div>
-					<div class="ns-item-meta">
-						<span class="updated-time">{formatDate(p.updatedAt)}</span>
-					</div>
+					{/if}
 				</button>
 			</div>
 		{/each}
@@ -1346,14 +1344,15 @@
 	.ns-tree-container {
 		display: flex;
 		flex-direction: column;
-		gap: 0.25rem;
+		gap: 0.15rem;
+		padding: 0.25rem 0.25rem;
 	}
 	.ns-folder-row {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
-		padding-top: 0.35rem;
-		padding-bottom: 0.35rem;
+		justify-content: flex-start;
+		gap: 0.35rem;
+		padding: 0.2rem 0;
 	}
 	.ns-folder-toggle-btn {
 		display: inline-flex;
@@ -1365,11 +1364,11 @@
 		font-weight: 600;
 		font-size: 0.95rem;
 		cursor: pointer;
-		padding: 0.2rem 0.4rem;
+		padding: 0.15rem 0.25rem;
 		border-radius: 4px;
 	}
 	.ns-folder-toggle-btn:hover {
-		background: var(--bg2);
+		color: var(--accent);
 	}
 	.ns-arrow {
 		font-size: 0.7rem;
@@ -1386,29 +1385,47 @@
 		border: none;
 		font-size: 0.8rem;
 		cursor: pointer;
-		opacity: 0.6;
-		padding: 0.2rem 0.4rem;
+		opacity: 0.5;
+		padding: 0.15rem 0.3rem;
 		border-radius: 4px;
 	}
 	.ns-quick-add:hover {
 		opacity: 1;
-		background: var(--bg2);
+		color: var(--accent);
 	}
 	.ns-page-row {
-		margin-bottom: 0.2rem;
-	}
-	.ns-page-item {
 		display: flex;
-		flex-direction: row;
 		align-items: center;
-		justify-content: space-between;
-		padding: 0.45rem 0.75rem;
+		padding: 0.15rem 0;
 	}
-	.ns-item-main {
-		display: flex;
+	.ns-page-link {
+		display: inline-flex;
 		align-items: baseline;
 		gap: 0.4rem;
-		flex: 1;
+		background: none;
+		border: none;
+		color: var(--text);
+		font-size: 0.95rem;
+		cursor: pointer;
+		padding: 0.15rem 0.3rem;
+		text-align: left;
+		border-radius: 4px;
+		line-height: 1.4;
+	}
+	.ns-page-link:hover {
+		color: var(--accent);
+		text-decoration: underline;
+	}
+	.ns-page-link.current {
+		color: var(--accent);
+		font-weight: 600;
+	}
+	.ns-page-link .page-icon {
+		font-size: 0.9rem;
+		opacity: 0.85;
+	}
+	.ns-page-link .page-title {
+		font-size: 0.95rem;
 	}
 	.page-basename {
 		font-size: 0.8rem;
@@ -1420,27 +1437,28 @@
 		overflow-y: auto;
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: 0.25rem;
 	}
 	.index-page-item {
 		display: flex;
-		flex-direction: column;
-		gap: 0.2rem;
-		padding: 0.75rem 1rem;
-		border: 1px solid var(--border);
-		border-radius: 8px;
-		background: var(--bg2);
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.5rem;
+		padding: 0.35rem 0.5rem;
+		border: none;
+		border-bottom: 1px solid var(--border);
+		background: none;
 		color: var(--text);
 		text-align: left;
 		cursor: pointer;
-		transition: border-color 0.15s;
 	}
 	.index-page-item:hover {
-		border-color: var(--accent);
+		color: var(--accent);
+		background: var(--bg2);
 	}
 	.index-page-item.current {
-		border-color: var(--accent);
-		background: var(--bg3);
+		color: var(--accent);
+		font-weight: 600;
 	}
 	.item-main {
 		display: flex;
