@@ -210,3 +210,4 @@ test('Formatting hotkeys (Ctrl+B, Ctrl+I, Ctrl+U, Ctrl+K)', () => {
 	deepStrictEqual(handleWikiEditorKeydown('text', 2, 2, { key: 'u', ctrlKey: true }), { type: 'format', format: 'underline' });
 	deepStrictEqual(handleWikiEditorKeydown('text', 2, 2, { key: 'k', ctrlKey: true }), { type: 'format', format: 'link' });
 });
+
