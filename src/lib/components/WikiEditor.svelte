@@ -211,7 +211,15 @@
 		<!-- Header -->
 		<div class="editor-header">
 			<div class="header-left">
-				<button type="button" class="hdr-btn cancel-btn" onclick={requestCancel}>Cancel</button>
+				<button
+					type="button"
+					class="hdr-btn cancel-btn"
+					onclick={requestCancel}
+					title="Cancel"
+					aria-label="Cancel"
+				>
+					✕
+				</button>
 				<span class="page-badge">wiki:{pageId}</span>
 			</div>
 			<div class="header-right">
@@ -220,12 +228,21 @@
 					class="hdr-btn preview-btn"
 					class:active={isPreview}
 					onclick={() => (isPreview = !isPreview)}
-					title="Toggle DokuWiki preview"
+					title={isPreview ? 'Back to Editor' : 'Preview'}
+					aria-label={isPreview ? 'Back to Editor' : 'Preview'}
 				>
-					{isPreview ? '✏️ Edit' : '👁️ Preview'}
+					{isPreview ? '✏️' : '👁️'}
 				</button>
 				{#if !readOnly}
-					<button type="button" class="hdr-btn save-btn" onclick={handleSave}>Save</button>
+					<button
+						type="button"
+						class="hdr-btn save-btn"
+						onclick={handleSave}
+						title="Save"
+						aria-label="Save"
+					>
+						💾
+					</button>
 				{/if}
 			</div>
 		</div>
@@ -425,29 +442,41 @@
 	}
 	.hdr-btn {
 		background: none;
-		border: 1px solid transparent;
-		font-size: 0.95rem;
-		cursor: pointer;
-		padding: 0.3rem 0.8rem;
+		border: 1px solid var(--border);
 		border-radius: 6px;
-		color: var(--text2);
+		color: var(--text);
+		font-size: 1.05rem;
+		min-width: 32px;
+		height: 32px;
+		padding: 0 0.4rem;
+		cursor: pointer;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		line-height: 1;
+		transition: background 0.15s, border-color 0.15s, transform 0.1s;
 	}
 	.hdr-btn:hover {
 		background: var(--bg3);
-		color: var(--text);
+		border-color: var(--accent);
+		transform: scale(1.05);
+	}
+	.hdr-btn:active {
+		transform: scale(0.96);
 	}
 	.preview-btn.active {
 		background: var(--bg3);
+		border-color: var(--accent);
 		color: var(--accent);
-		font-weight: 600;
 	}
 	.save-btn {
 		background: #6366f1;
 		color: #fff;
-		font-weight: 600;
+		border-color: #6366f1;
 	}
 	.save-btn:hover {
 		background: #4f46e5;
+		border-color: #4f46e5;
 	}
 
 	.title-bar {
