@@ -555,91 +555,77 @@
 						{linkedEntity.type === 'item' ? (linkedEntity.isNote ? '📝' : '☑️') : '📋'}
 					</button>
 				{/if}
-				<button
-					type="button"
-					class="hdr-btn index-toggle-btn"
-					class:active={showIndex}
-					onclick={() => (showIndex = !showIndex)}
-					title={showIndex ? 'Close Page Index' : 'All Wiki Pages'}
-					aria-label="All Wiki Pages"
-				>
-					📑
-				</button>
-				{#if !showIndex && !showHistory && !commitState.isHistorical}
+				{#if !commitState.isHistorical}
 					<button
 						type="button"
 						class="hdr-btn"
-						onclick={() => (isEditing = true)}
+						onclick={() => {
+							showIndex = false;
+							showHistory = false;
+							isEditing = true;
+						}}
 						title="Edit Page"
 						aria-label="Edit Page"
 					>
 						✏️
 					</button>
-					{#if currentPage}
-						<button
-							type="button"
-							class="hdr-btn history-toggle-btn"
-							onclick={() => { showHistory = true; selectedRevision = null; }}
-							title={`Revision History${currentPage.revisions?.length ? ` (${currentPage.revisions.length} revisions)` : ''}`}
-							aria-label="Revision History"
-						>
-							📜
-						</button>
-					{/if}
+				{/if}
+				<button
+					type="button"
+					class="hdr-btn index-toggle-btn"
+					class:active={showIndex}
+					onclick={() => {
+						showIndex = !showIndex;
+						if (showIndex) showHistory = false;
+					}}
+					title={showIndex ? 'Close Page Index' : 'All Wiki Pages'}
+					aria-label="All Wiki Pages"
+				>
+					📑
+				</button>
+				{#if currentPage}
 					<button
 						type="button"
-						class="hdr-btn new-page-btn"
-						onclick={() => openNewPageModal()}
-						title="Create New Page"
-						aria-label="Create New Page"
+						class="hdr-btn history-toggle-btn"
+						class:active={showHistory}
+						onclick={() => {
+							showHistory = !showHistory;
+							selectedRevision = null;
+							if (showHistory) showIndex = false;
+						}}
+						title={showHistory ? 'Close History' : `Revision History${currentPage.revisions?.length ? ` (${currentPage.revisions.length} revisions)` : ''}`}
+						aria-label="Revision History"
 					>
-						➕
+						📜
 					</button>
+				{/if}
+				<button
+					type="button"
+					class="hdr-btn new-page-btn"
+					onclick={() => openNewPageModal()}
+					title="Create New Page"
+					aria-label="Create New Page"
+				>
+					➕
+				</button>
+				<button
+					type="button"
+					class="hdr-btn"
+					onclick={copyLink}
+					title={copyFeedback ? 'Copied URL to clipboard!' : `Copy Web URL (#wiki:${currentPageId})`}
+					aria-label="Copy Web URL"
+				>
+					{copyFeedback ? '✓' : '🔗'}
+				</button>
+				{#if !commitState.isHistorical && currentPage && currentPageId !== 'start'}
 					<button
 						type="button"
-						class="hdr-btn"
-						onclick={copyLink}
-						title={copyFeedback ? 'Copied URL to clipboard!' : `Copy Web URL (#wiki:${currentPageId})`}
-						aria-label="Copy Web URL"
+						class="hdr-btn delete-btn"
+						onclick={() => (showDeleteConfirm = true)}
+						title="Delete Page"
+						aria-label="Delete Page"
 					>
-						{copyFeedback ? '✓' : '🔗'}
-					</button>
-					{#if currentPage && currentPageId !== 'start'}
-						<button
-							type="button"
-							class="hdr-btn delete-btn"
-							onclick={() => (showDeleteConfirm = true)}
-							title="Delete Page"
-							aria-label="Delete Page"
-						>
-							🗑️
-						</button>
-					{/if}
-				{:else if showHistory}
-					<button
-						type="button"
-						class="hdr-btn"
-						onclick={() => { showHistory = false; selectedRevision = null; }}>
-						↩️
-					</button>
-					<button
-						type="button"
-						class="hdr-btn new-page-btn"
-						onclick={() => openNewPageModal()}
-						title="Create New Page"
-						aria-label="Create New Page"
-					>
-						➕
-					</button>
-				{:else}
-					<button
-						type="button"
-						class="hdr-btn new-page-btn"
-						onclick={() => openNewPageModal()}
-						title="Create New Page"
-						aria-label="Create New Page"
-					>
-						➕
+						🗑️
 					</button>
 				{/if}
 			</div>
@@ -776,7 +762,10 @@
 						</div>
 					{:else}
 						<div class="history-list-header">
-							<h2>Revision History for "{currentPage?.title || currentPageId}"</h2>
+							<div class="history-title-row">
+								<h2>Revision History for "{currentPage?.title || currentPageId}"</h2>
+								<button type="button" class="hdr-btn" onclick={() => { showHistory = false; selectedRevision = null; }} title="Close History" aria-label="Close History">✕</button>
+							</div>
 							<p class="history-hint">Revisions are automatically preserved and thinned over time to keep history compact.</p>
 						</div>
 						<div class="history-page-list">
@@ -1208,7 +1197,8 @@
 	.hdr-btn:active {
 		transform: scale(0.96);
 	}
-	.index-toggle-btn.active {
+	.index-toggle-btn.active,
+	.history-toggle-btn.active {
 		background: var(--bg3);
 		border-color: var(--accent);
 		color: var(--accent);
@@ -1751,6 +1741,12 @@
 	}
 	.history-list-header {
 		margin-bottom: 1rem;
+	}
+	.history-title-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 0.5rem;
 	}
 	.history-list-header h2 {
 		margin: 0 0 0.25rem;
