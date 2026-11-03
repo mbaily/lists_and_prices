@@ -1270,8 +1270,6 @@
 		display: flex;
 		flex-direction: column;
 		padding: 1rem;
-		max-width: 800px;
-		margin: 0 auto;
 		width: 100%;
 		overflow: hidden;
 	}
@@ -1481,8 +1479,7 @@
 		padding: 1.5rem 1rem;
 	}
 	.wiki-article-card {
-		max-width: 820px;
-		margin: 0 auto;
+		width: 100%;
 		padding-bottom: 4rem;
 	}
 	/* Linked Entity Jump Icons */
@@ -1734,8 +1731,6 @@
 		display: flex;
 		flex-direction: column;
 		padding: 1rem;
-		max-width: 800px;
-		margin: 0 auto;
 		width: 100%;
 		overflow: hidden;
 	}

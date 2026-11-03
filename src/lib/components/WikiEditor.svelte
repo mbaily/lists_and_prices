@@ -600,8 +600,7 @@
 		padding: 1.5rem;
 	}
 	.preview-card {
-		max-width: 800px;
-		margin: 0 auto;
+		width: 100%;
 	}
 
 	.editor-footer {
