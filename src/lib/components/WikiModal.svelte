@@ -1329,6 +1329,7 @@
 		flex-direction: column;
 		gap: 0.15rem;
 		padding: 0.25rem 0.25rem;
+		line-height: 1.2;
 	}
 	.ns-folder-row {
 		display: flex;
@@ -1336,6 +1337,7 @@
 		justify-content: flex-start;
 		gap: 0.35rem;
 		padding: 0.2rem 0;
+		line-height: 1.2;
 	}
 	.ns-folder-toggle-btn {
 		display: inline-flex;
@@ -1349,6 +1351,7 @@
 		cursor: pointer;
 		padding: 0.15rem 0.25rem;
 		border-radius: 4px;
+		line-height: 1.2;
 	}
 	.ns-folder-toggle-btn:hover {
 		color: var(--accent);
@@ -1380,6 +1383,7 @@
 		display: flex;
 		align-items: center;
 		padding: 0.15rem 0;
+		line-height: 1.2;
 	}
 	.ns-page-link {
 		display: inline-flex;
@@ -1393,7 +1397,7 @@
 		padding: 0.15rem 0.3rem;
 		text-align: left;
 		border-radius: 4px;
-		line-height: 1.4;
+		line-height: 1.2;
 	}
 	.ns-page-link:hover {
 		color: var(--accent);
@@ -1553,8 +1557,10 @@
 		font-weight: 600;
 	}
 
-	.wiki-rendered-body {
+	.wiki-rendered-body,
+	.wiki-article-card {
 		min-height: 200px;
+		line-height: 1.2;
 	}
 
 	/* Backlinks */

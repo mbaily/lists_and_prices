@@ -671,7 +671,7 @@
 		color: var(--text);
 		font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 		font-size: 0.95rem;
-		line-height: 1.55;
+		line-height: 1.4;
 		tab-size: 2;
 	}
 	.preview-scroll {
@@ -837,7 +837,7 @@
 
 	/* Rendered wiki preview styling */
 	:global(.wiki-rendered) {
-		line-height: 1.6;
+		line-height: 1.2;
 		color: var(--text);
 	}
 	:global(.wiki-rendered h1.wiki-heading) {
