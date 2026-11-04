@@ -842,44 +842,58 @@
 	}
 	:global(.wiki-rendered h1.wiki-heading) {
 		font-size: 1.75rem;
-		margin: 1.2rem 0 0.6rem;
+		margin: 0.8rem 0 0.4rem;
 		border-bottom: 2px solid var(--border);
-		padding-bottom: 0.3rem;
+		padding-bottom: 0.25rem;
 	}
 	:global(.wiki-rendered h2.wiki-heading) {
 		font-size: 1.4rem;
-		margin: 1rem 0 0.5rem;
+		margin: 0.7rem 0 0.35rem;
 		border-bottom: 1px solid var(--border);
 		padding-bottom: 0.2rem;
 	}
 	:global(.wiki-rendered h3.wiki-heading) {
 		font-size: 1.2rem;
-		margin: 0.8rem 0 0.4rem;
+		margin: 0.6rem 0 0.3rem;
 	}
 	:global(.wiki-rendered h4.wiki-heading) {
 		font-size: 1.05rem;
-		margin: 0.6rem 0 0.3rem;
+		margin: 0.5rem 0 0.25rem;
 	}
 	:global(.wiki-rendered h5.wiki-heading) {
 		font-size: 0.95rem;
-		margin: 0.5rem 0 0.2rem;
+		margin: 0.4rem 0 0.2rem;
 	}
 	:global(.wiki-rendered p) {
-		margin: 0.6rem 0;
+		margin: 0.35rem 0;
+		line-height: 1;
+	}
+	:global(.wiki-rendered .wiki-list) {
+		margin: 0.35rem 0;
+		padding-left: 1.4rem;
+	}
+	:global(.wiki-rendered .wiki-list li) {
+		margin: 0.1rem 0;
+		line-height: 1;
+	}
+	:global(.wiki-rendered .wiki-list .wiki-list) {
+		margin: 0.1rem 0;
 	}
 	:global(.wiki-rendered hr.wiki-hr) {
 		border: none;
 		border-top: 1px solid var(--border);
-		margin: 1.2rem 0;
+		margin: 0.8rem 0;
 	}
 	:global(.wiki-rendered pre.wiki-code-block) {
 		background: var(--bg2);
 		border: 1px solid var(--border);
 		border-radius: 6px;
-		padding: 0.75rem 1rem;
+		padding: 0.5rem 0.75rem;
+		margin: 0.5rem 0;
 		overflow-x: auto;
 		font-family: ui-monospace, SFMono-Regular, monospace;
 		font-size: 0.9rem;
+		line-height: 1.2;
 	}
 	:global(.wiki-rendered code.wiki-inline-code) {
 		background: var(--bg2);
@@ -889,21 +903,23 @@
 		font-size: 0.9em;
 	}
 	:global(.wiki-rendered blockquote) {
-		margin: 0.75rem 0;
-		padding: 0.4rem 1rem;
+		margin: 0.5rem 0;
+		padding: 0.35rem 0.75rem;
 		border-left: 4px solid var(--accent);
 		background: var(--bg2);
 		color: var(--text2);
+		line-height: 1;
 	}
 	:global(.wiki-rendered table.wiki-table) {
 		width: 100%;
 		border-collapse: collapse;
-		margin: 0.8rem 0;
+		margin: 0.5rem 0;
+		line-height: 1;
 	}
 	:global(.wiki-rendered table.wiki-table th),
 	:global(.wiki-rendered table.wiki-table td) {
 		border: 1px solid var(--border);
-		padding: 0.4rem 0.75rem;
+		padding: 0.3rem 0.6rem;
 		text-align: left;
 	}
 	:global(.wiki-rendered table.wiki-table th) {

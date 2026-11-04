@@ -79,9 +79,10 @@ test('renderDokuWiki renders unordered and ordered lists', () => {
 	`;
 	const html = renderDokuWiki(markup);
 	strictEqual(html.includes('<ul class="wiki-list">'), true);
-	strictEqual(html.includes('<li>First bullet'), true);
-	strictEqual(html.includes('<ol class="wiki-list">'), true);
-	strictEqual(html.includes('<li>First number'), true);
+	strictEqual(html.includes('<li>First bullet</li><li>Second bullet'), true);
+	strictEqual(html.split('<ul class="wiki-list">').length - 1, 2);
+	strictEqual(html.split('<ol class="wiki-list">').length - 1, 1);
+	strictEqual(html.includes('<li>First number</li><li>Second number</li>'), true);
 });
 
 test('renderDokuWiki renders tables with headers and data rows', () => {

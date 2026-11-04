@@ -304,8 +304,12 @@ function renderListHierarchy(
 		const currentLevel = item.level;
 		const currentType = item.type;
 
-		// If deeper than current stack top
-		while (stack.length > 0 && stack[stack.length - 1].level >= currentLevel) {
+		// Pop deeper levels or same level with different list type
+		while (
+			stack.length > 0 &&
+			(stack[stack.length - 1].level > currentLevel ||
+				(stack[stack.length - 1].level === currentLevel && stack[stack.length - 1].type !== currentType))
+		) {
 			const popped = stack.pop()!;
 			result += `</li></${popped.type}>`;
 		}
