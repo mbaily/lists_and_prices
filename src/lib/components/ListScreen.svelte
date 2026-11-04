@@ -2358,6 +2358,8 @@
 		vertical-align: middle;
 		display: inline-flex;
 		align-items: center;
+		position: relative;
+		top: -1.5px;
 	}
 	.item-wiki-badge:hover {
 		opacity: 1;

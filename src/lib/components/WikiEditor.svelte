@@ -945,6 +945,9 @@
 	:global(.wiki-ref-icon) {
 		font-size: 0.9em;
 		margin-right: 0.2rem;
+		display: inline-block;
+		position: relative;
+		top: -1px;
 	}
 </style>
 
