@@ -837,7 +837,7 @@
 
 	/* Rendered wiki preview styling */
 	:global(.wiki-rendered) {
-		line-height: 1.2;
+		line-height: 1;
 		color: var(--text);
 	}
 	:global(.wiki-rendered h1.wiki-heading) {

@@ -1560,7 +1560,7 @@
 	.wiki-rendered-body,
 	.wiki-article-card {
 		min-height: 200px;
-		line-height: 1.2;
+		line-height: 1;
 	}
 
 	/* Backlinks */
