@@ -837,7 +837,7 @@
 
 	/* Rendered wiki preview styling */
 	:global(.wiki-rendered) {
-		line-height: 1;
+		line-height: 1.4;
 		color: var(--text);
 	}
 	:global(.wiki-rendered h1.wiki-heading) {
@@ -866,7 +866,7 @@
 	}
 	:global(.wiki-rendered p) {
 		margin: 0.35rem 0;
-		line-height: 1;
+		line-height: 1.4;
 	}
 	:global(.wiki-rendered .wiki-list) {
 		margin: 0.35rem 0;
@@ -874,7 +874,7 @@
 	}
 	:global(.wiki-rendered .wiki-list li) {
 		margin: 0.1rem 0;
-		line-height: 1;
+		line-height: 1.4;
 	}
 	:global(.wiki-rendered .wiki-list .wiki-list) {
 		margin: 0.1rem 0;
@@ -908,13 +908,13 @@
 		border-left: 4px solid var(--accent);
 		background: var(--bg2);
 		color: var(--text2);
-		line-height: 1;
+		line-height: 1.4;
 	}
 	:global(.wiki-rendered table.wiki-table) {
 		width: 100%;
 		border-collapse: collapse;
 		margin: 0.5rem 0;
-		line-height: 1;
+		line-height: 1.4;
 	}
 	:global(.wiki-rendered table.wiki-table th),
 	:global(.wiki-rendered table.wiki-table td) {
