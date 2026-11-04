@@ -294,6 +294,32 @@ def get_git_head_commit() -> tuple[str | None, str | None]:
     return None, None
 
 
+def get_unstaged_tracked_files() -> list[tuple[str, str]]:
+    """
+    Return list of (status, file_path) for tracked files modified or deleted
+    in the working tree but not staged for commit.
+    """
+    try:
+        res = subprocess.run(
+            ["git", "diff", "--name-status"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            items = []
+            for line in res.stdout.strip().splitlines():
+                parts = line.split("\t", 1)
+                if len(parts) == 2:
+                    items.append((parts[0].strip(), parts[1].strip()))
+                elif parts:
+                    items.append(("M", parts[0].strip()))
+            return items
+    except Exception:
+        pass
+    return []
+
+
 def is_message_already_committed(row: sqlite3.Row) -> tuple[bool, str | None]:
     """
     Check if the message in `row` has already been committed in this git repo.
@@ -447,6 +473,21 @@ def execute_commit(
     if add:
         print("Staging all changes: git add -A")
         subprocess.run(["git", "add", "-A"], check=True)
+    elif not force:
+        unstaged_tracked = get_unstaged_tracked_files()
+        if unstaged_tracked:
+            print(
+                f"Warning: {len(unstaged_tracked)} tracked file(s) have been modified but not added to this commit:",
+                file=sys.stderr,
+            )
+            for status, fpath in unstaged_tracked:
+                print(f"  [{status}] {fpath}", file=sys.stderr)
+            print(
+                "\nTo include them, stage them with 'git add <files>' or pass --add / -a to stage all changes.\n"
+                "To proceed anyway and commit ONLY currently staged changes, pass --force / -f.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     # Check if there are staged changes
     staged_check = subprocess.run(["git", "diff", "--cached", "--quiet"], check=False)

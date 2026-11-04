@@ -47,6 +47,10 @@ server/server.db-*
 server/yjs-data/
 server/task-tokens.json
 
+# Local commit messages database
+commit_messages.db
+commit_messages.db-*
+
 # Editor
 .idea/
 *.suo
