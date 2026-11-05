@@ -3046,6 +3046,7 @@
 	}
 	.ref-pill {
 		display: inline-block;
+		text-decoration: none;
 		background: color-mix(in srgb, var(--list-color, var(--accent)) 10%, transparent);
 		color: var(--list-color, var(--accent));
 		border: 1px solid color-mix(in srgb, var(--list-color, var(--accent)) 40%, transparent);
@@ -3076,7 +3077,7 @@
 	.include-bullet {
 		opacity: 0.8;
 	}
-	.include-inline a { color: inherit; }
+	.include-inline a { color: inherit; text-decoration: none; }
 	.include-inline a.include-completed { text-decoration: line-through; }
 	.calendar-important-badge {
 		display: inline-block;
