@@ -2371,7 +2371,7 @@
 	.ref-pill.wiki-pill::before { content: none; }
 	.wiki-nav-btn {
 		font-size: 1.3rem;
-		padding: 0.2rem 0.35rem;
+		padding: 0.15rem 0.2rem;
 		background: none;
 		border: none;
 		cursor: pointer;
@@ -2434,7 +2434,7 @@
 	header {
 		display: flex;
 		align-items: center;
-		gap: 0.75rem;
+		gap: 0.5rem;
 		padding: 0.25rem 1rem;
 		background: var(--bg2);
 		border-bottom: 1px solid var(--border);
@@ -2596,7 +2596,7 @@
 		border: none;
 		font-size: 1.3rem;
 		cursor: pointer;
-		padding: 0.2rem 0.35rem;
+		padding: 0.15rem 0.2rem;
 	}
 
 	.mobile-home-btn {
@@ -2604,7 +2604,7 @@
 		align-items: center;
 		justify-content: center;
 		flex-shrink: 0;
-		padding: 0.2rem 0.35rem;
+		padding: 0.15rem 0.2rem;
 		border: 1px solid transparent;
 		border-radius: 6px;
 		background: transparent;
@@ -2630,7 +2630,7 @@
 		border: none;
 		font-size: 1.3rem;
 		cursor: pointer;
-		padding: 0.2rem 0.35rem;
+		padding: 0.15rem 0.2rem;
 		flex-shrink: 0;
 		color: var(--text2);
 	}
@@ -2643,7 +2643,7 @@
 		border: none;
 		font-size: 1.3rem;
 		cursor: pointer;
-		padding: 0.2rem 0.35rem;
+		padding: 0.15rem 0.2rem;
 		flex-shrink: 0;
 		color: var(--list-color, var(--text));
 	}
@@ -2656,7 +2656,7 @@
 		align-items: center;
 		justify-content: center;
 		flex-shrink: 0;
-		padding: 0.2rem 0.35rem;
+		padding: 0.15rem 0.2rem;
 		border: 1px solid transparent;
 		border-radius: 6px;
 		background: transparent;
@@ -2673,7 +2673,7 @@
 		flex-shrink: 0;
 		display: flex;
 		align-items: center;
-		gap: 0.75rem;
+		gap: 0.5rem;
 	}
 	.nav-strip {
 		display: flex;
