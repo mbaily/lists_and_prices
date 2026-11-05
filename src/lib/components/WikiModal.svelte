@@ -2,7 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { getDoc, getMutableDoc, getItems, getLists, docState, commitState } from '$lib/yjsStore.svelte';
 	import { readWikiPage, readWikiPages, saveWikiPage, deleteWikiPage, findWikiBacklinks, type WikiPage, type WikiRevision } from '$lib/wiki/data';
-	import { renderDokuWiki, slugifyWikiPage } from '$lib/wiki/dokuwiki';
+	import { renderDokuWiki, slugifyWikiPage, toggleWikiTask } from '$lib/wiki/dokuwiki';
 	import {
 		getNamespace,
 		getPageBaseName,
@@ -295,6 +295,7 @@
 		if (!currentPage) return '';
 		return renderDokuWiki(currentPage.content, {
 			currentSlug: currentPage.id,
+			disableCheckboxes: commitState.isHistorical,
 			resolveWikiTitle: (slug) => {
 				const page = allPages.find((p) => p.id === slug);
 				if (page?.title) return page.title;
@@ -366,6 +367,27 @@
 	}
 
 	function handleContentClick(e: MouseEvent) {
+		const checkbox = (e.target as HTMLElement).closest<HTMLInputElement>('input.wiki-checkbox');
+		if (checkbox) {
+			if (commitState.isHistorical || !currentPage) return;
+			e.preventDefault();
+			const lineAttr = checkbox.getAttribute('data-line');
+			if (!lineAttr) return;
+			const lineIdx = parseInt(lineAttr, 10);
+			if (isNaN(lineIdx)) return;
+
+			const newContent = toggleWikiTask(currentPage.content, lineIdx, e.shiftKey);
+			if (newContent !== null) {
+				saveWikiPage(getMutableDoc(), currentPage.id, {
+					title: currentPage.title,
+					content: newContent,
+					summary: 'Toggle task',
+					isMinor: true
+				});
+			}
+			return;
+		}
+
 		const target = (e.target as HTMLElement).closest('a');
 		if (!target) return;
 
@@ -740,7 +762,7 @@
 						<div class="wiki-content-scroll">
 							<div class="wiki-article-card wiki-rendered">
 								<h1 class="page-main-heading">{selectedRevision.title}</h1>
-								{@html renderDokuWiki(selectedRevision.content)}
+								{@html renderDokuWiki(selectedRevision.content, { disableCheckboxes: true })}
 							</div>
 						</div>
 					{:else}
@@ -1561,6 +1583,47 @@
 	.wiki-article-card {
 		min-height: 200px;
 		line-height: 1.4;
+	}
+
+	:global(.wiki-rendered ul.wiki-task-list) {
+		list-style: none;
+		padding-left: 0.3rem;
+	}
+	:global(.wiki-rendered ul.wiki-task-list ul.wiki-task-list),
+	:global(.wiki-rendered ul.wiki-list ul.wiki-task-list),
+	:global(.wiki-rendered ul.wiki-task-list ul.wiki-list) {
+		padding-left: 1.3rem;
+	}
+	:global(.wiki-rendered li.wiki-task-item) {
+		list-style: none;
+		display: flex;
+		align-items: baseline;
+		gap: 0.45rem;
+		margin: 0.15rem 0;
+	}
+	:global(.wiki-rendered input.wiki-checkbox) {
+		cursor: pointer;
+		margin: 0;
+		position: relative;
+		top: 0.12em;
+		accent-color: var(--accent, #6366f1);
+		flex-shrink: 0;
+	}
+	:global(.wiki-rendered input.wiki-checkbox:disabled) {
+		cursor: not-allowed;
+		opacity: 0.6;
+	}
+	:global(.wiki-rendered .wiki-task-item.wiki-task-checked .wiki-task-text) {
+		text-decoration: line-through;
+		color: var(--text2);
+		opacity: 0.85;
+	}
+	:global(.wiki-rendered .wiki-task-item.wiki-task-cancelled) {
+		opacity: 0.55;
+	}
+	:global(.wiki-rendered .wiki-task-item.wiki-task-cancelled .wiki-task-text) {
+		text-decoration: line-through;
+		color: var(--text2);
 	}
 
 	/* Backlinks */

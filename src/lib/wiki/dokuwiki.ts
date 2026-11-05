@@ -28,6 +28,7 @@ export interface RenderOptions {
 	resolveWikiTitle?: (slug: string) => string | undefined;
 	resolveRefName?: (type: string, id: string) => string | undefined;
 	pageExists?: (slug: string) => boolean;
+	disableCheckboxes?: boolean;
 }
 
 export function slugifyWikiPage(name: string): string {
@@ -89,30 +90,68 @@ function escapeAttribute(str: string): string {
 	return escapeHtml(str);
 }
 
+export interface WikiListItem {
+	type: 'ul' | 'ol' | 'task';
+	level: number;
+	items: string[];
+	taskState?: 'open' | 'checked' | 'cancelled';
+	lineIndex?: number;
+}
+
+/**
+ * Toggle task state at a specific line in DokuWiki markup.
+ * - Normal click: [ ] -> [x], [x]/[X] -> [ ], [c]/[C] -> [ ]
+ * - Shift click: [ ]/[x]/[X] -> [c], [c]/[C] -> [ ]
+ * Returns the modified markup, or null if lineIndex was invalid or not a task line.
+ */
+export function toggleWikiTask(content: string, lineIndex: number, shiftKey = false): string | null {
+	const lines = content.replace(/\r\n/g, '\n').split('\n');
+	if (lineIndex < 0 || lineIndex >= lines.length) return null;
+
+	const line = lines[lineIndex];
+	const match = line.match(/^(\s{2,}(?:\*\s+)?)\[([ xXcC])\](.*)$/);
+	if (!match) return null;
+
+	const prefix = match[1];
+	const currentState = match[2];
+	const rest = match[3];
+
+	let newState: string;
+	if (shiftKey) {
+		newState = currentState.toLowerCase() === 'c' ? ' ' : 'c';
+	} else {
+		newState = currentState === ' ' ? 'x' : ' ';
+	}
+
+	lines[lineIndex] = `${prefix}[${newState}]${rest}`;
+	return lines.join('\n');
+}
+
 /**
  * Render DokuWiki markup into sanitized HTML.
  */
 export function renderDokuWiki(markup: string, options: RenderOptions = {}): string {
 	if (!markup) return '';
 
+	// Normalize CRLF to LF
+	const normalizedMarkup = markup.replace(/\r\n/g, '\n');
+
 	// 1. Extract and preserve code blocks
 	const codeBlocks: string[] = [];
-	let text = markup.replace(/<(code|file)(?:\s+([a-zA-Z0-9_\-]+))?>([\s\S]*?)<\/\1>/gi, (_, tag, lang, codeContent) => {
+	let text = normalizedMarkup.replace(/<(code|file)(?:\s+([a-zA-Z0-9_\-]+))?>([\s\S]*?)<\/\1>/gi, (match, tag, lang, codeContent) => {
 		const idx = codeBlocks.length;
 		const langAttr = lang ? ` class="language-${escapeAttribute(lang)}"` : '';
 		codeBlocks.push(`<pre class="wiki-code-block"><code${langAttr}>${escapeHtml(codeContent.replace(/^\r?\n|\r?\n$/g, ''))}</code></pre>`);
-		return `\x00CODE_${idx}\x00`;
+		const matchLines = match.split('\n').length - 1;
+		return `\x00CODE_${idx}\x00` + '\n\x00CODE_PAD\x00'.repeat(matchLines);
 	});
-
-	// Normalize CRLF to LF
-	text = text.replace(/\r\n/g, '\n');
 
 	// Split into lines
 	const lines = text.split('\n');
 	const outputBlocks: string[] = [];
 
 	let currentParagraph: string[] = [];
-	let currentList: { type: 'ul' | 'ol'; level: number; items: string[] }[] = [];
+	let currentList: WikiListItem[] = [];
 	let currentTable: { isHeader: boolean; cells: string[] }[] = [];
 	let currentQuote: string[] = [];
 
@@ -198,6 +237,9 @@ export function renderDokuWiki(markup: string, options: RenderOptions = {}): str
 			outputBlocks.push(line.trim());
 			continue;
 		}
+		if (line.trim() === '\x00CODE_PAD\x00') {
+			continue;
+		}
 
 		// Horizontal rule: 4 or more hyphens
 		if (/^----+\s*$/.test(line)) {
@@ -234,6 +276,24 @@ export function renderDokuWiki(markup: string, options: RenderOptions = {}): str
 			continue;
 		} else if (currentTable.length > 0) {
 			flushTable();
+		}
+
+		// Task lists: at least two spaces followed by [ ], [x], [X], [c], [C] (or with optional * bullet)
+		const taskMatch = line.match(/^(\s{2,})(?:\*\s+)?\[([ xXcC])\](?:\s+(.*))?$/);
+		if (taskMatch) {
+			flushParagraph();
+			flushTable();
+			flushQuote();
+
+			const indentSpaces = taskMatch[1].length;
+			const level = Math.floor(indentSpaces / 2);
+			const stateChar = taskMatch[2].toLowerCase();
+			const taskState: 'open' | 'checked' | 'cancelled' =
+				stateChar === 'x' ? 'checked' : stateChar === 'c' ? 'cancelled' : 'open';
+			const itemText = taskMatch[3] ?? '';
+
+			currentList.push({ type: 'task', level, items: [itemText], taskState, lineIndex: i });
+			continue;
 		}
 
 		// Lists: at least two spaces followed by * (ul) or - (ol)
@@ -292,13 +352,13 @@ export function renderDokuWiki(markup: string, options: RenderOptions = {}): str
  * Helper to build nested list HTML from list items with indentation levels.
  */
 function renderListHierarchy(
-	items: { type: 'ul' | 'ol'; level: number; items: string[] }[],
+	items: WikiListItem[],
 	options: RenderOptions
 ): string {
 	if (items.length === 0) return '';
 
 	let result = '';
-	const stack: { type: 'ul' | 'ol'; level: number }[] = [];
+	const stack: { type: 'ul' | 'ol' | 'task'; tag: 'ul' | 'ol'; level: number }[] = [];
 
 	for (const item of items) {
 		const currentLevel = item.level;
@@ -311,22 +371,33 @@ function renderListHierarchy(
 				(stack[stack.length - 1].level === currentLevel && stack[stack.length - 1].type !== currentType))
 		) {
 			const popped = stack.pop()!;
-			result += `</li></${popped.type}>`;
+			result += `</li></${popped.tag}>`;
 		}
 
 		if (stack.length === 0 || stack[stack.length - 1].level < currentLevel) {
-			result += `<${currentType} class="wiki-list">`;
-			stack.push({ type: currentType, level: currentLevel });
+			const tag = currentType === 'ol' ? 'ol' : 'ul';
+			const cls = currentType === 'task' ? 'wiki-list wiki-task-list' : 'wiki-list';
+			result += `<${tag} class="${cls}">`;
+			stack.push({ type: currentType, tag, level: currentLevel });
 		} else {
 			result += '</li>';
 		}
 
-		result += `<li>${renderInline(item.items[0], options)}`;
+		if (item.type === 'task') {
+			const checked = item.taskState === 'checked' ? ' checked' : '';
+			const disabled = options.disableCheckboxes ? ' disabled' : '';
+			const stateClass = item.taskState ? ` wiki-task-${item.taskState}` : '';
+			result += `<li class="wiki-task-item${stateClass}" data-line="${item.lineIndex ?? ''}">`;
+			result += `<input type="checkbox" class="wiki-checkbox" data-line="${item.lineIndex ?? ''}" data-state="${item.taskState || 'open'}"${checked}${disabled} aria-label="Task item" />`;
+			result += `<span class="wiki-task-text">${renderInline(item.items[0], options)}</span>`;
+		} else {
+			result += `<li>${renderInline(item.items[0], options)}`;
+		}
 	}
 
 	while (stack.length > 0) {
 		const popped = stack.pop()!;
-		result += `</li></${popped.type}>`;
+		result += `</li></${popped.tag}>`;
 	}
 
 	return result;

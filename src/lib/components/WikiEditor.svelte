@@ -1,6 +1,6 @@
 <script lang="ts">
 	import ConfirmDialog from './ConfirmDialog.svelte';
-	import { renderDokuWiki, slugifyWikiPage } from '$lib/wiki/dokuwiki';
+	import { renderDokuWiki, slugifyWikiPage, toggleWikiTask } from '$lib/wiki/dokuwiki';
 	import { readWikiPages } from '$lib/wiki/data';
 	import { handleWikiEditorKeydown } from '$lib/wiki/editorKeyHandler';
 	import { getDoc, getItems, getLists, getFolders } from '$lib/yjsStore.svelte';
@@ -131,6 +131,23 @@
 			summary: editSummary.trim(),
 			isMinor
 		});
+	}
+
+	function handlePreviewClick(e: MouseEvent) {
+		if (readOnly) return;
+		const checkbox = (e.target as HTMLElement).closest<HTMLInputElement>('input.wiki-checkbox');
+		if (!checkbox) return;
+		e.preventDefault();
+
+		const lineAttr = checkbox.getAttribute('data-line');
+		if (!lineAttr) return;
+		const lineIdx = parseInt(lineAttr, 10);
+		if (isNaN(lineIdx)) return;
+
+		const newContent = toggleWikiTask(content, lineIdx, e.shiftKey);
+		if (newContent !== null) {
+			content = newContent;
+		}
 	}
 
 	function applyReplaceAction(
@@ -347,6 +364,7 @@
 				<div class="btn-group">
 					<button type="button" class="tb-btn" onclick={() => insertPrefix('  * ')} title="Unordered list (  * item)">• List</button>
 					<button type="button" class="tb-btn" onclick={() => insertPrefix('  - ')} title="Ordered list (  - item)">1. List</button>
+					<button type="button" class="tb-btn" onclick={() => insertPrefix('  [ ] ')} title="Task checkbox list (  [ ] item)">☑ Task</button>
 					<button type="button" class="tb-btn" onclick={() => insertSnippet('\n^ Header 1 ^ Header 2 ^\n| Row 1 Col 1 | Row 1 Col 2 |\n')} title="Table template">⊞ Table</button>
 					<button type="button" class="tb-btn" onclick={() => insertSnippet('\n----\n')} title="Horizontal rule (----)">— Line</button>
 					<button type="button" class="tb-btn" onclick={() => wrapSelection('<code>\n', '\n</code>', 'code block')} title="Code block (&lt;code&gt;...&lt;/code&gt;)">[code]</button>
@@ -363,10 +381,10 @@
 		<!-- Editor / Preview Area -->
 		<div class="editor-body">
 			{#if isPreview}
-				<div class="preview-scroll">
+				<div class="preview-scroll" onclick={handlePreviewClick}>
 					<div class="preview-card wiki-rendered">
 						<h1 class="wiki-heading">{title || pageId}</h1>
-						{@html renderDokuWiki(content, { currentSlug: pageId })}
+						{@html renderDokuWiki(content, { currentSlug: pageId, disableCheckboxes: readOnly })}
 					</div>
 				</div>
 			{:else}
@@ -878,6 +896,46 @@
 	}
 	:global(.wiki-rendered .wiki-list .wiki-list) {
 		margin: 0.1rem 0;
+	}
+	:global(.wiki-rendered ul.wiki-task-list) {
+		list-style: none;
+		padding-left: 0.3rem;
+	}
+	:global(.wiki-rendered ul.wiki-task-list ul.wiki-task-list),
+	:global(.wiki-rendered ul.wiki-list ul.wiki-task-list),
+	:global(.wiki-rendered ul.wiki-task-list ul.wiki-list) {
+		padding-left: 1.3rem;
+	}
+	:global(.wiki-rendered li.wiki-task-item) {
+		list-style: none;
+		display: flex;
+		align-items: baseline;
+		gap: 0.45rem;
+		margin: 0.15rem 0;
+	}
+	:global(.wiki-rendered input.wiki-checkbox) {
+		cursor: pointer;
+		margin: 0;
+		position: relative;
+		top: 0.12em;
+		accent-color: var(--accent, #6366f1);
+		flex-shrink: 0;
+	}
+	:global(.wiki-rendered input.wiki-checkbox:disabled) {
+		cursor: not-allowed;
+		opacity: 0.6;
+	}
+	:global(.wiki-rendered .wiki-task-item.wiki-task-checked .wiki-task-text) {
+		text-decoration: line-through;
+		color: var(--text2);
+		opacity: 0.85;
+	}
+	:global(.wiki-rendered .wiki-task-item.wiki-task-cancelled) {
+		opacity: 0.55;
+	}
+	:global(.wiki-rendered .wiki-task-item.wiki-task-cancelled .wiki-task-text) {
+		text-decoration: line-through;
+		color: var(--text2);
 	}
 	:global(.wiki-rendered hr.wiki-hr) {
 		border: none;

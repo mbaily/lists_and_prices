@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { strictEqual, deepStrictEqual } from 'node:assert';
-import { renderDokuWiki, extractWikiLinks, slugifyWikiPage } from '../src/lib/wiki/dokuwiki';
+import { renderDokuWiki, extractWikiLinks, slugifyWikiPage, toggleWikiTask } from '../src/lib/wiki/dokuwiki';
 
 test('slugifyWikiPage normalizes names to lower-case slugs', () => {
 	strictEqual(slugifyWikiPage('Main Page'), 'main_page');
@@ -124,4 +124,87 @@ test('renderDokuWiki and extractWikiLinks resolve relative namespace links', () 
 	strictEqual(html.includes('data-wiki-page="work:projects:overview"'), true);
 	strictEqual(html.includes('data-wiki-page="start"'), true);
 });
+
+test('renderDokuWiki renders task lists with open, checked and cancelled checkboxes', () => {
+	const markup = `
+  [ ] Buy groceries
+  [x] Cook dinner
+  [X] Wash dishes
+  [c] Cancelled errand
+  [C] Another cancelled
+    [ ] Nested task
+	`;
+	const html = renderDokuWiki(markup);
+	strictEqual(html.includes('<ul class="wiki-list wiki-task-list">'), true);
+	strictEqual(html.includes('class="wiki-task-item wiki-task-open" data-line="1"'), true);
+	strictEqual(html.includes('class="wiki-checkbox" data-line="1" data-state="open" aria-label="Task item" />'), true);
+	strictEqual(html.includes('<span class="wiki-task-text">Buy groceries</span>'), true);
+
+	// Checked [x] and [X]
+	strictEqual(html.includes('class="wiki-task-item wiki-task-checked" data-line="2"'), true);
+	strictEqual(html.includes('class="wiki-checkbox" data-line="2" data-state="checked" checked'), true);
+	strictEqual(html.includes('class="wiki-task-item wiki-task-checked" data-line="3"'), true);
+	strictEqual(html.includes('class="wiki-checkbox" data-line="3" data-state="checked" checked'), true);
+
+	// Cancelled [c] and [C]
+	strictEqual(html.includes('class="wiki-task-item wiki-task-cancelled" data-line="4"'), true);
+	strictEqual(html.includes('class="wiki-checkbox" data-line="4" data-state="cancelled"'), true);
+	strictEqual(html.includes('class="wiki-task-item wiki-task-cancelled" data-line="5"'), true);
+	strictEqual(html.includes('class="wiki-checkbox" data-line="5" data-state="cancelled"'), true);
+
+	// Nested task
+	strictEqual(html.includes('class="wiki-task-item wiki-task-open" data-line="6"'), true);
+	strictEqual(html.includes('<span class="wiki-task-text">Nested task</span>'), true);
+});
+
+test('renderDokuWiki respects disableCheckboxes option', () => {
+	const markup = `  [ ] Task 1\n  [x] Task 2`;
+	const html = renderDokuWiki(markup, { disableCheckboxes: true });
+	strictEqual(html.includes('disabled'), true);
+});
+
+test('toggleWikiTask toggles task states accurately', () => {
+	const text = [
+		'====== Tasks ======',
+		'  [ ] Task 1',
+		'  [x] Task 2',
+		'  [X] Task 3',
+		'  [c] Task 4',
+		'  [C] Task 5',
+		'  * [ ] Task 6 with bullet',
+		'    [ ] Nested task'
+	].join('\n');
+
+	// [ ] -> [x]
+	strictEqual(toggleWikiTask(text, 1, false), text.replace('  [ ] Task 1', '  [x] Task 1'));
+	// [x] -> [ ]
+	strictEqual(toggleWikiTask(text, 2, false), text.replace('  [x] Task 2', '  [ ] Task 2'));
+	// [X] -> [ ]
+	strictEqual(toggleWikiTask(text, 3, false), text.replace('  [X] Task 3', '  [ ] Task 3'));
+	// [c] -> [ ]
+	strictEqual(toggleWikiTask(text, 4, false), text.replace('  [c] Task 4', '  [ ] Task 4'));
+	// [C] -> [ ]
+	strictEqual(toggleWikiTask(text, 5, false), text.replace('  [C] Task 5', '  [ ] Task 5'));
+	// * [ ] -> * [x]
+	strictEqual(toggleWikiTask(text, 6, false), text.replace('  * [ ] Task 6', '  * [x] Task 6'));
+	// Nested task
+	strictEqual(toggleWikiTask(text, 7, false), text.replace('    [ ] Nested task', '    [x] Nested task'));
+
+	// Shift-click tests:
+	// [ ] -> [c]
+	strictEqual(toggleWikiTask(text, 1, true), text.replace('  [ ] Task 1', '  [c] Task 1'));
+	// [x] -> [c]
+	strictEqual(toggleWikiTask(text, 2, true), text.replace('  [x] Task 2', '  [c] Task 2'));
+	// [c] -> [ ]
+	strictEqual(toggleWikiTask(text, 4, true), text.replace('  [c] Task 4', '  [ ] Task 4'));
+	// [C] -> [ ]
+	strictEqual(toggleWikiTask(text, 5, true), text.replace('  [C] Task 5', '  [ ] Task 5'));
+
+	// Non-task line returns null
+	strictEqual(toggleWikiTask(text, 0, false), null);
+	// Out of bounds index returns null
+	strictEqual(toggleWikiTask(text, 99, false), null);
+	strictEqual(toggleWikiTask(text, -1, false), null);
+});
+
 

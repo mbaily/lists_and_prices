@@ -211,3 +211,66 @@ test('Formatting hotkeys (Ctrl+B, Ctrl+I, Ctrl+U, Ctrl+K)', () => {
 	deepStrictEqual(handleWikiEditorKeydown('text', 2, 2, { key: 'k', ctrlKey: true }), { type: 'format', format: 'link' });
 });
 
+test('Enter auto-continues task checkbox and resets to open task', () => {
+	const text = '  [ ] Todo item';
+	const action = handleWikiEditorKeydown(text, text.length, text.length, { key: 'Enter' });
+	deepStrictEqual(action, {
+		type: 'replace',
+		start: text.length,
+		end: text.length,
+		replacement: '\n  [ ] ',
+		selectionStart: text.length + 7,
+		selectionEnd: text.length + 7
+	});
+
+	// When on a completed or cancelled task, pressing Enter continues with an open task [ ]
+	const doneText = '  [x] Done item';
+	const doneAction = handleWikiEditorKeydown(doneText, doneText.length, doneText.length, { key: 'Enter' });
+	deepStrictEqual(doneAction, {
+		type: 'replace',
+		start: doneText.length,
+		end: doneText.length,
+		replacement: '\n  [ ] ',
+		selectionStart: doneText.length + 7,
+		selectionEnd: doneText.length + 7
+	});
+});
+
+test('Enter on empty task checkbox cancels it', () => {
+	const text = '  [ ] Item 1\n  [ ] ';
+	const action = handleWikiEditorKeydown(text, text.length, text.length, { key: 'Enter' });
+	deepStrictEqual(action, {
+		type: 'replace',
+		start: 13,
+		end: 19,
+		replacement: '',
+		selectionStart: 13,
+		selectionEnd: 13
+	});
+});
+
+test('Backspace and Space on task checkbox', () => {
+	// Level 1 Backspace deletes task marker
+	const text = '  [ ] ';
+	const bsAction = handleWikiEditorKeydown(text, text.length, text.length, { key: 'Backspace' });
+	deepStrictEqual(bsAction, {
+		type: 'replace',
+		start: 0,
+		end: text.length,
+		replacement: '',
+		selectionStart: 0,
+		selectionEnd: 0
+	});
+
+	// Space after [ ] indents by 2 spaces
+	const spaceAction = handleWikiEditorKeydown(text, text.length, text.length, { key: ' ' });
+	deepStrictEqual(spaceAction, {
+		type: 'replace',
+		start: 0,
+		end: 0,
+		replacement: '  ',
+		selectionStart: text.length + 2,
+		selectionEnd: text.length + 2
+	});
+});
+

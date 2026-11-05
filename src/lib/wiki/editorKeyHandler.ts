@@ -164,12 +164,12 @@ export function handleWikiEditorKeydown(
 
 	// 3. Enter: Auto-continue list or code indentation, or cancel on empty item
 	if (event.key === 'Enter' && !isModifier && !event.altKey) {
-		// DokuWiki regex: var match = search.match(/(\n  +([\*-] ?)?)/);
-		const match = currentLineBefore.match(/^(\n  +([*-] )?)/);
+		// DokuWiki regex with task checkbox support: * or - or [ ]/[x]/[c]
+		const match = currentLineBefore.match(/^(\n  +(([*-]|\[[ xXcC]\]) )?)/);
 		if (match) {
-			const prefix = match[1]; // e.g. "\n  * " or "\n  - " or "\n  "
-			// Check if the current line is an empty list item: var match2 = search.match(/^\n  +[\*-]\s*$/);
-			const match2 = currentLineBefore.match(/^\n  +[*-]\s*$/);
+			const prefix = match[1]; // e.g. "\n  * " or "\n  - " or "\n  [ ] " or "\n  "
+			// Check if the current line is an empty list item: * or - or [ ]
+			const match2 = currentLineBefore.match(/^\n  +([*-]|\[[ xXcC]\])\s*$/);
 			const textAfterCursor = value.slice(selectionStart);
 			const isAtLineEnd = textAfterCursor.match(/^($|\r?\n)/);
 
@@ -185,8 +185,9 @@ export function handleWikiEditorKeydown(
 					selectionEnd: valueLineStart
 				};
 			} else {
-				// Insert newline with the same indentation and bullet
-				const bullet = prefix.slice(1); // strip leading '\n'
+				// Insert newline with the same indentation and bullet (reset task to open [ ])
+				let bullet = prefix.slice(1); // strip leading '\n'
+				bullet = bullet.replace(/\[[xXcC]\]/, '[ ]');
 				return {
 					type: 'replace',
 					start: selectionStart,
@@ -201,8 +202,7 @@ export function handleWikiEditorKeydown(
 
 	// 4. Backspace: Unindent nested lists or remove list marker
 	if (event.key === 'Backspace' && !isModifier && !event.altKey && !event.shiftKey) {
-		// DokuWiki regex: var match = search.match(/(\n  +)([*-] ?)$/);
-		const match = currentLineBefore.match(/^(\n  +)([*-] ?)$/);
+		const match = currentLineBefore.match(/^(\n  +)(([*-]|\[[ xXcC]\]) ?)$/);
 		if (match) {
 			const spaces = match[1].length - 1; // number of leading spaces
 			if (spaces > 3) {
@@ -246,8 +246,7 @@ export function handleWikiEditorKeydown(
 
 	// 5. Space: Indent list item when pressed right after bullet marker
 	if (event.key === ' ' && !isModifier && !event.altKey && !event.shiftKey) {
-		// DokuWiki regex: var match = search.match(/(\n  +)([*-] )$/);
-		const match = currentLineBefore.match(/^(\n  +)([*-] )$/);
+		const match = currentLineBefore.match(/^(\n  +)(([*-]|\[[ xXcC]\]) )$/);
 		if (match) {
 			// Indent list item by 2 spaces at start of line
 			return {
