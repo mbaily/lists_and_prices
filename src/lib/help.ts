@@ -77,7 +77,7 @@ export const helpTopics: HelpTopic[] = [
 				paragraphs: [
 					'Add [[bills:upcoming]] to a todo or note to display upcoming bills beneath it. You can add several includes to the same item. The available sections are overdue, due_today, upcoming, covered_early, future_estimates, unscheduled, recent_payments, monthly_estimates and inactive_bills; use the same [[bills:section_name]] format for each.',
 					'To show just the bills icon instead of the full pill label, add :icon, for example [[bills:upcoming:icon]].',
-					'To display bills as wrapping text after the refresh button instead of a list below, add :wrap, for example [[bills:upcoming:icon:wrap]]. Entries are separated by •. You can also use :wrap without :icon.',
+					'To display bills directly after the refresh button instead of a list below, add :wrap, for example [[bills:upcoming:icon:wrap]]. Entries are displayed one per line, each starting with •. You can also use :wrap without :icon.',
 					'The sections load from Simple Todo when the list is opened and can be refreshed. If authentication is enabled, sign in to Simple Todo in the same browser. Bills are displayed from the service and are not copied into your saved list.'
 				]
 			},
@@ -86,7 +86,7 @@ export const helpTopics: HelpTopic[] = [
 				paragraphs: [
 					'Add [[calendar:today]], [[calendar:today_tomorrow]], [[calendar:next_7_days]] or [[calendar:yesterday_today_tomorrow]] to a todo or note to display events beneath it. The next 7 days include today. You can combine calendar and bills includes in the same item.',
 					'To show just the calendar icon instead of the full pill label, add :icon, for example [[calendar:today:icon]].',
-					'To display events as wrapping text after the refresh button instead of a list below, add :wrap, for example [[calendar:today:icon:wrap]]. Entries are separated by •. You can also use :wrap without :icon.',
+					'To display events directly after the refresh button instead of a list below, add :wrap, for example [[calendar:today:icon:wrap]]. Entries are displayed one per line, each starting with •. You can also use :wrap without :icon.',
 					'Events include recurring and completed occurrences. Dates are based on your device’s local calendar day, and event times are shown as Simple Todo’s wall-clock times. Open an event link to visit the Simple Todo calendar. Refresh the include to load changes; if authentication is enabled, sign in to Simple Todo in the same browser. Events are not copied into your saved list.'
 				]
 			},

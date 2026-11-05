@@ -101,12 +101,12 @@ test('full-screen items do not clamp wrapped include entries', () => {
 	}
 });
 
-test('calendar layouts share date-title formatting and keep the wrapped entry divider', () => {
+test('calendar layouts share date-title formatting and start wrapped entries with bullets', () => {
 	const list = readFileSync(new URL('../src/lib/components/ListScreen.svelte', import.meta.url), 'utf8');
 	const calendar = readFileSync(new URL('../src/lib/components/CalendarInclude.svelte', import.meta.url), 'utf8');
 	assert.match(list, /calendarLine\(entry\.label, entry\.title\)/);
 	assert.match(calendar, /calendarLine\(calendarOccurrenceLabel\(row, now\), row\.event\.title\)/);
-	assert.match(list, /\{' • '\}/);
+	assert.match(list, /include-bullet[^{}]*•/);
 });
 
 test('icon notation parses alongside regular includes and leaves unknown options as text', () => {

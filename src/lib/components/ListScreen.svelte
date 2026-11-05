@@ -1956,11 +1956,11 @@
 		{/snippet}
 		{#snippet wrappedBills(itemId: string, section: BillSection)}
 			{@const view = billIncludes[itemId]?.sectionView(section)}
-			<span class="include-inline">{#if !view || view.status === 'loading'}Loading bills…{:else if view.status === 'error'}{view.message}{:else if view.status === 'unavailable'}Section unavailable.{:else if view.entries.length === 0}No entries.{:else}{#each view.entries as entry, index}{#if index > 0}{' • '}{/if}{entry}{/each}{/if}</span>
+			<span class="include-inline">{#if !view || view.status === 'loading'}<span class="include-line">Loading bills…</span>{:else if view.status === 'error'}<span class="include-line">{view.message}</span>{:else if view.status === 'unavailable'}<span class="include-line">Section unavailable.</span>{:else if view.entries.length === 0}<span class="include-line">No entries.</span>{:else}{#each view.entries as entry}<span class="include-line"><span class="include-bullet">• </span>{entry}</span>{/each}{/if}</span>
 		{/snippet}
 		{#snippet wrappedCalendar(itemId: string, section: CalendarSection)}
 			{@const view = calendarIncludes[itemId]?.sectionView(section)}
-			<span class="include-inline">{#if !view || view.status === 'loading'}Loading calendar events…{:else if view.status === 'error'}{view.message}{:else if view.status === 'unavailable'}Section unavailable.{:else if view.entries.length === 0}No events.{:else}{#each view.entries as entry, index}{#if index > 0}{' • '}{/if}<a class:include-completed={entry.completed} class:include-important={entry.isImportant} href={simpleTodoPageUrl('calendar', base)} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{calendarLine(entry.label, entry.title)}</a>{#if entry.isImportant}{' '}<span class="calendar-important-badge" title="Important (late and unchecked)">⚠️ Important</span>{/if}{/each}{/if}</span>
+			<span class="include-inline">{#if !view || view.status === 'loading'}<span class="include-line">Loading calendar events…</span>{:else if view.status === 'error'}<span class="include-line">{view.message}</span>{:else if view.status === 'unavailable'}<span class="include-line">Section unavailable.</span>{:else if view.entries.length === 0}<span class="include-line">No events.</span>{:else}{#each view.entries as entry}<span class="include-line"><span class="include-bullet">• </span><a class:include-completed={entry.completed} class:include-important={entry.isImportant} href={simpleTodoPageUrl('calendar', base)} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{calendarLine(entry.label, entry.title)}</a>{#if entry.isImportant}{' '}<span class="calendar-important-badge" title="Important (late and unchecked)">⚠️ Important</span>{/if}</span>{/each}{/if}</span>
 		{/snippet}
 		{#each filteredTreeItems as {item, level, tlIdx, rootTlIdx, sibIdx}}
 			{@const canAddChildren = !item.heading && level < 2}
@@ -3063,7 +3063,19 @@
 	.ref-pill::before { content: '→\00a0'; opacity: 0.7; }
 	.ref-pill.iconified::before { content: none; }
 	.include-pill { display: inline-flex; align-items: center; vertical-align: middle; }
-	.include-inline { color: var(--text2); font-size: .9rem; }
+	.include-inline {
+		display: block;
+		margin-top: 0.15rem;
+		color: var(--text2);
+		font-size: .9rem;
+	}
+	.include-line {
+		display: block;
+		line-height: 1.4;
+	}
+	.include-bullet {
+		opacity: 0.8;
+	}
 	.include-inline a { color: inherit; }
 	.include-inline a.include-completed { text-decoration: line-through; }
 	.calendar-important-badge {
