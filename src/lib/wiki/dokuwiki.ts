@@ -159,7 +159,7 @@ export function renderDokuWiki(markup: string, options: RenderOptions = {}): str
 		if (currentParagraph.length > 0) {
 			const content = currentParagraph.join(' ');
 			if (content.trim()) {
-				outputBlocks.push(`<p>${renderInline(content, options)}</p>`);
+				outputBlocks.push(`<p>${renderInline(content.trim(), options)}</p>`);
 			}
 			currentParagraph = [];
 		}
@@ -332,8 +332,8 @@ export function renderDokuWiki(markup: string, options: RenderOptions = {}): str
 			continue;
 		}
 
-		// Normal paragraph text
-		currentParagraph.push(line);
+		// Normal paragraph text: in DokuWiki, spaces without a bullet do not indent text
+		currentParagraph.push(line.trim());
 	}
 
 	flushAll();

@@ -207,4 +207,17 @@ test('toggleWikiTask toggles task states accurately', () => {
 	strictEqual(toggleWikiTask(text, -1, false), null);
 });
 
+test('renderDokuWiki renders indented text without a bullet as normal unindented paragraph', () => {
+	const markup = `
+  This is indented with two spaces.
+    This line is indented with four spaces.
+	`;
+	const html = renderDokuWiki(markup);
+	strictEqual(html.includes('<p>This is indented with two spaces. This line is indented with four spaces.</p>'), true);
+	// Leading spaces should not be preserved inside paragraph
+	strictEqual(html.includes('<p> '), false);
+	strictEqual(html.includes('<p>  '), false);
+});
+
+
 

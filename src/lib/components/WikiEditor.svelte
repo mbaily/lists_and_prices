@@ -887,24 +887,25 @@
 		line-height: 1.4;
 	}
 	:global(.wiki-rendered .wiki-list) {
-		margin: 0.35rem 0;
-		padding-left: 1.4rem;
+		margin: 0.4rem 0;
+		padding-left: 2.2rem;
 	}
 	:global(.wiki-rendered .wiki-list li) {
-		margin: 0.1rem 0;
+		margin: 0.15rem 0;
 		line-height: 1.4;
 	}
 	:global(.wiki-rendered .wiki-list .wiki-list) {
-		margin: 0.1rem 0;
+		margin: 0.15rem 0;
+		padding-left: 1.8rem;
 	}
 	:global(.wiki-rendered ul.wiki-task-list) {
 		list-style: none;
-		padding-left: 0.3rem;
+		padding-left: 2.2rem;
 	}
 	:global(.wiki-rendered ul.wiki-task-list ul.wiki-task-list),
 	:global(.wiki-rendered ul.wiki-list ul.wiki-task-list),
 	:global(.wiki-rendered ul.wiki-task-list ul.wiki-list) {
-		padding-left: 1.3rem;
+		padding-left: 1.8rem;
 	}
 	:global(.wiki-rendered li.wiki-task-item) {
 		list-style: none;
