@@ -114,7 +114,7 @@
 						{#each rows as row}
 							{@const important = isImportantOccurrence(row, now)}
 							<li class:completed={row.completed} class:important={important}>
-								<a href={calendarUrl} target="_blank" rel="noopener noreferrer">{calendarLine(calendarOccurrenceLabel(row, now), row.event.title)}</a>{#if important}{' '}<span class="calendar-important-badge" title="Important (late and unchecked)">⚠️ Important</span>{/if}{#if row.completed}{' (Completed)'}{/if}
+								<a href={calendarUrl} target="_blank" rel="noopener noreferrer">{calendarLine(calendarOccurrenceLabel(row, now), row.event.title)}</a>{#if important}{' '}<span class="calendar-important-badge" title="Important (late and unchecked)">⚠️ Important</span>{/if}
 							</li>
 						{/each}
 					</ul>
