@@ -2356,6 +2356,7 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
+		flex-shrink: 0;
 	}
 	.wiki-nav-btn.has-wiki {
 		color: var(--accent);
@@ -2417,11 +2418,25 @@
 		border-bottom: 1px solid var(--border);
 		flex-shrink: 0;
 		overflow-x: auto;
+		overflow-y: hidden;
 		scrollbar-width: none;
 		flex-wrap: nowrap;
+		-webkit-overflow-scrolling: touch;
 	}
 	header::-webkit-scrollbar { display: none; }
 	.header-row1, .header-row2 { display: contents; }
+	header :global(.breadcrumb) {
+		flex-shrink: 0;
+		min-width: max-content;
+		max-width: none;
+	}
+	header :global(.breadcrumb ol) {
+		overflow-x: visible;
+	}
+	header :global(.breadcrumb .home-item) {
+		position: static;
+		box-shadow: none;
+	}
 	/* ── Pinned items bar ───────────────────────────────────────────────────── */
 	/* Lives inside .item-list before fav-bar — scrolls away naturally */
 	.pin-bar {
