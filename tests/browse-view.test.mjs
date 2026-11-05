@@ -75,13 +75,13 @@ test('favourites wrap instead of scrolling horizontally', () => {
 	assert.doesNotMatch(css, /overflow-x:\s*(auto|scroll)/);
 });
 
-test('list header adds no vertical padding around the breadcrumb', () => {
+test('list header uses compact vertical padding around the breadcrumb', () => {
 	const rule = findNodes(component.css, (node) =>
 		node.type === 'Rule' && source.slice(node.prelude.start, node.prelude.end) === 'header'
 	)[0];
 	assert.ok(rule);
 	const css = source.slice(rule.block.start, rule.block.end);
-	assert.match(css, /padding:\s*0\s+1rem\s*;/);
+	assert.match(css, /padding:\s*0\.25rem\s+1rem\s*;/);
 });
 
 test('favourite navigation skips folders and wraps through ordered lists', () => {

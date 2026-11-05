@@ -2377,10 +2377,10 @@ ${bodyHtml}
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 0.75rem 1rem;
+		padding: 0.25rem 1rem;
 		background: var(--bg2);
 		border-bottom: 1px solid var(--border);
-		gap: 0.5rem;
+		gap: 0.35rem;
 		overflow-x: auto;
 		scrollbar-width: none;
 		flex-wrap: nowrap;
@@ -2388,12 +2388,12 @@ ${bodyHtml}
 	header::-webkit-scrollbar { display: none; }
 
 	/* Sheet row */
-	.sheet-row { gap: 0.5rem; }
+	.sheet-row { gap: 0.35rem; }
 	.sheet-icon { font-size: 1.1rem; flex-shrink: 0; }
 	.header-actions {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
+		gap: 0.35rem;
 		flex-shrink: 0;
 	}
 	.icon-btn {
@@ -2401,7 +2401,7 @@ ${bodyHtml}
 		border: none;
 		font-size: 1.3rem;
 		cursor: pointer;
-		padding: 0.25rem;
+		padding: 0.15rem 0.2rem;
 		color: var(--text);
 		flex-shrink: 0;
 	}

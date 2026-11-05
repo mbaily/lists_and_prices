@@ -1562,7 +1562,7 @@
 			aria-label="Home"
 			title="Home"
 		>
-			<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+			<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 				<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z" />
 			</svg>
 		</button>
@@ -1625,7 +1625,7 @@
 			aria-pressed={browseView}
 			title={browseView ? 'Turn browse view off' : 'Turn browse view on'}
 		>
-			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+			<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 				<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" />
 			</svg>
 		</button>
@@ -2370,8 +2370,8 @@
 <style>
 	.ref-pill.wiki-pill::before { content: none; }
 	.wiki-nav-btn {
-		font-size: 1.15rem;
-		padding: 0 0.35rem;
+		font-size: 1.3rem;
+		padding: 0.15rem 0.2rem;
 		background: none;
 		border: none;
 		cursor: pointer;
@@ -2434,8 +2434,8 @@
 	header {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
-		padding: 0 1rem;
+		gap: 0.35rem;
+		padding: 0.25rem 1rem;
 		background: var(--bg2);
 		border-bottom: 1px solid var(--border);
 		flex-shrink: 0;
@@ -2594,9 +2594,9 @@
 	.type-btn {
 		background: none;
 		border: none;
-		font-size: 1.2rem;
+		font-size: 1.3rem;
 		cursor: pointer;
-		padding: 0.2rem;
+		padding: 0.15rem 0.2rem;
 	}
 
 	.mobile-home-btn {
@@ -2604,7 +2604,7 @@
 		align-items: center;
 		justify-content: center;
 		flex-shrink: 0;
-		padding: 0.2rem;
+		padding: 0.15rem 0.2rem;
 		border: 1px solid transparent;
 		border-radius: 6px;
 		background: transparent;
@@ -2628,9 +2628,9 @@
 	.list-fav-btn {
 		background: none;
 		border: none;
-		font-size: 1.2rem;
+		font-size: 1.3rem;
 		cursor: pointer;
-		padding: 0.2rem;
+		padding: 0.15rem 0.2rem;
 		flex-shrink: 0;
 		color: var(--text2);
 	}
@@ -2641,15 +2641,14 @@
 	.list-done-btn {
 		background: none;
 		border: none;
-		font-size: 1.2rem;
+		font-size: 1.3rem;
 		cursor: pointer;
-		padding: 0.2rem;
+		padding: 0.15rem 0.2rem;
 		flex-shrink: 0;
 		color: var(--list-color, var(--text));
 	}
 	.header-menu-wrap {
 		position: relative;
-		margin-left: 0.4rem;
 		flex-shrink: 0;
 	}
 	.browse-view-btn {
@@ -2657,7 +2656,7 @@
 		align-items: center;
 		justify-content: center;
 		flex-shrink: 0;
-		padding: 0.25rem;
+		padding: 0.15rem 0.2rem;
 		border: 1px solid transparent;
 		border-radius: 6px;
 		background: transparent;
@@ -2674,7 +2673,7 @@
 		flex-shrink: 0;
 		display: flex;
 		align-items: center;
-		gap: 0.3rem;
+		gap: 0.35rem;
 	}
 	.nav-strip {
 		display: flex;
@@ -3364,8 +3363,9 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		min-width: 2rem;
-		min-height: 2rem;
+		font-size: 1.3rem;
+		min-width: 1.8rem;
+		min-height: 1.8rem;
 		border-radius: 6px;
 		text-decoration: none;
 	}
