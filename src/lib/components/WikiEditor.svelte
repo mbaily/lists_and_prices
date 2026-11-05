@@ -865,7 +865,7 @@
 		margin: 0.4rem 0 0.2rem;
 	}
 	:global(.wiki-rendered p) {
-		margin: 0.35rem 0;
+		margin: 0.85rem 0;
 		line-height: 1.4;
 	}
 	:global(.wiki-rendered .wiki-list) {

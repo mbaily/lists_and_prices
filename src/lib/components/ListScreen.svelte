@@ -1288,8 +1288,15 @@
 			const el = e.target as HTMLElement | null;
 			if (!el?.closest('.header-menu-wrap') && !el?.closest('.header-menu')) showHeaderMenu = false;
 		}
+		function onScroll() {
+			showHeaderMenu = false;
+		}
 		document.addEventListener('pointerdown', dismiss, { capture: true });
-		return () => document.removeEventListener('pointerdown', dismiss, { capture: true });
+		document.addEventListener('scroll', onScroll, { capture: true, passive: true });
+		return () => {
+			document.removeEventListener('pointerdown', dismiss, { capture: true });
+			document.removeEventListener('scroll', onScroll, { capture: true });
+		};
 	});
 
 	// If a peer deletes the item currently being priced or named, clear stale state
@@ -1572,11 +1579,17 @@
 				showHeaderMenu = !showHeaderMenu;
 				if (showHeaderMenu) {
 					const rect = e.currentTarget.getBoundingClientRect();
-					// The menu is ~13rem (208px) wide. Align to right if it would overflow.
-					if (rect.left + 220 > window.innerWidth) {
-						menuStyle = `top: ${rect.bottom + 4}px; right: ${window.innerWidth - rect.right}px; left: auto;`;
+					const MARGIN = 8;
+					const ESTIMATED_WIDTH = 250;
+					if (rect.left + ESTIMATED_WIDTH > window.innerWidth - MARGIN) {
+						const rightDist = window.innerWidth - rect.right;
+						if (rect.right < ESTIMATED_WIDTH + MARGIN) {
+							menuStyle = `top: ${rect.bottom + 4}px; right: ${MARGIN}px; left: auto;`;
+						} else {
+							menuStyle = `top: ${rect.bottom + 4}px; right: ${rightDist}px; left: auto;`;
+						}
 					} else {
-						menuStyle = `top: ${rect.bottom + 4}px; left: ${rect.left}px; right: auto;`;
+						menuStyle = `top: ${rect.bottom + 4}px; left: ${Math.max(MARGIN, rect.left)}px; right: auto;`;
 					}
 				}
 			}} aria-label="More options" aria-haspopup="menu" aria-expanded={showHeaderMenu}>⋮</button>
@@ -2632,7 +2645,9 @@
 		box-shadow: 0 4px 16px rgba(0,0,0,0.18);
 		z-index: 200;
 		min-width: 13rem;
+		max-width: calc(100vw - 16px);
 		overflow: hidden;
+		box-sizing: border-box;
 	}
 	.header-menu button {
 		display: block;
@@ -2644,6 +2659,9 @@
 		font-size: 0.9rem;
 		color: var(--text);
 		cursor: pointer;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 	.header-menu button:hover { background: var(--bg3); }
 
