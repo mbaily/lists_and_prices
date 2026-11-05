@@ -1528,6 +1528,17 @@
 		if (delta !== 0) itemListEl.scrollTop += delta;
 	});
 	let screenEl = $state<HTMLElement | null>(null);
+	let headerEl = $state<HTMLElement | null>(null);
+
+	$effect(() => {
+		void listId;
+		if (headerEl) {
+			headerEl.scrollLeft = headerEl.scrollWidth;
+			requestAnimationFrame(() => {
+				if (headerEl) headerEl.scrollLeft = headerEl.scrollWidth;
+			});
+		}
+	});
 </script>
 
 <svelte:window onkeydown={handleGlobalKeydown} onstorage={refreshDestinationMarks} />
@@ -1535,7 +1546,7 @@
 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 <div class="screen" bind:this={screenEl} class:has-keypad={(pricingItemId || qtyItemId) && isPriced} style="--list-color:{listMeta?.color ?? 'var(--text)'}">
 	<!-- Header -->
-	<header>
+	<header bind:this={headerEl}>
 		<div class="header-row1">
 		<Breadcrumb items={breadcrumbItems} searchLabel={savedSearch} {onRestoreSearch} />
 		{#if !highlightItemId && onReturnNearby && settings.showNearbyReturnLink}
