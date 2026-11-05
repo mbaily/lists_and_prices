@@ -1556,6 +1556,17 @@
 		</div>
 		<div class="header-row2">
 		<button
+			type="button"
+			class="mobile-home-btn"
+			onclick={onHome}
+			aria-label="Home"
+			title="Home"
+		>
+			<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z" />
+			</svg>
+		</button>
+		<button
 			class="list-fav-btn"
 			class:active={listMeta?.favourite}
 			onclick={() => { 
@@ -2586,6 +2597,32 @@
 		font-size: 1.2rem;
 		cursor: pointer;
 		padding: 0.2rem;
+	}
+
+	.mobile-home-btn {
+		display: none;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		padding: 0.2rem;
+		border: 1px solid transparent;
+		border-radius: 6px;
+		background: transparent;
+		color: var(--accent);
+		cursor: pointer;
+	}
+	.mobile-home-btn:hover { background: var(--bg3); }
+	.mobile-home-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+	@media (max-width: 600px) {
+		.mobile-home-btn {
+			display: inline-flex;
+		}
+	}
+	@media (pointer: coarse) {
+		.mobile-home-btn {
+			min-width: 32px;
+			min-height: 36px;
+		}
 	}
 
 	.list-fav-btn {
