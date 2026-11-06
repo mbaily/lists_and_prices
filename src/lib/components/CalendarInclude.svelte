@@ -90,14 +90,19 @@
 				return;
 			}
 			lastChecksum = rawText;
-			const data: unknown = JSON.parse(rawText);
+			let data: unknown;
+			try {
+				data = JSON.parse(rawText);
+			} catch {
+				throw new Error('Calendar service is unavailable.');
+			}
 			occurrences = parseCalendarResponse(data);
 			hasLoaded = true;
 		} catch (e) {
 			if (request.signal.aborted) return;
 			if (!hasLoaded) {
 				occurrences = [];
-				error = e instanceof Error ? e.message : 'Calendar service is unavailable.';
+				error = e instanceof Error && e.message.startsWith('Sign in') ? e.message : 'Calendar service is unavailable.';
 			}
 		} finally {
 			if (!request.signal.aborted) loading = false;

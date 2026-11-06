@@ -33,6 +33,8 @@ Paths are relative to the directory you run the command from.
   --build-dir PATH      Frontend files (default this checkout's build/)
   --no-serve            Sync only, without serving browsers
   --interval SECONDS    Upstream confirmation interval (default 5)
+  --simple-todo-url URL Simple Todo URL (default: ../simple_todo relative to upstream)
+  --no-simple-todo      Disable Simple Todo integration
   --help               Show this help
 
 Use Ctrl-C to stop. No background service or system installation is created.
@@ -58,7 +60,8 @@ async function main() {
 		'export-yjs': { type: 'boolean' }, output: { type: 'string' },
 		login: { type: 'boolean' }, 'password-file': { type: 'string' }, insecure: { type: 'boolean' }, host: { type: 'string' },
 		port: { type: 'string' }, cert: { type: 'string' }, key: { type: 'string' },
-		'build-dir': { type: 'string' }, 'no-serve': { type: 'boolean' }, interval: { type: 'string' }, help: { type: 'boolean' }
+		'build-dir': { type: 'string' }, 'no-serve': { type: 'boolean' }, interval: { type: 'string' }, help: { type: 'boolean' },
+		'simple-todo-url': { type: 'string' }, 'no-simple-todo': { type: 'boolean' }
 	} });
 	if (values.help) { console.log(help); return; }
 	if (Number(process.versions.node.split('.')[0]) < 24) throw new Error('Use Node 24 or newer.');
@@ -107,9 +110,21 @@ async function main() {
 				storage.set('upstreamCookie', cookie!); storage.set('passwordHash', hash);
 			})();
 		}
+		let simpleTodoUrl: string | undefined;
+		if (!values['no-simple-todo']) {
+			const configuredSimpleTodo = values['simple-todo-url'] ?? process.env.SIMPLE_TODO_URL;
+			if (configuredSimpleTodo) {
+				simpleTodoUrl = configuredSimpleTodo.trim().replace(/\/+$/, '');
+			} else if (server) {
+				const serverWithSlash = server.endsWith('/') ? server : `${server}/`;
+				simpleTodoUrl = new URL('../simple_todo', serverWithSlash).href.replace(/\/+$/, '');
+			}
+		}
 		host = createLocalHost({ storage, username, buildDirectory,
 			cert: values.cert && path.resolve(values.cert), key: values.key && path.resolve(values.key),
 			status: () => upstream!.status,
+			simpleTodoUrl,
+			insecure: values.insecure,
 			onStorageError: () => {
 				console.error('Local disk write failed. Stopping; browser caches retain unconfirmed edits.');
 				process.exitCode = 1; void close().catch(() => {});
@@ -137,7 +152,7 @@ async function main() {
 		const stop = () => { void close().catch(() => { console.error('Shutdown failed; retain the data directory for recovery.'); process.exitCode = 1; }); };
 		process.once('SIGINT', stop); process.once('SIGTERM', stop);
 		upstream.start();
-		console.log(`Data directory: ${storage.directory}\nUpstream: ${server} (${username})\nRunning in foreground; Ctrl-C stops the client.`);
+		console.log(`Data directory: ${storage.directory}\nUpstream: ${server} (${username})${simpleTodoUrl ? `\nSimple Todo: ${simpleTodoUrl}` : ''}\nRunning in foreground; Ctrl-C stops the client.`);
 	} catch (error) { await close(); throw error; }
 }
 

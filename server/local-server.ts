@@ -13,6 +13,7 @@ import { createAuthRouter, requireAuth } from './auth-http.ts';
 import { createOfflineSyncRouter } from './offline-sync.ts';
 import { readPublicBasePath } from './deployment-config.ts';
 import type { LocalStorage } from './local-storage.ts';
+import { upstreamFetch } from './local-sync.ts';
 
 const require = createRequire(import.meta.url);
 const Y = require('yjs') as typeof import('yjs');
@@ -26,6 +27,7 @@ const decoding = require('lib0/decoding') as typeof import('lib0/decoding');
 export function createLocalHost(options: {
 	storage: LocalStorage; username: string; buildDirectory?: string;
 	cert?: string; key?: string; status: () => object; onStorageError?: () => void;
+	simpleTodoUrl?: string; insecure?: boolean;
 }) {
 	const { storage, username } = options;
 	if (options.buildDirectory && readPublicBasePath(options.buildDirectory) !== '') {
@@ -70,6 +72,54 @@ export function createLocalHost(options: {
 	});
 	app.use('/api', createAuthRouter(sessions, Boolean(options.cert)));
 	app.use('/api', (_req, res) => { res.status(404).json({ error: 'Not found' }); });
+	if (options.simpleTodoUrl) {
+		const targetBase = options.simpleTodoUrl.replace(/\/+$/, '');
+		const insecure = Boolean(options.insecure);
+		app.use('/simple_todo', async (req, res) => {
+			const subPath = req.url;
+			const targetUrl = `${targetBase}${subPath.startsWith('/') ? '' : '/'}${subPath}`;
+			const headers: Record<string, string> = {};
+			for (const [key, value] of Object.entries(req.headers)) {
+				if (!value || ['host', 'connection'].includes(key.toLowerCase())) continue;
+				headers[key] = Array.isArray(value) ? value.join(', ') : value;
+			}
+			let body: Uint8Array | undefined;
+			if (['POST', 'PUT', 'PATCH'].includes(req.method.toUpperCase())) {
+				const chunks: Buffer[] = [];
+				for await (const chunk of req) chunks.push(Buffer.from(chunk));
+				if (chunks.length > 0) body = new Uint8Array(Buffer.concat(chunks));
+			}
+			try {
+				const upstreamRes = await upstreamFetch(targetUrl, {
+					method: req.method,
+					headers,
+					body,
+					signal: AbortSignal.timeout(30_000),
+					redirect: 'manual'
+				}, insecure);
+				res.status(upstreamRes.status);
+				upstreamRes.headers.forEach((val, key) => {
+					const lower = key.toLowerCase();
+					if (!['content-encoding', 'transfer-encoding', 'connection'].includes(lower)) {
+						if (lower === 'location') {
+							const rewritten = val.startsWith(targetBase) ? `/simple_todo${val.slice(targetBase.length)}` : val;
+							res.setHeader(key, rewritten);
+						} else {
+							res.setHeader(key, val);
+						}
+					}
+				});
+				const buf = await upstreamRes.arrayBuffer();
+				res.send(Buffer.from(buf));
+			} catch {
+				res.status(503).json({ error: 'Simple Todo service is unavailable.' });
+			}
+		});
+	} else {
+		app.use('/simple_todo', (_req, res) => {
+			res.status(503).json({ error: 'Simple Todo is not configured.' });
+		});
+	}
 	if (options.buildDirectory) {
 		app.use(express.static(options.buildDirectory, { redirect: false }));
 		app.get('/{*path}', (req, res) => {

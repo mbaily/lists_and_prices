@@ -395,3 +395,62 @@ test('generated launcher starts from an arbitrary working directory and keeps al
 	assert.deepEqual(await readFile(path.join(directory, 'custom-backup.yjs')), exported);
 	await assert.rejects(exportCommand(['--output', './lists-local-data/yjs.sqlite']), /must not overwrite/);
 });
+
+test('local host proxies /simple_todo requests to configured Simple Todo URL', async t => {
+	const directory = await mkdtemp(path.join(tmpdir(), 'lists-simple-todo-'));
+	t.after(() => rm(directory, { recursive: true, force: true }));
+
+	const fakeTodoApp = express();
+	fakeTodoApp.get('/api/calendar/events', (req, res) => {
+		if (req.headers.authorization !== 'Basic dGVzdDp0ZXN0') {
+			res.setHeader('WWW-Authenticate', 'Basic realm="simple_todo"');
+			return res.status(401).json({ detail: 'Not authenticated' });
+		}
+		res.json([{ id: 1, occurrence_at: '2026-11-07T10:00:00', completed: false, event: { id: 1, title: 'Test Event' } }]);
+	});
+	const fakeTodoServer = http.createServer(fakeTodoApp);
+	fakeTodoServer.listen(0, '127.0.0.1');
+	await once(fakeTodoServer, 'listening');
+	t.after(() => new Promise<void>(resolve => fakeTodoServer.close(() => resolve())));
+	const todoPort = (fakeTodoServer.address() as { port: number }).port;
+	const todoUrl = `http://127.0.0.1:${todoPort}`;
+
+	const storage = new LocalStorage(directory);
+	t.after(() => storage.close());
+	const host = createLocalHost({
+		storage,
+		username: 'alice',
+		status: () => ({}),
+		simpleTodoUrl: todoUrl
+	});
+	host.server.listen(0, '127.0.0.1');
+	await once(host.server, 'listening');
+	t.after(() => host.close());
+	const hostPort = (host.server.address() as { port: number }).port;
+	const hostBase = `http://127.0.0.1:${hostPort}`;
+
+	// Request without auth -> forwards 401 with WWW-Authenticate header
+	const unauthRes = await fetch(`${hostBase}/simple_todo/api/calendar/events`);
+	assert.equal(unauthRes.status, 401);
+	assert.equal(unauthRes.headers.get('www-authenticate'), 'Basic realm="simple_todo"');
+
+	// Request with auth -> forwards to fakeTodo and returns JSON
+	const authRes = await fetch(`${hostBase}/simple_todo/api/calendar/events`, {
+		headers: { Authorization: 'Basic dGVzdDp0ZXN0' }
+	});
+	assert.equal(authRes.status, 200);
+	const data = (await authRes.json()) as Array<{ event: { title: string } }>;
+	assert.equal(Array.isArray(data), true);
+	assert.equal(data[0].event.title, 'Test Event');
+
+	// When Simple Todo is not configured
+	const unconfiguredStorage = new LocalStorage(await mkdtemp(path.join(tmpdir(), 'lists-simple-unconf-')));
+	t.after(() => unconfiguredStorage.close());
+	const unconfiguredHost = createLocalHost({ storage: unconfiguredStorage, username: 'alice', status: () => ({}) });
+	unconfiguredHost.server.listen(0, '127.0.0.1');
+	await once(unconfiguredHost.server, 'listening');
+	t.after(() => unconfiguredHost.close());
+	const unconfPort = (unconfiguredHost.server.address() as { port: number }).port;
+	const unconfRes = await fetch(`http://127.0.0.1:${unconfPort}/simple_todo/api/calendar/events`);
+	assert.equal(unconfRes.status, 503);
+});

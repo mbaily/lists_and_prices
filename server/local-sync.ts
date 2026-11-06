@@ -11,18 +11,18 @@ const { WebsocketProvider } = require('y-websocket') as typeof import('y-websock
 
 /** Keep the certificate override on upstream requests, without changing Node's
  * process-wide TLS policy or any browser's connection to the local frontend. */
-function upstreamFetch(url: string, options: { method?: string; headers?: Record<string, string>; body?: string | Uint8Array<ArrayBuffer>; signal: AbortSignal }, insecure = false): Promise<Response> {
-	if (!insecure || new URL(url).protocol !== 'https:') return fetch(url, { ...options, redirect: 'error' });
+export function upstreamFetch(url: string, options: { method?: string; headers?: Record<string, string>; body?: string | Uint8Array | null; signal: AbortSignal; redirect?: 'error' | 'manual' | 'follow' }, insecure = false): Promise<Response> {
+	if (!insecure || new URL(url).protocol !== 'https:') return fetch(url, { ...options, body: options.body as any, redirect: options.redirect ?? 'error' });
 	return new Promise((resolve, reject) => {
 		const request = https.request(url, { method: options.method, headers: options.headers, signal: options.signal, rejectUnauthorized: false }, response => {
 			void (async () => {
 				const status = response.statusCode ?? 500;
-				if (status >= 300 && status < 400) { response.resume(); throw new Error('Upstream redirects are not allowed.'); }
+				if (options.redirect !== 'manual' && status >= 300 && status < 400) { response.resume(); throw new Error('Upstream redirects are not allowed.'); }
 				const chunks: Buffer[] = [];
 				for await (const chunk of response) chunks.push(Buffer.from(chunk));
 				const headers = new Headers();
 				for (let index = 0; index < response.rawHeaders.length; index += 2) headers.append(response.rawHeaders[index], response.rawHeaders[index + 1]);
-				resolve(new Response([204, 205].includes(status) ? null : new Uint8Array(Buffer.concat(chunks)), { status, headers }));
+				resolve(new Response([204, 205, 304].includes(status) ? null : new Uint8Array(Buffer.concat(chunks)), { status, headers }));
 			})().catch(reject);
 		});
 		request.once('error', reject);
