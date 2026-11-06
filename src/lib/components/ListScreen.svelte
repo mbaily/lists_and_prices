@@ -18,6 +18,7 @@
 		setItemCheckboxState,
 		clearItemCheckboxes,
 		isItemDone,
+		createList,
 		updateList,
 		reorderSiblings,
 		reparentItems,
@@ -916,6 +917,319 @@
 		}
 	}
 
+	// ── Quick list rollover ───────────────────────────────────────────────────────
+	let showRolloverModal = $state(false);
+	let rolloverScope = $state<'incomplete' | 'selected' | 'all'>('incomplete');
+	let rolloverOffset = $state(1);
+	let rolloverCustomDate = $state('');
+	let showRolloverCustomPicker = $state(false);
+	let rolloverTargetName = $state('');
+	let rolloverToast = $state<{ message: string; listId: string } | null>(null);
+	let rolloverToastTimer: ReturnType<typeof setTimeout> | null = null;
+
+	const DAY_NAMES_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+	const DAY_NAMES_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+	function pad2(n: number): string {
+		return String(n).padStart(2, '0');
+	}
+
+	interface ParsedListNameDate {
+		date: Date;
+		format: 'iso' | 'dmy' | 'dm';
+		hasDayName: 'short' | 'long' | false;
+		dayNameMatched?: string;
+		separator: string;
+		yearDigits: number;
+		prefix: string;
+		suffix: string;
+	}
+
+	function parseDateFromListName(name: string): ParsedListNameDate | null {
+		// 1. ISO: (DayName)? YYYY-MM-DD
+		const isoRegex = /(?:(\b(?:Sun(?:day)?|Mon(?:day)?|Tue(?:sday)?|Wed(?:nesday)?|Thu(?:rsday)?|Fri(?:day)?|Sat(?:urday)?)[,\s]*))?(\d{4})([-/.])(\d{1,2})\3(\d{1,2})\b/i;
+		const isoMatch = name.match(isoRegex);
+		if (isoMatch && isoMatch.index !== undefined) {
+			const dayPart = isoMatch[1];
+			const year = parseInt(isoMatch[2], 10);
+			const month = parseInt(isoMatch[4], 10) - 1;
+			const day = parseInt(isoMatch[5], 10);
+			const d = new Date(year, month, day);
+			if (!isNaN(d.getTime())) {
+				return {
+					date: d,
+					format: 'iso',
+					hasDayName: dayPart ? (dayPart.trim().length <= 3 ? 'short' : 'long') : false,
+					dayNameMatched: dayPart ? dayPart.trim() : undefined,
+					separator: isoMatch[3],
+					yearDigits: 4,
+					prefix: name.slice(0, isoMatch.index),
+					suffix: name.slice(isoMatch.index + isoMatch[0].length)
+				};
+			}
+		}
+
+		// 2. DMY: (DayName)? DD/MM/YYYY or DD/MM/YY
+		const dmyRegex = /(?:(\b(?:Sun(?:day)?|Mon(?:day)?|Tue(?:sday)?|Wed(?:nesday)?|Thu(?:rsday)?|Fri(?:day)?|Sat(?:urday)?)[,\s]*))?(\d{1,2})([-/.])(\d{1,2})\3(\d{2,4})\b/i;
+		const dmyMatch = name.match(dmyRegex);
+		if (dmyMatch && dmyMatch.index !== undefined) {
+			const dayPart = dmyMatch[1];
+			const day = parseInt(dmyMatch[2], 10);
+			const month = parseInt(dmyMatch[4], 10) - 1;
+			let year = parseInt(dmyMatch[5], 10);
+			const yearDigits = dmyMatch[5].length;
+			if (year < 100) year += 2000;
+			const d = new Date(year, month, day);
+			if (!isNaN(d.getTime())) {
+				return {
+					date: d,
+					format: 'dmy',
+					hasDayName: dayPart ? (dayPart.trim().length <= 3 ? 'short' : 'long') : false,
+					dayNameMatched: dayPart ? dayPart.trim() : undefined,
+					separator: dmyMatch[3],
+					yearDigits,
+					prefix: name.slice(0, dmyMatch.index),
+					suffix: name.slice(dmyMatch.index + dmyMatch[0].length)
+				};
+			}
+		}
+
+		// 3. DM without year: (DayName)? DD/MM
+		const dmRegex = /(?:(\b(?:Sun(?:day)?|Mon(?:day)?|Tue(?:sday)?|Wed(?:nesday)?|Thu(?:rsday)?|Fri(?:day)?|Sat(?:urday)?)[,\s]*))?(\d{1,2})([-/.])(\d{1,2})\b/i;
+		const dmMatch = name.match(dmRegex);
+		if (dmMatch && dmMatch.index !== undefined) {
+			const dayPart = dmMatch[1];
+			const day = parseInt(dmMatch[2], 10);
+			const month = parseInt(dmMatch[4], 10) - 1;
+			const year = new Date().getFullYear();
+			const d = new Date(year, month, day);
+			if (!isNaN(d.getTime())) {
+				return {
+					date: d,
+					format: 'dm',
+					hasDayName: dayPart ? (dayPart.trim().length <= 3 ? 'short' : 'long') : false,
+					dayNameMatched: dayPart ? dayPart.trim() : undefined,
+					separator: dmMatch[3],
+					yearDigits: 0,
+					prefix: name.slice(0, dmMatch.index),
+					suffix: name.slice(dmMatch.index + dmMatch[0].length)
+				};
+			}
+		}
+
+		return null;
+	}
+
+	function computeRolloverDate(currentListName: string, offsetDays: number, explicitDate?: Date): { targetName: string; targetDate: Date } {
+		const parsed = parseDateFromListName(currentListName);
+		let baseDate: Date;
+		if (explicitDate) {
+			baseDate = explicitDate;
+		} else if (parsed) {
+			baseDate = new Date(parsed.date.getFullYear(), parsed.date.getMonth(), parsed.date.getDate() + offsetDays);
+		} else {
+			const now = new Date();
+			baseDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offsetDays);
+		}
+
+		if (parsed) {
+			let dayPart = '';
+			if (parsed.hasDayName) {
+				const dayName = parsed.hasDayName === 'short'
+					? DAY_NAMES_SHORT[baseDate.getDay()]
+					: DAY_NAMES_LONG[baseDate.getDay()];
+				const trailingSpace = parsed.dayNameMatched && parsed.dayNameMatched.includes(',') ? ', ' : ' ';
+				dayPart = `${dayName}${trailingSpace}`;
+			}
+
+			let datePart = '';
+			const sep = parsed.separator;
+			if (parsed.format === 'iso') {
+				datePart = `${baseDate.getFullYear()}${sep}${pad2(baseDate.getMonth() + 1)}${sep}${pad2(baseDate.getDate())}`;
+			} else if (parsed.format === 'dmy') {
+				const yStr = parsed.yearDigits === 2 ? String(baseDate.getFullYear()).slice(-2) : String(baseDate.getFullYear());
+				datePart = `${pad2(baseDate.getDate())}${sep}${pad2(baseDate.getMonth() + 1)}${sep}${yStr}`;
+			} else {
+				datePart = `${pad2(baseDate.getDate())}${sep}${pad2(baseDate.getMonth() + 1)}`;
+			}
+
+			return {
+				targetName: `${parsed.prefix}${dayPart}${datePart}${parsed.suffix}`,
+				targetDate: baseDate
+			};
+		}
+
+		// Sibling list check in current folder
+		const currentList = allLists.find((l) => l.id === listId);
+		if (currentList && currentList.folderId) {
+			const sibling = allLists.find((l) => l.folderId === currentList.folderId && l.id !== listId && parseDateFromListName(l.name));
+			if (sibling) {
+				const sibParsed = parseDateFromListName(sibling.name)!;
+				const dayName = sibParsed.hasDayName === 'long'
+					? DAY_NAMES_LONG[baseDate.getDay()]
+					: DAY_NAMES_SHORT[baseDate.getDay()];
+				const yStr = sibParsed.yearDigits === 2 ? String(baseDate.getFullYear()).slice(-2) : String(baseDate.getFullYear());
+				const sep = sibParsed.separator;
+				const dateStr = sibParsed.format === 'iso'
+					? `${baseDate.getFullYear()}${sep}${pad2(baseDate.getMonth() + 1)}${sep}${pad2(baseDate.getDate())}`
+					: `${pad2(baseDate.getDate())}${sep}${pad2(baseDate.getMonth() + 1)}${sep}${yStr}`;
+				const formatted = sibParsed.hasDayName ? `${dayName} ${dateStr}` : dateStr;
+				return {
+					targetName: formatted,
+					targetDate: baseDate
+				};
+			}
+		}
+
+		// Default fallback: "DD/MM/YY"
+		const defaultFormatted = `${pad2(baseDate.getDate())}/${pad2(baseDate.getMonth() + 1)}/${String(baseDate.getFullYear()).slice(-2)}`;
+		return {
+			targetName: defaultFormatted,
+			targetDate: baseDate
+		};
+	}
+
+	const rolloverDestinationList = $derived.by(() => {
+		const trimmed = rolloverTargetName.trim().toLowerCase();
+		if (!trimmed) return null;
+		const current = allLists.find((l) => l.id === listId);
+		const folderId = current?.folderId ?? null;
+		return allLists.find(
+			(l) => l.folderId === folderId && l.type !== 'divider' && !isListEffectivelyArchived(l, allFolders) && l.name.trim().toLowerCase() === trimmed
+		) ?? null;
+	});
+
+	const incompleteItemCount = $derived(
+		items.filter((i) => !isDone(i) && !i.heading).length
+	);
+
+	const itemsToRolloverCount = $derived.by(() => {
+		if (rolloverScope === 'selected') return selectedIds.size;
+		if (rolloverScope === 'all') return items.length;
+		return incompleteItemCount;
+	});
+
+	function autoSelectInput(el: HTMLElement) {
+		tick().then(() => {
+			el.focus();
+			if (el instanceof HTMLInputElement) el.select();
+		});
+	}
+
+	function openRolloverModal(preferredScope?: 'incomplete' | 'selected' | 'all') {
+		if (!canEditList || commitState.isHistorical) return;
+		if (preferredScope) {
+			rolloverScope = preferredScope;
+		} else if (selectionMode && selectedIds.size > 0) {
+			rolloverScope = 'selected';
+		} else if (incompleteItemCount > 0) {
+			rolloverScope = 'incomplete';
+		} else {
+			rolloverScope = 'all';
+		}
+		rolloverOffset = 1;
+		rolloverCustomDate = '';
+		showRolloverCustomPicker = false;
+		const res = computeRolloverDate(listMeta?.name ?? '', 1);
+		rolloverTargetName = res.targetName;
+		showRolloverModal = true;
+	}
+
+	function selectRolloverOffset(offset: number) {
+		rolloverOffset = offset;
+		showRolloverCustomPicker = false;
+		rolloverCustomDate = '';
+		const res = computeRolloverDate(listMeta?.name ?? '', offset);
+		rolloverTargetName = res.targetName;
+	}
+
+	function onRolloverCustomDateChange() {
+		if (!rolloverCustomDate) return;
+		const [y, m, d] = rolloverCustomDate.split('-').map(Number);
+		if (!y || !m || !d) return;
+		const explicit = new Date(y, m - 1, d);
+		const res = computeRolloverDate(listMeta?.name ?? '', 0, explicit);
+		rolloverTargetName = res.targetName;
+	}
+
+	function toggleSelectIncomplete() {
+		if (!canEditList) return;
+		const incompleteIds = items.filter((i) => !i.heading && !isDone(i)).map((i) => i.id);
+		const allSelected = incompleteIds.length > 0 && incompleteIds.every((id) => selectedIds.has(id));
+		const next = new Set(selectedIds);
+		if (allSelected) {
+			for (const id of incompleteIds) next.delete(id);
+		} else {
+			for (const id of incompleteIds) next.add(id);
+		}
+		selectedIds = next;
+	}
+
+	function getRolloverItemIds(): string[] {
+		if (rolloverScope === 'selected' && selectedIds.size > 0) {
+			return [...selectedIds];
+		}
+		if (rolloverScope === 'all') {
+			return items.map((i) => i.id);
+		}
+		return items.filter((i) => !isDone(i) && !i.heading).map((i) => i.id);
+	}
+
+	function submitRollover() {
+		if (!canEditList || commitState.isHistorical || !rolloverTargetName.trim()) return;
+		const current = allLists.find((l) => l.id === listId);
+		if (!current) return;
+
+		const targetIds = getRolloverItemIds();
+		if (targetIds.length === 0) {
+			alert('No items to move.');
+			return;
+		}
+
+		let targetList = rolloverDestinationList;
+		if (!targetList) {
+			const isFuture = rolloverOffset > 0;
+			const newId = createList(
+				rolloverTargetName.trim(),
+				current.folderId,
+				current.type,
+				current.color,
+				settings.addListPosition,
+				isFuture
+			);
+			targetList = readLists().find((l) => l.id === newId) ?? null;
+		}
+
+		if (!targetList || targetList.id === listId) {
+			alert('Could not determine a valid destination list.');
+			return;
+		}
+
+		const movedCount = targetIds.length;
+		const success = moveItemsToDestination(listId, targetIds, { listId: targetList.id, parentId: null }, settings.addItemPosition);
+		if (!success) {
+			alert('Cannot move items to the destination list.');
+			return;
+		}
+
+		showRolloverModal = false;
+		if (selectionMode) {
+			exitSelectionMode();
+		}
+
+		const targetName = targetList.name;
+		const destId = targetList.id;
+		rolloverToast = {
+			message: `Moved ${movedCount} item${movedCount === 1 ? '' : 's'} to "${targetName}"`,
+			listId: destId
+		};
+		if (rolloverToastTimer) clearTimeout(rolloverToastTimer);
+		rolloverToastTimer = setTimeout(() => {
+			rolloverToast = null;
+			rolloverToastTimer = null;
+		}, 6000);
+	}
+
 	const compatibleMoveMarks = $derived.by(() => {
 		const lists = allLists.filter((list) => list.type !== 'divider' && !isListEffectivelyArchived(list, allFolders));
 		return Object.entries(destinationMarks).flatMap(([name, mark]) => {
@@ -1082,6 +1396,7 @@
 		isActive = false;
 		listContextVersion++;
 		cancelLongPress();
+		if (rolloverToastTimer) clearTimeout(rolloverToastTimer);
 	});
 
 	// ── Drag reorder (pointer events — works on both touch and mouse) ──────────────
@@ -1771,6 +2086,11 @@
 		<div class="summary-bar selection-bar">
 			<span class="sel-count">{selectedIds.size} selected</span>
 			<button
+				class="bulk-btn sel-helper-btn"
+				onclick={toggleSelectIncomplete}
+				title="Toggle selection of all incomplete items"
+			>☐ Incomplete</button>
+			<button
 				class="bulk-btn icon-btn"
 				onclick={copySelectedAsText}
 				disabled={selectedIds.size === 0}
@@ -1778,12 +2098,19 @@
 				aria-label="Copy selected items as plain text"
 			><span aria-hidden="true">📋</span></button>
 			<button
+				class="bulk-btn icon-btn rollover-btn"
+				onclick={() => openRolloverModal('selected')}
+				disabled={!canEditList || selectedIds.size === 0}
+				title="Move selected items to next day / list…"
+				aria-label="Move selected items to next day / list…"
+			><span aria-hidden="true">⏭</span></button>
+			<button
 				class="bulk-btn icon-btn sel-folder-move-btn"
-				onclick={moveSelectedToFolderEdge}
-				disabled={!canEditList || selectedIds.size === 0 || !folderMoveTarget || folderMoveTarget.id === listId}
-				title={folderMoveLabel}
-				aria-label={folderMoveLabel}
-			><span aria-hidden="true">{settings.addListPosition === 'top' ? '⤒' : '⤓'}</span></button>
+				onclick={() => { if (!folderMoveTarget || folderMoveTarget.id === listId) openRolloverModal('selected'); else moveSelectedToFolderEdge(); }}
+				disabled={!canEditList || selectedIds.size === 0}
+				title={folderMoveTarget && folderMoveTarget.id !== listId ? folderMoveLabel : 'Move selected items to next day / list…'}
+				aria-label={folderMoveTarget && folderMoveTarget.id !== listId ? folderMoveLabel : 'Move selected items to next day / list…'}
+			><span aria-hidden="true">{folderMoveTarget && folderMoveTarget.id !== listId ? (settings.addListPosition === 'top' ? '⤒' : '⤓') : '⤒+'}</span></button>
 			<button class="bulk-btn sel-view-btn" onclick={() => showSelectionPanel = !showSelectionPanel}>
 				{showSelectionPanel ? '▾ Hide list' : '▸ View list'}
 			</button>
@@ -1795,6 +2122,14 @@
 			<span>Total: <strong>{formatPrice(total)}</strong></span>
 		{/if}
 		<span class="check-counts">✓ {checkedCount} / ✗ {uncheckedCount}</span>
+		{#if !commitState.isHistorical && canEditList}
+			<button
+				class="bulk-btn icon-btn rollover-btn"
+				onclick={() => openRolloverModal()}
+				title="Move items to next day / list"
+				aria-label="Move items to next day / list"
+			><span aria-hidden="true">⏭</span></button>
+		{/if}
 		{#if items.some((i) => hasAnyChecked(i))}
 			{#if !commitState.isHistorical}
 			<button class="bulk-btn icon-btn" onclick={bulkUncheck} title={selectedIds.size > 0 ? 'Uncheck selected' : 'Uncheck all'} aria-label={selectedIds.size > 0 ? 'Uncheck selected' : 'Uncheck all'}>☐</button>
@@ -2315,6 +2650,7 @@
 				<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsJournal(); }}>📓 Copy as journal</button>
 			{:else}
 				{#if !commitState.isHistorical}
+					<button role="menuitem" disabled={!canEditList} onclick={() => { showHeaderMenu = false; openRolloverModal(); }}>⏭ Move items to next day / list…</button>
 					{#if selectionMode && selectedIds.size > 0}
 						<button role="menuitem" disabled={!canEditList || !canReparentItems(items, selectedIds, null)} onclick={() => { showHeaderMenu = false; reparentSelectedTo(null); }}>↳ Move selected to root</button>
 					{:else}
@@ -2392,7 +2728,323 @@
 	/>
 {/if}
 
+{#if showRolloverModal && !commitState.isHistorical}
+	<div class="modal-backdrop" onclick={(e) => { if (e.target === e.currentTarget) showRolloverModal = false; }}>
+		<div class="modal rollover-modal">
+			<h2>Move to Next List</h2>
+			
+			<div class="rollover-field">
+				<label for="rollover-name-input">Destination list</label>
+				<input
+					id="rollover-name-input"
+					use:autoSelectInput
+					bind:value={rolloverTargetName}
+					placeholder="Destination list name"
+					onkeydown={(e) => { if (e.key === 'Enter') submitRollover(); else if (e.key === 'Escape') showRolloverModal = false; }}
+				/>
+			</div>
+
+			<div class="date-shortcuts">
+				<span class="date-shortcuts-label">Date:</span>
+				{#each [1, 2, 3, 7] as offset}
+					<button
+						type="button"
+						class:active={!showRolloverCustomPicker && rolloverOffset === offset}
+						onclick={() => selectRolloverOffset(offset)}
+					>+{offset} {offset === 1 ? 'day' : 'days'}</button>
+				{/each}
+				<button
+					type="button"
+					class:active={showRolloverCustomPicker}
+					onclick={() => {
+						showRolloverCustomPicker = !showRolloverCustomPicker;
+						if (showRolloverCustomPicker) {
+							rolloverOffset = -1;
+						} else {
+							selectRolloverOffset(1);
+						}
+					}}
+					title="Pick a custom date"
+				>📅</button>
+			</div>
+
+			{#if showRolloverCustomPicker}
+				<input
+					type="date"
+					bind:value={rolloverCustomDate}
+					onchange={onRolloverCustomDateChange}
+					class="rollover-date-input"
+				/>
+			{/if}
+
+			<div class="rollover-scope-group">
+				<span class="date-shortcuts-label">Items:</span>
+				<div class="rollover-scope-options">
+					<button
+						type="button"
+						class="scope-chip"
+						class:active={rolloverScope === 'incomplete'}
+						onclick={() => rolloverScope = 'incomplete'}
+					>☐ Incomplete ({incompleteItemCount})</button>
+					{#if selectedIds.size > 0}
+						<button
+							type="button"
+							class="scope-chip"
+							class:active={rolloverScope === 'selected'}
+							onclick={() => rolloverScope = 'selected'}
+						>◇ Selected ({selectedIds.size})</button>
+					{/if}
+					<button
+						type="button"
+						class="scope-chip"
+						class:active={rolloverScope === 'all'}
+						onclick={() => rolloverScope = 'all'}
+					>☰ All ({items.length})</button>
+				</div>
+			</div>
+
+			<div
+				class="rollover-status"
+				class:is-existing={Boolean(rolloverDestinationList && rolloverDestinationList.id !== listId)}
+				class:is-invalid={!rolloverTargetName.trim() || rolloverDestinationList?.id === listId}
+			>
+				{#if !rolloverTargetName.trim()}
+					<span>Please enter a destination list name.</span>
+				{:else if rolloverDestinationList?.id === listId}
+					<span>⚠️ Cannot move items into the current list.</span>
+				{:else if rolloverDestinationList}
+					<span>✓ Will move into existing list: <strong>{rolloverDestinationList.name}</strong></span>
+				{:else}
+					<span>✨ Will create new list <strong>"{rolloverTargetName.trim()}"</strong> in this folder and move items into it.</span>
+				{/if}
+			</div>
+
+			<div class="modal-actions">
+				<button
+					type="button"
+					class="confirm-btn"
+					onclick={submitRollover}
+					disabled={!canEditList || !rolloverTargetName.trim() || rolloverDestinationList?.id === listId || itemsToRolloverCount === 0}
+				>
+					{rolloverDestinationList ? `Move ${itemsToRolloverCount} item${itemsToRolloverCount === 1 ? '' : 's'}` : `Create & move ${itemsToRolloverCount} item${itemsToRolloverCount === 1 ? '' : 's'}`}
+				</button>
+				<button type="button" class="cancel-btn" onclick={() => showRolloverModal = false}>Cancel</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+{#if rolloverToast}
+	<div class="rollover-toast" role="status" aria-live="polite">
+		<span class="toast-msg">{rolloverToast.message}</span>
+		<button
+			type="button"
+			class="toast-action-btn"
+			onclick={() => {
+				const id = rolloverToast?.listId;
+				rolloverToast = null;
+				if (id) onOpenList(id);
+			}}
+		>Open list →</button>
+		<button
+			type="button"
+			class="toast-close-btn"
+			onclick={() => rolloverToast = null}
+			aria-label="Dismiss notification"
+		>✕</button>
+	</div>
+{/if}
+
 <style>
+	.modal-backdrop {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.4);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 100;
+		padding: 1rem;
+	}
+	.modal {
+		background: var(--bg);
+		border-radius: 16px;
+		padding: 1.5rem;
+		width: 100%;
+		max-width: 360px;
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+	}
+	.modal h2 {
+		margin: 0;
+		font-size: 1.15rem;
+		font-weight: 700;
+	}
+	.rollover-field {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.rollover-field label {
+		font-size: 0.8rem;
+		color: var(--text2);
+		font-weight: 600;
+	}
+	.rollover-field input, .rollover-date-input {
+		padding: 0.65rem 0.85rem;
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		font-size: 0.95rem;
+		background: var(--bg2);
+		color: var(--text);
+	}
+	.date-shortcuts {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		flex-wrap: wrap;
+	}
+	.date-shortcuts-label {
+		font-size: 0.8rem;
+		color: var(--text2);
+		margin-right: 0.1rem;
+		font-weight: 600;
+	}
+	.date-shortcuts button {
+		padding: 0.3rem 0.6rem;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--bg2);
+		color: var(--text);
+		font-size: 0.82rem;
+		cursor: pointer;
+		line-height: 1.3;
+	}
+	.date-shortcuts button.active {
+		background: var(--accent);
+		color: #fff;
+		border-color: var(--accent);
+	}
+	.rollover-scope-group {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.rollover-scope-options {
+		display: flex;
+		gap: 0.35rem;
+		flex-wrap: wrap;
+	}
+	.scope-chip {
+		padding: 0.3rem 0.55rem;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--bg2);
+		color: var(--text);
+		font-size: 0.8rem;
+		cursor: pointer;
+		line-height: 1.3;
+	}
+	.scope-chip.active {
+		background: var(--accent);
+		color: #fff;
+		border-color: var(--accent);
+	}
+	.rollover-status {
+		font-size: 0.82rem;
+		padding: 0.6rem 0.75rem;
+		border-radius: 8px;
+		background: var(--bg2);
+		color: var(--text2);
+		border: 1px solid var(--border);
+		line-height: 1.35;
+	}
+	.rollover-status.is-existing {
+		border-color: #10b981;
+		color: #10b981;
+	}
+	.rollover-status.is-invalid {
+		border-color: #ef4444;
+		color: #ef4444;
+	}
+	.modal-actions {
+		display: flex;
+		gap: 0.5rem;
+	}
+	.modal-actions button {
+		flex: 1;
+		padding: 0.7rem;
+		border: none;
+		border-radius: 10px;
+		font-size: 0.95rem;
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.modal-actions button.confirm-btn {
+		background: var(--accent);
+		color: #fff;
+	}
+	.modal-actions button.confirm-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+	.modal-actions button.cancel-btn {
+		background: var(--bg3);
+		color: var(--text);
+	}
+	.sel-helper-btn {
+		font-size: 0.8rem;
+		padding: 0.25rem 0.55rem;
+		font-weight: 600;
+	}
+	.rollover-toast {
+		position: fixed;
+		bottom: 1.5rem;
+		left: 50%;
+		transform: translateX(-50%);
+		background: #1e1e2e;
+		color: #fff;
+		border: 1px solid var(--border, #3b3b4f);
+		border-radius: 12px;
+		padding: 0.65rem 1rem;
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+		z-index: 1000;
+		font-size: 0.9rem;
+		max-width: 90vw;
+	}
+	.toast-msg {
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.toast-action-btn {
+		background: var(--accent, #6366f1);
+		color: #fff;
+		border: none;
+		border-radius: 6px;
+		padding: 0.35rem 0.65rem;
+		font-size: 0.82rem;
+		font-weight: 600;
+		cursor: pointer;
+		white-space: nowrap;
+	}
+	.toast-close-btn {
+		background: transparent;
+		color: #aaa;
+		border: none;
+		cursor: pointer;
+		font-size: 0.9rem;
+		padding: 0.2rem;
+		line-height: 1;
+	}
+	.toast-close-btn:hover {
+		color: #fff;
+	}
 	.ref-pill.wiki-pill::before { content: none; }
 	.wiki-nav-btn {
 		font-size: 1.3rem;

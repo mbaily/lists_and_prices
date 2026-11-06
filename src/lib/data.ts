@@ -401,7 +401,7 @@ function yMapToList(m: Y.Map<unknown>): ListMeta {
 
 export function createList(
 	name: string,
-	folderId: string,
+	folderId: string | null,
 	type: 'plain' | 'priced' | 'divider',
 	color = '#6366f1',
 	addPosition: 'top' | 'bottom' = 'bottom',
@@ -455,7 +455,7 @@ export function createList(
 		m.set('defaultIsNote', false);
 		m.set('journalMode', false);
 		lists.push([m]);
-		const folder = findYMap(getFolders(doc), folderId);
+		const folder = folderId ? findYMap(getFolders(doc), folderId) : null;
 		if (folder && type !== 'divider') {
 			readFolderDefaultItems(folder).forEach((item, index) => {
 				createItem(id, item.name, null, null, item.note, 'bottom', index);
