@@ -2650,7 +2650,6 @@
 				<button role="menuitem" onclick={() => { showHeaderMenu = false; copyAsJournal(); }}>📓 Copy as journal</button>
 			{:else}
 				{#if !commitState.isHistorical}
-					<button role="menuitem" disabled={!canEditList} onclick={() => { showHeaderMenu = false; openRolloverModal(); }}>⏭ Move items to next day / list…</button>
 					{#if selectionMode && selectedIds.size > 0}
 						<button role="menuitem" disabled={!canEditList || !canReparentItems(items, selectedIds, null)} onclick={() => { showHeaderMenu = false; reparentSelectedTo(null); }}>↳ Move selected to root</button>
 					{:else}
