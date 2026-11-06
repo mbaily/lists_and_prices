@@ -1,6 +1,15 @@
 import { test } from 'node:test';
 import { strictEqual, deepStrictEqual } from 'node:assert';
-import { renderDokuWiki, extractWikiLinks, slugifyWikiPage, toggleWikiTask } from '../src/lib/wiki/dokuwiki';
+import {
+	renderDokuWiki,
+	extractWikiLinks,
+	slugifyWikiPage,
+	toggleWikiTask,
+	extractWikiHeadings,
+	getWikiSection,
+	replaceWikiSection,
+	INTERWIKI_MAP
+} from '../src/lib/wiki/dokuwiki';
 
 test('slugifyWikiPage normalizes names to lower-case slugs', () => {
 	strictEqual(slugifyWikiPage('Main Page'), 'main_page');
@@ -218,6 +227,184 @@ test('renderDokuWiki renders indented text without a bullet as normal unindented
 	strictEqual(html.includes('<p> '), false);
 	strictEqual(html.includes('<p>  '), false);
 });
+
+test('renderDokuWiki performs auto-typographical replacements while protecting code and URLs', () => {
+	const markup = `
+Arrows: -> and <- and <-> and => and <=>
+Quotes and symbols: <<quote>> (c) (C) (r) (R) (tm) (TM)
+Dashes and dots: en--dash and em---dash and dots...
+Dimensions: screen resolution is 1920x1080 and photo is 640 x 480
+Code protected: ''monospace -> not arrow and 640x480''
+URL protected: https://example.com/path--with-dashes/640x480
+	`;
+	const html = renderDokuWiki(markup);
+
+	// Prose typography applied
+	strictEqual(html.includes('→ and ← and ↔ and ⇒ and ⇔'), true);
+	strictEqual(html.includes('«quote» © © ® ® ™ ™'), true);
+	strictEqual(html.includes('en–dash and em—dash and dots…'), true);
+	strictEqual(html.includes('1920×1080 and photo is 640×480'), true);
+
+	// Code protected
+	strictEqual(html.includes('<code class="wiki-inline-code">monospace -&gt; not arrow and 640x480</code>'), true);
+
+	// URL protected
+	strictEqual(html.includes('href="https://example.com/path--with-dashes/640x480"'), true);
+});
+
+test('extractWikiLinks and renderDokuWiki handle interwiki links', () => {
+	const markup = `
+Check [[wp>Svelte (programming language)|Wikipedia Svelte]] and [[gh>sveltejs/svelte]]
+Also [[doku>syntax]] and [[google>test query]].
+	`;
+	const links = extractWikiLinks(markup);
+	strictEqual(links.length, 4);
+	strictEqual(links[0].type, 'interwiki');
+	strictEqual(links[0].target, 'https://en.wikipedia.org/wiki/Svelte%20(programming%20language)');
+	strictEqual(links[0].label, 'Wikipedia Svelte');
+
+	strictEqual(links[1].type, 'interwiki');
+	strictEqual(links[1].target, 'https://github.com/sveltejs/svelte');
+
+	const html = renderDokuWiki(markup);
+	strictEqual(html.includes('href="https://en.wikipedia.org/wiki/Svelte%20(programming%20language)"'), true);
+	strictEqual(html.includes('class="wiki-external-link wiki-interwiki-link"'), true);
+	strictEqual(html.includes('>Wikipedia Svelte</a>'), true);
+	strictEqual(html.includes('href="https://github.com/sveltejs/svelte"'), true);
+	strictEqual(html.includes('href="https://www.dokuwiki.org/syntax"'), true);
+	strictEqual(html.includes('href="https://www.google.com/search?q=test%20query"'), true);
+});
+
+test('renderDokuWiki renders footnotes and footnote section with backlinks', () => {
+	const markup = `
+This is a sentence((First footnote with **bold** text)).
+Another sentence((Second footnote with [[https://example.com|link]])).
+	`;
+	const html = renderDokuWiki(markup);
+
+	// Inline footnote markers
+	strictEqual(html.includes('<sup class="wiki-fn-ref"><a href="#fn__1" id="fnt__1" class="wiki-fn-link">[1]</a></sup>'), true);
+	strictEqual(html.includes('<sup class="wiki-fn-ref"><a href="#fn__2" id="fnt__2" class="wiki-fn-link">[2]</a></sup>'), true);
+
+	// Footnotes section at bottom
+	strictEqual(html.includes('<aside class="wiki-footnotes" aria-label="Footnotes">'), true);
+	strictEqual(html.includes('<li id="fn__1">First footnote with <strong>bold</strong> text <a href="#fnt__1" class="wiki-fn-backref" title="Back to text" aria-label="Back to reference">↩</a></li>'), true);
+	strictEqual(html.includes('<li id="fn__2">Second footnote with <a href="https://example.com" class="wiki-external-link" target="_blank" rel="noopener noreferrer">link</a> <a href="#fnt__2" class="wiki-fn-backref" title="Back to text" aria-label="Back to reference">↩</a></li>'), true);
+});
+
+test('renderDokuWiki renders advanced tables with colspan, rowspan and text alignment', () => {
+	const markup = `
+^ Heading 1 ^ Heading 2 ^ Heading 3 ^
+|  Right aligned |  Centered  | Left aligned  |
+| Colspan 2 cols || Normal col |
+| Rowspan 2 rows | Col B | Col C |
+| ::: | Col B2 | Col C2 |
+	`;
+	const html = renderDokuWiki(markup);
+
+	// Table structure
+	strictEqual(html.includes('<table class="wiki-table"><thead><tr><th>Heading 1</th><th>Heading 2</th><th>Heading 3</th></tr></thead><tbody>'), true);
+
+	// Alignment classes
+	strictEqual(html.includes('<td class="wiki-align-right">Right aligned</td>'), true);
+	strictEqual(html.includes('<td class="wiki-align-center">Centered</td>'), true);
+	strictEqual(html.includes('<td class="wiki-align-left">Left aligned</td>'), true);
+
+	// Colspan
+	strictEqual(html.includes('<td colspan="2">Colspan 2 cols</td><td>Normal col</td>'), true);
+
+	// Rowspan
+	strictEqual(html.includes('<td rowspan="2">Rowspan 2 rows</td><td>Col B</td><td>Col C</td>'), true);
+	// In the second row, the rowspan placeholder cell is omitted
+	strictEqual(html.includes('<tr><td>Col B2</td><td>Col C2</td></tr>'), true);
+});
+
+test('renderDokuWiki generates table of contents and heading anchors when enabled', () => {
+	const markup = `
+====== Main Page ======
+Introduction here.
+===== Chapter One =====
+Content 1
+===== Chapter Two =====
+Content 2
+==== Subsection 2.1 ====
+Content 2.1
+	`;
+
+	// Default render without toc option: basic headings, no TOC block
+	const plainHtml = renderDokuWiki(markup);
+	strictEqual(plainHtml.includes('class="wiki-toc"'), false);
+
+	// With toc: true and headingAnchors: true
+	const tocHtml = renderDokuWiki(markup, { toc: true, headingAnchors: true, sectionEdit: true });
+	strictEqual(tocHtml.includes('<nav class="wiki-toc" aria-label="Table of Contents">'), true);
+	strictEqual(tocHtml.includes('<a href="#main-page">Main Page</a>'), true);
+	strictEqual(tocHtml.includes('<a href="#chapter-one">Chapter One</a>'), true);
+	strictEqual(tocHtml.includes('<a href="#chapter-two">Chapter Two</a>'), true);
+	strictEqual(tocHtml.includes('<a href="#subsection-2-1">Subsection 2.1</a>'), true);
+
+	// Headings have anchors and section edit buttons
+	strictEqual(tocHtml.includes('id="main-page"'), true);
+	strictEqual(tocHtml.includes('<a href="#main-page" class="wiki-heading-anchor" title="Link to this section" aria-hidden="true">#</a>'), true);
+	strictEqual(tocHtml.includes('<button type="button" class="wiki-section-edit-btn" data-section="0" title="Edit this section">[edit]</button>'), true);
+
+	// ~~NOTOC~~ disables TOC even with 4 headings
+	const noTocHtml = renderDokuWiki(`~~NOTOC~~\n` + markup, { toc: true });
+	strictEqual(noTocHtml.includes('class="wiki-toc"'), false);
+
+	// ~~TOC~~ forces TOC even with fewer than 3 headings
+	const forceTocMarkup = `
+~~TOC~~
+====== Only One Heading ======
+Text
+	`;
+	const forceTocHtml = renderDokuWiki(forceTocMarkup);
+	strictEqual(forceTocHtml.includes('<nav class="wiki-toc" aria-label="Table of Contents">'), true);
+	strictEqual(forceTocHtml.includes('<a href="#only-one-heading">Only One Heading</a>'), true);
+});
+
+test('extractWikiHeadings, getWikiSection and replaceWikiSection handle section editing', () => {
+	const markup = `====== Doc Title ======
+Intro paragraph.
+
+===== Section 1 =====
+Section 1 text.
+==== Subsection 1.1 ====
+Details 1.1.
+
+===== Section 2 =====
+Section 2 text.`;
+
+	const headings = extractWikiHeadings(markup);
+	strictEqual(headings.length, 4);
+	strictEqual(headings[0].title, 'Doc Title');
+	strictEqual(headings[0].level, 1);
+	strictEqual(headings[1].title, 'Section 1');
+	strictEqual(headings[1].level, 2);
+	strictEqual(headings[2].title, 'Subsection 1.1');
+	strictEqual(headings[2].level, 3);
+	strictEqual(headings[3].title, 'Section 2');
+	strictEqual(headings[3].level, 2);
+
+	// Section 1 (level 2) includes its subsection (level 3) up until Section 2 (level 2)
+	const sec1 = getWikiSection(markup, 1);
+	strictEqual(sec1 !== null, true);
+	strictEqual(sec1!.content, `===== Section 1 =====\nSection 1 text.\n==== Subsection 1.1 ====\nDetails 1.1.\n`);
+
+	// Section 2 goes until end of doc
+	const sec2 = getWikiSection(markup, 3);
+	strictEqual(sec2 !== null, true);
+	strictEqual(sec2!.content, `===== Section 2 =====\nSection 2 text.`);
+
+	// Replace Section 1
+	const replaced = replaceWikiSection(markup, 1, `===== Section 1 Edited =====\nUpdated text.`);
+	strictEqual(replaced.includes('===== Section 1 Edited ====='), true);
+	strictEqual(replaced.includes('Updated text.'), true);
+	strictEqual(replaced.includes('===== Section 2 ====='), true);
+	strictEqual(replaced.includes('====== Doc Title ======'), true);
+	strictEqual(replaced.includes('Details 1.1.'), false); // replaced along with section 1
+});
+
 
 
 

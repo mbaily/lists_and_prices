@@ -2,7 +2,14 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { getDoc, getMutableDoc, getItems, getLists, docState, commitState } from '$lib/yjsStore.svelte';
 	import { readWikiPage, readWikiPages, saveWikiPage, deleteWikiPage, findWikiBacklinks, type WikiPage, type WikiRevision } from '$lib/wiki/data';
-	import { renderDokuWiki, slugifyWikiPage, toggleWikiTask } from '$lib/wiki/dokuwiki';
+	import {
+		renderDokuWiki,
+		slugifyWikiPage,
+		toggleWikiTask,
+		getWikiSection,
+		replaceWikiSection
+	} from '$lib/wiki/dokuwiki';
+	import { searchWikiPages, type WikiSearchResult } from '$lib/wiki/search';
 	import {
 		getNamespace,
 		getPageBaseName,
@@ -30,7 +37,11 @@
 
 	let currentPageId = $state(slugifyWikiPage(initialPageId));
 	let history = $state<string[]>([slugifyWikiPage(initialPageId)]);
+	let trace = $state<string[]>([slugifyWikiPage(initialPageId)]);
 	let isEditing = $state(false);
+	let editingSectionIndex = $state<number | null>(null);
+	let editingSectionTitle = $state<string>('');
+	let editingSectionContent = $state<string>('');
 	let showIndex = $state(false);
 	let showHistory = $state(false);
 	let selectedRevision = $state<WikiRevision | null>(null);
@@ -86,6 +97,7 @@
 				const slug = getWikiSlugFromHash(window.location.hash);
 				if (slug) {
 					const normalized = slugifyWikiPage(slug);
+					addToTrace(normalized);
 					if (normalized !== currentPageId) {
 						currentPageId = normalized;
 						if (!history.includes(normalized)) {
@@ -288,7 +300,32 @@
 		)
 	);
 
+	const fullTextResults = $derived(indexSearch.trim() ? searchWikiPages(allPages, indexSearch) : []);
+
 	const namespaceTree = $derived(buildNamespaceTree(filteredPages));
+
+	function addToTrace(slug: string) {
+		if (!slug) return;
+		trace = [...trace.filter((s) => s !== slug), slug].slice(-7);
+	}
+
+	function getPageDisplayTitle(slug: string): string {
+		const page = allPages.find((p) => p.id === slug);
+		if (page?.title) return page.title;
+		if (slug === 'start') return 'start';
+		return getPageBaseName(slug) || slug;
+	}
+
+	function openSectionEdit(secIdx: number) {
+		if (commitState.isHistorical || !currentPage) return;
+		const sec = getWikiSection(currentPage.content, secIdx);
+		if (sec) {
+			editingSectionIndex = secIdx;
+			editingSectionTitle = sec.heading.title;
+			editingSectionContent = sec.content;
+			isEditing = true;
+		}
+	}
 
 	// Rendered HTML of the current page
 	const renderedHtml = $derived.by(() => {
@@ -296,6 +333,9 @@
 		return renderDokuWiki(currentPage.content, {
 			currentSlug: currentPage.id,
 			disableCheckboxes: commitState.isHistorical,
+			toc: true,
+			headingAnchors: true,
+			sectionEdit: !commitState.isHistorical,
 			resolveWikiTitle: (slug) => {
 				const page = allPages.find((p) => p.id === slug);
 				if (page?.title) return page.title;
@@ -333,6 +373,7 @@
 
 	function navigateToPage(id: string) {
 		const slug = slugifyWikiPage(id);
+		addToTrace(slug);
 		if (slug !== currentPageId) {
 			currentPageId = slug;
 			history = [...history, slug];
@@ -388,6 +429,49 @@
 			return;
 		}
 
+		// Section edit button
+		const editBtn = (e.target as HTMLElement).closest<HTMLButtonElement>('.wiki-section-edit-btn');
+		if (editBtn) {
+			e.preventDefault();
+			const secAttr = editBtn.getAttribute('data-section');
+			if (secAttr !== null) {
+				const secIdx = parseInt(secAttr, 10);
+				if (!isNaN(secIdx)) {
+					openSectionEdit(secIdx);
+				}
+			}
+			return;
+		}
+
+		// TOC toggle button
+		const tocToggle = (e.target as HTMLElement).closest<HTMLButtonElement>('.wiki-toc-toggle');
+		if (tocToggle) {
+			e.preventDefault();
+			const tocList = tocToggle.closest('.wiki-toc')?.querySelector('.wiki-toc-list');
+			if (tocList) {
+				const isHidden = (tocList as HTMLElement).style.display === 'none';
+				(tocList as HTMLElement).style.display = isHidden ? 'flex' : 'none';
+				tocToggle.textContent = isHidden ? '[-]' : '[+]';
+				tocToggle.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+			}
+			return;
+		}
+
+		// In-page hash anchors (TOC, heading anchors, footnotes)
+		const hashAnchor = (e.target as HTMLElement).closest<HTMLAnchorElement>('a[href^="#"]');
+		if (hashAnchor) {
+			const href = hashAnchor.getAttribute('href');
+			if (href && href.length > 1 && !hashAnchor.classList.contains('wiki-link')) {
+				const targetId = href.slice(1);
+				const targetEl = document.getElementById(targetId);
+				if (targetEl) {
+					e.preventDefault();
+					targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+					return;
+				}
+			}
+		}
+
 		const target = (e.target as HTMLElement).closest('a');
 		if (!target) return;
 
@@ -438,12 +522,25 @@
 
 	function handleSavePage(data: { id: string; title: string; content: string; summary: string; isMinor: boolean }) {
 		if (commitState.isHistorical) return;
-		saveWikiPage(getMutableDoc(), data.id, {
-			title: data.title,
-			content: data.content,
-			summary: data.summary,
-			isMinor: data.isMinor
-		});
+		if (editingSectionIndex !== null && currentPage) {
+			const fullContent = replaceWikiSection(currentPage.content, editingSectionIndex, data.content);
+			saveWikiPage(getMutableDoc(), data.id, {
+				title: currentPage.title,
+				content: fullContent,
+				summary: data.summary || `Edit section: ${editingSectionTitle}`,
+				isMinor: data.isMinor
+			});
+			editingSectionIndex = null;
+			editingSectionTitle = '';
+			editingSectionContent = '';
+		} else {
+			saveWikiPage(getMutableDoc(), data.id, {
+				title: data.title,
+				content: data.content,
+				summary: data.summary,
+				isMinor: data.isMinor
+			});
+		}
 		isEditing = false;
 	}
 
@@ -667,32 +764,43 @@
 						<input
 							type="text"
 							class="index-search-input"
-							placeholder="Search pages or namespaces..."
+							placeholder="Search pages, namespaces or full text..."
 							bind:value={indexSearch}
 						/>
-						<div class="index-view-toggles">
+						{#if !indexSearch.trim()}
+							<div class="index-view-toggles">
+								<button
+									type="button"
+									class="mode-toggle-btn"
+									class:active={indexViewMode === 'tree'}
+									onclick={() => (indexViewMode = 'tree')}
+									title="Hierarchical Namespace Tree"
+								>
+									🌳 Tree
+								</button>
+								<button
+									type="button"
+									class="mode-toggle-btn"
+									class:active={indexViewMode === 'flat'}
+									onclick={() => (indexViewMode = 'flat')}
+									title="Flat List"
+								>
+									📋 Flat
+								</button>
+							</div>
+						{:else}
 							<button
 								type="button"
-								class="mode-toggle-btn"
-								class:active={indexViewMode === 'tree'}
-								onclick={() => (indexViewMode = 'tree')}
-								title="Hierarchical Namespace Tree"
+								class="mode-toggle-btn clear-search-mode-btn"
+								onclick={() => (indexSearch = '')}
+								title="Clear Search"
 							>
-								🌳 Tree
+								✕ Clear
 							</button>
-							<button
-								type="button"
-								class="mode-toggle-btn"
-								class:active={indexViewMode === 'flat'}
-								onclick={() => (indexViewMode = 'flat')}
-								title="Flat List"
-							>
-								📋 Flat
-							</button>
-						</div>
+						{/if}
 					</div>
 
-					{#if indexViewMode === 'tree' && allPages.length > 0}
+					{#if !indexSearch.trim() && indexViewMode === 'tree' && allPages.length > 0}
 						<div class="tree-controls">
 							<button type="button" class="tree-ctrl-btn" onclick={expandAllFolders}>Expand All</button>
 							<button type="button" class="tree-ctrl-btn" onclick={collapseAllFolders}>Collapse All</button>
@@ -707,6 +815,32 @@
 								<button type="button" class="primary-btn" onclick={() => { navigateToPage('start'); isEditing = true; showIndex = false; }}>
 									Create Start Page
 								</button>
+							</div>
+						{:else if indexSearch.trim()}
+							<div class="search-results-container">
+								<div class="search-results-summary">
+									<span>{fullTextResults.length} {fullTextResults.length === 1 ? 'result' : 'results'} found</span>
+									<button type="button" class="clear-search-btn" onclick={() => (indexSearch = '')}>Clear</button>
+								</div>
+								{#if fullTextResults.length === 0}
+									<div class="empty-pages-msg">
+										<p>No pages matching "{indexSearch}".</p>
+									</div>
+								{:else}
+									<div class="search-results-list">
+										{#each fullTextResults as res}
+											<button type="button" class="search-result-card" onclick={() => navigateToPage(res.id)}>
+												<div class="search-card-hdr">
+													<span class="search-card-title">{res.title}</span>
+													<span class="search-card-slug">wiki:{res.id}</span>
+												</div>
+												{#if res.snippet}
+													<div class="search-card-snippet">{@html res.snippet}</div>
+												{/if}
+											</button>
+										{/each}
+									</div>
+								{/if}
 							</div>
 						{:else if indexViewMode === 'tree'}
 							<div class="ns-tree-container">
@@ -841,6 +975,30 @@
 								📄 <span class="bc-name">{currentPage?.title || linkedEntity?.name || pageBaseName}</span>
 							</span>
 						</nav>
+
+						<!-- Visited Page Trace (Session Breadcrumbs) -->
+						{#if trace.length > 1}
+							<div class="wiki-trace-bar" aria-label="Recent page trace">
+								<span class="wiki-trace-label">Trace:</span>
+								{#each trace as traceSlug, i}
+									{#if i > 0}
+										<span class="wiki-trace-sep">»</span>
+									{/if}
+									{#if traceSlug === currentPageId}
+										<span class="wiki-trace-current">{getPageDisplayTitle(traceSlug)}</span>
+									{:else}
+										<button
+											type="button"
+											class="wiki-trace-link"
+											onclick={() => navigateToPage(traceSlug)}
+											title="Go to {traceSlug}"
+										>
+											{getPageDisplayTitle(traceSlug)}
+										</button>
+									{/if}
+								{/each}
+							</div>
+						{/if}
 
 						{#if currentPage}
 							<!-- Page Title & Meta -->
@@ -1014,11 +1172,17 @@
 	{#if isEditing}
 		<WikiEditor
 			pageId={currentPageId}
-			initialTitle={defaultPageTitle}
-			initialContent={defaultPageContent}
+			initialTitle={editingSectionIndex !== null ? editingSectionTitle : defaultPageTitle}
+			initialContent={editingSectionIndex !== null ? editingSectionContent : defaultPageContent}
+			sectionTitle={editingSectionIndex !== null ? editingSectionTitle : undefined}
 			readOnly={commitState.isHistorical}
 			onSave={handleSavePage}
-			onClose={() => (isEditing = false)}
+			onClose={() => {
+				isEditing = false;
+				editingSectionIndex = null;
+				editingSectionTitle = '';
+				editingSectionContent = '';
+			}}
 		/>
 	{/if}
 
@@ -1944,6 +2108,298 @@
 	}
 	.restore-btn:hover {
 		opacity: 0.9;
+	}
+
+	/* Visited Page Trace (Breadcrumbs) */
+	.wiki-trace-bar {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 0.35rem;
+		font-size: 0.8rem;
+		color: var(--text2);
+		margin: 0.4rem 0 1rem;
+		padding: 0.3rem 0.6rem;
+		background: var(--bg2);
+		border-radius: 4px;
+		border: 1px solid var(--border);
+	}
+	.wiki-trace-label {
+		font-weight: 600;
+		color: var(--text2);
+		margin-right: 0.2rem;
+	}
+	.wiki-trace-sep {
+		color: var(--text2);
+		opacity: 0.6;
+	}
+	.wiki-trace-link {
+		background: none;
+		border: none;
+		color: var(--accent);
+		cursor: pointer;
+		padding: 0;
+		font-size: inherit;
+		text-decoration: underline;
+		text-underline-offset: 2px;
+	}
+	.wiki-trace-link:hover {
+		color: var(--text);
+	}
+	.wiki-trace-current {
+		font-weight: 600;
+		color: var(--text);
+	}
+
+	/* Table of Contents */
+	:global(.wiki-rendered .wiki-toc) {
+		background: var(--bg2);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 0.8rem 1rem;
+		margin: 1.25rem 0;
+		max-width: 480px;
+	}
+	:global(.wiki-rendered .wiki-toc-header) {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		font-weight: 700;
+		font-size: 0.95rem;
+		border-bottom: 1px solid var(--border);
+		padding-bottom: 0.4rem;
+		margin-bottom: 0.6rem;
+	}
+	:global(.wiki-rendered .wiki-toc-toggle) {
+		background: none;
+		border: none;
+		color: var(--accent);
+		cursor: pointer;
+		font-size: 0.9rem;
+		font-family: monospace;
+		padding: 0 0.25rem;
+	}
+	:global(.wiki-rendered .wiki-toc-toggle:hover) {
+		color: var(--text);
+	}
+	:global(.wiki-rendered .wiki-toc-list) {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	:global(.wiki-rendered .wiki-toc-item) {
+		font-size: 0.9rem;
+	}
+	:global(.wiki-rendered .wiki-toc-item a) {
+		color: var(--accent);
+		text-decoration: none;
+	}
+	:global(.wiki-rendered .wiki-toc-item a:hover) {
+		text-decoration: underline;
+	}
+	:global(.wiki-rendered .wiki-toc-level-1) { padding-left: 0; font-weight: 600; }
+	:global(.wiki-rendered .wiki-toc-level-2) { padding-left: 1rem; }
+	:global(.wiki-rendered .wiki-toc-level-3) { padding-left: 2rem; }
+	:global(.wiki-rendered .wiki-toc-level-4) { padding-left: 3rem; }
+	:global(.wiki-rendered .wiki-toc-level-5) { padding-left: 4rem; }
+
+	/* Headings with anchors & section edit */
+	:global(.wiki-rendered .wiki-heading) {
+		position: relative;
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
+	:global(.wiki-rendered .wiki-heading-anchor) {
+		opacity: 0;
+		color: var(--text2);
+		text-decoration: none;
+		font-size: 0.85em;
+		transition: opacity 0.15s;
+	}
+	:global(.wiki-rendered .wiki-heading:hover .wiki-heading-anchor) {
+		opacity: 1;
+	}
+	:global(.wiki-rendered .wiki-section-edit-btn) {
+		opacity: 0;
+		background: none;
+		border: none;
+		color: var(--accent);
+		font-size: 0.75rem;
+		cursor: pointer;
+		padding: 0.1rem 0.3rem;
+		border-radius: 3px;
+		transition: opacity 0.15s, background 0.15s;
+	}
+	:global(.wiki-rendered .wiki-heading:hover .wiki-section-edit-btn) {
+		opacity: 1;
+	}
+	:global(.wiki-rendered .wiki-section-edit-btn:hover) {
+		background: var(--bg3);
+		text-decoration: underline;
+	}
+
+	/* Advanced Tables */
+	:global(.wiki-rendered table.wiki-table) {
+		width: 100%;
+		border-collapse: collapse;
+		margin: 1.25rem 0;
+		font-size: 0.95rem;
+		border: 1px solid var(--border);
+	}
+	:global(.wiki-rendered table.wiki-table th),
+	:global(.wiki-rendered table.wiki-table td) {
+		border: 1px solid var(--border);
+		padding: 0.5rem 0.75rem;
+	}
+	:global(.wiki-rendered table.wiki-table th) {
+		background: var(--bg2);
+		font-weight: 600;
+	}
+	:global(.wiki-rendered table.wiki-table tr:hover td) {
+		background: var(--bg2);
+	}
+	:global(.wiki-rendered .wiki-align-left) {
+		text-align: left;
+	}
+	:global(.wiki-rendered .wiki-align-right) {
+		text-align: right;
+	}
+	:global(.wiki-rendered .wiki-align-center) {
+		text-align: center;
+	}
+
+	/* Footnotes */
+	:global(.wiki-rendered .wiki-fn-ref) {
+		font-size: 0.75em;
+		line-height: 0;
+		vertical-align: super;
+	}
+	:global(.wiki-rendered .wiki-fn-link) {
+		color: var(--accent);
+		text-decoration: none;
+		padding: 0 0.15rem;
+		font-weight: 600;
+	}
+	:global(.wiki-rendered .wiki-fn-link:hover) {
+		text-decoration: underline;
+	}
+	:global(.wiki-rendered aside.wiki-footnotes) {
+		margin-top: 3rem;
+		padding-top: 1rem;
+		border-top: 1px solid var(--border);
+		font-size: 0.9rem;
+	}
+	:global(.wiki-rendered .wiki-footnotes-title) {
+		font-weight: 700;
+		font-size: 1rem;
+		margin-bottom: 0.5rem;
+		color: var(--text2);
+	}
+	:global(.wiki-rendered aside.wiki-footnotes ol) {
+		padding-left: 1.5rem;
+		margin: 0;
+	}
+	:global(.wiki-rendered aside.wiki-footnotes li) {
+		margin-bottom: 0.35rem;
+	}
+	:global(.wiki-rendered .wiki-fn-backref) {
+		color: var(--accent);
+		text-decoration: none;
+		font-size: 0.9em;
+		margin-left: 0.25rem;
+	}
+	:global(.wiki-rendered .wiki-fn-backref:hover) {
+		text-decoration: underline;
+	}
+
+	/* Interwiki Links */
+	:global(.wiki-rendered a.wiki-interwiki-link) {
+		color: #0284c7;
+		text-decoration-line: underline;
+		text-decoration-style: dotted;
+	}
+
+	/* Full-Text Search Results */
+	.search-results-container {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		padding-bottom: 2rem;
+	}
+	.search-results-summary {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		font-size: 0.85rem;
+		color: var(--text2);
+		padding: 0 0.25rem;
+	}
+	.clear-search-btn {
+		background: none;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		color: var(--text);
+		font-size: 0.8rem;
+		padding: 0.2rem 0.5rem;
+		cursor: pointer;
+	}
+	.clear-search-btn:hover {
+		background: var(--bg2);
+	}
+	.search-results-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+		overflow-y: auto;
+	}
+	.search-result-card {
+		background: var(--bg2);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 0.75rem 1rem;
+		text-align: left;
+		cursor: pointer;
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+		transition: border-color 0.15s, background 0.15s;
+	}
+	.search-result-card:hover {
+		border-color: var(--accent);
+		background: var(--bg3);
+	}
+	.search-card-hdr {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+	}
+	.search-card-title {
+		font-size: 1rem;
+		font-weight: 600;
+		color: var(--text);
+	}
+	.search-card-slug {
+		font-size: 0.8rem;
+		font-family: monospace;
+		color: var(--text2);
+	}
+	.search-card-snippet {
+		font-size: 0.85rem;
+		color: var(--text2);
+		line-height: 1.4;
+	}
+	:global(.search-card-snippet mark.wiki-search-match) {
+		background: #fef08a;
+		color: #854d0e;
+		font-weight: 600;
+		padding: 0 0.15rem;
+		border-radius: 2px;
 	}
 </style>
 

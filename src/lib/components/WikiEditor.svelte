@@ -9,6 +9,7 @@
 		pageId,
 		initialTitle = '',
 		initialContent = '',
+		sectionTitle = undefined,
 		readOnly = false,
 		onSave,
 		onClose
@@ -16,6 +17,7 @@
 		pageId: string;
 		initialTitle?: string;
 		initialContent?: string;
+		sectionTitle?: string;
 		readOnly?: boolean;
 		onSave: (data: { id: string; title: string; content: string; summary: string; isMinor: boolean }) => void;
 		onClose: () => void;
@@ -23,7 +25,7 @@
 
 	let title = $state(initialTitle || pageId);
 	let content = $state(initialContent);
-	let editSummary = $state('');
+	let editSummary = $state(sectionTitle ? `Edit section: ${sectionTitle}` : '');
 	let isMinor = $state(false);
 	let isPreview = $state(false);
 	let showConfirmCancel = $state(false);
@@ -333,13 +335,20 @@
 			</div>
 
 			<div class="editor-title-wrap">
-				<input
-					type="text"
-					class="title-input"
-					bind:value={title}
-					placeholder="Page Title"
-					disabled={readOnly}
-				/>
+				{#if sectionTitle}
+					<div class="section-edit-badge" title="Editing section: {sectionTitle}">
+						<span class="section-icon">✏️</span>
+						<span>Editing Section: <strong>{sectionTitle}</strong></span>
+					</div>
+				{:else}
+					<input
+						type="text"
+						class="title-input"
+						bind:value={title}
+						placeholder="Page Title"
+						disabled={readOnly}
+					/>
+				{/if}
 				<span class="page-badge" title="Slug: {pageId}">wiki:{pageId}</span>
 			</div>
 		</div>
@@ -552,6 +561,23 @@
 		border-color: var(--accent);
 		background: var(--bg);
 	}
+	.section-edit-badge {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.95rem;
+		padding: 0.25rem 0.6rem;
+		border-radius: 6px;
+		background: var(--bg2);
+		border: 1px solid var(--accent);
+		color: var(--text);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.section-edit-badge .section-icon {
+		font-size: 1rem;
+	}
 	.page-badge {
 		font-size: 0.8rem;
 		font-family: monospace;
@@ -606,7 +632,24 @@
 			gap: 0.35rem;
 			min-height: 40px;
 		}
-		.page-badge {
+		.section-edit-badge {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.95rem;
+		padding: 0.25rem 0.6rem;
+		border-radius: 6px;
+		background: var(--bg2);
+		border: 1px solid var(--accent);
+		color: var(--text);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.section-edit-badge .section-icon {
+		font-size: 1rem;
+	}
+	.page-badge {
 			display: none;
 		}
 		.title-input {
