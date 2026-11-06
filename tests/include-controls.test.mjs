@@ -262,3 +262,11 @@ test('filtered tree items each block is keyed by item id to maintain inclusion i
 	assert.match(text, /\{#each\s+filteredTreeItems\s+as\s+\{[^}]+\}\s*\(\s*item\.id\s*\)\s*\}/);
 });
 
+test('include refresh button has spinning animation when refreshed', () => {
+	const rules = cssRules('../src/lib/components/ListScreen.svelte');
+	assert.match(rules.get('.include-refresh.spinning'), /animation:\s*spin\b/);
+	const text = readFileSync(new URL('../src/lib/components/ListScreen.svelte', import.meta.url), 'utf8');
+	assert.match(text, /triggerRefreshInclude/);
+	assert.match(text, /class:spinning=\{refreshingIncludes\[/);
+});
+
