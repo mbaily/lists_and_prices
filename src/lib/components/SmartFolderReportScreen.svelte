@@ -2,6 +2,7 @@
 	import { appUrl } from '$lib/urls';
 	import { docState, getDoc } from '$lib/yjsStore.svelte';
 	import { readWikiPage } from '$lib/wiki/data';
+	import { slugifyWikiPage } from '$lib/wiki/dokuwiki';
 	import { settings } from '$lib/settings.svelte';
 	import {
 		readFolders,
@@ -225,7 +226,7 @@
 						{#snippet renderItem(item: ItemEntry, depth: number)}
 							<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 							<div class="rf-item rf-clickable" style="margin-left: {depth * 2}ch" onclick={() => navigateToList(lb.listId)}>
-									{#if item.isNote}<span class="rf-note-mark">↳ </span>{:else}<span class="rf-bullet">• </span>{/if}{#each splitWithTags(item.name) as part}{#if part.type === 'url'}<a class="rf-url" href={part.value} target="_blank" rel="noopener noreferrer" onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="rf-tag-pill" onclick={(e) => e.stopPropagation()}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref' || part.type === 'wiki-ref'}<span role="button" class="rf-ref-pill" onclick={(e) => { e.stopPropagation(); navigateToList(lb.listId); }}>{resolveRefName(part.type, part.value)}</span>{:else}{part.value}{/if}{/each}{#if item.date}<span class="rf-date"> ({item.date})</span>{/if}
+									{#if item.isNote}<span class="rf-note-mark">↳ </span>{:else}<span class="rf-bullet">• </span>{/if}{#each splitWithTags(item.name) as part}{#if part.type === 'url'}<a class="rf-url" href={part.value} target="_blank" rel="noopener noreferrer" onclick={(e) => e.stopPropagation()}>{part.value}</a>{:else if part.type === 'tag'}<span class="rf-tag-pill" onclick={(e) => e.stopPropagation()}>{part.value}</span>{:else if part.type === 'item-ref' || part.type === 'list-ref' || part.type === 'folder-ref' || part.type === 'wiki-ref'}<a class="rf-ref-pill" href={part.type === 'wiki-ref' ? `#wiki:${encodeURI(slugifyWikiPage(part.value))}` : `#l/${encodeURIComponent(lb.listId)}`} onclick={(e) => { e.stopPropagation(); if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return; if (part.type !== 'wiki-ref') { e.preventDefault(); navigateToList(lb.listId); } }}>{resolveRefName(part.type, part.value)}</a>{:else}{part.value}{/if}{/each}{#if item.date}<span class="rf-date"> ({item.date})</span>{/if}
 								</div>
 								{#each item.children as child}
 									{@render renderItem(child, depth + 1)}

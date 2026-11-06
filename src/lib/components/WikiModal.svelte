@@ -835,7 +835,15 @@
 								{:else}
 									<div class="search-results-list">
 										{#each fullTextResults as res}
-											<button type="button" class="search-result-card" onclick={() => navigateToPage(res.id)}>
+											<a
+												href="#wiki:{encodeURI(res.id)}"
+												class="search-result-card"
+												onclick={(e) => {
+													if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+													e.preventDefault();
+													navigateToPage(res.id);
+												}}
+											>
 												<div class="search-card-hdr">
 													<span class="search-card-title">{res.title}</span>
 													<span class="search-card-slug">wiki:{res.id}</span>
@@ -843,7 +851,7 @@
 												{#if res.snippet}
 													<div class="search-card-snippet">{@html res.snippet}</div>
 												{/if}
-											</button>
+											</a>
 										{/each}
 									</div>
 								{/if}
@@ -854,7 +862,16 @@
 							</div>
 						{:else}
 							{#each filteredPages as p}
-								<button type="button" class="index-page-item" class:current={p.id === currentPageId} onclick={() => navigateToPage(p.id)}>
+								<a
+									href="#wiki:{encodeURI(p.id)}"
+									class="index-page-item"
+									class:current={p.id === currentPageId}
+									onclick={(e) => {
+										if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+										e.preventDefault();
+										navigateToPage(p.id);
+									}}
+								>
 									<div class="item-main">
 										<span class="page-title">{p.title}</span>
 										<span class="page-slug">({p.id})</span>
@@ -865,7 +882,7 @@
 											<span class="item-summary">— {p.lastSummary}</span>
 										{/if}
 									</div>
-								</button>
+								</a>
 							{/each}
 						{/if}
 					</div>
@@ -967,14 +984,32 @@
 					<div class="wiki-article-card">
 						<!-- Namespace Breadcrumbs (scrolls with content) -->
 						<nav class="wiki-breadcrumbs" aria-label="Namespace breadcrumbs">
-							<button type="button" class="bc-item bc-root" onclick={() => navigateToPage('start')} title="Start / Root">
+							<a
+								href="#wiki:start"
+								class="bc-item bc-root"
+								onclick={(e) => {
+									if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+									e.preventDefault();
+									navigateToPage('start');
+								}}
+								title="Start / Root"
+							>
 								🏠 <span class="bc-name">root</span>
-							</button>
+							</a>
 							{#each namespaceSegments as seg}
 								<span class="bc-sep">:</span>
-								<button type="button" class="bc-item bc-ns" onclick={() => navigateToNamespace(seg.fullPath)} title="Namespace: {seg.fullPath}">
+								<a
+									href="#wiki:{encodeURI(seg.fullPath + ':start')}"
+									class="bc-item bc-ns"
+									onclick={(e) => {
+										if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+										e.preventDefault();
+										navigateToNamespace(seg.fullPath);
+									}}
+									title="Namespace: {seg.fullPath}"
+								>
 									📁 <span class="bc-name">{seg.name}</span>
-								</button>
+								</a>
 							{/each}
 							<span class="bc-sep">:</span>
 							<span class="bc-current" title="Page: {currentPage?.title || linkedEntity?.name || pageBaseName}">
@@ -993,14 +1028,18 @@
 									{#if traceSlug === currentPageId}
 										<span class="wiki-trace-current">{getPageDisplayTitle(traceSlug)}</span>
 									{:else}
-										<button
-											type="button"
+										<a
+											href="#wiki:{encodeURI(traceSlug)}"
 											class="wiki-trace-link"
-											onclick={() => navigateToPage(traceSlug)}
+											onclick={(e) => {
+												if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+												e.preventDefault();
+												navigateToPage(traceSlug);
+											}}
 											title="Go to {traceSlug}"
 										>
 											{getPageDisplayTitle(traceSlug)}
-										</button>
+										</a>
 									{/if}
 								{/each}
 							</div>
@@ -1012,15 +1051,19 @@
 								<div class="article-title-row">
 									<h1 class="page-main-heading">{currentPage.title}</h1>
 									{#if linkedEntity}
-										<button
-											type="button"
+										<a
+											href={linkedEntity.type === 'item' ? `#item:${encodeURIComponent(linkedEntity.id)}` : `#l/${encodeURIComponent(linkedEntity.id)}`}
 											class="entity-jump-icon-btn"
-											onclick={jumpToLinkedEntity}
+											onclick={(e) => {
+												if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+												e.preventDefault();
+												jumpToLinkedEntity();
+											}}
 											title="Jump to {linkedEntity.type === 'item' ? (linkedEntity.isNote ? 'Note' : 'Todo') : 'List'}: {linkedEntity.name}"
 											aria-label="Jump to {linkedEntity.type === 'item' ? (linkedEntity.isNote ? 'Note' : 'Todo') : 'List'}"
 										>
 											{linkedEntity.type === 'item' ? (linkedEntity.isNote ? '📝' : '☑️') : '📋'}
-										</button>
+										</a>
 									{/if}
 								</div>
 								<div class="page-metadata-bar">
@@ -1051,9 +1094,17 @@
 											<span class="group-label">Wiki pages:</span>
 											<div class="backlink-chips">
 												{#each backlinks.wikiPages as wp}
-													<button type="button" class="backlink-chip wiki-chip" onclick={() => navigateToPage(wp.id)}>
+													<a
+														href="#wiki:{encodeURI(wp.id)}"
+														class="backlink-chip wiki-chip"
+														onclick={(e) => {
+															if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+															e.preventDefault();
+															navigateToPage(wp.id);
+														}}
+													>
 														📖 {wp.title}
-													</button>
+													</a>
 												{/each}
 											</div>
 										</div>
@@ -1063,10 +1114,12 @@
 											<span class="group-label">Todos & Notes:</span>
 											<div class="backlink-chips">
 												{#each backlinks.items as item}
-													<button
-														type="button"
+													<a
+														href="#item:{encodeURIComponent(item.id)}"
 														class="backlink-chip item-chip"
-														onclick={() => {
+														onclick={(e) => {
+															if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+															e.preventDefault();
 															if (onNavigateToItem) {
 																onClose();
 																onNavigateToItem(item.id, item.listId);
@@ -1074,7 +1127,7 @@
 														}}
 													>
 														{item.isNote ? '📝' : '☑️'} {item.name.replace(/\[\[wiki:.*?\]\]/g, '').trim() || item.id}
-													</button>
+													</a>
 												{/each}
 											</div>
 										</div>
@@ -1087,15 +1140,19 @@
 								<div class="article-title-row">
 									<h2>Topic does not exist yet</h2>
 									{#if linkedEntity}
-										<button
-											type="button"
+										<a
+											href={linkedEntity.type === 'item' ? `#item:${encodeURIComponent(linkedEntity.id)}` : `#l/${encodeURIComponent(linkedEntity.id)}`}
 											class="entity-jump-icon-btn"
-											onclick={jumpToLinkedEntity}
+											onclick={(e) => {
+												if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+												e.preventDefault();
+												jumpToLinkedEntity();
+											}}
 											title="Jump to {linkedEntity.type === 'item' ? (linkedEntity.isNote ? 'Note' : 'Todo') : 'List'}: {linkedEntity.name}"
 											aria-label="Jump to {linkedEntity.type === 'item' ? (linkedEntity.isNote ? 'Note' : 'Todo') : 'List'}"
 										>
 											{linkedEntity.type === 'item' ? (linkedEntity.isNote ? '📝' : '☑️') : '📋'}
-										</button>
+										</a>
 									{/if}
 								</div>
 								<p>
@@ -1156,11 +1213,15 @@
 
 		{#each node.pages as p}
 			<div class="ns-page-row" style="padding-left: {(node.isRoot ? 0.3 : (depth + 1) * 1.15)}rem">
-				<button
-					type="button"
+				<a
+					href="#wiki:{encodeURI(p.id)}"
 					class="ns-page-link"
 					class:current={p.id === currentPageId}
-					onclick={() => navigateToPage(p.id)}
+					onclick={(e) => {
+						if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+						e.preventDefault();
+						navigateToPage(p.id);
+					}}
 					title="Open {p.title || p.id}"
 				>
 					<span class="page-icon">📄</span>
@@ -1168,7 +1229,7 @@
 					{#if p.title && p.title !== getPageBaseName(p.id)}
 						<span class="page-basename">({getPageBaseName(p.id)})</span>
 					{/if}
-				</button>
+				</a>
 			</div>
 		{/each}
 	{/if}
@@ -1432,6 +1493,7 @@
 		padding: 0.15rem 0.35rem;
 		border-radius: 4px;
 		font-weight: 500;
+		text-decoration: none;
 	}
 	.bc-item:hover {
 		background: var(--bg3);
@@ -1630,6 +1692,7 @@
 		color: var(--text);
 		text-align: left;
 		cursor: pointer;
+		text-decoration: none;
 	}
 	.index-page-item:hover {
 		color: var(--accent);
@@ -1697,6 +1760,8 @@
 		align-items: center;
 		justify-content: center;
 		transition: background 0.15s, border-color 0.15s, transform 0.1s;
+		text-decoration: none;
+		color: inherit;
 	}
 	.entity-jump-icon-btn:hover {
 		background: var(--bg3);
@@ -1846,6 +1911,7 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 0.3rem;
+		text-decoration: none;
 	}
 	.backlink-chip:hover {
 		border-color: var(--accent);
@@ -2374,6 +2440,8 @@
 		flex-direction: column;
 		gap: 0.4rem;
 		transition: border-color 0.15s, background 0.15s;
+		text-decoration: none;
+		color: inherit;
 	}
 	.search-result-card:hover {
 		border-color: var(--accent);

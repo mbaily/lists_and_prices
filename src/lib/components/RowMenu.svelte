@@ -1,5 +1,5 @@
 <script module lang="ts">
-	export interface MenuItem { label: string; action?: () => void; danger?: boolean; submenu?: MenuItem[] }
+	export interface MenuItem { label: string; action?: () => void; danger?: boolean; submenu?: MenuItem[]; href?: string }
 </script>
 <script lang="ts">
 	let { items }: { items: MenuItem[] } = $props();
@@ -95,12 +95,28 @@
 			{#if subItems}
 				<button class="menu-item menu-back" role="menuitem" onclick={(e) => { e.stopPropagation(); subItems = null; }}>← Back</button>
 				{#each subItems as item}
-					<button
-						class="menu-item"
-						class:danger={item.danger}
-						role="menuitem"
-						onclick={(e) => { e.stopPropagation(); close(); item.action?.(); }}
-					>{item.label}</button>
+					{#if item.href}
+						<a
+							class="menu-item"
+							class:danger={item.danger}
+							role="menuitem"
+							href={item.href}
+							onclick={(e) => {
+								e.stopPropagation();
+								close();
+								if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+								e.preventDefault();
+								item.action?.();
+							}}
+						>{item.label}</a>
+					{:else}
+						<button
+							class="menu-item"
+							class:danger={item.danger}
+							role="menuitem"
+							onclick={(e) => { e.stopPropagation(); close(); item.action?.(); }}
+						>{item.label}</button>
+					{/if}
 				{/each}
 			{:else}
 				{#each items as item}
@@ -110,6 +126,20 @@
 							role="menuitem"
 							onclick={(e) => { e.stopPropagation(); subItems = item.submenu!; }}
 						>{item.label} ›</button>
+					{:else if item.href}
+						<a
+							class="menu-item"
+							class:danger={item.danger}
+							role="menuitem"
+							href={item.href}
+							onclick={(e) => {
+								e.stopPropagation();
+								close();
+								if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+								e.preventDefault();
+								item.action?.();
+							}}
+						>{item.label}</a>
 					{:else}
 						<button
 							class="menu-item"
@@ -165,6 +195,9 @@
 		color: var(--text);
 		cursor: pointer;
 		border-bottom: 1px solid var(--border);
+		text-decoration: none;
+		display: block;
+		box-sizing: border-box;
 	}
 	.menu-item:last-child { border-bottom: none; }
 	.menu-item:hover, .menu-item:active { background: var(--bg2); }

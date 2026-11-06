@@ -74,7 +74,7 @@
 		return ids.length ? `#f/${ids.join('/')}` : '#';
 	}
 
-	function parseHash(): { breadcrumb: (string | null)[], openListId: string | null, nearby?: boolean, wikiPage?: string } {
+	function parseHash(): { breadcrumb: (string | null)[], openListId: string | null, nearby?: boolean, wikiPage?: string, itemId?: string } {
 		if (typeof window === 'undefined') return { breadcrumb: [null], openListId: null };
 		const hash = window.location.hash.slice(1); // strip '#'
 		if (hash === 'nearby') return { breadcrumb: [null], openListId: null, nearby: true };
@@ -90,6 +90,10 @@
 			             hash.startsWith('wiki/') ? hash.slice(5) :
 			             hash.startsWith('wiki=') ? hash.slice(5) : hash.slice(2);
 			return { breadcrumb: [null], openListId: null, wikiPage: decodeURIComponent(slug) };
+		}
+		if (hash.startsWith('item:') || hash.startsWith('i/')) {
+			const id = hash.startsWith('item:') ? hash.slice(5) : hash.slice(2);
+			return { breadcrumb: [null], openListId: null, itemId: decodeURIComponent(id) };
 		}
 		return { breadcrumb: [null], openListId: null };
 	}
@@ -107,6 +111,18 @@
 	// ── View state ──────────────────────────────────────────────────────────────
 	let openListId = $state<string | null>(_init.openListId);
 	let openItemId = $state<string | null>(null);
+	let pendingItemId = $state<string | null>(_init.itemId ?? null);
+
+	$effect(() => {
+		if (pendingItemId) {
+			const item = readAllItems().find((it) => it.id === pendingItemId);
+			if (item) {
+				openListId = item.listId;
+				openItemId = pendingItemId;
+				pendingItemId = null;
+			}
+		}
+	});
 	let nearbyOpenedTarget = $state<{ listId: string; itemId: string | null } | null>(null);
 	let showSettings = $state(false);
 	let showNearby = $state(_init.nearby ?? false);
@@ -1396,7 +1412,7 @@ ${bodyHtml}
 	// Use pushState so the browser back button works between navigations.
 	let _lastHash = typeof window !== 'undefined' ? window.location.hash : '';
 	$effect(() => {
-		if (typeof window !== 'undefined' && (window.location.hash.startsWith('#wiki') || window.location.hash.startsWith('#w/'))) {
+		if (typeof window !== 'undefined' && (window.location.hash.startsWith('#wiki') || window.location.hash.startsWith('#w/') || window.location.hash.startsWith('#item:') || window.location.hash.startsWith('#i/'))) {
 			return;
 		}
 		const hash = buildHash(breadcrumb, openListId, showNearby);
@@ -1410,7 +1426,7 @@ ${bodyHtml}
 	$effect(() => {
 		if (typeof window === 'undefined') return;
 		function onPopState() {
-			const { breadcrumb: crumbs, openListId: listId, nearby, wikiPage } = parseHash();
+			const { breadcrumb: crumbs, openListId: listId, nearby, wikiPage, itemId } = parseHash();
 			if (wikiPage) {
 				wikiInitialPage = wikiPage;
 				showWikiModal = true;
@@ -1419,6 +1435,15 @@ ${bodyHtml}
 			}
 			if (showWikiModal) {
 				showWikiModal = false;
+			}
+			if (itemId) {
+				const item = readAllItems().find((it) => it.id === itemId);
+				if (item) {
+					openListId = item.listId;
+					openItemId = itemId;
+					_lastHash = window.location.hash;
+					return;
+				}
 			}
 			showNearby = nearby ?? false;
 			breadcrumb = crumbs;
@@ -1588,7 +1613,19 @@ ${bodyHtml}
 			<!-- {#if !isInArchiveView && currentFolderId !== ARCHIVE_ID} -->
 
 			<div class="header-actions">
-				<button class="icon-btn" onclick={() => { showReportsMenu = false; showWikiModal = true; wikiInitialPage = 'start'; }} aria-label="Mini Wiki" title="Mini Wiki">📖</button>
+				<a
+					class="icon-btn"
+					href="#wiki:start"
+					onclick={(e) => {
+						if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+						e.preventDefault();
+						showReportsMenu = false;
+						showWikiModal = true;
+						wikiInitialPage = 'start';
+					}}
+					aria-label="Mini Wiki"
+					title="Mini Wiki"
+				>📖</a>
 				<button class="icon-btn" onclick={() => { showReportsMenu = false; showNearby = true; }} aria-label="Nearby errands" title="Nearby errands">🚗</button>
 				{#if currentFolderId === null && hasArchived}
 					<button class="icon-btn" onclick={() => (breadcrumb = [...breadcrumb, ARCHIVE_ID])} aria-label="Archived">
@@ -2048,7 +2085,7 @@ ${bodyHtml}
 						{ label: '✏ Rename', action: () => startRename(list.id, list.name, 'list', list.color) },
 						{ label: list.archived ? '📤 Unarchive' : '📥 Archive', action: () => { if (!commitState.isHistorical) { list.archived ? unarchiveList(list.id) : archiveList(list.id); } } },
 						{ label: '🔗 Tag as Link', action: () => writeClipboard(`[[list:${list.id}]]`) },
-						{ label: '📖 Wiki Page', action: () => { wikiInitialPage = `list:${list.id}`; showWikiModal = true; } },
+						{ label: '📖 Wiki Page', href: `#wiki:list:${encodeURI(list.id)}`, action: () => { wikiInitialPage = `list:${list.id}`; showWikiModal = true; } },
 						...(hasTag
 							? [{ label: '✕ Clear Tag', action: clearTag }]
 							: [{ label: '🏷 Tag (to move)', action: () => tagList(list.id) }]),
@@ -2404,6 +2441,10 @@ ${bodyHtml}
 		padding: 0.15rem 0.2rem;
 		color: var(--text);
 		flex-shrink: 0;
+		text-decoration: none;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
 	}
 	.nav-bar {
 		display: flex;
