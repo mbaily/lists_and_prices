@@ -99,7 +99,7 @@ export function extractWikiLinks(
 			const resolved = resolveNamespaceLink(target.slice(5), currentSlug, pageExists);
 			results.push({ raw: match[0], type: 'wiki', target: resolved, label });
 		} else {
-			const iwMatch = target.match(/^([a-zA-Z0-9_\-]+)>(.*)$/);
+			const iwMatch = target.match(/^([a-zA-Z0-9_\-]+)\s*(?:>|:)\s*(.*)$/);
 			if (iwMatch && INTERWIKI_MAP[iwMatch[1].toLowerCase()]) {
 				const resolvedUrl = INTERWIKI_MAP[iwMatch[1].toLowerCase()](iwMatch[2].trim());
 				results.push({ raw: match[0], type: 'interwiki', target: resolvedUrl, label });
@@ -895,8 +895,8 @@ function renderLink(target: string, label: string | undefined, options: RenderOp
 		return `<a href="${escapeAttribute(target)}" class="wiki-external-link" target="_blank" rel="noopener noreferrer">${display}</a>`;
 	}
 
-	// Interwiki link: prefix>target
-	const iwMatch = target.match(/^([a-zA-Z0-9_\-]+)(?:>|&gt;)(.*)$/);
+	// Interwiki link: prefix>target or prefix:target
+	const iwMatch = target.match(/^([a-zA-Z0-9_\-]+)\s*(?:>|&gt;|:)\s*(.*)$/);
 	if (iwMatch) {
 		const prefix = iwMatch[1].toLowerCase();
 		const resolver = INTERWIKI_MAP[prefix];
@@ -912,7 +912,7 @@ function renderLink(target: string, label: string | undefined, options: RenderOp
 		const id = target.slice(5).trim();
 		const resolved = options.resolveRefName ? options.resolveRefName('item-ref', id) : undefined;
 		const display = renderedLabel || resolved || `Todo: ${id.slice(0, 8)}…`;
-		return `<a href="#" class="wiki-link wiki-ref-link wiki-ref-item" data-ref-type="item" data-ref-id="${escapeAttribute(id)}"><span class="wiki-ref-icon">☑️</span> ${display}</a>`;
+		return `<a href="#item:${encodeURIComponent(id)}" class="wiki-link wiki-ref-link wiki-ref-item" data-ref-type="item" data-ref-id="${escapeAttribute(id)}"><span class="wiki-ref-icon">☑️</span> ${display}</a>`;
 	}
 
 	// Entity link: list:UUID
@@ -920,7 +920,7 @@ function renderLink(target: string, label: string | undefined, options: RenderOp
 		const id = target.slice(5).trim();
 		const resolved = options.resolveRefName ? options.resolveRefName('list-ref', id) : undefined;
 		const display = renderedLabel || resolved || `List: ${id.slice(0, 8)}…`;
-		return `<a href="#" class="wiki-link wiki-ref-link wiki-ref-list" data-ref-type="list" data-ref-id="${escapeAttribute(id)}"><span class="wiki-ref-icon">📋</span> ${display}</a>`;
+		return `<a href="#l/${encodeURIComponent(id)}" class="wiki-link wiki-ref-link wiki-ref-list" data-ref-type="list" data-ref-id="${escapeAttribute(id)}"><span class="wiki-ref-icon">📋</span> ${display}</a>`;
 	}
 
 	// Entity link: folder:UUID
@@ -928,7 +928,7 @@ function renderLink(target: string, label: string | undefined, options: RenderOp
 		const id = target.slice(7).trim();
 		const resolved = options.resolveRefName ? options.resolveRefName('folder-ref', id) : undefined;
 		const display = renderedLabel || resolved || `Folder: ${id.slice(0, 8)}…`;
-		return `<a href="#" class="wiki-link wiki-ref-link wiki-ref-folder" data-ref-type="folder" data-ref-id="${escapeAttribute(id)}"><span class="wiki-ref-icon">📁</span> ${display}</a>`;
+		return `<a href="#f/${encodeURIComponent(id)}" class="wiki-link wiki-ref-link wiki-ref-folder" data-ref-type="folder" data-ref-id="${escapeAttribute(id)}"><span class="wiki-ref-icon">📁</span> ${display}</a>`;
 	}
 
 	// Wiki link (explicit wiki: or ordinary page target)
@@ -942,5 +942,5 @@ function renderLink(target: string, label: string | undefined, options: RenderOp
 	const exists = options.pageExists ? options.pageExists(normalizedSlug) : true;
 	const missingClass = exists ? '' : ' wiki-link-missing';
 
-	return `<a href="#" class="wiki-link${missingClass}" data-wiki-page="${escapeAttribute(normalizedSlug)}" title="Wiki: ${escapeAttribute(display)}"><span class="wiki-ref-icon">📖</span> ${display}</a>`;
+	return `<a href="#wiki:${encodeURI(normalizedSlug)}" class="wiki-link${missingClass}" data-wiki-page="${escapeAttribute(normalizedSlug)}" title="Wiki: ${escapeAttribute(display)}"><span class="wiki-ref-icon">📖</span> ${display}</a>`;
 }

@@ -475,6 +475,12 @@
 		const target = (e.target as HTMLElement).closest('a');
 		if (!target) return;
 
+		// If user middle-clicked (button === 1) or used modifier keys (Ctrl/Cmd/Shift/Alt),
+		// allow browser default link behavior (e.g. open in new tab/window)
+		if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) {
+			return;
+		}
+
 		// Wiki link
 		if (target.classList.contains('wiki-link')) {
 			e.preventDefault();

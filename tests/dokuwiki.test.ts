@@ -256,15 +256,19 @@ test('extractWikiLinks and renderDokuWiki handle interwiki links', () => {
 	const markup = `
 Check [[wp>Svelte (programming language)|Wikipedia Svelte]] and [[gh>sveltejs/svelte]]
 Also [[doku>syntax]] and [[google>test query]].
+Colon prefix variant: [[wp:Linux]] and [[github:torvalds/linux]]
 	`;
 	const links = extractWikiLinks(markup);
-	strictEqual(links.length, 4);
+	strictEqual(links.length, 6);
 	strictEqual(links[0].type, 'interwiki');
 	strictEqual(links[0].target, 'https://en.wikipedia.org/wiki/Svelte%20(programming%20language)');
 	strictEqual(links[0].label, 'Wikipedia Svelte');
 
 	strictEqual(links[1].type, 'interwiki');
 	strictEqual(links[1].target, 'https://github.com/sveltejs/svelte');
+
+	strictEqual(links[4].type, 'interwiki');
+	strictEqual(links[4].target, 'https://en.wikipedia.org/wiki/Linux');
 
 	const html = renderDokuWiki(markup);
 	strictEqual(html.includes('href="https://en.wikipedia.org/wiki/Svelte%20(programming%20language)"'), true);
@@ -273,6 +277,22 @@ Also [[doku>syntax]] and [[google>test query]].
 	strictEqual(html.includes('href="https://github.com/sveltejs/svelte"'), true);
 	strictEqual(html.includes('href="https://www.dokuwiki.org/syntax"'), true);
 	strictEqual(html.includes('href="https://www.google.com/search?q=test%20query"'), true);
+	strictEqual(html.includes('href="https://en.wikipedia.org/wiki/Linux"'), true);
+	strictEqual(html.includes('href="https://github.com/torvalds/linux"'), true);
+});
+
+test('renderDokuWiki renders deep-linking hrefs on wiki and entity links for middle-click opening', () => {
+	const markup = `
+Link to [[start]] and [[projects:plan|Plan]].
+Link to item [[item:abc-123|My Item]], list [[list:def-456]] and folder [[folder:ghi-789]].
+	`;
+	const html = renderDokuWiki(markup);
+	// Wiki links point to #wiki:slug instead of bare #
+	strictEqual(html.includes('href="#wiki:start"'), true);
+	strictEqual(html.includes('href="#wiki:projects:plan"'), true);
+	strictEqual(html.includes('href="#item:abc-123"'), true);
+	strictEqual(html.includes('href="#l/def-456"'), true);
+	strictEqual(html.includes('href="#f/ghi-789"'), true);
 });
 
 test('renderDokuWiki renders footnotes and footnote section with backlinks', () => {
