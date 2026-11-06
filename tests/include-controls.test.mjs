@@ -256,3 +256,9 @@ test('items with includes have no bottom padding, including priced touch layouts
 	assert.match(rules.get('.item-row.has-bills'), /padding-bottom:\s*0\s*;/);
 	assert.match(rules.get('.item-row.priced-row.has-bills'), /padding-bottom:\s*0\s*;/);
 });
+
+test('filtered tree items each block is keyed by item id to maintain inclusion identity', () => {
+	const text = readFileSync(new URL('../src/lib/components/ListScreen.svelte', import.meta.url), 'utf8');
+	assert.match(text, /\{#each\s+filteredTreeItems\s+as\s+\{[^}]+\}\s*\(\s*item\.id\s*\)\s*\}/);
+});
+

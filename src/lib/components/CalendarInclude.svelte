@@ -13,6 +13,9 @@
 	let now = $state(new Date());
 	let error = $state('');
 	let loading = $state(true);
+	let hasLoaded = false;
+	let lastChecksum = '';
+	let lastSectionsKey = '';
 	let controller: AbortController;
 	const calendarUrl = simpleTodoPageUrl('calendar', base);
 
@@ -52,14 +55,25 @@
 		};
 	}
 
-	async function refreshSelected(selected: CalendarSection[]) {
+	async function refreshSelected(selected: CalendarSection[], force = false) {
+		const currentKey = [...selected].sort().join(',');
+		if (!force && hasLoaded && currentKey === lastSectionsKey) {
+			return;
+		}
+		lastSectionsKey = currentKey;
+
 		controller?.abort();
-		if (selected.length === 0) return;
+		if (selected.length === 0) {
+			loading = false;
+			return;
+		}
 		controller = new AbortController();
 		const request = controller;
 		const today = new Date();
 		now = today;
-		loading = true;
+		if (!hasLoaded) {
+			loading = true;
+		}
 		error = '';
 		const { start, end } = calendarQueryRange(selected, today);
 		try {
@@ -70,30 +84,38 @@
 			const response = await fetch(url, { credentials, cache: 'no-store', signal: request.signal });
 			if (response.status === 401 || response.status === 403) throw new Error('Sign in to Simple Todo to view calendar events.');
 			if (!response.ok) throw new Error('Calendar service is unavailable.');
-			const data: unknown = await response.json();
+			const rawText = await response.text();
 			if (request.signal.aborted) return;
+			if (hasLoaded && rawText === lastChecksum) {
+				return;
+			}
+			lastChecksum = rawText;
+			const data: unknown = JSON.parse(rawText);
 			occurrences = parseCalendarResponse(data);
+			hasLoaded = true;
 		} catch (e) {
 			if (request.signal.aborted) return;
-			occurrences = [];
-			error = e instanceof Error ? e.message : 'Calendar service is unavailable.';
+			if (!hasLoaded) {
+				occurrences = [];
+				error = e instanceof Error ? e.message : 'Calendar service is unavailable.';
+			}
 		} finally {
 			if (!request.signal.aborted) loading = false;
 		}
 	}
 
 	export function refresh() {
-		return refreshSelected(sections);
+		return refreshSelected(sections, true);
 	}
 
 	$effect(() => {
 		const selected = [...sections];
-		void refreshSelected(selected);
+		void refreshSelected(selected, false);
 		let timer: ReturnType<typeof setTimeout>;
 		function scheduleMidnight() {
 			const current = new Date();
 			const midnight = new Date(current.getFullYear(), current.getMonth(), current.getDate() + 1);
-			timer = setTimeout(() => { void refreshSelected(selected); scheduleMidnight(); }, midnight.getTime() - current.getTime() + 100);
+			timer = setTimeout(() => { void refreshSelected(selected, true); scheduleMidnight(); }, midnight.getTime() - current.getTime() + 100);
 		}
 		scheduleMidnight();
 		return () => { controller?.abort(); clearTimeout(timer); };

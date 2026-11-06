@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { base } from '$app/paths';
-	import { onMount } from 'svelte';
 	import { billSections, billLine, type BillSection } from '$lib/billsInclude';
 	import { simpleTodoApiUrl } from '$lib/simpleTodo';
 	import type { IncludeView } from '$lib/includeView';
@@ -8,6 +7,9 @@
 	let data = $state<Record<string, unknown> | null>(null);
 	let error = $state('');
 	let loading = $state(true);
+	let hasLoaded = false;
+	let lastChecksum = '';
+	let lastSectionsKey = '';
 	let controller: AbortController;
 	export function sectionView(section: BillSection): IncludeView<string> {
 		if (loading) return { status: 'loading' };
@@ -22,11 +24,18 @@
 			entries: rows.map((row: unknown) => billLine(row as Record<string, unknown>, section))
 		};
 	}
-	export async function refresh() {
+	async function fetchBills(selected: BillSection[], force = false) {
+		const currentKey = [...selected].sort().join(',');
+		if (!force && hasLoaded && currentKey === lastSectionsKey) {
+			return;
+		}
+		lastSectionsKey = currentKey;
 		controller?.abort();
 		controller = new AbortController();
 		const request = controller;
-		loading = true;
+		if (!hasLoaded) {
+			loading = true;
+		}
 		error = '';
 		try {
 			const url = simpleTodoApiUrl('api/bills?show_inactive=1', base);
@@ -34,17 +43,32 @@
 			const response = await fetch(url, { credentials, cache: 'no-store', signal: request.signal });
 			if (response.status === 401 || response.status === 403) throw new Error('Sign in to Simple Todo to view bills.');
 			if (!response.ok) throw new Error('Bills service is unavailable.');
-			const json: unknown = await response.json();
+			const rawText = await response.text();
 			if (request.signal.aborted) return;
+			if (hasLoaded && rawText === lastChecksum) {
+				return;
+			}
+			lastChecksum = rawText;
+			const json: unknown = JSON.parse(rawText);
 			if (!json || typeof json !== 'object' || Array.isArray(json)) throw new Error('Invalid bills response.');
 			data = json as Record<string, unknown>;
+			hasLoaded = true;
 		} catch (e) {
 			if (request.signal.aborted) return;
-			data = null;
-			error = e instanceof Error && e.message.startsWith('Sign in') ? e.message : 'Bills service is unavailable.';
+			if (!hasLoaded) {
+				data = null;
+				error = e instanceof Error && e.message.startsWith('Sign in') ? e.message : 'Bills service is unavailable.';
+			}
 		} finally { if (!request.signal.aborted) loading = false; }
 	}
-	onMount(() => { refresh(); return () => controller?.abort(); });
+	export function refresh() {
+		return fetchBills(sections, true);
+	}
+	$effect(() => {
+		const selected = [...sections];
+		void fetchBills(selected, false);
+		return () => controller?.abort();
+	});
 </script>
 {#if displaySections.length}
 <div class="bills-includes">
