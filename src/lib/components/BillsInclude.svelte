@@ -16,12 +16,16 @@
 		if (error) return { status: 'error', message: error };
 		const rows: unknown = data?.[section];
 		if (!Array.isArray(rows)) return { status: 'unavailable' };
-		if (!rows.every((row: unknown) => row && typeof row === 'object' && !Array.isArray(row))) {
+		const overdueRows: unknown[] = (section === 'upcoming' || section === 'due_today') && Array.isArray(data?.overdue)
+			? (data.overdue as unknown[])
+			: [];
+		const combined = [...overdueRows, ...rows];
+		if (!combined.every((row: unknown) => row && typeof row === 'object' && !Array.isArray(row))) {
 			return { status: 'error', message: 'Invalid bills response.' };
 		}
 		return {
 			status: 'ready',
-			entries: rows.map((row: unknown) => billLine(row as Record<string, unknown>, section))
+			entries: combined.map((row: unknown) => billLine(row as Record<string, unknown>, section))
 		};
 	}
 	async function fetchBills(selected: BillSection[], force = false) {
@@ -76,10 +80,13 @@
 	{:else if error}<p>{error} <button onclick={refresh}>Retry</button></p>
 	{:else if data}
 		{#each displaySections as section}
+			{@const overdueRows = (section === 'upcoming' || section === 'due_today') && !displaySections.includes('overdue') && Array.isArray(data?.overdue) ? (data.overdue as unknown[]) : []}
+			{@const sectionRows = Array.isArray(data[section]) ? (data[section] as unknown[]) : []}
+			{@const allRows = [...overdueRows, ...sectionRows]}
 			<section aria-label={billSections[section]}>
 				{#if !Array.isArray(data[section])}<p>Section unavailable.</p>
-				{:else if (data[section] as unknown[]).length === 0}<p>No entries.</p>
-				{:else}<ul>{#each (data[section] as unknown[]) as row}{#if row && typeof row === 'object' && !Array.isArray(row)}<li>{billLine(row as Record<string, unknown>, section)}</li>{/if}{/each}</ul>{/if}
+				{:else if allRows.length === 0}<p>No entries.</p>
+				{:else}<ul>{#each allRows as row}{#if row && typeof row === 'object' && !Array.isArray(row)}<li>{billLine(row as Record<string, unknown>, section)}</li>{/if}{/each}</ul>{/if}
 			</section>
 		{/each}
 	{/if}

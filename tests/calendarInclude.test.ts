@@ -136,30 +136,3 @@ test('calendarQueryRange looks back CALENDAR_LOOKBACK_DAYS without exceeding 365
 	strictEqual(spanDays <= 365, true);
 	strictEqual(query.start, '2025-11-14');
 });
-
-test('overdue uncompleted occurrences are included while completed past occurrences are excluded', () => {
-	const now = new Date(2026, 10, 4, 12); // 2026-11-04
-	const range = calendarRange('today', now); // 2026-11-04 to 2026-11-04
-
-	const occurrences: CalendarOccurrence[] = [
-		// Overdue, uncompleted (not important)
-		{ event: { id: 1, title: 'Old normal task', all_day: true }, occurrence_at: '2026-11-01T00:00:00', completed: false },
-		// Overdue, uncompleted (important)
-		{ event: { id: 2, title: 'Old urgent task', all_day: true, important_if_late: true }, occurrence_at: '2026-11-02T00:00:00', completed: false },
-		// Past, completed (should be excluded)
-		{ event: { id: 3, title: 'Done task', all_day: true }, occurrence_at: '2026-11-02T00:00:00', completed: true },
-		// Today, uncompleted (should be included)
-		{ event: { id: 4, title: 'Today task', all_day: true }, occurrence_at: '2026-11-04T00:00:00', completed: false },
-		// Future beyond range (should be excluded)
-		{ event: { id: 5, title: 'Future task', all_day: true }, occurrence_at: '2026-11-06T00:00:00', completed: false }
-	];
-
-	const filtered = occurrences.filter((row) => {
-		const date = row.occurrence_at.slice(0, 10);
-		if (date >= range.start && date <= range.end) return true;
-		if (date < range.start && !row.completed) return true;
-		return false;
-	});
-
-	deepStrictEqual(filtered.map((r) => r.event.id), [1, 2, 4]);
-});

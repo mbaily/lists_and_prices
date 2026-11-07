@@ -152,6 +152,8 @@ test('wrapped bills surface loading, errors, empty sections and formatted entrie
 		assert.deepEqual(sectionView('upcoming'), { status: 'error', message: 'Invalid bills response.' });
 		state.data.upcoming.pop();
 		assert.deepEqual(sectionView('upcoming'), { status: 'ready', entries: ['Power, $25.00'] });
+		state.data.overdue = [{ name: 'Exetel', effective_amount: 30, currency_symbol: '$', next_due_date: '2026-11-01' }];
+		assert.deepEqual(sectionView('upcoming'), { status: 'ready', entries: ['Exetel, $30.00, due 2026-11-01', 'Power, $25.00'] });
 	} finally {
 		app.dispose();
 	}
