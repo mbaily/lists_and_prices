@@ -21,14 +21,10 @@
 
 	function sectionRows(section: CalendarSection): CalendarOccurrence[] {
 		const range = calendarRange(section, now);
-		const todayStart = calendarRange('today', now).start;
 		return occurrences.filter((row) => {
 			const date = row.occurrence_at.slice(0, 10);
 			if (date >= range.start && date <= range.end) return true;
-			if (date < range.start && !row.completed) {
-				if (row.is_important !== undefined) return Boolean(row.is_important);
-				return Boolean(row.event.important_if_late && date < todayStart);
-			}
+			if (date < range.start && !row.completed) return true;
 			return false;
 		});
 	}
@@ -36,15 +32,10 @@
 	export function sectionView(section: CalendarSection): IncludeView<CalendarInlineEntry> {
 		if (loading) return { status: 'loading' };
 		if (error) return { status: 'error', message: error };
-		const todayStart = calendarRange('today', now).start;
 		return {
 			status: 'ready',
 			entries: sectionRows(section).map((row) => {
-				const isImportant = !row.completed && (
-					row.is_important !== undefined
-						? Boolean(row.is_important)
-						: Boolean(row.event.important_if_late && row.occurrence_at.slice(0, 10) < todayStart)
-				);
+				const isImportant = isImportantOccurrence(row, now);
 				return {
 					label: calendarOccurrenceLabel(row, now),
 					title: row.event.title,
