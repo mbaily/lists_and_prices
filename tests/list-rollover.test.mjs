@@ -3,14 +3,24 @@ import { test } from 'node:test';
 import { createApp, componentFunctions, transpile } from './helpers/app.mjs';
 
 const functions = componentFunctions('src/lib/components/ListScreen.svelte', [
-	'parseDateFromListName', 'computeRolloverDate', 'pad2'
+	'parseDateFromListName', 'computeRolloverDate', 'pad2',
+	'selectRolloverIncompleteScope', 'selectRolloverAllScope', 'selectRolloverCustomScope',
+	'deselectAllRolloverItems', 'selectIncompleteRolloverItems', 'selectAllRolloverItems',
+	'toggleRolloverItem', 'confirmRolloverItemSelection', 'cancelRolloverItemSelection',
+	'getRolloverItemIds', 'openRolloverModal'
 ]);
 
 const helpers = new Function('state', `with (state) {
 	const DAY_NAMES_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 	const DAY_NAMES_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 	${transpile(functions)};
-	return { parseDateFromListName, computeRolloverDate };
+	return {
+		parseDateFromListName, computeRolloverDate,
+		selectRolloverIncompleteScope, selectRolloverAllScope, selectRolloverCustomScope,
+		deselectAllRolloverItems, selectIncompleteRolloverItems, selectAllRolloverItems,
+		toggleRolloverItem, confirmRolloverItemSelection, cancelRolloverItemSelection,
+		getRolloverItemIds, openRolloverModal
+	};
 }`)({ allLists: [], listId: '' });
 
 test('date parsing extracts DMY, ISO, and Day-prefixed patterns', () => {
@@ -118,6 +128,149 @@ test('rollover creates target list and moves incomplete items leaving checked it
 		const sourceItemsAfter = app.data.readItems(sourceListId);
 		assert.equal(sourceItemsAfter.length, 1);
 		assert.equal(sourceItemsAfter[0].id, item2);
+	} finally {
+		app.dispose();
+	}
+});
+
+test('rollover selection dialog supports Selected scope, pre-selection, preset overwrites and move', () => {
+	const app = createApp();
+	try {
+		const folderId = app.data.createFolder('Sprint Folder', null);
+		const sourceListId = app.data.createList('Sat 07/11/26', folderId, 'plain', '#6366f1', 'bottom');
+
+		const item1 = app.data.createItem(sourceListId, 'Task 1 (incomplete)');
+		const item2 = app.data.createItem(sourceListId, 'Task 2 (done)');
+		const item3 = app.data.createItem(sourceListId, 'Task 3 (incomplete)');
+		const item4 = app.data.createItem(sourceListId, 'Task 4 (heading)');
+		app.data.updateItem(item2, { checked: true });
+		app.data.updateItem(item4, { heading: true });
+
+		const items = app.data.readItems(sourceListId);
+		const state = {
+			canEditList: true,
+			commitState: { isHistorical: false },
+			listMeta: { name: 'Sat 07/11/26' },
+			listId: sourceListId,
+			items,
+			incompleteItemCount: 2,
+			selectedIds: new Set(),
+			selectionMode: false,
+			showRolloverModal: false,
+			showRolloverItemSelectModal: false,
+			rolloverScope: 'incomplete',
+			rolloverSelectedIds: new Set(),
+			rolloverSelectedBackup: new Set(),
+			lastClickedScope: null,
+			rolloverOffset: 1,
+			rolloverCustomDate: '',
+			showRolloverCustomPicker: false,
+			rolloverTargetName: '',
+			isDone: (item) => item.checked
+		};
+
+		const ctx = new Function('state', `with (state) {
+			const DAY_NAMES_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+			const DAY_NAMES_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+			${transpile(functions)};
+			return {
+				openRolloverModal: () => openRolloverModal(),
+				selectRolloverIncompleteScope: () => selectRolloverIncompleteScope(),
+				selectRolloverAllScope: () => selectRolloverAllScope(),
+				selectRolloverCustomScope: () => selectRolloverCustomScope(),
+				deselectAllRolloverItems: () => deselectAllRolloverItems(),
+				selectIncompleteRolloverItems: () => selectIncompleteRolloverItems(),
+				selectAllRolloverItems: () => selectAllRolloverItems(),
+				toggleRolloverItem: (id) => toggleRolloverItem(id),
+				confirmRolloverItemSelection: () => confirmRolloverItemSelection(),
+				cancelRolloverItemSelection: () => cancelRolloverItemSelection(),
+				getRolloverItemIds: () => getRolloverItemIds(),
+				getState: () => state
+			};
+		}`)(state);
+
+		// 1. Initial open of rollover modal without clicking Incomplete or All
+		ctx.openRolloverModal();
+		assert.equal(state.showRolloverModal, true);
+		assert.equal(state.rolloverScope, 'incomplete');
+		assert.equal(state.lastClickedScope, null);
+		assert.deepEqual([...state.rolloverSelectedIds], [item1, item3]);
+
+		// 2. Click 'Selected' without clicking Incomplete or All -> incomplete todos pre-selected automatically
+		ctx.selectRolloverCustomScope();
+		assert.equal(state.showRolloverItemSelectModal, true);
+		assert.deepEqual([...state.rolloverSelectedIds], [item1, item3]);
+
+		// 3. In dialog, test preset icon buttons overwriting selection
+		// Deselect all (None)
+		ctx.deselectAllRolloverItems();
+		assert.equal(state.rolloverSelectedIds.size, 0);
+
+		// Select All
+		ctx.selectAllRolloverItems();
+		assert.equal(state.rolloverSelectedIds.size, 4);
+		assert.deepEqual([...state.rolloverSelectedIds], [item1, item2, item3, item4]);
+
+		// Select Incomplete
+		ctx.selectIncompleteRolloverItems();
+		assert.deepEqual([...state.rolloverSelectedIds], [item1, item3]);
+
+		// Toggle item individual selection
+		ctx.toggleRolloverItem(item1); // uncheck item1
+		assert.deepEqual([...state.rolloverSelectedIds], [item3]);
+		ctx.toggleRolloverItem(item2); // check item2
+		assert.deepEqual([...state.rolloverSelectedIds].sort(), [item2, item3].sort());
+
+		// Test Cancel reverts selection
+		ctx.cancelRolloverItemSelection();
+		assert.equal(state.showRolloverItemSelectModal, false);
+		assert.deepEqual([...state.rolloverSelectedIds], [item1, item3]); // restored backup
+
+		// Re-open and toggle item1, then confirm
+		ctx.selectRolloverCustomScope();
+		ctx.toggleRolloverItem(item1); // only item3 remains
+		ctx.confirmRolloverItemSelection();
+		assert.equal(state.showRolloverItemSelectModal, false);
+		assert.equal(state.rolloverScope, 'selected');
+		assert.deepEqual(ctx.getRolloverItemIds(), [item3]);
+
+		// 4. Test clicking 'All' then 'Selected' -> all items pre-selected
+		ctx.selectRolloverAllScope();
+		assert.equal(state.rolloverScope, 'all');
+		assert.equal(state.lastClickedScope, 'all');
+		ctx.selectRolloverCustomScope();
+		assert.equal(state.showRolloverItemSelectModal, true);
+		assert.equal(state.rolloverSelectedIds.size, 4);
+
+		// 5. Test clicking 'Incomplete' then 'Selected' -> incomplete items pre-selected
+		ctx.selectRolloverIncompleteScope();
+		assert.equal(state.rolloverScope, 'incomplete');
+		assert.equal(state.lastClickedScope, 'incomplete');
+		ctx.selectRolloverCustomScope();
+		assert.equal(state.showRolloverItemSelectModal, true);
+		assert.deepEqual([...state.rolloverSelectedIds], [item1, item3]);
+
+		// 6. Confirm selection with custom items [item1] and perform move
+		ctx.deselectAllRolloverItems();
+		ctx.toggleRolloverItem(item1);
+		ctx.confirmRolloverItemSelection();
+		assert.equal(state.rolloverScope, 'selected');
+		assert.deepEqual(ctx.getRolloverItemIds(), [item1]);
+
+		// Target list creation & move
+		const targetListId = app.data.createList('Sun 08/11/26', folderId, 'plain', '#6366f1', 'bottom', true);
+		const moved = app.data.moveItemsToDestination(sourceListId, ctx.getRolloverItemIds(), { listId: targetListId, parentId: null }, 'bottom');
+		assert.equal(moved, true);
+
+		// Verify target list only has item1
+		const targetItems = app.data.readItems(targetListId);
+		assert.equal(targetItems.length, 1);
+		assert.equal(targetItems[0].id, item1);
+
+		// Verify source list retained item2, item3, item4
+		const sourceItems = app.data.readItems(sourceListId);
+		assert.equal(sourceItems.length, 3);
+		assert.deepEqual(sourceItems.map((i) => i.id).sort(), [item2, item3, item4].sort());
 	} finally {
 		app.dispose();
 	}

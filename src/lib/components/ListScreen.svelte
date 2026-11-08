@@ -919,7 +919,11 @@
 
 	// ── Quick list rollover ───────────────────────────────────────────────────────
 	let showRolloverModal = $state(false);
+	let showRolloverItemSelectModal = $state(false);
 	let rolloverScope = $state<'incomplete' | 'selected' | 'all'>('incomplete');
+	let rolloverSelectedIds = $state<Set<string>>(new Set());
+	let rolloverSelectedBackup = $state<Set<string>>(new Set());
+	let lastClickedScope = $state<'incomplete' | 'all' | null>(null);
 	let rolloverOffset = $state(1);
 	let rolloverCustomDate = $state('');
 	let showRolloverCustomPicker = $state(false);
@@ -1104,7 +1108,7 @@
 	);
 
 	const itemsToRolloverCount = $derived.by(() => {
-		if (rolloverScope === 'selected') return selectedIds.size;
+		if (rolloverScope === 'selected') return rolloverSelectedIds.size;
 		if (rolloverScope === 'all') return items.length;
 		return incompleteItemCount;
 	});
@@ -1118,18 +1122,31 @@
 
 	function openRolloverModal(preferredScope?: 'incomplete' | 'selected' | 'all') {
 		if (!canEditList || commitState.isHistorical) return;
-		if (preferredScope) {
-			rolloverScope = preferredScope;
+		lastClickedScope = null;
+		const incompleteIds = items.filter((i) => !isDone(i) && !i.heading).map((i) => i.id);
+		if (preferredScope === 'selected' && selectedIds.size > 0) {
+			rolloverScope = 'selected';
+			rolloverSelectedIds = new Set(selectedIds);
+		} else if (preferredScope === 'all') {
+			rolloverScope = 'all';
+			rolloverSelectedIds = new Set(items.map((i) => i.id));
+		} else if (preferredScope === 'incomplete') {
+			rolloverScope = 'incomplete';
+			rolloverSelectedIds = new Set(incompleteIds);
 		} else if (selectionMode && selectedIds.size > 0) {
 			rolloverScope = 'selected';
+			rolloverSelectedIds = new Set(selectedIds);
 		} else if (incompleteItemCount > 0) {
 			rolloverScope = 'incomplete';
+			rolloverSelectedIds = new Set(incompleteIds);
 		} else {
 			rolloverScope = 'all';
+			rolloverSelectedIds = new Set(items.map((i) => i.id));
 		}
 		rolloverOffset = 1;
 		rolloverCustomDate = '';
 		showRolloverCustomPicker = false;
+		showRolloverItemSelectModal = false;
 		const res = computeRolloverDate(listMeta?.name ?? '', 1);
 		rolloverTargetName = res.targetName;
 		showRolloverModal = true;
@@ -1152,6 +1169,58 @@
 		rolloverTargetName = res.targetName;
 	}
 
+	function selectRolloverIncompleteScope() {
+		rolloverScope = 'incomplete';
+		lastClickedScope = 'incomplete';
+	}
+
+	function selectRolloverAllScope() {
+		rolloverScope = 'all';
+		lastClickedScope = 'all';
+	}
+
+	function selectRolloverCustomScope() {
+		if (lastClickedScope === 'all') {
+			rolloverSelectedIds = new Set(items.map((i) => i.id));
+		} else if (lastClickedScope === 'incomplete') {
+			rolloverSelectedIds = new Set(items.filter((i) => !isDone(i) && !i.heading).map((i) => i.id));
+		} else if (rolloverSelectedIds.size === 0) {
+			rolloverSelectedIds = new Set(items.filter((i) => !isDone(i) && !i.heading).map((i) => i.id));
+		}
+		rolloverSelectedBackup = new Set(rolloverSelectedIds);
+		showRolloverItemSelectModal = true;
+	}
+
+	function deselectAllRolloverItems() {
+		rolloverSelectedIds = new Set();
+	}
+
+	function selectIncompleteRolloverItems() {
+		rolloverSelectedIds = new Set(items.filter((i) => !isDone(i) && !i.heading).map((i) => i.id));
+	}
+
+	function selectAllRolloverItems() {
+		rolloverSelectedIds = new Set(items.map((i) => i.id));
+	}
+
+	function toggleRolloverItem(id: string) {
+		const next = new Set(rolloverSelectedIds);
+		if (next.has(id)) next.delete(id);
+		else next.add(id);
+		rolloverSelectedIds = next;
+	}
+
+	function confirmRolloverItemSelection() {
+		rolloverScope = 'selected';
+		lastClickedScope = null;
+		showRolloverItemSelectModal = false;
+	}
+
+	function cancelRolloverItemSelection() {
+		rolloverSelectedIds = new Set(rolloverSelectedBackup);
+		showRolloverItemSelectModal = false;
+	}
+
 	function toggleSelectIncomplete() {
 		if (!canEditList) return;
 		const incompleteIds = items.filter((i) => !i.heading && !isDone(i)).map((i) => i.id);
@@ -1166,8 +1235,8 @@
 	}
 
 	function getRolloverItemIds(): string[] {
-		if (rolloverScope === 'selected' && selectedIds.size > 0) {
-			return [...selectedIds];
+		if (rolloverScope === 'selected') {
+			return [...rolloverSelectedIds];
 		}
 		if (rolloverScope === 'all') {
 			return items.map((i) => i.id);
@@ -2728,7 +2797,7 @@
 {/if}
 
 {#if showRolloverModal && !commitState.isHistorical}
-	<div class="modal-backdrop" onclick={(e) => { if (e.target === e.currentTarget) showRolloverModal = false; }}>
+	<div class="modal-backdrop" onclick={(e) => { if (e.target === e.currentTarget && !showRolloverItemSelectModal) showRolloverModal = false; }}>
 		<div class="modal rollover-modal">
 			<h2>Move to Next List</h2>
 			
@@ -2783,21 +2852,19 @@
 						type="button"
 						class="scope-chip"
 						class:active={rolloverScope === 'incomplete'}
-						onclick={() => rolloverScope = 'incomplete'}
+						onclick={selectRolloverIncompleteScope}
 					>☐ Incomplete ({incompleteItemCount})</button>
-					{#if selectedIds.size > 0}
-						<button
-							type="button"
-							class="scope-chip"
-							class:active={rolloverScope === 'selected'}
-							onclick={() => rolloverScope = 'selected'}
-						>◇ Selected ({selectedIds.size})</button>
-					{/if}
+					<button
+						type="button"
+						class="scope-chip"
+						class:active={rolloverScope === 'selected'}
+						onclick={selectRolloverCustomScope}
+					>◇ Selected ({rolloverSelectedIds.size})</button>
 					<button
 						type="button"
 						class="scope-chip"
 						class:active={rolloverScope === 'all'}
-						onclick={() => rolloverScope = 'all'}
+						onclick={selectRolloverAllScope}
 					>☰ All ({items.length})</button>
 				</div>
 			</div>
@@ -2831,6 +2898,104 @@
 			</div>
 		</div>
 	</div>
+
+	{#if showRolloverItemSelectModal}
+		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+		<div
+			class="modal-backdrop select-items-backdrop"
+			role="presentation"
+			onclick={(e) => { if (e.target === e.currentTarget) cancelRolloverItemSelection(); }}
+			onkeydown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); cancelRolloverItemSelection(); } }}
+		>
+			<div class="modal rollover-select-modal" role="dialog" aria-modal="true" aria-labelledby="rollover-select-title">
+				<div class="rollover-select-header">
+					<div class="rollover-select-title-group">
+						<h3 id="rollover-select-title">Select items to move</h3>
+						<span class="rollover-select-count">{rolloverSelectedIds.size} of {items.length} selected</span>
+					</div>
+					<div class="rollover-select-actions">
+						<button
+							type="button"
+							class="icon-action-btn"
+							title="Deselect all (None)"
+							aria-label="Deselect all (None)"
+							onclick={deselectAllRolloverItems}
+						><span aria-hidden="true">⊘</span></button>
+						<button
+							type="button"
+							class="icon-action-btn"
+							title="Select incomplete items"
+							aria-label="Select incomplete items"
+							onclick={selectIncompleteRolloverItems}
+						><span aria-hidden="true">☐</span></button>
+						<button
+							type="button"
+							class="icon-action-btn"
+							title="Select all items"
+							aria-label="Select all items"
+							onclick={selectAllRolloverItems}
+						><span aria-hidden="true">☑</span></button>
+						<button
+							type="button"
+							class="icon-action-btn ok-icon-btn"
+							title="OK"
+							aria-label="OK"
+							onclick={confirmRolloverItemSelection}
+						><span aria-hidden="true">✓</span></button>
+					</div>
+				</div>
+
+				<div class="rollover-items-scroll">
+					{#if treeItems.length === 0}
+						<p class="rollover-no-items">No items in this list.</p>
+					{:else}
+						{#each treeItems as { item, level } (item.id)}
+							{@const selected = rolloverSelectedIds.has(item.id)}
+							{@const done = isDone(item)}
+							<label
+								class="rollover-item-row"
+								class:is-done={done}
+								class:is-heading={item.heading}
+								class:is-selected={selected}
+								style={level > 0 ? `padding-left: calc(0.75rem + ${level} * 1.25rem);` : undefined}
+							>
+								<input
+									type="checkbox"
+									checked={selected}
+									onchange={() => toggleRolloverItem(item.id)}
+									class="rollover-item-cb"
+								/>
+								<span class="rollover-item-label">
+									{#if item.heading}
+										<strong>{item.name}</strong>
+									{:else if item.note}
+										<span class="rollover-note-prefix">↳</span> {item.name}
+									{:else}
+										{item.name}
+									{/if}
+								</span>
+							</label>
+						{/each}
+					{/if}
+				</div>
+
+				<div class="modal-actions">
+					<button
+						type="button"
+						class="confirm-btn"
+						onclick={confirmRolloverItemSelection}
+					>
+						✓ OK ({rolloverSelectedIds.size} selected)
+					</button>
+					<button
+						type="button"
+						class="cancel-btn"
+						onclick={cancelRolloverItemSelection}
+					>Cancel</button>
+				</div>
+			</div>
+		</div>
+	{/if}
 {/if}
 
 {#if rolloverToast}
@@ -2992,6 +3157,118 @@
 	.modal-actions button.cancel-btn {
 		background: var(--bg3);
 		color: var(--text);
+	}
+	.select-items-backdrop {
+		z-index: 110;
+	}
+	.rollover-select-modal {
+		max-width: 440px;
+		max-height: 85vh;
+	}
+	.rollover-select-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+	}
+	.rollover-select-title-group h3 {
+		margin: 0;
+		font-size: 1.05rem;
+		font-weight: 700;
+	}
+	.rollover-select-count {
+		font-size: 0.8rem;
+		color: var(--text2);
+	}
+	.rollover-select-actions {
+		display: flex;
+		gap: 0.35rem;
+		align-items: center;
+	}
+	.icon-action-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 2.1rem;
+		height: 2.1rem;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--bg2);
+		color: var(--text);
+		font-size: 1.05rem;
+		cursor: pointer;
+		line-height: 1;
+		transition: background 0.15s, border-color 0.15s;
+	}
+	.icon-action-btn:hover {
+		background: var(--border);
+	}
+	.icon-action-btn.ok-icon-btn {
+		background: var(--accent);
+		color: #fff;
+		border-color: var(--accent);
+		font-weight: 700;
+	}
+	.rollover-items-scroll {
+		max-height: 50vh;
+		overflow-y: auto;
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		background: var(--bg2);
+		padding: 0.25rem 0;
+		display: flex;
+		flex-direction: column;
+	}
+	.rollover-item-row {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		padding: 0.45rem 0.75rem;
+		cursor: pointer;
+		user-select: none;
+		border-bottom: 1px solid var(--border);
+		font-size: 0.9rem;
+		line-height: 1.3;
+	}
+	.rollover-item-row:last-child {
+		border-bottom: none;
+	}
+	.rollover-item-row:hover {
+		background: var(--bg);
+	}
+	.rollover-item-row.is-done {
+		color: var(--text2);
+	}
+	.rollover-item-row.is-done .rollover-item-label {
+		text-decoration: line-through;
+		opacity: 0.75;
+	}
+	.rollover-item-row.is-heading {
+		font-weight: 700;
+		color: var(--accent);
+	}
+	.rollover-item-cb {
+		cursor: pointer;
+		width: 1.1rem;
+		height: 1.1rem;
+		accent-color: var(--accent);
+		flex-shrink: 0;
+		margin: 0;
+	}
+	.rollover-item-label {
+		flex: 1;
+		word-break: break-word;
+	}
+	.rollover-note-prefix {
+		color: var(--text2);
+	}
+	.rollover-no-items {
+		padding: 1rem;
+		color: var(--text2);
+		font-size: 0.85rem;
+		text-align: center;
+		margin: 0;
 	}
 	.sel-helper-btn {
 		font-size: 0.8rem;
