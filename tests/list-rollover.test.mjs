@@ -4,6 +4,7 @@ import { createApp, componentFunctions, transpile } from './helpers/app.mjs';
 
 const functions = componentFunctions('src/lib/components/ListScreen.svelte', [
 	'parseDateFromListName', 'computeRolloverDate', 'pad2',
+	'isFolderDefaultItem', 'isItemIncompleteForRollover',
 	'selectRolloverIncompleteScope', 'selectRolloverAllScope', 'selectRolloverCustomScope',
 	'deselectAllRolloverItems', 'selectIncompleteRolloverItems', 'selectAllRolloverItems',
 	'toggleRolloverItem', 'confirmRolloverItemSelection', 'cancelRolloverItemSelection',
@@ -16,12 +17,13 @@ const helpers = new Function('state', `with (state) {
 	${transpile(functions)};
 	return {
 		parseDateFromListName, computeRolloverDate,
+		isFolderDefaultItem, isItemIncompleteForRollover,
 		selectRolloverIncompleteScope, selectRolloverAllScope, selectRolloverCustomScope,
 		deselectAllRolloverItems, selectIncompleteRolloverItems, selectAllRolloverItems,
 		toggleRolloverItem, confirmRolloverItemSelection, cancelRolloverItemSelection,
 		getRolloverItemIds, openRolloverModal
 	};
-}`)({ allLists: [], listId: '' });
+}`)({ allLists: [], listId: '', folderDefaultItems: [] });
 
 test('date parsing extracts DMY, ISO, and Day-prefixed patterns', () => {
 	const p1 = helpers.parseDateFromListName('Sat 07/11/26');
@@ -168,6 +170,7 @@ test('rollover selection dialog supports Selected scope, pre-selection, preset o
 			rolloverCustomDate: '',
 			showRolloverCustomPicker: false,
 			rolloverTargetName: '',
+			folderDefaultItems: [],
 			isDone: (item) => item.checked
 		};
 
@@ -274,6 +277,135 @@ test('rollover selection dialog supports Selected scope, pre-selection, preset o
 		const sourceItems = app.data.readItems(sourceListId);
 		assert.equal(sourceItems.length, 5);
 		assert.deepEqual(sourceItems.map((i) => i.id).sort(), [item2, item3, item4, note1, subnote1].sort());
+	} finally {
+		app.dispose();
+	}
+});
+
+test('rollover treats folder default items as completed (not moved by default)', () => {
+	const app = createApp();
+	try {
+		const folderId = app.data.createFolder('Routine Folder', null);
+		// Configure default items on the folder
+		app.data.addFolderDefaultItem(folderId, 'Daily Vitamins', false);
+		app.data.addFolderDefaultItem(folderId, 'Daily Affirmations', true);
+
+		const folder = app.data.readFolders().find((f) => f.id === folderId);
+		const folderDefaultItems = folder?.defaultItems ?? [];
+		assert.equal(folderDefaultItems.length, 2);
+
+		// Creating the list will automatically populate the default items
+		const sourceListId = app.data.createList('Mon 09/11/26', folderId, 'plain', '#6366f1', 'bottom');
+		const initialItems = app.data.readItems(sourceListId);
+		assert.equal(initialItems.length, 2);
+
+		// Add an ad-hoc incomplete task and an ad-hoc completed task
+		const customTask1 = app.data.createItem(sourceListId, 'Fix urgent bug');
+		const customTask2 = app.data.createItem(sourceListId, 'Order coffee beans');
+		app.data.updateItem(customTask2, { checked: true });
+
+		const allItems = app.data.readItems(sourceListId);
+		assert.equal(allItems.length, 4);
+
+		const defaultItemTodo = allItems.find((i) => i.name === 'Daily Vitamins');
+		const defaultItemNote = allItems.find((i) => i.name === 'Daily Affirmations');
+		assert.ok(defaultItemTodo);
+		assert.ok(defaultItemNote);
+
+		const state = {
+			canEditList: true,
+			commitState: { isHistorical: false },
+			listMeta: { name: 'Mon 09/11/26', folderId },
+			listId: sourceListId,
+			items: allItems,
+			incompleteItemCount: 1,
+			selectedIds: new Set(),
+			selectionMode: false,
+			showRolloverModal: false,
+			showRolloverItemSelectModal: false,
+			rolloverScope: 'incomplete',
+			rolloverSelectedIds: new Set(),
+			rolloverSelectedBackup: new Set(),
+			lastClickedScope: null,
+			rolloverOffset: 1,
+			rolloverCustomDate: '',
+			showRolloverCustomPicker: false,
+			rolloverTargetName: '',
+			folderDefaultItems,
+			isDone: (item) => Boolean(item.checked)
+		};
+
+		const ctx = new Function('state', `with (state) {
+			const DAY_NAMES_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+			const DAY_NAMES_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+			${transpile(functions)};
+			return {
+				isFolderDefaultItem,
+				isItemIncompleteForRollover,
+				openRolloverModal: () => openRolloverModal(),
+				selectRolloverIncompleteScope: () => selectRolloverIncompleteScope(),
+				selectRolloverAllScope: () => selectRolloverAllScope(),
+				selectRolloverCustomScope: () => selectRolloverCustomScope(),
+				deselectAllRolloverItems: () => deselectAllRolloverItems(),
+				selectIncompleteRolloverItems: () => selectIncompleteRolloverItems(),
+				selectAllRolloverItems: () => selectAllRolloverItems(),
+				toggleRolloverItem: (id) => toggleRolloverItem(id),
+				confirmRolloverItemSelection: () => confirmRolloverItemSelection(),
+				getRolloverItemIds: () => getRolloverItemIds()
+			};
+		}`)(state);
+
+		// Verify helpers
+		assert.equal(ctx.isFolderDefaultItem(defaultItemTodo), true);
+		assert.equal(ctx.isFolderDefaultItem(defaultItemNote), true);
+		assert.equal(ctx.isFolderDefaultItem({ name: 'Fix urgent bug', note: false }), false);
+
+		// Default items should NOT be incomplete for rollover
+		assert.equal(ctx.isItemIncompleteForRollover(defaultItemTodo), false);
+		assert.equal(ctx.isItemIncompleteForRollover(defaultItemNote), false);
+		assert.equal(ctx.isItemIncompleteForRollover(allItems.find((i) => i.id === customTask1)), true);
+		assert.equal(ctx.isItemIncompleteForRollover(allItems.find((i) => i.id === customTask2)), false);
+
+		// 1. Initial open of rollover modal defaults to customTask1 only (excluding default items)
+		ctx.openRolloverModal();
+		assert.equal(state.showRolloverModal, true);
+		assert.equal(state.rolloverScope, 'incomplete');
+		assert.deepEqual([...state.rolloverSelectedIds], [customTask1]);
+
+		// 2. Open 'Select items to move' dialog -> pre-selects only customTask1
+		ctx.selectRolloverCustomScope();
+		assert.equal(state.showRolloverItemSelectModal, true);
+		assert.deepEqual([...state.rolloverSelectedIds], [customTask1]);
+
+		// 3. Test Incomplete preset button in modal -> selects only customTask1 (excluding default items)
+		ctx.selectAllRolloverItems();
+		assert.equal(state.rolloverSelectedIds.size, 4);
+		ctx.selectIncompleteRolloverItems();
+		assert.deepEqual([...state.rolloverSelectedIds], [customTask1]);
+
+		// 4. Test Incomplete scope button in main rollover modal -> selects only customTask1
+		ctx.selectRolloverAllScope();
+		assert.equal(state.rolloverScope, 'all');
+		ctx.selectRolloverIncompleteScope();
+		assert.equal(state.rolloverScope, 'incomplete');
+		assert.deepEqual([...state.rolloverSelectedIds], [customTask1]);
+
+		// 5. Target list creation & move
+		const targetListId = app.data.createList('Tue 10/11/26', folderId, 'plain', '#6366f1', 'bottom', true);
+		const moved = app.data.moveItemsToDestination(sourceListId, ctx.getRolloverItemIds(), { listId: targetListId, parentId: null }, 'bottom');
+		assert.equal(moved, true);
+
+		// Target list has the fresh default items generated upon creation PLUS the moved customTask1 (NO duplicates!)
+		const targetItems = app.data.readItems(targetListId);
+		assert.equal(targetItems.length, 3);
+		assert.ok(targetItems.some((i) => i.id === customTask1));
+		assert.equal(targetItems.filter((i) => i.name === 'Daily Vitamins').length, 1);
+		assert.equal(targetItems.filter((i) => i.name === 'Daily Affirmations').length, 1);
+
+		// Source list retained the default items and the completed custom task
+		const sourceItems = app.data.readItems(sourceListId);
+		assert.equal(sourceItems.length, 3);
+		assert.deepEqual(sourceItems.map((i) => i.id).sort(), [defaultItemTodo.id, defaultItemNote.id, customTask2].sort());
 	} finally {
 		app.dispose();
 	}

@@ -107,6 +107,7 @@
 	let currentFolder = $derived(listMeta ? (allFolders.find((f) => f.id === listMeta.folderId) ?? null) : null);
 	// Named checkboxes configured on the current list's folder — empty = legacy single checkbox.
 	let folderCheckboxes = $derived(currentFolder?.checkboxes ?? []);
+	let folderDefaultItems = $derived(currentFolder?.defaultItems ?? []);
 	function isChecked(item: Item, checkboxId: string): boolean {
 		return !!item.checks[checkboxId];
 	}
@@ -1103,8 +1104,20 @@
 		) ?? null;
 	});
 
+	function isFolderDefaultItem(item: Item): boolean {
+		if (!folderDefaultItems || folderDefaultItems.length === 0) return false;
+		const trimmedName = item.name.trim().toLowerCase();
+		return folderDefaultItems.some(
+			(di) => di.name.trim().toLowerCase() === trimmedName && Boolean(di.note) === Boolean(item.note)
+		);
+	}
+
+	function isItemIncompleteForRollover(item: Item): boolean {
+		return !isDone(item) && !item.heading && !item.note && !isFolderDefaultItem(item);
+	}
+
 	const incompleteItemCount = $derived(
-		items.filter((i) => !isDone(i) && !i.heading && !i.note).length
+		items.filter(isItemIncompleteForRollover).length
 	);
 
 	const itemsToRolloverCount = $derived.by(() => {
@@ -1123,7 +1136,7 @@
 	function openRolloverModal(preferredScope?: 'incomplete' | 'selected' | 'all') {
 		if (!canEditList || commitState.isHistorical) return;
 		lastClickedScope = null;
-		const incompleteIds = items.filter((i) => !isDone(i) && !i.heading && !i.note).map((i) => i.id);
+		const incompleteIds = items.filter(isItemIncompleteForRollover).map((i) => i.id);
 		if (preferredScope === 'selected' && selectedIds.size > 0) {
 			rolloverScope = 'selected';
 			rolloverSelectedIds = new Set(selectedIds);
@@ -1172,20 +1185,22 @@
 	function selectRolloverIncompleteScope() {
 		rolloverScope = 'incomplete';
 		lastClickedScope = 'incomplete';
+		rolloverSelectedIds = new Set(items.filter(isItemIncompleteForRollover).map((i) => i.id));
 	}
 
 	function selectRolloverAllScope() {
 		rolloverScope = 'all';
 		lastClickedScope = 'all';
+		rolloverSelectedIds = new Set(items.map((i) => i.id));
 	}
 
 	function selectRolloverCustomScope() {
 		if (lastClickedScope === 'all') {
 			rolloverSelectedIds = new Set(items.map((i) => i.id));
 		} else if (lastClickedScope === 'incomplete') {
-			rolloverSelectedIds = new Set(items.filter((i) => !isDone(i) && !i.heading && !i.note).map((i) => i.id));
+			rolloverSelectedIds = new Set(items.filter(isItemIncompleteForRollover).map((i) => i.id));
 		} else if (rolloverSelectedIds.size === 0) {
-			rolloverSelectedIds = new Set(items.filter((i) => !isDone(i) && !i.heading && !i.note).map((i) => i.id));
+			rolloverSelectedIds = new Set(items.filter(isItemIncompleteForRollover).map((i) => i.id));
 		}
 		rolloverSelectedBackup = new Set(rolloverSelectedIds);
 		showRolloverItemSelectModal = true;
@@ -1196,7 +1211,7 @@
 	}
 
 	function selectIncompleteRolloverItems() {
-		rolloverSelectedIds = new Set(items.filter((i) => !isDone(i) && !i.heading && !i.note).map((i) => i.id));
+		rolloverSelectedIds = new Set(items.filter(isItemIncompleteForRollover).map((i) => i.id));
 	}
 
 	function selectAllRolloverItems() {
@@ -1241,7 +1256,7 @@
 		if (rolloverScope === 'all') {
 			return items.map((i) => i.id);
 		}
-		return items.filter((i) => !isDone(i) && !i.heading && !i.note).map((i) => i.id);
+		return items.filter(isItemIncompleteForRollover).map((i) => i.id);
 	}
 
 	function submitRollover() {
@@ -2964,11 +2979,15 @@
 					{:else}
 						{#each treeItems as { item, level } (item.id)}
 							{@const selected = rolloverSelectedIds.has(item.id)}
-							{@const done = isDone(item) || Boolean(item.note)}
+							{@const actuallyDone = isDone(item)}
+							{@const defaultItem = isFolderDefaultItem(item)}
+							{@const done = actuallyDone || Boolean(item.note) || defaultItem}
 							<label
 								class="rollover-item-row"
 								class:is-done={done}
+								class:is-actually-done={actuallyDone}
 								class:is-note={item.note}
+								class:is-default-item={defaultItem}
 								class:is-heading={item.heading}
 								class:is-selected={selected}
 								style={level > 0 ? `padding-left: calc(0.75rem + ${level} * 1.25rem);` : undefined}
@@ -3268,11 +3287,13 @@
 	.rollover-item-row.is-done {
 		color: var(--text2);
 	}
-	.rollover-item-row.is-done:not(.is-note) .rollover-item-label {
+	.rollover-item-row.is-done:not(.is-note):not(.is-default-item) .rollover-item-label,
+	.rollover-item-row.is-done.is-actually-done:not(.is-note) .rollover-item-label {
 		text-decoration: line-through;
 		opacity: 0.75;
 	}
-	.rollover-item-row.is-note {
+	.rollover-item-row.is-note,
+	.rollover-item-row.is-default-item {
 		color: var(--text2);
 	}
 	.rollover-item-row.is-heading {
