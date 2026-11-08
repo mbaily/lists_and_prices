@@ -1104,7 +1104,7 @@
 	});
 
 	const incompleteItemCount = $derived(
-		items.filter((i) => !isDone(i) && !i.heading).length
+		items.filter((i) => !isDone(i) && !i.heading && !i.note).length
 	);
 
 	const itemsToRolloverCount = $derived.by(() => {
@@ -1123,7 +1123,7 @@
 	function openRolloverModal(preferredScope?: 'incomplete' | 'selected' | 'all') {
 		if (!canEditList || commitState.isHistorical) return;
 		lastClickedScope = null;
-		const incompleteIds = items.filter((i) => !isDone(i) && !i.heading).map((i) => i.id);
+		const incompleteIds = items.filter((i) => !isDone(i) && !i.heading && !i.note).map((i) => i.id);
 		if (preferredScope === 'selected' && selectedIds.size > 0) {
 			rolloverScope = 'selected';
 			rolloverSelectedIds = new Set(selectedIds);
@@ -1183,9 +1183,9 @@
 		if (lastClickedScope === 'all') {
 			rolloverSelectedIds = new Set(items.map((i) => i.id));
 		} else if (lastClickedScope === 'incomplete') {
-			rolloverSelectedIds = new Set(items.filter((i) => !isDone(i) && !i.heading).map((i) => i.id));
+			rolloverSelectedIds = new Set(items.filter((i) => !isDone(i) && !i.heading && !i.note).map((i) => i.id));
 		} else if (rolloverSelectedIds.size === 0) {
-			rolloverSelectedIds = new Set(items.filter((i) => !isDone(i) && !i.heading).map((i) => i.id));
+			rolloverSelectedIds = new Set(items.filter((i) => !isDone(i) && !i.heading && !i.note).map((i) => i.id));
 		}
 		rolloverSelectedBackup = new Set(rolloverSelectedIds);
 		showRolloverItemSelectModal = true;
@@ -1196,7 +1196,7 @@
 	}
 
 	function selectIncompleteRolloverItems() {
-		rolloverSelectedIds = new Set(items.filter((i) => !isDone(i) && !i.heading).map((i) => i.id));
+		rolloverSelectedIds = new Set(items.filter((i) => !isDone(i) && !i.heading && !i.note).map((i) => i.id));
 	}
 
 	function selectAllRolloverItems() {
@@ -1223,7 +1223,7 @@
 
 	function toggleSelectIncomplete() {
 		if (!canEditList) return;
-		const incompleteIds = items.filter((i) => !i.heading && !isDone(i)).map((i) => i.id);
+		const incompleteIds = items.filter((i) => !i.heading && !i.note && !isDone(i)).map((i) => i.id);
 		const allSelected = incompleteIds.length > 0 && incompleteIds.every((id) => selectedIds.has(id));
 		const next = new Set(selectedIds);
 		if (allSelected) {
@@ -1241,7 +1241,7 @@
 		if (rolloverScope === 'all') {
 			return items.map((i) => i.id);
 		}
-		return items.filter((i) => !isDone(i) && !i.heading).map((i) => i.id);
+		return items.filter((i) => !isDone(i) && !i.heading && !i.note).map((i) => i.id);
 	}
 
 	function submitRollover() {
@@ -2964,10 +2964,11 @@
 					{:else}
 						{#each treeItems as { item, level } (item.id)}
 							{@const selected = rolloverSelectedIds.has(item.id)}
-							{@const done = isDone(item)}
+							{@const done = isDone(item) || Boolean(item.note)}
 							<label
 								class="rollover-item-row"
 								class:is-done={done}
+								class:is-note={item.note}
 								class:is-heading={item.heading}
 								class:is-selected={selected}
 								style={level > 0 ? `padding-left: calc(0.75rem + ${level} * 1.25rem);` : undefined}
@@ -3267,9 +3268,12 @@
 	.rollover-item-row.is-done {
 		color: var(--text2);
 	}
-	.rollover-item-row.is-done .rollover-item-label {
+	.rollover-item-row.is-done:not(.is-note) .rollover-item-label {
 		text-decoration: line-through;
 		opacity: 0.75;
+	}
+	.rollover-item-row.is-note {
+		color: var(--text2);
 	}
 	.rollover-item-row.is-heading {
 		font-weight: 700;

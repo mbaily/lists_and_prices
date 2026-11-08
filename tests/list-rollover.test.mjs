@@ -143,6 +143,8 @@ test('rollover selection dialog supports Selected scope, pre-selection, preset o
 		const item2 = app.data.createItem(sourceListId, 'Task 2 (done)');
 		const item3 = app.data.createItem(sourceListId, 'Task 3 (incomplete)');
 		const item4 = app.data.createItem(sourceListId, 'Task 4 (heading)');
+		const note1 = app.data.createItem(sourceListId, 'Note 1 (standalone note)', null, null, true);
+		const subnote1 = app.data.createItem(sourceListId, 'Subnote 1 (under task 2)', null, item2, true);
 		app.data.updateItem(item2, { checked: true });
 		app.data.updateItem(item4, { heading: true });
 
@@ -190,13 +192,14 @@ test('rollover selection dialog supports Selected scope, pre-selection, preset o
 		}`)(state);
 
 		// 1. Initial open of rollover modal without clicking Incomplete or All
+		// Notes and subnotes must default as completed, NOT incomplete.
 		ctx.openRolloverModal();
 		assert.equal(state.showRolloverModal, true);
 		assert.equal(state.rolloverScope, 'incomplete');
 		assert.equal(state.lastClickedScope, null);
 		assert.deepEqual([...state.rolloverSelectedIds], [item1, item3]);
 
-		// 2. Click 'Selected' without clicking Incomplete or All -> incomplete todos pre-selected automatically
+		// 2. Click 'Selected' without clicking Incomplete or All -> incomplete todos pre-selected automatically (no notes)
 		ctx.selectRolloverCustomScope();
 		assert.equal(state.showRolloverItemSelectModal, true);
 		assert.deepEqual([...state.rolloverSelectedIds], [item1, item3]);
@@ -206,12 +209,12 @@ test('rollover selection dialog supports Selected scope, pre-selection, preset o
 		ctx.deselectAllRolloverItems();
 		assert.equal(state.rolloverSelectedIds.size, 0);
 
-		// Select All
+		// Select All (selects todos, heading, note, subnote)
 		ctx.selectAllRolloverItems();
-		assert.equal(state.rolloverSelectedIds.size, 4);
-		assert.deepEqual([...state.rolloverSelectedIds], [item1, item2, item3, item4]);
+		assert.equal(state.rolloverSelectedIds.size, 6);
+		assert.deepEqual([...state.rolloverSelectedIds].sort(), [item1, item2, item3, item4, note1, subnote1].sort());
 
-		// Select Incomplete
+		// Select Incomplete (must strictly select only incomplete todos, excluding notes/subnotes)
 		ctx.selectIncompleteRolloverItems();
 		assert.deepEqual([...state.rolloverSelectedIds], [item1, item3]);
 
@@ -240,7 +243,7 @@ test('rollover selection dialog supports Selected scope, pre-selection, preset o
 		assert.equal(state.lastClickedScope, 'all');
 		ctx.selectRolloverCustomScope();
 		assert.equal(state.showRolloverItemSelectModal, true);
-		assert.equal(state.rolloverSelectedIds.size, 4);
+		assert.equal(state.rolloverSelectedIds.size, 6);
 
 		// 5. Test clicking 'Incomplete' then 'Selected' -> incomplete items pre-selected
 		ctx.selectRolloverIncompleteScope();
@@ -267,10 +270,10 @@ test('rollover selection dialog supports Selected scope, pre-selection, preset o
 		assert.equal(targetItems.length, 1);
 		assert.equal(targetItems[0].id, item1);
 
-		// Verify source list retained item2, item3, item4
+		// Verify source list retained item2, item3, item4, note1, subnote1
 		const sourceItems = app.data.readItems(sourceListId);
-		assert.equal(sourceItems.length, 3);
-		assert.deepEqual(sourceItems.map((i) => i.id).sort(), [item2, item3, item4].sort());
+		assert.equal(sourceItems.length, 5);
+		assert.deepEqual(sourceItems.map((i) => i.id).sort(), [item2, item3, item4, note1, subnote1].sort());
 	} finally {
 		app.dispose();
 	}
