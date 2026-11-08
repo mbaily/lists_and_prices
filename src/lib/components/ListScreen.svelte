@@ -2845,28 +2845,41 @@
 				/>
 			{/if}
 
-			<div class="rollover-scope-group">
+			<div class="rollover-scope-row">
 				<span class="date-shortcuts-label">Items:</span>
-				<div class="rollover-scope-options">
-					<button
-						type="button"
-						class="scope-chip"
-						class:active={rolloverScope === 'incomplete'}
-						onclick={selectRolloverIncompleteScope}
-					>☐ Incomplete ({incompleteItemCount})</button>
-					<button
-						type="button"
-						class="scope-chip"
-						class:active={rolloverScope === 'selected'}
-						onclick={selectRolloverCustomScope}
-					>◇ Selected ({rolloverSelectedIds.size})</button>
-					<button
-						type="button"
-						class="scope-chip"
-						class:active={rolloverScope === 'all'}
-						onclick={selectRolloverAllScope}
-					>☰ All ({items.length})</button>
-				</div>
+				<button
+					type="button"
+					class="scope-chip icon-scope-chip"
+					class:active={rolloverScope === 'incomplete'}
+					onclick={selectRolloverIncompleteScope}
+					title="Incomplete ({incompleteItemCount} {incompleteItemCount === 1 ? 'item' : 'items'})"
+					aria-label="Incomplete ({incompleteItemCount} items)"
+				><span aria-hidden="true">☐</span></button>
+				<button
+					type="button"
+					class="scope-chip icon-scope-chip"
+					class:active={rolloverScope === 'selected'}
+					onclick={selectRolloverCustomScope}
+					title="Selected ({rolloverSelectedIds.size} {rolloverSelectedIds.size === 1 ? 'item' : 'items'}) — click to customize"
+					aria-label="Selected ({rolloverSelectedIds.size} items)"
+				><span aria-hidden="true">◇</span></button>
+				<button
+					type="button"
+					class="scope-chip icon-scope-chip"
+					class:active={rolloverScope === 'all'}
+					onclick={selectRolloverAllScope}
+					title="All ({items.length} {items.length === 1 ? 'item' : 'items'})"
+					aria-label="All ({items.length} items)"
+				><span aria-hidden="true">☰</span></button>
+				<span class="scope-active-summary">
+					{#if rolloverScope === 'incomplete'}
+						Incomplete ({incompleteItemCount})
+					{:else if rolloverScope === 'selected'}
+						Selected ({rolloverSelectedIds.size})
+					{:else}
+						All ({items.length})
+					{/if}
+				</span>
 			</div>
 
 			<div
@@ -3091,15 +3104,11 @@
 		color: #fff;
 		border-color: var(--accent);
 	}
-	.rollover-scope-group {
+	.rollover-scope-row {
 		display: flex;
-		flex-direction: column;
+		align-items: center;
 		gap: 0.35rem;
-	}
-	.rollover-scope-options {
-		display: flex;
-		gap: 0.35rem;
-		flex-wrap: wrap;
+		flex-wrap: nowrap;
 	}
 	.scope-chip {
 		padding: 0.3rem 0.55rem;
@@ -3111,10 +3120,28 @@
 		cursor: pointer;
 		line-height: 1.3;
 	}
+	.scope-chip.icon-scope-chip {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-width: 2.1rem;
+		height: 2.1rem;
+		padding: 0;
+		font-size: 1.05rem;
+		line-height: 1;
+	}
 	.scope-chip.active {
 		background: var(--accent);
 		color: #fff;
 		border-color: var(--accent);
+	}
+	.scope-active-summary {
+		font-size: 0.82rem;
+		color: var(--text2);
+		margin-left: 0.2rem;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 	.rollover-status {
 		font-size: 0.82rem;
