@@ -34,7 +34,7 @@ test('nearby previews and stop rows use source-list tree order after top inserti
         assert.deepEqual(stops[0].errands.map(errand => errand.item.id), expected);
         const pill = app.load('src/lib/nearbyPills.ts').nearbyListPills(stops, errands, 3)[0];
         assert.equal(pill.id, `list:${list}`);
-        assert.equal(pill.name, 'Minced garlic · Check pantry · Bread · +3 more');
+        assert.equal(pill.name, 'Minced garlic #urgent · Check pantry · Bread · +3 more');
         assert.deepEqual(pill.errands.map(errand => errand.item.id), expected);
         assert.deepEqual(collect(app, true).map(errand => errand.item.id), [garlic, headingChild, bread, milk, milkChild, completed, completedChild]);
         assert.deepEqual(Y.encodeStateAsUpdate(app.doc), before, 'reading nearby order does not rewrite stored items');

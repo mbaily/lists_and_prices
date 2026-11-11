@@ -24,7 +24,7 @@ export function groupErrands<T extends { errand: Errand }>(rows: readonly T[]): 
 
 export function errandPreview(errands: readonly Errand[], limit: number): string {
     const names = errands.slice(0, limit).map(errand => errand.item.name
-        .replace(/(^|\s)#\w+/g, '$1').replace(/\s+/g, ' ').trim()).filter(Boolean);
+        .replace(/\s+/g, ' ').trim()).filter(Boolean);
     const remaining = errands.length - Math.min(errands.length, limit);
     return names.join(' · ') + (remaining > 0 ? ` · +${remaining} more` : '');
 }

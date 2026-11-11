@@ -7,8 +7,10 @@ Nearby pills, Matched tasks, Paused errands and stop lists. Expand a list to use
 its individual completion, pause, resume and dismiss controls. Task-specific
 errand hashtags form separate errands and determine which locations match each task.
 
-The Nearby pill previews the list's active task names on one line. Set **Items
-per pill** beside the Nearby heading to choose 1–9 names (default 3); additional
+The Nearby pill previews the list's active task names on one line. Hashtags stay
+in their original position, with matching hashtags shown in blue. Matching tags
+absent from the preview, such as inherited list tags, appear at the end.
+Set **Items per pill** beside the Nearby heading to choose 1–9 names (default 3); additional
 tasks show as **+n more**. This setting syncs across devices and is included in
 backups. The preview limit only changes the display; every eligible task is
 still considered when suggesting stops. Task previews and grouped rows follow

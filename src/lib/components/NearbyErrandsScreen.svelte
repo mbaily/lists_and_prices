@@ -3,7 +3,7 @@
     import catalogue from '$lib/locations/melbourne.json';
     import suburbCatalogue from '$lib/locations/melbourne-suburbs.json';
     import { suburbLocations } from '$lib/suburbLocations';
-    import { nearbyTaskPills, nearbyListPills } from '$lib/nearbyPills';
+    import { nearbyTaskPills, nearbyListPills, nearbyPillSegments } from '$lib/nearbyPills';
     import { readNearbyRecentlyModifiedFirst, saveNearbyRecentlyModifiedFirst } from '$lib/data';
     import { readLocationOptionalTags, setLocationOptionalTag } from '$lib/data';
     import { groupErrands, errandPreview } from '$lib/errandGroups';
@@ -318,11 +318,12 @@
             <h2 id="nearby-strip-heading"><button class="nearby-heading" title="Go to distance setting" onclick={scrollToRadius}>Nearby</button></h2>
             <select class="preview-limit" aria-label="Items per pill" title="Items per pill" value={previewLimit} onchange={setPreviewLimit} disabled={commitState.isHistorical}>{#each [1, 2, 3, 4, 5, 6, 7, 8, 9] as count}<option value={count}>{count}</option>{/each}</select>
             {#each nearbyPills as pill (pill.id)}
+                {@const segments = nearbyPillSegments(pill.name, pill.tags)}
                 <span class="nearby-pill">
                     {#if pill.id.startsWith('list:') && pill.errands.length > 1}{@render groupCheckbox(pill.list)}{/if}
-                    <button class="nearby-pill-link" title={`${pill.list.name}: ${pill.name} ${pill.tags.map(tag => '#' + tag).join(' ')}`}
+                    <button class="nearby-pill-link" title={`${pill.list.name}: ${segments.map(segment => segment.text).join('')}`}
                         onclick={() => openPill(pill)}>
-                        <span class="nearby-pill-name">{pill.name}</span><span class="nearby-pill-tag">{pill.tags.map(tag => '#' + tag).join(' ')}</span>
+                        <span class="nearby-pill-name">{#each segments as segment}{#if segment.matched}<span class="nearby-pill-tag">{segment.text}</span>{:else}{segment.text}{/if}{/each}</span>
                     </button>
                 </span>
             {/each}
@@ -528,7 +529,7 @@
     .nearby-pill { display: inline-flex; align-items: center; gap: .35rem; max-width: 100%; min-width: 0; background: #000; border: 1px solid var(--border); border-radius: 999px; padding: .35rem .65rem; white-space: nowrap; }
     .nearby-pill-link { display: inline-flex; align-items: center; gap: .35rem; min-width: 0; padding: 0; border: 0; background: transparent; }
     .nearby-pill-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .nearby-pill-tag { color: var(--accent); flex-shrink: 0; max-width: 45%; overflow: hidden; text-overflow: ellipsis; }
+    .nearby-pill-tag { color: var(--accent); }
     button, select, input { font: inherit; color: var(--text); border: 1px solid var(--border); background: var(--bg2); border-radius: 6px; padding: .65rem; }
     button, select { cursor: pointer; } button:disabled { opacity: .5; cursor: default; }
     .back { border: 0; font-size: 1.35rem; padding: .3rem .6rem; } .primary { background: var(--accent); color: #fff; border-color: var(--accent); }

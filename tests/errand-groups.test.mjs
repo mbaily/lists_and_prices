@@ -47,7 +47,7 @@ test('explicit bank errands stay separate from inherited general errands and can
             .filter(errand => !nearby.isErrandPaused(errand, [], app.data.readPausedErrandItemIds()));
         const pills = nearbyListPills([], active(), 3);
         assert.equal(pills.length, 2);
-        assert.equal(pills[0].name, 'Withdraw cash');
+        assert.equal(pills[0].name, 'Withdraw cash #bank');
         assert.deepEqual(pills[0].tags, ['bank']);
         assert.equal(pills[1].name, 'Post a letter');
         assert.deepEqual(pills[1].tags, ['errand']);

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createApp, merge, componentFunctions, transpile } from './helpers/app.mjs';
 
-test('nearby pills deduplicate tasks, strip inline hashtags and label the actual match', () => {
+test('nearby pills deduplicate tasks, preserve inline hashtags and label the actual match', () => {
     const app = createApp();
     try {
         const { nearbyTaskPills } = app.load('src/lib/nearbyPills.ts');
@@ -15,7 +15,7 @@ test('nearby pills deduplicate tasks, strip inline hashtags and label the actual
             { location: coles, distanceKm: 2, errands: [first, note] }
         ]);
         assert.deepEqual(pills.map(({ errand, name, tag }) => ({ id: errand.item.id, name, tag })), [
-            { id: 'todo', name: 'Buy milk', tag: 'supermarket' },
+            { id: 'todo', name: 'Buy milk #coles #supermarket', tag: 'supermarket' },
             { id: 'note', name: 'Check opening hours', tag: 'supermarket' }
         ]);
         assert.deepEqual(nearbyTaskPills([]), []);
@@ -31,9 +31,9 @@ test('bank errands appear without a location and are not duplicated by saved mat
         const general = { item: { id: 'general', name: 'Post a letter #ERRAND' }, list: { id: 'list' }, tags: ['ERRAND'] };
         const other = { item: { id: 'other', name: 'Collect parcel #postoffice' }, list: { id: 'list' }, tags: ['postoffice'] };
         assert.deepEqual(nearbyTaskPills([], [bank, note, general, other]).map(({ errand, name, tag }) => ({ id: errand.item.id, name, tag })), [
-            { id: 'bank', name: 'Withdraw cash', tag: 'bank' },
+            { id: 'bank', name: 'Withdraw cash #BANK', tag: 'bank' },
             { id: 'note', name: 'Check account details', tag: 'bank' },
-            { id: 'general', name: 'Post a letter', tag: 'errand' }
+            { id: 'general', name: 'Post a letter #ERRAND', tag: 'errand' }
         ]);
         const saved = { location: { id: 'saved-bank', tags: ['bank'] }, distanceKm: 1, errands: [bank] };
         assert.equal(nearbyTaskPills([saved], [bank]).length, 1);
