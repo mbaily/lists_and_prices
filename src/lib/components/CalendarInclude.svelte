@@ -2,13 +2,15 @@
 	import { base } from '$app/paths';
 	import {
 		calendarSections, calendarRange, calendarOccurrenceLabel, calendarLine, parseCalendarResponse,
-		calendarQueryRange, isImportantOccurrence,
+		calendarQueryRange, isImportantOccurrence, calendarSectionRows,
 		type CalendarOccurrence, type CalendarSection
 	} from '$lib/calendarInclude';
 	import { simpleTodoPageUrl, simpleTodoApiUrl } from '$lib/simpleTodo';
 	import type { CalendarInlineEntry, IncludeView } from '$lib/includeView';
+	import { calendarIncludeEntries } from '$lib/includeEntries';
+	import IncludeText from './IncludeText.svelte';
 
-	let { sections, displaySections = sections }: { sections: CalendarSection[]; displaySections?: CalendarSection[] } = $props();
+	let { sections, displaySections = sections, onTagClick }: { sections: CalendarSection[]; displaySections?: CalendarSection[]; onTagClick?: (tag: string) => void } = $props();
 	let occurrences = $state<CalendarOccurrence[]>([]);
 	let now = $state(new Date());
 	let error = $state('');
@@ -20,18 +22,14 @@
 	const calendarUrl = simpleTodoPageUrl('calendar', base);
 
 	function sectionRows(section: CalendarSection): CalendarOccurrence[] {
-		const range = calendarRange(section, now);
-		const todayStart = calendarRange('today', now).start;
-		return occurrences.filter((row) => {
-			const date = row.occurrence_at.slice(0, 10);
-			if (date >= range.start && date <= range.end) return true;
-			if (date < range.start && !row.completed) {
-				if (row.is_important !== undefined) return Boolean(row.is_important);
-				return Boolean(row.event.important_if_late && date < todayStart);
-			}
-			return false;
-		});
+		return calendarSectionRows(occurrences, section, now);
 	}
+
+	export function nearbyEntries(section: CalendarSection) {
+		return calendarIncludeEntries(occurrences, section, now);
+	}
+
+	export function status() { return { loading, error }; }
 
 	export function sectionView(section: CalendarSection): IncludeView<CalendarInlineEntry> {
 		if (loading) return { status: 'loading' };
@@ -141,7 +139,7 @@
 						{#each rows as row}
 							{@const important = isImportantOccurrence(row, now)}
 							<li class:completed={row.completed} class:important={important}>
-								<a href={calendarUrl} target="_blank" rel="noopener noreferrer">{calendarLine(calendarOccurrenceLabel(row, now), row.event.title)}</a>{#if important}{' '}<span class="calendar-important-badge" title="Important (late and unchecked)">⚠️ Important</span>{/if}
+								<IncludeText text={calendarLine(calendarOccurrenceLabel(row, now), row.event.title)} href={calendarUrl} completed={row.completed} {onTagClick} />{#if important}{' '}<span class="calendar-important-badge" title="Important (late and unchecked)">⚠️ Important</span>{/if}
 							</li>
 						{/each}
 					</ul>
@@ -156,8 +154,6 @@
 	.calendar-includes { padding: 0 .75rem 0 0; color: var(--text2); font-size: .9rem; }
 	p, ul { margin: 0; }
 	ul { padding-left: 0; }
-	a { color: inherit; text-decoration: none; }
-	.completed a { text-decoration: line-through; }
 	button { color: inherit; cursor: pointer; }
 	.important {
 		background-color: rgba(220, 38, 38, 0.1);

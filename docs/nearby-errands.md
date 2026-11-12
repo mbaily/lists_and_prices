@@ -18,6 +18,23 @@ the source list's order, including subtasks and subnotes. Selecting an inherited
 list pill opens the list from the top, without highlighting a particular task.
 Selecting an explicitly tagged item pill opens and highlights that item.
 
+Calendar and bills inclusions (`[[calendar:today]]`, `[[bills:upcoming]]`, including
+`:wrap` and `:icon` variants) also contribute their included rows to Nearby.
+Hashtags in the event title or bill name use the same recognition, alias, list
+inheritance, location-free, distance, pause and dismiss rules as native items.
+For example, `#errands` is eligible only if registered at a location or added to
+**Location-free errand hashtags**; the built-in singular `#errand` is eligible by default.
+The configured inclusion sections determine which rows are considered, including
+late important calendar events and overdue bills shown with upcoming/due-today sections.
+Completed calendar occurrences, paid/covered bills, inactive bills and budget
+summaries do not contribute active errands. Checked source todos, headings and
+archived lists/folders do not contribute inclusions. Duplicate references to the
+same occurrence or bill cycle appear once; recurring occurrences remain separate.
+Select an included errand to open its containing inclusion. Included rows are
+read-only here: complete them in Simple Todo. Pause/dismiss stays local to Lists
+and syncs across your devices. Use **Refresh included errands** beside Nearby to
+reload the API data. Live inclusions are omitted when viewing historical data.
+
 Turn on the **Recently modified first** clock-icon button to the left of the
 Nearby heading to sort source lists by their most recently modified nearby task.
 All pills from the same source list stay together in source order, and task names

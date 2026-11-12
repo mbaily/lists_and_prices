@@ -3,7 +3,9 @@
 	import { billSections, billLine, type BillSection } from '$lib/billsInclude';
 	import { simpleTodoApiUrl } from '$lib/simpleTodo';
 	import type { IncludeView } from '$lib/includeView';
-	let { sections, displaySections = sections }: { sections: BillSection[]; displaySections?: BillSection[] } = $props();
+	import { billIncludeEntries } from '$lib/includeEntries';
+	import IncludeText from './IncludeText.svelte';
+	let { sections, displaySections = sections, onTagClick }: { sections: BillSection[]; displaySections?: BillSection[]; onTagClick?: (tag: string) => void } = $props();
 	let data = $state<Record<string, unknown> | null>(null);
 	let error = $state('');
 	let loading = $state(true);
@@ -11,6 +13,10 @@
 	let lastChecksum = '';
 	let lastSectionsKey = '';
 	let controller: AbortController;
+	export function nearbyEntries(section: BillSection) {
+		return data ? billIncludeEntries(data, section) : [];
+	}
+	export function status() { return { loading, error }; }
 	export function sectionView(section: BillSection): IncludeView<string> {
 		if (loading) return { status: 'loading' };
 		if (error) return { status: 'error', message: error };
@@ -86,7 +92,7 @@
 			<section aria-label={billSections[section]}>
 				{#if !Array.isArray(data[section])}<p>Section unavailable.</p>
 				{:else if allRows.length === 0}<p>No entries.</p>
-				{:else}<ul>{#each allRows as row}{#if row && typeof row === 'object' && !Array.isArray(row)}<li>{billLine(row as Record<string, unknown>, section)}</li>{/if}{/each}</ul>{/if}
+				{:else}<ul>{#each allRows as row}{#if row && typeof row === 'object' && !Array.isArray(row)}<li><IncludeText text={billLine(row as Record<string, unknown>, section)} {onTagClick} /></li>{/if}{/each}</ul>{/if}
 			</section>
 		{/each}
 	{/if}

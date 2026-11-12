@@ -17,11 +17,31 @@
     import { suburbById } from '$lib/hotSuburbs';
     import type { Suburb } from '$lib/suburbSearch';
     import { isChecklistDismissed } from '$lib/nearbyChecklist';
+    import { findInclusionSources, collectIncludedErrands } from '$lib/includedErrands';
+    import BillsInclude from './BillsInclude.svelte';
+    import CalendarInclude from './CalendarInclude.svelte';
 
     let { onBack, onOpenList, onOpenItem }: { onBack: () => void; onOpenList: (listId: string) => void; onOpenItem: (listId: string, itemId: string) => void } = $props();
     function openPill(pill: ReturnType<typeof nearbyListPills>[number]) {
         if (pill.id.startsWith('list:')) onOpenList(pill.list.id);
-        else onOpenItem(pill.list.id, pill.errands[0].item.id);
+        else onOpenItem(pill.list.id, pill.errands[0].inclusion?.sourceItemId ?? pill.errands[0].item.id);
+    }
+    function openErrand(errand: Errand) {
+        onOpenItem(errand.list.id, errand.inclusion?.sourceItemId ?? errand.item.id);
+    }
+    let billsInclude = $state<BillsInclude>();
+    let calendarInclude = $state<CalendarInclude>();
+    const inclusionSources = $derived.by(() => {
+        void docState.version;
+        return commitState.isHistorical ? [] : findInclusionSources(readAllItems(), readLists(), readFolders());
+    });
+    const includedBillSections = $derived([...new Set(inclusionSources.flatMap(source => source.bills))]);
+    const includedCalendarSections = $derived([...new Set(inclusionSources.flatMap(source => source.calendar))]);
+    const includeStatuses = $derived([billsInclude?.status(), calendarInclude?.status()].filter(status => status !== undefined));
+    const includesLoading = $derived(includeStatuses.some(status => status.loading));
+    const includeErrors = $derived(includeStatuses.flatMap(status => status.error ? [status.error] : []));
+    async function refreshIncludes() {
+        await Promise.all([billsInclude?.refresh(), calendarInclude?.refresh()]);
     }
     const savedLocation = $derived.by(() => { void docState.version; return readStartingLocation(); });
     const locationFilterEnabled = $derived.by(() => { void docState.version; return readNearbyLocationFilterEnabled(); });
@@ -119,7 +139,11 @@
         void docState.version;
         const folders = readFolders();
         const folderById = new Map(folders.map(folder => [folder.id, folder]));
-        return collectErrands(readAllItems(), readLists(), folders, true, locations).map(errand => {
+        const included = collectIncludedErrands(inclusionSources, {
+            bills: section => billsInclude?.nearbyEntries(section) ?? [],
+            calendar: section => calendarInclude?.nearbyEntries(section) ?? []
+        }, folders, locations);
+        return [...collectErrands(readAllItems(), readLists(), folders, true, locations), ...included].map(errand => {
             const folder = folderById.get(errand.list.folderId);
             const done = !errand.item.note && isItemDone(errand.item, folder);
             const fingerprint = nearbyItemFingerprint(errand.item, errand.list, folder);
@@ -264,6 +288,9 @@
     function distanceLabel(km: number) { return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`; }
 </script>
 
+{#if includedBillSections.length}<BillsInclude bind:this={billsInclude} sections={includedBillSections} displaySections={[]} />{/if}
+{#if includedCalendarSections.length}<CalendarInclude bind:this={calendarInclude} sections={includedCalendarSections} displaySections={[]} />{/if}
+
 {#snippet groupCheckbox(list: Errand['list'])}
     <input class="group-checkbox" type="checkbox" checked={list.done} disabled={commitState.isHistorical}
         aria-label={`Completed list: ${list.name}`} title="Complete this list; individual task checkboxes stay unchanged"
@@ -286,7 +313,7 @@
                     <p class="match-count">{groupErrands(stop.errands.map(errand => ({ errand }))).length} errands · {stop.errands.length} tasks</p>
                     <ul class="errand-groups">{#each groupErrands(stop.errands.map(errand => ({ errand }))) as group (group.id)}
                         {#snippet errandRows()}
-                            {#each group.rows as row (row.errand.item.id)}<li><button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span></button></li>{/each}
+                            {#each group.rows as row (row.errand.item.id)}<li><button class="errand" onclick={() => openErrand(row.errand)}><span>{row.errand.item.name}</span></button></li>{/each}
                         {/snippet}
                         {@render errandGroup(group, errandRows)}
                     {/each}</ul>
@@ -316,6 +343,7 @@
                 </svg>
             </button>
             <h2 id="nearby-strip-heading"><button class="nearby-heading" title="Go to distance setting" onclick={scrollToRadius}>Nearby</button></h2>
+            {#if inclusionSources.length}<button type="button" aria-label="Refresh included errands" title="Refresh calendar and bills inclusions" disabled={includesLoading} onclick={refreshIncludes}>↻</button>{/if}
             <select class="preview-limit" aria-label="Items per pill" title="Items per pill" value={previewLimit} onchange={setPreviewLimit} disabled={commitState.isHistorical}>{#each [1, 2, 3, 4, 5, 6, 7, 8, 9] as count}<option value={count}>{count}</option>{/each}</select>
             {#each nearbyPills as pill (pill.id)}
                 {@const segments = nearbyPillSegments(pill.name, pill.tags)}
@@ -328,6 +356,8 @@
                 </span>
             {/each}
         </section>
+        {#if includesLoading}<p role="status">Loading included errands…</p>{/if}
+        {#each includeErrors as error}<p role="alert" class="error">{error}</p>{/each}
         <section class="position">
             <div class="location-shortcuts">
                 <button class="suburb-shortcut no-filter-shortcut" class:active={!locationFilterEnabled}
@@ -404,7 +434,7 @@
                     <div class="pause-actions">{#each pausedTags as tag (tag)}<button disabled={commitState.isHistorical} onclick={() => pauseTag(tag, false)}>Resume all #{tag} errands</button>{/each}</div>
                     <ul class="errand-groups">{#each pausedGroups as group (group.id)}
                         {#snippet errandRows()}
-                            {#each group.rows as row (row.errand.item.id)}<li class="checklist-row"><button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}</small>{#if isErrandPaused(row.errand, pausedTags)}<small>Paused by hashtag: {row.errand.tags.map(normalizeLocationTag).filter(tag => pausedTags.includes(tag)).map(tag => '#' + tag).join(', ')}</small>{/if}</button>{#if row.itemPaused}<button class="resume-task" disabled={commitState.isHistorical} onclick={() => pauseItem(row.errand.item.id, false)} aria-label={`Resume ${row.errand.item.name}`} title="Resume this errand"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l14-8z" /></svg></button>{/if}</li>{/each}
+                            {#each group.rows as row (row.errand.item.id)}<li class="checklist-row"><button class="errand" onclick={() => openErrand(row.errand)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}</small>{#if isErrandPaused(row.errand, pausedTags)}<small>Paused by hashtag: {row.errand.tags.map(normalizeLocationTag).filter(tag => pausedTags.includes(tag)).map(tag => '#' + tag).join(', ')}</small>{/if}</button>{#if row.itemPaused}<button class="resume-task" disabled={commitState.isHistorical} onclick={() => pauseItem(row.errand.item.id, false)} aria-label={`Resume ${row.errand.item.name}`} title="Resume this errand"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l14-8z" /></svg></button>{/if}</li>{/each}
                         {/snippet}
                         {@render errandGroup(group, errandRows)}
                     {:else}<li class="hint">No unfinished paused tasks.</li>{/each}</ul>
@@ -417,8 +447,8 @@
                     {#snippet errandRows()}
                         {#each group.rows as row (row.errand.item.id)}
                             <li class="checklist-row" class:completed={row.done}>
-                                {#if row.errand.item.note}<span class="note-mark" aria-label="Note">📝</span>{:else}<input type="checkbox" checked={row.done} disabled={commitState.isHistorical} aria-label={`Completed: ${row.errand.item.name}`} onchange={(event) => setTaskDone(row.errand.item.id, event.currentTarget.checked)} />{/if}
-                                <button class="errand" onclick={() => onOpenItem(row.errand.list.id, row.errand.item.id)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}{row.errand.item.note ? ' · Note' : ''}</small>{#if !row.done && isLocationOptionalErrand(row.errand) && !locationIds.has(row.errand.item.id)}<small>{locationOptionalTag(row.errand) === 'bank' ? 'Choose a bank or ATM yourself' : 'Choose a location yourself'} · no saved location needed.</small>{:else if !row.done && (origin || !locationFilterEnabled) && !nearbyIds.has(row.errand.item.id)}<small>{locationFilterEnabled && supportedIds.has(row.errand.item.id) ? `No match within ${radius} km.` : 'No matching location in the database.'}</small>{/if}</button>
+                                {#if row.errand.inclusion}<span class="note-mark" aria-label={`${row.errand.inclusion.type === 'calendar' ? 'Calendar' : 'Bills'} inclusion`} title="Manage this entry in Simple Todo">↗</span>{:else if row.errand.item.note}<span class="note-mark" aria-label="Note">📝</span>{:else}<input type="checkbox" checked={row.done} disabled={commitState.isHistorical} aria-label={`Completed: ${row.errand.item.name}`} onchange={(event) => setTaskDone(row.errand.item.id, event.currentTarget.checked)} />{/if}
+                                <button class="errand" onclick={() => openErrand(row.errand)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}{row.errand.inclusion ? ' · ' + (row.errand.inclusion.type === 'calendar' ? 'Calendar' : 'Bills') : row.errand.item.note ? ' · Note' : ''}</small>{#if !row.done && isLocationOptionalErrand(row.errand) && !locationIds.has(row.errand.item.id)}<small>{locationOptionalTag(row.errand) === 'bank' ? 'Choose a bank or ATM yourself' : 'Choose a location yourself'} · no saved location needed.</small>{:else if !row.done && (origin || !locationFilterEnabled) && !nearbyIds.has(row.errand.item.id)}<small>{locationFilterEnabled && supportedIds.has(row.errand.item.id) ? `No match within ${radius} km.` : 'No matching location in the database.'}</small>{/if}</button>
                                 {#if !row.done}<button class="pause-task" disabled={commitState.isHistorical} onclick={() => pauseItem(row.errand.item.id, true)} aria-label={`Pause ${row.errand.item.name}`} title="Pause this errand"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg></button>{/if}
                                 <button class="dismiss-task" disabled={commitState.isHistorical} onclick={() => dismissTask(row.errand.item.id)} aria-label={`Dismiss from errands: ${row.errand.item.name}`} title="Dismiss from errands">×</button>
                             </li>
@@ -442,7 +472,7 @@
                             <ul class="errand-groups">{#each groupErrands(plan.unavailable.map(errand => ({ errand }))) as group (group.id)}
                                 {#snippet errandRows()}
                                     {#each group.rows as { errand } (errand.item.id)}<li>
-                                        <button class="errand" onclick={() => onOpenItem(errand.list.id, errand.item.id)}><span>{errand.item.name}</span><small>{errand.list.name}{errand.item.note ? ' · Note' : ''}</small><small>{locationFilterEnabled && supportedIds.has(errand.item.id) ? `No match within ${radius} km. Try a larger radius.` : 'No matching location in the database. Add a place in Locations.'}</small></button>
+                                        <button class="errand" onclick={() => openErrand(errand)}><span>{errand.item.name}</span><small>{errand.list.name}{errand.inclusion ? ' · ' + (errand.inclusion.type === 'calendar' ? 'Calendar' : 'Bills') : errand.item.note ? ' · Note' : ''}</small><small>{locationFilterEnabled && supportedIds.has(errand.item.id) ? `No match within ${radius} km. Try a larger radius.` : 'No matching location in the database. Add a place in Locations.'}</small></button>
                                     </li>{/each}
                                 {/snippet}
                                 {@render errandGroup(group, errandRows)}

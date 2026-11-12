@@ -162,11 +162,11 @@ test('wrapped bills surface loading, errors, empty sections and formatted entrie
 test('wrapped calendar keeps the selected range and completed occurrence information', () => {
 	const app = createApp();
 	try {
-		const { calendarRange, calendarOccurrenceLabel } = app.load('src/lib/calendarInclude.ts');
+		const { calendarRange, calendarOccurrenceLabel, calendarSectionRows } = app.load('src/lib/calendarInclude.ts');
 		const source = componentFunctions('src/lib/components/CalendarInclude.svelte', ['sectionRows', 'sectionView'])
 			.replace('export function ', 'function ');
 		const state = {
-			loading: false, error: '', now: new Date(2026, 10, 1, 12), calendarRange, calendarOccurrenceLabel,
+			loading: false, error: '', now: new Date(2026, 10, 1, 12), calendarRange, calendarOccurrenceLabel, calendarSectionRows,
 			occurrences: [
 				{ event: { title: 'Meeting', all_day: false }, occurrence_at: '2026-11-01T09:30:00', completed: false },
 				{ event: { title: 'Done', all_day: true }, occurrence_at: '2026-11-01T00:00:00', completed: true },

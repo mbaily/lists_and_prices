@@ -5,7 +5,7 @@ import catalogue from './locations/melbourne.json';
 import { suburbLocations } from './suburbLocations';
 import { buildItemTreeOrder } from './hierarchy';
 
-export interface Errand { item: Item; list: ListMeta; tags: string[]; inheritsListTags?: boolean }
+export interface Errand { item: Item; list: ListMeta; tags: string[]; inheritsListTags?: boolean; inclusion?: { sourceItemId: string; type: 'bills' | 'calendar' } }
 export interface NearbyStop { location: RetailLocation; distanceKm: number | null; errands: Errand[] }
 export interface SuggestedStops { suggested: NearbyStop[]; alternatives: NearbyStop[]; unavailable: Errand[] }
 

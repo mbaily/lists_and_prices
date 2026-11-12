@@ -17,6 +17,7 @@ import { isStartingLocation, type StartingLocation } from './startingLocation';
 import { defaultHotSuburbIds, isHotSuburbIds } from './hotSuburbs';
 import { checklistFingerprint, isNearbyChecklistState, NEARBY_CHECKLIST_MEMBERSHIP_ORIGIN, type NearbyChecklistState } from './nearbyChecklist';
 import { importNameKey } from './importText';
+import { isIncludedErrandId } from './includeEntries';
 
 export type { FolderCheckbox } from './folderCheckboxes';
 export type { FolderDefaultItem } from './folderDefaultItems';
@@ -1413,7 +1414,7 @@ export function readPausedErrandItemIds(): string[] {
 export function setErrandItemPaused(id: string, paused: boolean): void {
 	if (!id.trim()) throw new Error('Invalid errand item id.');
 	const doc = getMutableDoc();
-	if (paused && !findYMap(getItems(doc), id)) return;
+	if (paused && !findYMap(getItems(doc), id) && !isIncludedErrandId(id)) return;
 	const items = doc.getMap<boolean>('paused-errand-items');
 	if (paused) items.set(id, true);
 	else items.delete(id);

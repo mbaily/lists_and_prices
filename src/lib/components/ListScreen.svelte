@@ -37,6 +37,7 @@
 	import { billSections, findBillSections, type BillSection } from '$lib/billsInclude';
 	import { calendarSections, calendarLine, findCalendarSections, type CalendarSection } from '$lib/calendarInclude';
 	import { simpleTodoPageUrl } from '$lib/simpleTodo';
+	import IncludeText from './IncludeText.svelte';
 	import { findIncludeTokens } from '$lib/includeTokens';
 	import type { CalendarInlineEntry, IncludeView } from '$lib/includeView';
 	import { base } from '$app/paths';
@@ -2400,11 +2401,11 @@
 		{/snippet}
 		{#snippet wrappedBills(itemId: string, section: BillSection)}
 			{@const view = billIncludes[itemId]?.sectionView(section)}
-			<span class="include-inline">{#if !view || view.status === 'loading'}<span class="include-line">Loading bills…</span>{:else if view.status === 'error'}<span class="include-line">{view.message}</span>{:else if view.status === 'unavailable'}<span class="include-line">Section unavailable.</span>{:else if view.entries.length === 0}<span class="include-line">No entries.</span>{:else}{#each view.entries as entry}<span class="include-line"><span class="include-bullet">•</span>{' '}{entry}</span>{/each}{/if}</span>
+			<span class="include-inline">{#if !view || view.status === 'loading'}<span class="include-line">Loading bills…</span>{:else if view.status === 'error'}<span class="include-line">{view.message}</span>{:else if view.status === 'unavailable'}<span class="include-line">Section unavailable.</span>{:else if view.entries.length === 0}<span class="include-line">No entries.</span>{:else}{#each view.entries as entry}<span class="include-line"><span class="include-bullet">•</span>{' '}<IncludeText text={entry} {onTagClick} /></span>{/each}{/if}</span>
 		{/snippet}
 		{#snippet wrappedCalendar(itemId: string, section: CalendarSection)}
 			{@const view = calendarIncludes[itemId]?.sectionView(section)}
-			<span class="include-inline">{#if !view || view.status === 'loading'}<span class="include-line">Loading calendar events…</span>{:else if view.status === 'error'}<span class="include-line">{view.message}</span>{:else if view.status === 'unavailable'}<span class="include-line">Section unavailable.</span>{:else if view.entries.length === 0}<span class="include-line">No events.</span>{:else}{#each view.entries as entry}<span class="include-line"><span class="include-bullet">•</span>{' '}<a class:include-completed={entry.completed} class:include-important={entry.isImportant} href={simpleTodoPageUrl('calendar', base)} target="_blank" rel="noopener noreferrer" onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onclick={(e) => e.stopPropagation()}>{calendarLine(entry.label, entry.title)}</a>{#if entry.isImportant}{' '}<span class="calendar-important-badge" title="Important (late and unchecked)">⚠️ Important</span>{/if}</span>{/each}{/if}</span>
+			<span class="include-inline">{#if !view || view.status === 'loading'}<span class="include-line">Loading calendar events…</span>{:else if view.status === 'error'}<span class="include-line">{view.message}</span>{:else if view.status === 'unavailable'}<span class="include-line">Section unavailable.</span>{:else if view.entries.length === 0}<span class="include-line">No events.</span>{:else}{#each view.entries as entry}<span class="include-line"><span class="include-bullet">•</span>{' '}<IncludeText text={calendarLine(entry.label, entry.title)} href={simpleTodoPageUrl('calendar', base)} completed={entry.completed} {onTagClick} />{#if entry.isImportant}{' '}<span class="calendar-important-badge" title="Important (late and unchecked)">⚠️ Important</span>{/if}</span>{/each}{/if}</span>
 		{/snippet}
 		{#each filteredTreeItems as {item, level, tlIdx, rootTlIdx, sibIdx} (item.id)}
 			{@const canAddChildren = !item.heading && level < 2}
@@ -2611,8 +2612,8 @@
 			</div>
 			{#if includedBillSections.length || includedCalendarSections.length}
 				<div class="item-bills" hidden={!displayedBillSections.length && !displayedCalendarSections.length} use:alignIncludes>
-					{#if includedBillSections.length}<BillsInclude bind:this={billIncludes[item.id]} sections={includedBillSections} displaySections={displayedBillSections} />{/if}
-					{#if includedCalendarSections.length}<CalendarInclude bind:this={calendarIncludes[item.id]} sections={includedCalendarSections} displaySections={displayedCalendarSections} />{/if}
+					{#if includedBillSections.length}<BillsInclude bind:this={billIncludes[item.id]} sections={includedBillSections} displaySections={displayedBillSections} {onTagClick} />{/if}
+					{#if includedCalendarSections.length}<CalendarInclude bind:this={calendarIncludes[item.id]} sections={includedCalendarSections} displaySections={displayedCalendarSections} {onTagClick} />{/if}
 				</div>
 			{/if}
 		{/each}
@@ -4087,8 +4088,6 @@
 	.include-bullet {
 		opacity: 0.8;
 	}
-	.include-inline a { color: inherit; text-decoration: none; }
-	.include-inline a.include-completed { text-decoration: line-through; }
 	.calendar-important-badge {
 		display: inline-block;
 		background-color: #fee2e2;

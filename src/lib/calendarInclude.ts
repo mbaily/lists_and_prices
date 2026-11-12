@@ -56,6 +56,16 @@ export function isImportantOccurrence(occurrence: CalendarOccurrence, now: Date)
 	return occurrence.occurrence_at.slice(0, 10) < localDate(now);
 }
 
+/** The same range and overdue-important rules apply wherever an include is used. */
+export function calendarSectionRows(occurrences: CalendarOccurrence[], section: CalendarSection, now: Date): CalendarOccurrence[] {
+	const range = calendarRange(section, now);
+	return occurrences.filter(row => {
+		const date = row.occurrence_at.slice(0, 10);
+		return (date >= range.start && date <= range.end)
+			|| (date < range.start && isImportantOccurrence(row, now));
+	});
+}
+
 export function parseCalendarResponse(data: unknown): CalendarOccurrence[] {
 	if (!data || typeof data !== 'object' || !('occurrences' in data) || !Array.isArray(data.occurrences)) {
 		throw new Error('Invalid calendar response.');

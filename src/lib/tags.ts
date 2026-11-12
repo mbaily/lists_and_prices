@@ -10,6 +10,19 @@ export function extractTags(name: string): string[] {
 	return [...name.matchAll(TAG_RE)].map((m) => m[1].toLowerCase());
 }
 
+/** Split imported plain text using the same hashtag boundaries as errand matching. */
+export function splitHashtags(text: string): { type: 'text' | 'tag'; value: string }[] {
+	const parts: { type: 'text' | 'tag'; value: string }[] = [];
+	let last = 0;
+	for (const match of text.matchAll(TAG_RE)) {
+		if (match.index > last) parts.push({ type: 'text', value: text.slice(last, match.index) });
+		parts.push({ type: 'tag', value: match[0] });
+		last = match.index + match[0].length;
+	}
+	if (last < text.length) parts.push({ type: 'text', value: text.slice(last) });
+	return parts;
+}
+
 export type NameSegment = {
 	type: 'text' | 'url' | 'tag' | 'item-ref' | 'list-ref' | 'folder-ref' | 'wiki-ref';
 	value: string;
