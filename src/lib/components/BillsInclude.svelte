@@ -5,18 +5,24 @@
 	import type { IncludeView } from '$lib/includeView';
 	import { billIncludeEntries } from '$lib/includeEntries';
 	import IncludeText from './IncludeText.svelte';
+	import { getDoc } from '$lib/yjsStore.svelte';
+	import { readIncludeCache, writeIncludeCache } from '$lib/includeCache';
 	let { sections, displaySections = sections, onTagClick }: { sections: BillSection[]; displaySections?: BillSection[]; onTagClick?: (tag: string) => void } = $props();
-	let data = $state<Record<string, unknown> | null>(null);
+	const cacheScope = getDoc();
+	const cached = readIncludeCache<Record<string, unknown>>(cacheScope, 'bills');
+	let lastValue = cached?.value ?? null;
+	let data = $state<Record<string, unknown> | null>(lastValue);
 	let error = $state('');
-	let loading = $state(true);
-	let hasLoaded = false;
-	let lastChecksum = '';
+	let loading = $state(!cached);
+	let refreshing = $state(false);
+	let hasLoaded = !!cached;
+	let lastChecksum = cached?.checksum ?? '';
 	let lastSectionsKey = '';
 	let controller: AbortController;
 	export function nearbyEntries(section: BillSection) {
 		return data ? billIncludeEntries(data, section) : [];
 	}
-	export function status() { return { loading, error }; }
+	export function status() { return { loading, refreshing, error }; }
 	export function sectionView(section: BillSection): IncludeView<string> {
 		if (loading) return { status: 'loading' };
 		if (error) return { status: 'error', message: error };
@@ -43,6 +49,8 @@
 		controller?.abort();
 		controller = new AbortController();
 		const request = controller;
+		const today = new Date();
+		refreshing = true;
 		if (!hasLoaded) {
 			loading = true;
 		}
@@ -56,12 +64,15 @@
 			const rawText = await response.text();
 			if (request.signal.aborted) return;
 			if (hasLoaded && rawText === lastChecksum) {
+				writeIncludeCache(cacheScope, 'bills', lastValue, rawText, today);
 				return;
 			}
-			lastChecksum = rawText;
 			const json: unknown = JSON.parse(rawText);
 			if (!json || typeof json !== 'object' || Array.isArray(json)) throw new Error('Invalid bills response.');
 			data = json as Record<string, unknown>;
+			lastValue = json as Record<string, unknown>;
+			lastChecksum = rawText;
+			writeIncludeCache(cacheScope, 'bills', json, rawText, today);
 			hasLoaded = true;
 		} catch (e) {
 			if (request.signal.aborted) return;
@@ -69,7 +80,12 @@
 				data = null;
 				error = e instanceof Error && e.message.startsWith('Sign in') ? e.message : 'Bills service is unavailable.';
 			}
-		} finally { if (!request.signal.aborted) loading = false; }
+		} finally {
+			if (!request.signal.aborted) {
+				loading = false;
+				refreshing = false;
+			}
+		}
 	}
 	export function refresh() {
 		return fetchBills(sections, true);

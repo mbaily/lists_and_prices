@@ -9,14 +9,21 @@
 	import type { CalendarInlineEntry, IncludeView } from '$lib/includeView';
 	import { calendarIncludeEntries } from '$lib/includeEntries';
 	import IncludeText from './IncludeText.svelte';
+	import { getDoc } from '$lib/yjsStore.svelte';
+	import { readIncludeCache, writeIncludeCache } from '$lib/includeCache';
+	import { untrack } from 'svelte';
 
 	let { sections, displaySections = sections, onTagClick }: { sections: CalendarSection[]; displaySections?: CalendarSection[]; onTagClick?: (tag: string) => void } = $props();
-	let occurrences = $state<CalendarOccurrence[]>([]);
+	const cacheScope = getDoc();
+	const cached = untrack(() => readIncludeCache<CalendarOccurrence[]>(cacheScope, 'calendar:' + [...sections].sort().join(',')));
+	let lastValue = cached?.value ?? [];
+	let occurrences = $state<CalendarOccurrence[]>(lastValue);
 	let now = $state(new Date());
 	let error = $state('');
-	let loading = $state(true);
-	let hasLoaded = false;
-	let lastChecksum = '';
+	let loading = $state(!cached);
+	let refreshing = $state(false);
+	let hasLoaded = !!cached;
+	let lastChecksum = cached?.checksum ?? '';
 	let lastSectionsKey = '';
 	let controller: AbortController;
 	const calendarUrl = simpleTodoPageUrl('calendar', base);
@@ -29,7 +36,7 @@
 		return calendarIncludeEntries(occurrences, section, now);
 	}
 
-	export function status() { return { loading, error }; }
+	export function status() { return { loading, refreshing, error }; }
 
 	export function sectionView(section: CalendarSection): IncludeView<CalendarInlineEntry> {
 		if (loading) return { status: 'loading' };
@@ -63,10 +70,12 @@
 		controller?.abort();
 		if (selected.length === 0) {
 			loading = false;
+			refreshing = false;
 			return;
 		}
 		controller = new AbortController();
 		const request = controller;
+		refreshing = true;
 		const today = new Date();
 		now = today;
 		if (!hasLoaded) {
@@ -85,16 +94,20 @@
 			const rawText = await response.text();
 			if (request.signal.aborted) return;
 			if (hasLoaded && rawText === lastChecksum) {
+				writeIncludeCache(cacheScope, 'calendar:' + currentKey, lastValue, rawText, today);
 				return;
 			}
-			lastChecksum = rawText;
 			let data: unknown;
 			try {
 				data = JSON.parse(rawText);
 			} catch {
 				throw new Error('Calendar service is unavailable.');
 			}
-			occurrences = parseCalendarResponse(data);
+			const parsed = parseCalendarResponse(data);
+			occurrences = parsed;
+			lastValue = parsed;
+			lastChecksum = rawText;
+			writeIncludeCache(cacheScope, 'calendar:' + currentKey, parsed, rawText, today);
 			hasLoaded = true;
 		} catch (e) {
 			if (request.signal.aborted) return;
@@ -103,7 +116,10 @@
 				error = e instanceof Error && e.message.startsWith('Sign in') ? e.message : 'Calendar service is unavailable.';
 			}
 		} finally {
-			if (!request.signal.aborted) loading = false;
+			if (!request.signal.aborted) {
+				loading = false;
+				refreshing = false;
+			}
 		}
 	}
 

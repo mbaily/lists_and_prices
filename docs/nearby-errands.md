@@ -34,6 +34,13 @@ Select an included errand to open its containing inclusion. Included rows are
 read-only here: complete them in Simple Todo. Pause/dismiss stays local to Lists
 and syncs across your devices. Use **Refresh included errands** beside Nearby to
 reload the API data. Live inclusions are omitted when viewing historical data.
+Returning to Nearby shows the last successful inclusion results immediately
+while requesting fresh data. Unchanged responses keep the existing pills in
+place; loading is indicated by the refresh icon without shifting the content.
+These snapshots are kept only in memory for the current document and local day,
+separately for each calendar section selection. They are not synced or included
+in backups, and are not shared between accounts. A page reload starts without
+these snapshots.
 
 Turn on the **Recently modified first** clock-icon button to the left of the
 Nearby heading to sort source lists by their most recently modified nearby task.

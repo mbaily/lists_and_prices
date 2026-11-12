@@ -20,6 +20,8 @@
     import { findInclusionSources, collectIncludedErrands } from '$lib/includedErrands';
     import BillsInclude from './BillsInclude.svelte';
     import CalendarInclude from './CalendarInclude.svelte';
+    import type { BillSection } from '$lib/billsInclude';
+    import type { CalendarSection } from '$lib/calendarInclude';
 
     let { onBack, onOpenList, onOpenItem }: { onBack: () => void; onOpenList: (listId: string) => void; onOpenItem: (listId: string, itemId: string) => void } = $props();
     function openPill(pill: ReturnType<typeof nearbyListPills>[number]) {
@@ -35,10 +37,14 @@
         void docState.version;
         return commitState.isHistorical ? [] : findInclusionSources(readAllItems(), readLists(), readFolders());
     });
-    const includedBillSections = $derived([...new Set(inclusionSources.flatMap(source => source.bills))]);
-    const includedCalendarSections = $derived([...new Set(inclusionSources.flatMap(source => source.calendar))]);
+    // Primitive keys keep the include components' effects stable when unrelated
+    // Yjs/checklist changes rebuild the source objects with identical sections.
+    const billSectionsKey = $derived([...new Set(inclusionSources.flatMap(source => source.bills))].sort().join(','));
+    const calendarSectionsKey = $derived([...new Set(inclusionSources.flatMap(source => source.calendar))].sort().join(','));
+    const includedBillSections = $derived(billSectionsKey ? billSectionsKey.split(',') as BillSection[] : []);
+    const includedCalendarSections = $derived(calendarSectionsKey ? calendarSectionsKey.split(',') as CalendarSection[] : []);
     const includeStatuses = $derived([billsInclude?.status(), calendarInclude?.status()].filter(status => status !== undefined));
-    const includesLoading = $derived(includeStatuses.some(status => status.loading));
+    const includesLoading = $derived(includeStatuses.some(status => status.loading || status.refreshing));
     const includeErrors = $derived(includeStatuses.flatMap(status => status.error ? [status.error] : []));
     async function refreshIncludes() {
         await Promise.all([billsInclude?.refresh(), calendarInclude?.refresh()]);
@@ -343,7 +349,7 @@
                 </svg>
             </button>
             <h2 id="nearby-strip-heading"><button class="nearby-heading" title="Go to distance setting" onclick={scrollToRadius}>Nearby</button></h2>
-            {#if inclusionSources.length}<button type="button" aria-label="Refresh included errands" title="Refresh calendar and bills inclusions" disabled={includesLoading} onclick={refreshIncludes}>↻</button>{/if}
+            {#if inclusionSources.length}<button type="button" class="include-refresh" aria-label="Refresh included errands" aria-busy={includesLoading} title="Refresh calendar and bills inclusions" disabled={includesLoading} onclick={refreshIncludes}><span aria-hidden="true">↻</span></button>{/if}
             <select class="preview-limit" aria-label="Items per pill" title="Items per pill" value={previewLimit} onchange={setPreviewLimit} disabled={commitState.isHistorical}>{#each [1, 2, 3, 4, 5, 6, 7, 8, 9] as count}<option value={count}>{count}</option>{/each}</select>
             {#each nearbyPills as pill (pill.id)}
                 {@const segments = nearbyPillSegments(pill.name, pill.tags)}
@@ -356,7 +362,7 @@
                 </span>
             {/each}
         </section>
-        {#if includesLoading}<p role="status">Loading included errands…</p>{/if}
+        {#if includesLoading}<p class="include-loading-status" role="status">Refreshing included errands…</p>{/if}
         {#each includeErrors as error}<p role="alert" class="error">{error}</p>{/each}
         <section class="position">
             <div class="location-shortcuts">
@@ -556,6 +562,11 @@
     .nearby-strip h2 { margin: 0; flex-shrink: 0; }
     .nearby-strip .preview-limit { width: auto; flex-shrink: 0; padding: .35rem; }
     .nearby-heading { border: 0; background: transparent; padding: 0; font: inherit; color: inherit; }
+    .include-refresh { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; flex-shrink: 0; }
+    .include-refresh[aria-busy="true"] span { animation: include-refresh-spin 1s linear infinite; }
+    @keyframes include-refresh-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .include-refresh[aria-busy="true"] span { animation: none; } }
+    .include-loading-status { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     .nearby-pill { display: inline-flex; align-items: center; gap: .35rem; max-width: 100%; min-width: 0; background: #000; border: 1px solid var(--border); border-radius: 999px; padding: .35rem .65rem; white-space: nowrap; }
     .nearby-pill-link { display: inline-flex; align-items: center; gap: .35rem; min-width: 0; padding: 0; border: 0; background: transparent; }
     .nearby-pill-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
