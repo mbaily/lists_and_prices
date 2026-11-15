@@ -155,7 +155,7 @@
 						{#each rows as row}
 							{@const important = isImportantOccurrence(row, now)}
 							<li class:completed={row.completed} class:important={important}>
-								<IncludeText text={calendarLine(calendarOccurrenceLabel(row, now), row.event.title)} href={calendarUrl} completed={row.completed} {onTagClick} />{#if important}{' '}<span class="calendar-important-badge" title="Important (late and unchecked)">⚠️ Important</span>{/if}
+								<input type="checkbox" class="include-checkbox" checked={row.completed} disabled aria-label={row.completed ? 'Completed' : 'Not completed'} /><IncludeText text={calendarLine(calendarOccurrenceLabel(row, now), row.event.title)} href={calendarUrl} completed={row.completed} {onTagClick} />{#if important}{' '}<span class="calendar-important-badge" title="Important (late and unchecked)">⚠️ Important</span>{/if}
 							</li>
 						{/each}
 					</ul>
@@ -169,7 +169,8 @@
 <style>
 	.calendar-includes { padding: 0 .75rem 0 0; color: var(--text2); font-size: .9rem; }
 	p, ul { margin: 0; }
-	ul { padding-left: 0; color: var(--text); }
+	ul { padding-left: 0; color: var(--text); list-style: none; }
+	.include-checkbox { margin: 0 0.35rem 0 0; vertical-align: middle; pointer-events: none; }
 	button { color: inherit; cursor: pointer; }
 	.important {
 		background-color: rgba(220, 38, 38, 0.1);
