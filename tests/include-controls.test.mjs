@@ -272,3 +272,31 @@ test('include refresh button has spinning animation when refreshed', () => {
 	assert.match(text, /class:spinning=\{refreshingIncludes\[/);
 });
 
+test('calendar include checkboxes open the simple todo calendar link just like the event text', () => {
+	const checkboxNodes = elements('../src/lib/components/IncludeCheckbox.svelte');
+	const link = checkboxNodes.find((node) => node.name === 'a');
+	assert.ok(link);
+	assert.ok(attribute(link, 'href'));
+	assert.equal(attribute(link, 'target')?.value[0]?.data, '_blank');
+	assert.equal(attribute(link, 'rel')?.value[0]?.data, 'noopener noreferrer');
+	assert.ok(attribute(link, 'onpointerdown'));
+	assert.ok(attribute(link, 'onclick'));
+
+	const input = checkboxNodes.find((node) => node.name === 'input');
+	assert.ok(input);
+	assert.equal(attribute(input, 'type')?.value[0]?.data, 'checkbox');
+	assert.ok(attribute(input, 'disabled'));
+
+	const rules = cssRules('../src/lib/components/IncludeCheckbox.svelte');
+	assert.match(rules.get('.include-checkbox-link'), /cursor:\s*pointer/);
+	assert.match(rules.get('.include-checkbox'), /pointer-events:\s*none/);
+
+	for (const file of ['../src/lib/components/CalendarInclude.svelte', '../src/lib/components/ListScreen.svelte']) {
+		const nodes = elements(file);
+		const instance = nodes.find((node) => node.type === 'Component' && node.name === 'IncludeCheckbox');
+		assert.ok(instance, `${file} should render IncludeCheckbox`);
+		assert.ok(attribute(instance, 'href'), `${file} IncludeCheckbox should pass href`);
+		assert.ok(attribute(instance, 'completed'), `${file} IncludeCheckbox should pass completed`);
+	}
+});
+

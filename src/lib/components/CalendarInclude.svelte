@@ -8,6 +8,7 @@
 	import { simpleTodoPageUrl, simpleTodoApiUrl } from '$lib/simpleTodo';
 	import type { CalendarInlineEntry, IncludeView } from '$lib/includeView';
 	import { calendarIncludeEntries } from '$lib/includeEntries';
+	import IncludeCheckbox from './IncludeCheckbox.svelte';
 	import IncludeText from './IncludeText.svelte';
 	import { getDoc } from '$lib/yjsStore.svelte';
 	import { readIncludeCache, writeIncludeCache } from '$lib/includeCache';
@@ -155,7 +156,7 @@
 						{#each rows as row}
 							{@const important = isImportantOccurrence(row, now)}
 							<li class:completed={row.completed} class:important={important}>
-								<input type="checkbox" class="include-checkbox" checked={row.completed} disabled aria-label={row.completed ? 'Completed' : 'Not completed'} /><IncludeText text={calendarLine(calendarOccurrenceLabel(row, now), row.event.title)} href={calendarUrl} completed={row.completed} {onTagClick} />{#if important}{' '}<span class="calendar-important-badge" title="Important (late and unchecked)">⚠️ Important</span>{/if}
+								<IncludeCheckbox href={calendarUrl} completed={row.completed} /><IncludeText text={calendarLine(calendarOccurrenceLabel(row, now), row.event.title)} href={calendarUrl} completed={row.completed} {onTagClick} />{#if important}{' '}<span class="calendar-important-badge" title="Important (late and unchecked)">⚠️ Important</span>{/if}
 							</li>
 						{/each}
 					</ul>
@@ -170,7 +171,6 @@
 	.calendar-includes { padding: 0 .75rem 0 0; color: var(--text2); font-size: .9rem; }
 	p, ul { margin: 0; }
 	ul { padding-left: 0; color: var(--text); list-style: none; }
-	.include-checkbox { margin: 0 0.35rem 0 0; vertical-align: middle; pointer-events: none; }
 	button { color: inherit; cursor: pointer; }
 	.important {
 		background-color: rgba(220, 38, 38, 0.1);

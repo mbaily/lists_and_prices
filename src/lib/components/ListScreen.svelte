@@ -37,6 +37,7 @@
 	import { billSections, findBillSections, type BillSection } from '$lib/billsInclude';
 	import { calendarSections, calendarLine, findCalendarSections, type CalendarSection } from '$lib/calendarInclude';
 	import { simpleTodoPageUrl } from '$lib/simpleTodo';
+	import IncludeCheckbox from './IncludeCheckbox.svelte';
 	import IncludeText from './IncludeText.svelte';
 	import { findIncludeTokens } from '$lib/includeTokens';
 	import type { CalendarInlineEntry, IncludeView } from '$lib/includeView';
@@ -2406,7 +2407,7 @@
 		{/snippet}
 		{#snippet wrappedCalendar(itemId: string, section: CalendarSection)}
 			{@const view = calendarIncludes[itemId]?.sectionView(section)}
-			<span class="include-inline">{#if !view || view.status === 'loading'}<span class="include-line include-line-muted">Loading calendar events…</span>{:else if view.status === 'error'}<span class="include-line include-line-muted">{view.message}</span>{:else if view.status === 'unavailable'}<span class="include-line include-line-muted">Section unavailable.</span>{:else if view.entries.length === 0}<span class="include-line include-line-muted">No events.</span>{:else}{#each view.entries as entry}<span class="include-line"><input type="checkbox" class="include-checkbox" checked={entry.completed} disabled aria-label={entry.completed ? 'Completed' : 'Not completed'} /><IncludeText text={calendarLine(entry.label, entry.title)} href={simpleTodoPageUrl('calendar', base)} completed={entry.completed} {onTagClick} />{#if entry.isImportant}{' '}<span class="calendar-important-badge" title="Important (late and unchecked)">⚠️ Important</span>{/if}</span>{/each}{/if}</span>
+			<span class="include-inline">{#if !view || view.status === 'loading'}<span class="include-line include-line-muted">Loading calendar events…</span>{:else if view.status === 'error'}<span class="include-line include-line-muted">{view.message}</span>{:else if view.status === 'unavailable'}<span class="include-line include-line-muted">Section unavailable.</span>{:else if view.entries.length === 0}<span class="include-line include-line-muted">No events.</span>{:else}{#each view.entries as entry}<span class="include-line"><IncludeCheckbox href={simpleTodoPageUrl('calendar', base)} completed={entry.completed} /><IncludeText text={calendarLine(entry.label, entry.title)} href={simpleTodoPageUrl('calendar', base)} completed={entry.completed} {onTagClick} />{#if entry.isImportant}{' '}<span class="calendar-important-badge" title="Important (late and unchecked)">⚠️ Important</span>{/if}</span>{/each}{/if}</span>
 		{/snippet}
 		{#each filteredTreeItems as {item, level, tlIdx, rootTlIdx, sibIdx} (item.id)}
 			{@const canAddChildren = !item.heading && level < 2}
@@ -4095,11 +4096,6 @@
 	}
 	.include-bullet {
 		opacity: 0.8;
-	}
-	.include-checkbox {
-		margin: 0 0.35rem 0 0;
-		vertical-align: middle;
-		pointer-events: none;
 	}
 	.calendar-important-badge {
 		display: inline-block;
