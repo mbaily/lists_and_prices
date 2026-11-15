@@ -112,3 +112,96 @@ export function canReparentItems(items: Item[], ids: Iterable<string>, targetId:
 	}
 	return true;
 }
+
+/** Return IDs of notes/subnotes whose parent, sibling, and child tasks/notes are all complete. */
+export function getCompletedNoteIds(items: Item[], isDone: (item: Item) => boolean): Set<string> {
+	const resolved = resolveParentLinks(items);
+	const byId = new Map(resolved.map((item) => [item.id, item]));
+	const childrenByParent = new Map<string | null, Item[]>();
+	for (const item of resolved) {
+		const siblings = childrenByParent.get(item.parentId) ?? [];
+		siblings.push(item);
+		childrenByParent.set(item.parentId, siblings);
+	}
+
+	const subtreeMemo = new Map<string, { complete: boolean; hasTask: boolean }>();
+	function evalSubtree(id: string): { complete: boolean; hasTask: boolean } {
+		const cached = subtreeMemo.get(id);
+		if (cached) return cached;
+		const item = byId.get(id)!;
+		let complete = !item.heading && !item.note ? isDone(item) : true;
+		let hasTask = !item.heading && !item.note;
+		for (const child of childrenByParent.get(id) ?? []) {
+			const childRes = evalSubtree(child.id);
+			if (!childRes.complete) complete = false;
+			if (childRes.hasTask) hasTask = true;
+		}
+		const res = { complete, hasTask };
+		subtreeMemo.set(id, res);
+		return res;
+	}
+
+	const noteCompleteMemo = new Map<string, boolean>();
+	function isNoteComplete(id: string): boolean {
+		const cached = noteCompleteMemo.get(id);
+		if (cached !== undefined) return cached;
+		const item = byId.get(id);
+		if (!item || !item.note || item.heading) {
+			noteCompleteMemo.set(id, false);
+			return false;
+		}
+
+		let hasTask = false;
+		let ancId = item.parentId;
+		while (ancId !== null) {
+			const anc = byId.get(ancId);
+			if (!anc) break;
+			if (anc.note && !anc.heading) {
+				if (!isNoteComplete(anc.id)) {
+					noteCompleteMemo.set(id, false);
+					return false;
+				}
+				hasTask = true;
+				break;
+			}
+			if (!anc.heading) {
+				hasTask = true;
+				if (!isDone(anc)) {
+					noteCompleteMemo.set(id, false);
+					return false;
+				}
+			}
+			ancId = anc.parentId;
+		}
+
+		for (const sibling of childrenByParent.get(item.parentId) ?? []) {
+			if (sibling.id === item.id) continue;
+			const sibRes = evalSubtree(sibling.id);
+			if (!sibRes.complete) {
+				noteCompleteMemo.set(id, false);
+				return false;
+			}
+			if (sibRes.hasTask) hasTask = true;
+		}
+
+		for (const child of childrenByParent.get(item.id) ?? []) {
+			const childRes = evalSubtree(child.id);
+			if (!childRes.complete) {
+				noteCompleteMemo.set(id, false);
+				return false;
+			}
+			if (childRes.hasTask) hasTask = true;
+		}
+
+		noteCompleteMemo.set(id, hasTask);
+		return hasTask;
+	}
+
+	const result = new Set<string>();
+	for (const item of resolved) {
+		if (item.note && !item.heading && isNoteComplete(item.id)) {
+			result.add(item.id);
+		}
+	}
+	return result;
+}

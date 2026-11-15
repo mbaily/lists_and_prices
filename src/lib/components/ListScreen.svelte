@@ -2,7 +2,7 @@
 	import { docState, commitState, undoLastAction, canUndo, getUndoCount, exitCommitView, getDoc } from '$lib/yjsStore.svelte';
 	import { readItemRichText } from '$lib/noteText';
 	import { onDestroy, tick, untrack } from 'svelte';
-	import { buildItemTreeOrder, canReparentItems } from '$lib/hierarchy';
+	import { buildItemTreeOrder, canReparentItems, getCompletedNoteIds } from '$lib/hierarchy';
 	import {
 		readItems,
 		readAllItems,
@@ -471,6 +471,7 @@
 
 	// ── Tree order (subtasks / subnotes) ──────────────────────────────────────────
 	const treeItems = $derived(buildItemTreeOrder(items));
+	const completedNoteIds = $derived(getCompletedNoteIds(items, isDone));
 	const filterView = $derived<FilterView>(listMeta?.filterView ?? 'all');
 	const filteredTreeItems = $derived(
 		filterView === 'all'
@@ -2474,6 +2475,7 @@
 					{@render nearbyReturnLink(item)}
 					<div role="button" tabindex="0" onkeydown={activateItemName}
 						class="item-name note-name"
+						class:note-complete={completedNoteIds.has(item.id)}
 						class:fullscreen-note={item.fullScreen}
 						class:editing={editingId === item.id}
 						onclick={() => {
@@ -4022,6 +4024,7 @@
 		overflow-wrap: break-word;
 	}
 	.item-name.strikethrough { text-decoration: line-through; color: var(--text2); }
+	.item-name.note-complete { color: var(--text2); }
 	.item-name.editing { color: var(--accent); font-style: italic; }
 	.item-name-text {
 		display: block;
