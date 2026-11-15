@@ -9,7 +9,7 @@
 
 <style>
 	a { color: inherit; text-decoration: none; }
-	.completed { text-decoration: line-through; }
+	.completed { text-decoration: line-through; color: var(--text2); }
 	.tag-pill { display: inline-block; background: color-mix(in srgb, var(--list-color, var(--accent)) 18%, transparent); color: var(--list-color, var(--accent)); border-radius: 999px; padding: 0 .45em; font: inherit; font-size: .82em; font-weight: 600; border: 0; white-space: nowrap; }
 	button.tag-pill { cursor: pointer; }
 </style>
