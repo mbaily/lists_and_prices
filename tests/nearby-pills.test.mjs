@@ -140,3 +140,20 @@ test('recently modified preference syncs, restores from backups and respects und
         assert.equal(a.data.readNearbyRecentlyModifiedFirst(), false);
     } finally { a.dispose(); b.dispose(); }
 });
+
+test('nearby pill hashtag grouping collects sorted unique tags and filters by hashtag or All', () => {
+    const app = createApp();
+    try {
+        const { nearbyPillTags, filterNearbyPillsByTag } = app.load('src/lib/nearbyPills.ts');
+        const pills = [
+            { id: '1', tags: ['supermarket', 'Coles'] },
+            { id: '2', tags: ['bank'] },
+            { id: '3', tags: ['coles', 'pharmacy'] }
+        ];
+        assert.deepEqual(nearbyPillTags(pills), ['bank', 'coles', 'pharmacy', 'supermarket']);
+        assert.deepEqual(nearbyPillTags([]), []);
+        assert.deepEqual(filterNearbyPillsByTag(pills, null).map(pill => pill.id), ['1', '2', '3']);
+        assert.deepEqual(filterNearbyPillsByTag(pills, 'coles').map(pill => pill.id), ['1', '3']);
+        assert.deepEqual(filterNearbyPillsByTag(pills, '#BANK').map(pill => pill.id), ['2']);
+    } finally { app.dispose(); }
+});

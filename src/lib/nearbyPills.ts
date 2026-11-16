@@ -88,3 +88,19 @@ export function nearbyListPills(stops: readonly NearbyStop[], errands: readonly 
     const orderedLists = [...sourceLists.values()].sort((a, b) => b.modifiedAt - a.modifiedAt || 0);
     return orderedLists.flatMap(source => source.pills);
 }
+
+/** Sorted unique hashtags present across the current nearby pills. */
+export function nearbyPillTags(pills: readonly { tags: readonly string[] }[]): string[] {
+    const tags = new Set<string>();
+    for (const pill of pills) {
+        for (const tag of pill.tags) tags.add(normalizeLocationTag(tag));
+    }
+    return [...tags].sort((a, b) => a.localeCompare(b));
+}
+
+/** Filter nearby pills to a single hashtag, or return all when no hashtag is selected. */
+export function filterNearbyPillsByTag<T extends { tags: readonly string[] }>(pills: readonly T[], selectedTag: string | null): T[] {
+    if (!selectedTag) return [...pills];
+    const target = normalizeLocationTag(selectedTag);
+    return pills.filter(pill => pill.tags.some(tag => normalizeLocationTag(tag) === target));
+}

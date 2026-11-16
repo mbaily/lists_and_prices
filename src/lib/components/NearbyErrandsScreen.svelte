@@ -3,7 +3,7 @@
     import catalogue from '$lib/locations/melbourne.json';
     import suburbCatalogue from '$lib/locations/melbourne-suburbs.json';
     import { suburbLocations } from '$lib/suburbLocations';
-    import { nearbyTaskPills, nearbyListPills, nearbyPillSegments } from '$lib/nearbyPills';
+    import { nearbyTaskPills, nearbyListPills, nearbyPillSegments, nearbyPillTags, filterNearbyPillsByTag } from '$lib/nearbyPills';
     import { readNearbyRecentlyModifiedFirst, saveNearbyRecentlyModifiedFirst } from '$lib/data';
     import { readLocationOptionalTags, setLocationOptionalTag } from '$lib/data';
     import { groupErrands, errandPreview } from '$lib/errandGroups';
@@ -172,7 +172,12 @@
     }
     const completedChecklist = $derived(checklist.filter(row => row.done));
     const stops = $derived(!locationFilterEnabled || origin ? nearbyStops(locations, origin, radius, errands) : []);
+    let showHashtagGrouping = $state(false);
+    let selectedNearbyTag = $state<string | null>(null);
     const nearbyPills = $derived(nearbyListPills(stops, errands, previewLimit, recentlyModifiedFirst));
+    const nearbyTags = $derived(nearbyPillTags(nearbyPills));
+    const activeNearbyTag = $derived(selectedNearbyTag && nearbyTags.includes(selectedNearbyTag) ? selectedNearbyTag : null);
+    const visibleNearbyPills = $derived(showHashtagGrouping ? filterNearbyPillsByTag(nearbyPills, activeNearbyTag) : nearbyPills);
     const nearbyIds = $derived(new Set(nearbyTaskPills(stops, errands).map(pill => pill.errand.item.id)));
     const locationIds = $derived(new Set(stops.flatMap(stop => stop.errands.map(errand => errand.item.id))));
     const locationErrands = $derived(errands.filter(errand => !isLocationOptionalErrand(errand) || locationIds.has(errand.item.id)));
@@ -351,7 +356,19 @@
             <h2 id="nearby-strip-heading"><button class="nearby-heading" title="Go to distance setting" onclick={scrollToRadius}>Nearby</button></h2>
             {#if inclusionSources.length}<button type="button" class="include-refresh" aria-label="Refresh included errands" aria-busy={includesLoading} title="Refresh calendar and bills inclusions" disabled={includesLoading} onclick={refreshIncludes}><span aria-hidden="true">↻</span></button>{/if}
             <select class="preview-limit" aria-label="Items per pill" title="Items per pill" value={previewLimit} onchange={setPreviewLimit} disabled={commitState.isHistorical}>{#each [1, 2, 3, 4, 5, 6, 7, 8, 9] as count}<option value={count}>{count}</option>{/each}</select>
-            {#each nearbyPills as pill (pill.id)}
+            <label class="nearby-grouping-toggle" title="Show hashtag grouping">
+                <input type="checkbox" bind:checked={showHashtagGrouping} aria-label="Show hashtag grouping" />
+                <span>#</span>
+            </label>
+            {#if showHashtagGrouping}
+                <div class="nearby-tag-groups" role="group" aria-label="Group nearby errands by hashtag">
+                    <button type="button" class="nearby-tag-group" class:active={activeNearbyTag === null} aria-pressed={activeNearbyTag === null} onclick={() => selectedNearbyTag = null}>All</button>
+                    {#each nearbyTags as tag (tag)}
+                        <button type="button" class="nearby-tag-group" class:active={activeNearbyTag === tag} aria-pressed={activeNearbyTag === tag} onclick={() => selectedNearbyTag = tag}>#{tag}</button>
+                    {/each}
+                </div>
+            {/if}
+            {#each visibleNearbyPills as pill (pill.id)}
                 {@const segments = nearbyPillSegments(pill.name, pill.tags)}
                 <span class="nearby-pill">
                     {#if pill.id.startsWith('list:') && pill.errands.length > 1}{@render groupCheckbox(pill.list)}{/if}
@@ -561,6 +578,11 @@
     .nearby-strip { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-bottom: .8rem; padding-bottom: .2rem; }
     .nearby-strip h2 { margin: 0; flex-shrink: 0; }
     .nearby-strip .preview-limit { width: auto; flex-shrink: 0; padding: .35rem; }
+    .nearby-grouping-toggle { flex-direction: row; align-items: center; gap: .3rem; margin: 0; flex-shrink: 0; cursor: pointer; }
+    .nearby-grouping-toggle input { width: 20px; height: 20px; flex-shrink: 0; margin: 0; padding: 0; accent-color: var(--accent); cursor: pointer; }
+    .nearby-tag-groups { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; flex-basis: 100%; }
+    .nearby-tag-group { border-radius: 999px; background: #000; color: #fff; padding: .35rem .65rem; }
+    .nearby-tag-group.active { border-color: var(--accent); color: var(--accent); }
     .nearby-heading { border: 0; background: transparent; padding: 0; font: inherit; color: inherit; }
     .include-refresh { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; flex-shrink: 0; }
     .include-refresh[aria-busy="true"] span { animation: include-refresh-spin 1s linear infinite; }
