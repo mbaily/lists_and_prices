@@ -1,5 +1,7 @@
 <script module lang="ts">
-	export interface MenuItem { label: string; action?: () => void; danger?: boolean; submenu?: MenuItem[]; href?: string }
+	/** A small icon-only button sharing the item's row (about 80/20). */
+	export interface MenuSideAction { icon: string; title: string; action: () => void }
+	export interface MenuItem { label: string; action?: () => void; danger?: boolean; submenu?: MenuItem[]; href?: string; side?: MenuSideAction }
 </script>
 <script lang="ts">
 	let { items }: { items: MenuItem[] } = $props();
@@ -82,6 +84,34 @@
 	});
 </script>
 
+{#snippet actionItem(item: MenuItem)}
+	{#if item.side}
+		{@const side = item.side}
+		<div class="menu-split">
+			<button
+				class="menu-item split-main"
+				class:danger={item.danger}
+				role="menuitem"
+				onclick={(e) => { e.stopPropagation(); close(); item.action?.(); }}
+			>{item.label}</button>
+			<button
+				class="menu-item split-side"
+				role="menuitem"
+				title={side.title}
+				aria-label={side.title}
+				onclick={(e) => { e.stopPropagation(); close(); side.action(); }}
+			>{side.icon}</button>
+		</div>
+	{:else}
+		<button
+			class="menu-item"
+			class:danger={item.danger}
+			role="menuitem"
+			onclick={(e) => { e.stopPropagation(); close(); item.action?.(); }}
+		>{item.label}</button>
+	{/if}
+{/snippet}
+
 <div class="row-menu">
 	<button
 		bind:this={btnEl}
@@ -110,12 +140,7 @@
 							}}
 						>{item.label}</a>
 					{:else}
-						<button
-							class="menu-item"
-							class:danger={item.danger}
-							role="menuitem"
-							onclick={(e) => { e.stopPropagation(); close(); item.action?.(); }}
-						>{item.label}</button>
+						{@render actionItem(item)}
 					{/if}
 				{/each}
 			{:else}
@@ -141,12 +166,7 @@
 							}}
 						>{item.label}</a>
 					{:else}
-						<button
-							class="menu-item"
-							class:danger={item.danger}
-							role="menuitem"
-							onclick={(e) => { e.stopPropagation(); close(); item.action?.(); }}
-						>{item.label}</button>
+						{@render actionItem(item)}
 					{/if}
 				{/each}
 			{/if}
@@ -204,6 +224,11 @@
 	.menu-item.danger { color: #ef4444; }
 	.menu-item.menu-back { color: var(--text2); font-size: 0.9rem; }
 	.menu-item.menu-group { display: flex; justify-content: space-between; }
+	.menu-split { display: flex; border-bottom: 1px solid var(--border); }
+	.menu-split:last-child { border-bottom: none; }
+	.menu-split .menu-item { border-bottom: none; }
+	.split-main { flex: 4 1 0; min-width: 0; }
+	.split-side { flex: 1 1 0; text-align: center; padding-left: 0.5rem; padding-right: 0.5rem; border-left: 1px solid var(--border); }
 
 	@media (max-width: 600px) {
 		.menu-trigger { min-width: 24px; }

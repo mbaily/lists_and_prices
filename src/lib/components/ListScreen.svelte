@@ -57,7 +57,7 @@
 	import WikiModal from './WikiModal.svelte';
 	import { readWikiPage } from '$lib/wiki/data';
 	import { slugifyWikiPage } from '$lib/wiki/dokuwiki';
-	import { itemBadge, markItem, retryItem, stopItem, isConfigured, openTokenDialog, promptForTokenIfMissing, type ItemBadge } from '$lib/dokuwikiClient.svelte';
+	import { itemBadge, markItem, retryItem, setNewPage, stopItem, isConfigured, openTokenDialog, promptForTokenIfMissing, type ItemBadge } from '$lib/dokuwikiClient.svelte';
 
 	let {
 		listId,
@@ -660,22 +660,27 @@
 	}
 
 	function getDokuWikiMenuItems(item: Item): MenuItem[] {
-		if (!item.dokuwiki) return [{ label: '📝 DokuWiki', action: () => markForDokuWiki(item) }];
+		if (!item.dokuwiki) return [{
+			label: '📝 DokuWiki', action: () => markForDokuWiki(item),
+			side: { icon: '📄', title: 'Dokuwiki new page', action: () => markForDokuWiki(item, true) }
+		}];
 		const badge = dokuwikiBadges.get(item.id);
+		const newPage = item.dokuwiki.newPage === true;
 		return [
 			...(badge?.href ? [{ label: '🌐 Open in DokuWiki', href: badge.href, action: () => window.open(badge.href!, '_blank', 'noopener') }] : []),
+			{ label: newPage ? '📄 DokuWiki new page: on' : '📄 DokuWiki new page: off', action: () => { if (canEditList) setNewPage(item.id, !newPage); } },
 			{ label: '🔁 DokuWiki: retry', action: () => { if (canEditList) retryItem(item.id); } },
 			{ label: '🚫 DokuWiki: stop', action: () => { if (canEditList) stopItem(item.id); } }
 		];
 	}
 
-	function markForDokuWiki(item: Item) {
+	function markForDokuWiki(item: Item, newPage = false) {
 		if (!canEditList) return;
 		if (!isConfigured()) {
 			alert('Set the DokuWiki URL first: Settings → DokuWiki settings.');
 			return;
 		}
-		markItem(item.id);
+		markItem(item.id, { newPage });
 		void promptForTokenIfMissing();
 	}
 

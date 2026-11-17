@@ -5,7 +5,7 @@
 		readSettings, saveSettings, getTokenStatus, clearToken, testConnection, openTokenDialog, dokuwikiUi, type TokenStatus
 	} from '$lib/dokuwikiClient.svelte';
 	import {
-		DATE_VARIABLES, DEFAULT_DOKUWIKI_SETTINGS, headingFor, localDateString, markerFor, normalizeBaseUrl, pageIdFor, pageUrl,
+		DATE_VARIABLES, DEFAULT_DOKUWIKI_SETTINGS, headingFor, localDateString, markerFor, newPageTarget, normalizeBaseUrl, pageIdFor, pageUrl,
 		renderEntry, type DokuWikiSettings
 	} from '$lib/dokuwikiWriter';
 
@@ -27,6 +27,7 @@
 
 	const readOnly = $derived(commitState.isHistorical);
 	const today = localDateString();
+	const NEW_PAGE_EXAMPLE = 'Call "Bob\'s" plumber | urgent';
 	const urlValid = $derived(!form.baseUrl.trim() || normalizeBaseUrl(form.baseUrl) !== null);
 	const preview = $derived.by(() => {
 		try {
@@ -35,6 +36,7 @@
 				pageId,
 				heading: headingFor(form, today),
 				line: renderEntry(form.lineTemplate, { text: 'Buy milk', children: [{ text: 'full cream', children: [] }] }, markerFor('example')),
+				newPageLine: renderEntry(form.lineTemplate, { text: NEW_PAGE_EXAMPLE, children: [] }, markerFor('example2'), newPageTarget(NEW_PAGE_EXAMPLE, form.newPageNamespace, today)),
 				href: pageUrl(form.baseUrl, pageId)
 			};
 		} catch { return null; }
@@ -46,7 +48,7 @@
 		saveSettings({ [key]: form[key] });
 	}
 
-	function reset(key: Exclude<keyof DokuWikiSettings, 'baseUrl'>) {
+	function reset(key: Exclude<keyof DokuWikiSettings, 'baseUrl' | 'newPageNamespace'>) {
 		form[key] = DEFAULT_DOKUWIKI_SETTINGS[key];
 		save(key);
 	}
@@ -113,6 +115,11 @@
 				<input id="dw-lineTemplate" class="text-input mono" bind:value={form.lineTemplate} onchange={() => save('lineTemplate')} disabled={readOnly} spellcheck="false" />
 				<span class="hint"><code>{'{text}'}</code> is the item text, <code>{'{id}'}</code> its marker (added at the end if left out). Subnotes become nested bullets.</span>
 			</div>
+			<div class="field-group">
+				<label class="field-label" for="dw-newPageNamespace">New page namespace</label>
+				<input id="dw-newPageNamespace" class="text-input mono" placeholder="(next to the todo page)" bind:value={form.newPageNamespace} onchange={() => save('newPageNamespace')} disabled={readOnly} spellcheck="false" />
+				<span class="hint">For <b>📄 Dokuwiki new page</b>: the item line becomes a link to a page named after the item. Leave empty to put new pages next to the todo page, or enter a namespace such as <code>projects:{'{yyyy}'}</code>.</span>
+			</div>
 			<p class="hint">Date variables: {#each DATE_VARIABLES as v, i}<code>{`{${v}}`}</code>{i < DATE_VARIABLES.length - 1 ? ' ' : ''}{/each}</p>
 
 			{#if preview}
@@ -121,6 +128,8 @@
 					<div><span class="preview-label">Page</span> {#if preview.href}<a href={preview.href} target="_blank" rel="noopener noreferrer"><code>{preview.pageId}</code></a>{:else}<code>{preview.pageId}</code>{/if}</div>
 					<div><span class="preview-label">Section</span> <code>{preview.heading}</code></div>
 					<pre>{preview.line}</pre>
+					<div class="preview-label">New page</div>
+					<pre>{preview.newPageLine}</pre>
 				</div>
 			{/if}
 		</section>

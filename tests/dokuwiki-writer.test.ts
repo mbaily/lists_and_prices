@@ -7,7 +7,7 @@ import path from 'node:path';
 import type * as Yjs from 'yjs';
 import {
 	DEFAULT_DOKUWIKI_SETTINGS, DOKUWIKI_EDITING_MAP, DOKUWIKI_ORIGIN, applyEntry, badgeFor, dateVariables, expandTemplate, headingFor, markerFor,
-	normalizeBaseUrl, pageIdFor, pageUrl, planEntry, sectionAnchor, sectionId, readStatus, renderEntry, xmlRpcUrl, type DokuWikiStatus
+	newPageTarget, normalizeBaseUrl, pageIdFor, pageNameFor, pageUrl, planEntry, sectionAnchor, sectionId, readStatus, renderEntry, xmlRpcUrl, type DokuWikiStatus
 } from '../src/lib/dokuwikiWriter.ts';
 import { decodeResponse, encodeCall, XmlRpcFault } from '../server/xmlrpc.ts';
 import { DokuWikiTokens, DokuWikiWriter, needsWrite, retryDelay } from '../server/dokuwiki.ts';
@@ -254,6 +254,34 @@ test('section anchors follow DokuWiki: date stripped, repeats numbered', () => {
 	assert.equal(sectionAnchor(page, '===== 2026-11-18 Wed ====='), 'wed');
 	assert.equal(sectionAnchor(page, '===== 2026-11-19 Thu ====='), null);
 	assert.equal(pageUrl('https://wiki.example/', 'a:b', 'tue2'), 'https://wiki.example/doku.php?id=a:b#tue2');
+});
+
+test('"DokuWiki new page" links: a valid page name, the original text kept as the link text', () => {
+	assert.equal(pageNameFor('Call "Bob\'s" plumber | urgent [today]'), 'call_bob_s_plumber_urgent_today');
+	assert.equal(pageNameFor('Fix the garage door: quotes'), 'fix_the_garage_door_quotes');
+	assert.equal(pageNameFor('Café #2 / v1.5'), 'cafe_2_v1.5');
+	assert.equal(pageNameFor('  ..Ünïcode__--  '), 'unicode');
+	assert.equal(pageNameFor('"!!!"'), '');
+	assert.equal(pageNameFor('First line\nsecond line'), 'first_line');
+
+	assert.equal(newPageTarget('Buy milk', '', '2026-11-17'), 'buy_milk');
+	assert.equal(newPageTarget('Buy milk', 'Projects:{yyyy}', '2026-11-17'), ':projects:2026:buy_milk');
+	assert.equal(newPageTarget('!!!', '', '2026-11-17'), null);
+
+	const marker = markerFor('i');
+	const target = newPageTarget('Call "Bob\'s" plumber | urgent [today] {{img}}', '', '2026-11-17');
+	assert.equal(renderEntry('  * {text} {id}', { text: 'Call "Bob\'s" plumber | urgent [today] {{img}}\nring after 9', children: [{ text: 'quote', children: [] }] }, marker, target),
+		`  * [[call_bob_s_plumber_urgent_today_img|Call "Bob's" plumber / urgent (today) {img}]] \\\\ ring after 9 ${marker}\n    * quote`);
+
+	// The request flag drives it; nothing usable falls back to plain text.
+	const doc = new Y.Doc();
+	const item = addItem(doc, 'i', 'Buy milk', { dokuwiki: { date: '2026-11-17', requestedAt: '1', newPage: true } });
+	assert.equal(planEntry(doc as never, DEFAULT_DOKUWIKI_SETTINGS, item)!.text, `  * [[buy_milk|Buy milk]] ${markerFor('i')}`);
+	item.set('name', '???');
+	assert.equal(planEntry(doc as never, DEFAULT_DOKUWIKI_SETTINGS, item)!.text, `  * ??? ${markerFor('i')}`);
+	item.set('dokuwiki', { date: '2026-11-17', requestedAt: '1' });
+	item.set('name', 'Buy milk');
+	assert.equal(planEntry(doc as never, DEFAULT_DOKUWIKI_SETTINGS, item)!.text, `  * Buy milk ${markerFor('i')}`);
 });
 
 test('records missing sections, missing tokens and network failures', async (t) => {

@@ -18,13 +18,19 @@ export interface DokuWikiSettings {
 	pageTemplate: string;
 	headingTemplate: string;
 	lineTemplate: string;
+	/** Where "DokuWiki new page" links point. Empty: next to the todo page. */
+	newPageNamespace: string;
 }
+
+/** Settings that may be left empty. */
+const OPTIONAL_SETTINGS: ReadonlySet<keyof DokuWikiSettings> = new Set(['baseUrl', 'newPageNamespace']);
 
 export const DEFAULT_DOKUWIKI_SETTINGS: DokuWikiSettings = {
 	baseUrl: '',
 	pageTemplate: 'chronological:{yyyy}:{mon}:todo_{yyyy}_{month}',
 	headingTemplate: '===== {yyyy}-{mm}-{dd} {ddd} =====',
-	lineTemplate: '  * {text} {id}'
+	lineTemplate: '  * {text} {id}',
+	newPageNamespace: ''
 };
 
 export const DOKUWIKI_SETTINGS_MAP = 'dokuwikiSettings';
@@ -45,6 +51,8 @@ export interface DokuWikiRequest {
 	date: string;
 	/** Changes whenever the user marks or retries, so the server notices. */
 	requestedAt: string;
+	/** "DokuWiki new page": the item line becomes a link to a page named after it. */
+	newPage?: boolean;
 }
 
 export type DokuWikiState = 'written' | 'error' | 'auth';
@@ -123,9 +131,12 @@ export function readDokuWikiSettings(doc: Pick<DocLike, 'getMap'>): DokuWikiSett
 	const map = doc.getMap(DOKUWIKI_SETTINGS_MAP);
 	const read = (key: keyof DokuWikiSettings) => {
 		const value = map.get(key);
-		return typeof value === 'string' && (key === 'baseUrl' || value.trim()) ? value : DEFAULT_DOKUWIKI_SETTINGS[key];
+		return typeof value === 'string' && (OPTIONAL_SETTINGS.has(key) || value.trim()) ? value : DEFAULT_DOKUWIKI_SETTINGS[key];
 	};
-	return { baseUrl: read('baseUrl'), pageTemplate: read('pageTemplate'), headingTemplate: read('headingTemplate'), lineTemplate: read('lineTemplate') };
+	return {
+		baseUrl: read('baseUrl'), pageTemplate: read('pageTemplate'), headingTemplate: read('headingTemplate'), lineTemplate: read('lineTemplate'),
+		newPageNamespace: read('newPageNamespace')
+	};
 }
 
 /** Accepts `https://wiki/`, `https://wiki/doku.php?id=x#y`, or `https://wiki/sub/`. */
@@ -189,10 +200,10 @@ const oneLine = (text: string) => text.replace(/\r\n?/g, '\n').split('\n').map((
 
 /** One item line from the template, plus nested subnote bullets. The marker is
  * always present: `{id}` places it, otherwise it is appended to the line. */
-export function renderEntry(lineTemplate: string, node: EntryNode, marker: string): string {
+export function renderEntry(lineTemplate: string, node: EntryNode, marker: string, linkTarget?: string | null): string {
 	const template = lineTemplate.includes('{text}') ? lineTemplate : `${lineTemplate.trimEnd()} {text}`;
 	const withId = template.includes('{id}') ? template : `${template.trimEnd()} {id}`;
-	const first = expandTemplate(withId, { text: oneLine(node.text), id: marker }).replace(/[ \t]+$/, '');
+	const first = expandTemplate(withId, { text: linkTarget ? linkedText(node.text, linkTarget) : oneLine(node.text), id: marker }).replace(/[ \t]+$/, '');
 	const indent = /^\s*/.exec(first)![0].length;
 	const lines = [first];
 	const walk = (children: EntryNode[], depth: number) => {
@@ -205,6 +216,37 @@ export function renderEntry(lineTemplate: string, node: EntryNode, marker: strin
 	// Nested bullets are indented further than the item line itself.
 	walk(node.children, 1);
 	return lines.join('\n');
+}
+
+// ── "DokuWiki new page" links ───────────────────────────────────────────────
+
+const firstLine = (text: string) => text.replace(/\r\n?/g, '\n').split('\n').map((line) => line.trim()).find(Boolean) ?? '';
+
+/** A valid DokuWiki page name for the item's text: lowercase letters, digits,
+ * "_", "-" and "."; accents removed, everything else becomes "_". Colons and
+ * semicolons in the text are not allowed to create namespaces. Empty when
+ * nothing usable is left. */
+export function pageNameFor(text: string): string {
+	return cleanId(firstLine(text).replace(/[:;]/g, ' ')).replace(/:/g, '_');
+}
+
+/** The link target: `name` (next to the todo page) or `:namespace:name`. */
+export function newPageTarget(text: string, namespaceTemplate: string, date: string): string | null {
+	const name = pageNameFor(text);
+	if (!name) return null;
+	const namespace = cleanId(expandTemplate(namespaceTemplate, dateVariables(date)));
+	return namespace ? `:${namespace}:${name}` : name;
+}
+
+/** Link text can hold almost anything; only what would end or split the link changes. */
+function linkTitle(text: string): string {
+	return text.replace(/\|/g, '/').replace(/\[/g, '(').replace(/\]/g, ')').replace(/\{\{+/g, '{').replace(/\}\}+/g, '}');
+}
+
+/** `[[target|first line]]`, then any further lines as usual. */
+function linkedText(text: string, target: string): string {
+	const lines = text.replace(/\r\n?/g, '\n').split('\n').map((line) => line.trim()).filter(Boolean);
+	return [`[[${target}|${linkTitle(lines[0] ?? '')}]]`, ...lines.slice(1)].join(' \\\\ ');
 }
 
 const TEXT_PREFIX = 'note_text_';
@@ -248,7 +290,7 @@ export function readEntryNode(doc: DocLike, itemId: string): EntryNode | null {
 export function readRequest(item: MapLike): DokuWikiRequest | null {
 	const value = item.get(DOKUWIKI_REQUEST_KEY) as Partial<DokuWikiRequest> | null | undefined;
 	if (!value || typeof value !== 'object' || !isDateString(value.date) || typeof value.requestedAt !== 'string') return null;
-	return { date: value.date, requestedAt: value.requestedAt };
+	return { date: value.date, requestedAt: value.requestedAt, ...(value.newPage === true ? { newPage: true } : {}) };
 }
 
 export function readStatus(item: MapLike): DokuWikiStatus | null {
@@ -275,7 +317,8 @@ export function planEntry(doc: DocLike, settings: DokuWikiSettings, item: ItemMa
 	const node = readEntryNode(doc, itemId);
 	if (!node) return null;
 	const marker = markerFor(itemId);
-	const text = renderEntry(settings.lineTemplate, node, marker);
+	const link = request.newPage ? newPageTarget(node.text, settings.newPageNamespace, request.date) : null;
+	const text = renderEntry(settings.lineTemplate, node, marker, link);
 	const pageId = pageIdFor(settings, request.date);
 	return { itemId, request, pageId, heading: headingFor(settings, request.date), marker, text, hash: fnv1a(`${pageId}\n${text}`), ids: entryIds(node) };
 }

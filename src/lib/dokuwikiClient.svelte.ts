@@ -77,11 +77,11 @@ export function holdForEditing(itemId: string): () => void {
 
 // ── Marking items ────────────────────────────────────────────────────────────
 
-export function markItem(itemId: string, date = localDateString()) {
+export function markItem(itemId: string, options: { newPage?: boolean; date?: string } = {}) {
 	const doc = getMutableDoc();
 	const item = findItem(doc, itemId);
 	if (!item) return;
-	const request: DokuWikiRequest = { date, requestedAt: new Date().toISOString() };
+	const request: DokuWikiRequest = { date: options.date ?? localDateString(), requestedAt: new Date().toISOString(), ...(options.newPage ? { newPage: true } : {}) };
 	doc.transact(() => item.set(DOKUWIKI_REQUEST_KEY, request));
 }
 
@@ -91,8 +91,19 @@ export function retryItem(itemId: string) {
 	const item = findItem(doc, itemId);
 	const current = item?.get(DOKUWIKI_REQUEST_KEY) as DokuWikiRequest | undefined;
 	if (!item || !current) return;
-	doc.transact(() => item.set(DOKUWIKI_REQUEST_KEY, { date: current.date, requestedAt: new Date().toISOString() }));
+	doc.transact(() => item.set(DOKUWIKI_REQUEST_KEY, { ...current, requestedAt: new Date().toISOString() }));
 	void runNow();
+}
+
+/** Switch an already marked item between a plain line and a new-page link.
+ * The entry's text changes, so the server rewrites the line in place. */
+export function setNewPage(itemId: string, newPage: boolean) {
+	const doc = getMutableDoc();
+	const item = findItem(doc, itemId);
+	const current = item?.get(DOKUWIKI_REQUEST_KEY) as DokuWikiRequest | undefined;
+	if (!item || !current) return;
+	const { newPage: _old, ...rest } = current;
+	doc.transact(() => item.set(DOKUWIKI_REQUEST_KEY, newPage ? { ...rest, newPage: true } : rest));
 }
 
 /** Stop syncing the item. Text already in the wiki is left alone. */

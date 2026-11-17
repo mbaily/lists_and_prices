@@ -95,7 +95,9 @@ export const helpTopics: HelpTopic[] = [
 				paragraphs: [
 					'Set up the wiki once in Settings → DokuWiki settings: the wiki URL, the page id and section heading templates (with date variables such as {yyyy}, {mon}, {month}, {dd} and {ddd}), and an API token from your DokuWiki profile page. The token is kept on the server, never in the browser.',
 					'To send an item, open its menu and choose Copy & Link → 📝 DokuWiki. The item goes into the section for the day you marked it, even if your device is offline until later. The server writes it when your changes sync, adding it at the end of that section with an id such as #3fa9c01. Subnotes become nested bullets.',
-					'The badge after the item shows its state: ⏳ waiting, ✅ written (tap to open the page), ⚠️ failed (tap to see why and retry) or 🔑 token needed. Editing a written item updates its line in the wiki. Pages and sections are never created for you: create them in DokuWiki, then retry. Copy & Link → 🚫 DokuWiki: stop leaves the wiki text alone.'
+					'The badge after the item shows its state: ⏳ waiting, ✅ written (tap to open the page), ⚠️ failed (tap to see why and retry) or 🔑 token needed. Editing a written item updates its line in the wiki. Pages and sections are never created for you: create them in DokuWiki, then retry. Copy & Link → 🚫 DokuWiki: stop leaves the wiki text alone.',
+					'The 📄 icon next to 📝 DokuWiki (Dokuwiki new page) does the same, but turns the item into a link to a new wiki page named after it, such as [[call_bob_s_plumber|Call Bob\'s plumber]]. The page name is cleaned up to be valid in DokuWiki; your text stays as the link text. Follow the link in the wiki to create the page. New pages go next to the todo page unless you set a namespace in DokuWiki settings. For a marked item, Copy & Link → 📄 DokuWiki new page switches it on or off.',
+					'Edits are uploaded when you finish: when you save in the input bar, or save, cancel or close the full-screen note editor. Nothing half-typed is written.'
 				]
 			},
 			{
