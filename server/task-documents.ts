@@ -11,7 +11,7 @@ export interface TaskDocuments {
 }
 
 /** Share live WS documents, await cold loads, and acknowledge persisted writes. */
-export function createTaskDocuments(): TaskDocuments {
+export function createTaskDocuments(options: { onUpdate?: (username: string, origin: unknown) => void } = {}): TaskDocuments {
 	const persistence = getPersistence();
 	const ready = new WeakMap<Yjs.Doc, Promise<void>>();
 	const confirmedVectors = new WeakMap<Yjs.Doc, Uint8Array>();
@@ -21,6 +21,11 @@ export function createTaskDocuments(): TaskDocuments {
 			bindState(name, doc) {
 				const loaded = Promise.resolve().then(() => persistence.bindState(name, doc));
 				ready.set(doc, loaded);
+				const username = name.startsWith('yjs/pnl-') ? name.slice('yjs/pnl-'.length) : null;
+				if (username && options.onUpdate) {
+					// Registered after persistence, so stored data is loaded first.
+					loaded.then(() => doc.on('update', (_update: Uint8Array, origin: unknown) => options.onUpdate!(username, origin)), () => {});
+				}
 				// WS setup doesn't await bindState. The API still receives load failures.
 				loaded.catch(() => {});
 				return loaded;

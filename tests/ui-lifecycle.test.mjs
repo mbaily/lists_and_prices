@@ -65,7 +65,7 @@ function itemCopyProbe(item, folderCheckboxes = []) {
 		selectedIds: new Set(), selectedItems: [], treeItems: [{ item }], showHeaderMenu: true
 	};
 	const source = componentFunctions('src/lib/components/ListScreen.svelte', [
-		'serializeClipboardItems', 'writeClipboard', 'getCopyMenuItem', 'exportToClipboard'
+		'serializeClipboardItems', 'writeClipboard', 'getCopyMenuItem', 'getDokuWikiMenuItems', 'exportToClipboard'
 	]);
 	const api = new Function('state', `with (state) { ${transpile(source)}; return { getCopyMenuItem, exportToClipboard }; }`)(state);
 	return { state, writes, refs, menu: api.getCopyMenuItem(item), exportList: api.exportToClipboard };
@@ -76,7 +76,7 @@ test('item copy submenu keeps Tag as Link and copies just the todo or note name 
 		const item = { id: 'item-a', name: 'Buy milk #shopping', note };
 		const probe = itemCopyProbe(item);
 		assert.equal(probe.menu.action, undefined);
-		assert.deepEqual(probe.menu.submenu.map((entry) => entry.label), ['🔗 Tag as Link', '📋 Copy', '📋 Copy JSON']);
+		assert.deepEqual(probe.menu.submenu.map((entry) => entry.label), ['🔗 Tag as Link', '📋 Copy', '📋 Copy JSON', '📝 DokuWiki']);
 		probe.menu.submenu[0].action();
 		await probe.menu.submenu[1].action();
 		assert.deepEqual(probe.refs, ['item-a']);

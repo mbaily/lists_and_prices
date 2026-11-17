@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Shared with deployment regression tests. Never sync a whole checkout.
-RUNTIME_SHARED_MODULES=(folderDefaultItems.ts syncProtocol.ts)
+RUNTIME_SHARED_MODULES=(folderDefaultItems.ts syncProtocol.ts dokuwikiWriter.ts)
 
 validate_runtime() {
     local runtime=$1

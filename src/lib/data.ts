@@ -18,6 +18,7 @@ import { defaultHotSuburbIds, isHotSuburbIds } from './hotSuburbs';
 import { checklistFingerprint, isNearbyChecklistState, NEARBY_CHECKLIST_MEMBERSHIP_ORIGIN, type NearbyChecklistState } from './nearbyChecklist';
 import { importNameKey } from './importText';
 import { isIncludedErrandId } from './includeEntries';
+import { readRequest as readDokuWikiRequest, readStatus as readDokuWikiStatus, type DokuWikiRequest, type DokuWikiStatus } from './dokuwikiWriter';
 
 export type { FolderCheckbox } from './folderCheckboxes';
 export type { FolderDefaultItem } from './folderDefaultItems';
@@ -519,6 +520,9 @@ export interface Item {
 	/** Per-named-checkbox state, keyed by FolderCheckbox.id. Only meaningful
 	 *  when the item's list's folder has `checkboxes` configured. */
 	checks: Record<string, boolean>;
+	/** DokuWiki writer request (client) and outcome (server); see dokuwikiWriter.ts. */
+	dokuwiki?: DokuWikiRequest | null;
+	dokuwikiStatus?: DokuWikiStatus | null;
 }
 
 export function readItems(listId: string): Item[] {
@@ -562,7 +566,9 @@ function yMapToItem(m: Y.Map<unknown>): Item {
 		fullScreen: (m.get('fullScreen') as boolean) ?? false,
 		createdAt: (m.get('createdAt') as string | null) ?? null,
 		updatedAt: (m.get('updatedAt') as string | null) ?? null,
-		checks
+		checks,
+		dokuwiki: readDokuWikiRequest(m),
+		dokuwikiStatus: readDokuWikiStatus(m)
 	};
 }
 
@@ -1224,7 +1230,8 @@ export function exportBackup(): BackupFile {
 		exported: new Date().toISOString(),
 		folders: readFolders(),
 		lists: readLists(),
-		items: readAllItems().map(item => {
+		// DokuWiki write state is not part of backups: a restore must not resend old entries.
+		items: readAllItems().map(({ dokuwiki: _request, dokuwikiStatus: _status, ...item }) => {
 			const richText = readItemRichText(doc, item.id, item.name);
 			return richText === undefined ? item : { ...item, richText };
 		}),

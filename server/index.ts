@@ -35,6 +35,7 @@ import { bindTaskDestination, createTaskRouter, readTaskTokens } from './task-ap
 import { createOfflineSyncRouter } from './offline-sync.ts';
 import { readPublicBasePath, secureCookies, tlsEnabled } from './deployment-config.ts';
 import { preparePersistentDocuments } from './persistence.ts';
+import { DokuWikiTokens, DokuWikiWriter, createDokuWikiRouter } from './dokuwiki.ts';
 
 // better-sqlite3 is a CJS module; use createRequire to import it from ESM.
 const require = createRequire(import.meta.url);
@@ -212,7 +213,20 @@ const useTls = tlsEnabled(process.env.LISTS_TLS, fs.existsSync(CERT_FILE) && fs.
 const publicBasePath = readPublicBasePath(BUILD_DIR);
 await preparePersistentDocuments();
 const app = express();
-const documents = createTaskDocuments();
+let dokuwikiWriter: DokuWikiWriter | undefined;
+const documents = createTaskDocuments({ onUpdate: (username, origin) => dokuwikiWriter?.onDocumentUpdate(username, origin) });
+const dokuwikiTokens = new DokuWikiTokens(
+	{ get: kvGet, set: kvSet, delete: (key) => { db.prepare('DELETE FROM kv WHERE key = ?').run(key); } },
+	path.join(path.dirname(DB_FILE), 'dokuwiki-token.key')
+);
+dokuwikiWriter = new DokuWikiWriter({ documents, tokens: dokuwikiTokens });
+app.use('/api/dokuwiki', createDokuWikiRouter(sessions, dokuwikiTokens, dokuwikiWriter));
+// Pick up items marked while the server was down, once it has settled.
+setTimeout(() => {
+	let users: string[] = [];
+	try { users = fs.readFileSync(HTPASSWD_FILE, 'utf8').split('\n').map((line) => line.split(':', 1)[0]).filter(Boolean); } catch { /* no users */ }
+	for (const username of users) dokuwikiWriter!.schedule(username, 'startup', 0);
+}, 10_000).unref();
 app.use('/api/sync', createOfflineSyncRouter(sessions, documents));
 app.use('/api/tasks', createTaskRouter(sessions, documents, {
 	readTokens: () => readTaskTokens(storagePaths.taskTokensFile),

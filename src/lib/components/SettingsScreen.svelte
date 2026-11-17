@@ -5,6 +5,7 @@
 	import { MAX_BACKUP_BYTES } from '$lib/jsonImport';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import KeyboardSettingsScreen from './KeyboardSettingsScreen.svelte';
+	import DokuWikiSettingsScreen from './DokuWikiSettingsScreen.svelte';
 	import HelpScreen from './HelpScreen.svelte';
 	import OfflineSettings from './OfflineSettings.svelte';
 	import { docState, commitState, exitCommitView, cacheState, idbSynced, compactLocalCache } from '$lib/yjsStore.svelte';
@@ -14,6 +15,7 @@
 	const APP_VERSION = __APP_VERSION__;
 
 	let showKeyboardSettings = $state(false);
+	let showDokuWikiSettings = $state(false);
 	let showHelp = $state(false);
 	let helpButtonEl = $state<HTMLButtonElement>();
 
@@ -164,6 +166,8 @@
 	<HelpScreen onBack={closeHelp} />
 {:else if showKeyboardSettings}
 	<KeyboardSettingsScreen onBack={() => (showKeyboardSettings = false)} />
+{:else if showDokuWikiSettings}
+	<DokuWikiSettingsScreen onBack={() => (showDokuWikiSettings = false)} />
 {:else}
 <div class="screen">
 	<header>
@@ -188,6 +192,12 @@
 		<section>
 			<h2>Keyboard Shortcuts</h2>
 			<button class="action-btn" onclick={() => (showKeyboardSettings = true)}>⌨ Configure Shortcuts</button>
+		</section>
+
+		<section>
+			<h2>DokuWiki</h2>
+			<button class="action-btn" onclick={() => (showDokuWikiSettings = true)}>📝 DokuWiki settings</button>
+			<p class="hint">Wiki URL, page and section templates, and the API token for writing items to DokuWiki.</p>
 		</section>
 
 		<section>

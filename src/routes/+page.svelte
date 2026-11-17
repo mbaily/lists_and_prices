@@ -7,6 +7,8 @@
 	import { reloadSettings } from '$lib/settings.svelte';
 	import LoginScreen from '$lib/components/LoginScreen.svelte';
 	import HomeScreen from '$lib/components/HomeScreen.svelte';
+	import DokuWikiTokenDialog from '$lib/components/DokuWikiTokenDialog.svelte';
+	import { dokuwikiUi } from '$lib/dokuwikiClient.svelte';
 
 	let ready = $state(false);
 	let continueOffline = $state(false);
@@ -65,6 +67,7 @@
 		{#key auth.username}
 			<HomeScreen onLogout={handleLogout} />
 		{/key}
+		{#if dokuwikiUi.tokenDialogOpen}<DokuWikiTokenDialog />{/if}
 	{/if}
 {:else}
 	<div class="startup-message" role="status">{ready ? 'Loading data from this device…' : 'Starting the app…'}</div>

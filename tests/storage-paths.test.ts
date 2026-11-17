@@ -50,7 +50,7 @@ function fixture(t: TestContext) {
 	for (const file of fs.readdirSync(path.join(root, 'server')).filter(file => file.endsWith('.ts'))) {
 		fs.copyFileSync(path.join(root, 'server', file), path.join(app, 'server', file));
 	}
-	for (const file of ['folderDefaultItems.ts', 'syncProtocol.ts']) {
+	for (const file of ['folderDefaultItems.ts', 'syncProtocol.ts', 'dokuwikiWriter.ts']) {
 		fs.copyFileSync(path.join(root, 'src/lib', file), path.join(app, 'src/lib', file));
 	}
 	fs.symlinkSync(path.join(root, 'node_modules'), path.join(app, 'node_modules'), 'dir');
