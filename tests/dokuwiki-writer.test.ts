@@ -272,3 +272,19 @@ test('remembered tokens are encrypted at rest and survive a restart', async (t) 
 	tokens.clear('mark');
 	assert.equal(tokens.get('mark'), null);
 });
+
+test('an untrusted HTTPS certificate is reported with its cause and not retried', async (t) => {
+	const doc = new Y.Doc({ gc: false });
+	doc.getMap('dokuwikiSettings').set('baseUrl', 'https://wiki.example/');
+	const { tokens } = await tokensIn(t);
+	tokens.set('mark', 'secret', false);
+	const item = addItem(doc, 'i', 'x', { dokuwiki: { date: '2026-11-17', requestedAt: '1' } });
+	const fetcher = async () => {
+		throw new TypeError('fetch failed', { cause: Object.assign(new Error('unable to verify the first certificate'), { code: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' }) });
+	};
+	const writer = new DokuWikiWriter({ documents: fakeDocuments(doc), tokens, fetcher, log: () => {} });
+	await writer.process('mark', 'update');
+	const status = readStatus(item)!;
+	assert.equal(status.retryable, false);
+	assert.match(status.message!, /certificate is not trusted \(unable to verify the first certificate\).*NODE_EXTRA_CA_CERTS/);
+});

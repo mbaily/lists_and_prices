@@ -112,7 +112,14 @@ function classify(error: unknown): DokuWikiError {
 	}
 	const message = error instanceof Error ? error.message : String(error);
 	if (/malformed|did not return/i.test(message)) return new DokuWikiError('other', message);
-	return new DokuWikiError('network', `Could not reach DokuWiki: ${message}`);
+	// fetch() reports only "fetch failed"; the reason is in its cause.
+	const cause = error instanceof Error && error.cause && typeof error.cause === 'object' ? error.cause as { code?: string; message?: string } : undefined;
+	const detail = cause?.message ? `${message}: ${cause.message}` : message;
+	if (cause?.code && /CERT|SELF_SIGNED|UNABLE_TO_VERIFY|ERR_TLS/.test(cause.code)) {
+		// Retrying cannot fix an untrusted certificate.
+		return new DokuWikiError('other', `DokuWiki's HTTPS certificate is not trusted (${cause.message ?? cause.code}). For a private CA, start the server with NODE_EXTRA_CA_CERTS=/path/to/ca.crt.`);
+	}
+	return new DokuWikiError('network', `Could not reach DokuWiki: ${detail}`);
 }
 
 const methodMissing = (error: unknown) => error instanceof XmlRpcFault && (error.code === -32601 || /does not exist|not found|unknown method/i.test(error.message));
