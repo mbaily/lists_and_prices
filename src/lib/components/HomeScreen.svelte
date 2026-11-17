@@ -36,6 +36,7 @@
 	import { syncState, docState, idbSynced, commitState, exitCommitView, undoLastAction, canUndo, getUndoCount } from '$lib/yjsStore.svelte';
 	import { auth } from '$lib/auth.svelte';
 	import { settings, updateSettings } from '$lib/settings.svelte';
+	import { createSearchMatcher, type SearchMode } from '$lib/homeSearch';
 	import { getInsertionOrder } from '$lib/hierarchy';
 	import { DEFAULT_MARK_NAME, setDestinationMark } from '$lib/destinationMarks';
 	import { getSmartFolders, assignToReport, removeFromReport, deleteReport } from '$lib/smartFolders.svelte';
@@ -51,6 +52,7 @@
 	import InfoDialog from './InfoDialog.svelte';
 	import FolderCheckboxesDialog from './FolderCheckboxesDialog.svelte';
 	import FolderDefaultItemsDialog from './FolderDefaultItemsDialog.svelte';
+	import SavedSearchesDialog from './SavedSearchesDialog.svelte';
 	import CommitsScreen from './CommitsScreen.svelte';
 	import FavouritesOrderScreen from './FavouritesOrderScreen.svelte';
 	import NearbyErrandsScreen from './NearbyErrandsScreen.svelte';
@@ -175,7 +177,7 @@
 		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || (e.target instanceof HTMLElement && e.target.isContentEditable)) return;
 		
 		// Or if a modal/overlay is open
-		if (showSettings || showFavouritesOrder || showNewFolder || showNewList || showReportsMenu || infoTarget || sfDialogFolder || checkboxesFolder || defaultItemsFolder || renamingId || markTarget) return;
+		if (showSettings || showFavouritesOrder || showNewFolder || showNewList || showReportsMenu || showSavedSearches || infoTarget || sfDialogFolder || checkboxesFolder || defaultItemsFolder || renamingId || markTarget) return;
 
 		// Modifier keys should not trigger a bind by themselves
 		if (['Control', 'Meta', 'Alt', 'Shift', 'CapsLock'].includes(e.key)) return;
@@ -243,10 +245,12 @@
 
 	// ── Search ────────────────────────────────────────────────────────────────────
 	let showSearch = $state(false);
+	let showSavedSearches = $state(false);
 	let searchQuery = $state('');
+	let searchMode = $state<SearchMode>('phrase');
 	let searchUncheckedOnly = $state(false);
 	let searchInputEl = $state<HTMLInputElement | null>(null);
-	let savedSearch = $state<string | null>(null); // persists after navigating to a result
+	let searchToRestore = $state<{ query: string; mode: SearchMode; uncheckedOnly: boolean } | null>(null);
 
 	// ── Quick Add ────────────────────────────────────────────────────────────────
 	let showQuickAdd = $state(false);
@@ -308,16 +312,16 @@
 		| { kind: 'list'; data: ListMeta; path: string }
 		| { kind: 'item'; data: Item; listData: ListMeta };
 	let searchResults = $derived.by((): SearchResult[] => {
-		const q = searchQuery.trim().toLowerCase();
-		if (!q) return [];
+		const matches = createSearchMatcher(searchQuery, searchMode);
+		if (!matches) return [];
 		const results: SearchResult[] = [];
 		for (const folder of allFolders) {
-			if (folder.name.toLowerCase().includes(q))
+			if (matches(folder.name))
 				results.push({ kind: 'folder', data: folder, path: folderPath(folder) });
 		}
 		for (const list of allLists) {
 			if (searchUncheckedOnly && list.done) continue;
-			if (list.name.toLowerCase().includes(q))
+			if (matches(list.name))
 				results.push({ kind: 'list', data: list, path: listPath(list) });
 		}
 		for (const item of allItems) {
@@ -326,7 +330,7 @@
 			const folder = allFolders.find(f => f.id === list.folderId);
 			if (searchUncheckedOnly && isItemDone(item, folder)) continue;
 			if (searchUncheckedOnly && list.done) continue;
-			if (item.name.toLowerCase().includes(q)) {
+			if (matches(item.name)) {
 				results.push({ kind: 'item', data: item, listData: list });
 			}
 		}
@@ -667,11 +671,7 @@
 	}
 
 	function navigateBreadcrumb(index: number) {
-		if (index === 0 && showSearch) {
-			savedSearch = searchQuery.trim() || null;
-			showSearch = false;
-			searchQuery = '';
-		}
+		if (index === 0 && showSearch) rememberSearch();
 		breadcrumb = breadcrumb.slice(0, index + 1);
 	}
 
@@ -1111,35 +1111,42 @@
 	}
 
 	// ── Search actions ────────────────────────────────────────────────────────────
-	function toggleSearch() {
-		if (!showSearch) {
-			// Opening fresh search — clear saved crumb and any active tag filter
-			savedSearch = null;
-			activeTagFilter = null;
-			showSearch = true;
-			showQuickAdd = false;
-			tick().then(() => searchInputEl?.focus());
-		} else {
-			showSearch = false;
-			searchQuery = '';
-			searchUncheckedOnly = false;
-		}
-	}
-
-	function restoreSearch() {
-		if (!savedSearch) return;
-		searchQuery = savedSearch;
-		savedSearch = null;
+	function startSearch(query: string, mode: SearchMode = 'phrase', uncheckedOnly = searchUncheckedOnly) {
+		searchQuery = query;
+		searchMode = mode;
+		searchUncheckedOnly = uncheckedOnly;
+		searchToRestore = null;
+		activeTagFilter = null;
 		showSearch = true;
 		showQuickAdd = false;
 		tick().then(() => searchInputEl?.focus());
 	}
 
-	function openSearchResult(result: SearchResult) {
+	function toggleSearch() {
+		if (!showSearch) {
+			startSearch(searchQuery, searchMode);
+		} else {
+			showSearch = false;
+			searchQuery = '';
+			searchMode = 'phrase';
+			searchUncheckedOnly = false;
+		}
+	}
+
+	function restoreSearch() {
+		if (searchToRestore) startSearch(searchToRestore.query, searchToRestore.mode, searchToRestore.uncheckedOnly);
+	}
+
+	function rememberSearch() {
 		const query = searchQuery.trim();
+		searchToRestore = query ? { query, mode: searchMode, uncheckedOnly: searchUncheckedOnly } : null;
 		showSearch = false;
 		searchQuery = '';
-		savedSearch = query || null;
+		searchMode = 'phrase';
+	}
+
+	function openSearchResult(result: SearchResult) {
+		rememberSearch();
 		if (result.kind === 'folder') {
 			const visited = new Set<string>();
 			const ids: string[] = [];
@@ -1519,7 +1526,14 @@ ${bodyHtml}
 {:else if openSheetId}
 	<SpreadsheetScreen sheetId={openSheetId} onBack={() => openSheetId = null} />
 {:else if openListId}
-	<ListScreen listId={openListId} highlightItemId={openItemId} onReturnNearby={nearbyOpenedTarget?.listId === openListId && nearbyOpenedTarget?.itemId === openItemId ? returnToNearby : undefined} orderedLists={navOrderedLists} onHome={() => { nearbyOpenedTarget = null; openListId = null; openItemId = null; breadcrumb = [null]; }} onOpenList={(id) => { nearbyOpenedTarget = null; openItemId = null; openListId = id; }} onOpenFavouritesOrder={() => { if (commitState.isHistorical) return; nearbyOpenedTarget = null; previousListId = openListId; openListId = null; openItemId = null; showFavouritesOrder = true; }} savedSearch={savedSearch} onRestoreSearch={() => { nearbyOpenedTarget = null; openListId = null; openItemId = null; breadcrumb = [null]; restoreSearch(); }} onTagClick={(tag) => { nearbyOpenedTarget = null; openListId = null; openItemId = null; breadcrumb = [null]; activeTagFilter = null; showSearch = true; searchQuery = '#' + tag; savedSearch = '#' + tag; tick().then(() => searchInputEl?.focus()); }} onNavigateTo={(folderId) => {
+	<ListScreen listId={openListId} highlightItemId={openItemId} onReturnNearby={nearbyOpenedTarget?.listId === openListId && nearbyOpenedTarget?.itemId === openItemId ? returnToNearby : undefined} orderedLists={navOrderedLists} onHome={() => { nearbyOpenedTarget = null; openListId = null; openItemId = null; breadcrumb = [null]; }} onOpenList={(id) => { nearbyOpenedTarget = null; openItemId = null; openListId = id; }} onOpenFavouritesOrder={() => { if (commitState.isHistorical) return; nearbyOpenedTarget = null; previousListId = openListId; openListId = null; openItemId = null; showFavouritesOrder = true; }} savedSearch={searchToRestore?.query ?? null} onRestoreSearch={() => { nearbyOpenedTarget = null; openListId = null; openItemId = null; breadcrumb = [null]; restoreSearch(); }} onTagClick={(tag) => {
+		nearbyOpenedTarget = null;
+		openListId = null;
+		openItemId = null;
+		breadcrumb = [null];
+		startSearch('#' + tag);
+		searchToRestore = { query: searchQuery, mode: searchMode, uncheckedOnly: searchUncheckedOnly };
+	}} onNavigateTo={(folderId) => {
 		nearbyOpenedTarget = null;
 		openListId = null;
 		openItemId = null;
@@ -1598,10 +1612,12 @@ ${bodyHtml}
 				</div>
 			{/if}
 			<div class="header-left">
-				<Breadcrumb items={breadcrumbItems} searchLabel={!showSearch ? savedSearch : null} onRestoreSearch={restoreSearch} />
+				<Breadcrumb items={breadcrumbItems} searchLabel={!showSearch ? searchToRestore?.query ?? null : null} onRestoreSearch={restoreSearch} />
 				<button class="icon-btn search-btn" class:search-active={showSearch} onclick={toggleSearch} aria-label={showSearch ? 'Close search' : 'Search'}>
 					🔍
 				</button>
+				<button type="button" class="icon-btn" onclick={() => showSavedSearches = true}
+					aria-label="Saved searches" aria-haspopup="dialog" title="Saved searches">🔖</button>
 				{#if !commitState.isHistorical}
 					<button class="icon-btn quick-add-btn" class:quick-add-active={showQuickAdd} onclick={toggleQuickAdd} aria-label={showQuickAdd ? 'Close quick add' : 'Quick add'} title="Quick add">
 						⚡
@@ -1747,6 +1763,15 @@ ${bodyHtml}
 			</div>
 		{/if}
 
+		{#if showSavedSearches}
+			<SavedSearchesDialog
+				initialQuery={showSearch ? searchQuery : ''}
+				initialMode={showSearch ? searchMode : 'phrase'}
+				onClose={() => showSavedSearches = false}
+				onRun={({ query, mode }) => { showSavedSearches = false; startSearch(query, mode); }}
+			/>
+		{/if}
+
 		{#if showSearch}
 			<div class="search-bar">
 				<button
@@ -1766,6 +1791,7 @@ ${bodyHtml}
 					autocorrect="off"
 					spellcheck={false}
 				/>
+				{#if searchMode !== 'phrase'}<span class="search-mode">{searchMode === 'and' ? 'AND' : 'OR'}</span>{/if}
 				{#if searchQuery}
 					<button class="search-clear" onclick={() => searchQuery = ''} aria-label="Clear search">✕</button>
 				{/if}
@@ -2947,6 +2973,7 @@ ${bodyHtml}
 	}
 	.search-input {
 		flex: 1;
+		min-width: 0;
 		border: 1px solid var(--border);
 		border-radius: 10px;
 		padding: 0.5rem 0.75rem;
@@ -2956,6 +2983,7 @@ ${bodyHtml}
 		outline: none;
 	}
 	.search-input:focus { border-color: var(--accent); }
+	.search-mode { color: var(--text2); font-size: 0.8rem; font-weight: 600; }
 	.search-clear {
 		background: none;
 		border: none;
