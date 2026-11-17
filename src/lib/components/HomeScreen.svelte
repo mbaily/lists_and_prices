@@ -244,13 +244,13 @@
 	}
 
 	// ── Search ────────────────────────────────────────────────────────────────────
+	type SearchOptions = { mode: SearchMode; uncheckedOnly: boolean; includeUnfinishedListItems: boolean };
 	let showSearch = $state(false);
 	let showSavedSearches = $state(false);
 	let searchQuery = $state('');
-	let searchMode = $state<SearchMode>('phrase');
-	let searchUncheckedOnly = $state(false);
+	let searchOptions = $state<SearchOptions>({ mode: 'phrase', uncheckedOnly: false, includeUnfinishedListItems: false });
 	let searchInputEl = $state<HTMLInputElement | null>(null);
-	let searchToRestore = $state<{ query: string; mode: SearchMode; uncheckedOnly: boolean } | null>(null);
+	let searchToRestore = $state<({ query: string } & SearchOptions) | null>(null);
 
 	// ── Quick Add ────────────────────────────────────────────────────────────────
 	let showQuickAdd = $state(false);
@@ -312,27 +312,32 @@
 		| { kind: 'list'; data: ListMeta; path: string }
 		| { kind: 'item'; data: Item; listData: ListMeta };
 	let searchResults = $derived.by((): SearchResult[] => {
-		const matches = createSearchMatcher(searchQuery, searchMode);
+		const matches = createSearchMatcher(searchQuery, searchOptions.mode);
 		if (!matches) return [];
 		const results: SearchResult[] = [];
 		for (const folder of allFolders) {
 			if (matches(folder.name))
 				results.push({ kind: 'folder', data: folder, path: folderPath(folder) });
 		}
+		const listsById = new Map<string, ListMeta>();
+		const matchingListIds = new Set<string>();
 		for (const list of allLists) {
-			if (searchUncheckedOnly && list.done) continue;
-			if (matches(list.name))
-				results.push({ kind: 'list', data: list, path: listPath(list) });
+			if (searchOptions.uncheckedOnly && list.done) continue;
+			listsById.set(list.id, list);
+			if (!matches(list.name)) continue;
+			results.push({ kind: 'list', data: list, path: listPath(list) });
+			if (searchOptions.includeUnfinishedListItems && !list.done) matchingListIds.add(list.id);
 		}
 		for (const item of allItems) {
-			const list = allLists.find(l => l.id === item.listId);
+			const list = listsById.get(item.listId);
 			if (!list) continue;
-			const folder = allFolders.find(f => f.id === list.folderId);
-			if (searchUncheckedOnly && isItemDone(item, folder)) continue;
-			if (searchUncheckedOnly && list.done) continue;
-			if (matches(item.name)) {
-				results.push({ kind: 'item', data: item, listData: list });
+			const matchesName = matches(item.name);
+			if (!matchesName && !matchingListIds.has(list.id)) continue;
+			if (searchOptions.uncheckedOnly || !matchesName) {
+				const folder = allFolders.find(f => f.id === list.folderId);
+				if (isItemDone(item, folder)) continue;
 			}
+			results.push({ kind: 'item', data: item, listData: list });
 		}
 		// Sort by createdAt descending (newest first); nulls go last
 		results.sort((a, b) => {
@@ -1111,10 +1116,11 @@
 	}
 
 	// ── Search actions ────────────────────────────────────────────────────────────
-	function startSearch(query: string, mode: SearchMode = 'phrase', uncheckedOnly = searchUncheckedOnly) {
+	function startSearch(query: string, {
+		mode = 'phrase', uncheckedOnly = searchOptions.uncheckedOnly, includeUnfinishedListItems = false
+	}: Partial<SearchOptions> = {}) {
 		searchQuery = query;
-		searchMode = mode;
-		searchUncheckedOnly = uncheckedOnly;
+		searchOptions = { mode, uncheckedOnly, includeUnfinishedListItems };
 		searchToRestore = null;
 		activeTagFilter = null;
 		showSearch = true;
@@ -1124,25 +1130,24 @@
 
 	function toggleSearch() {
 		if (!showSearch) {
-			startSearch(searchQuery, searchMode);
+			startSearch(searchQuery, searchOptions);
 		} else {
 			showSearch = false;
 			searchQuery = '';
-			searchMode = 'phrase';
-			searchUncheckedOnly = false;
+			searchOptions = { mode: 'phrase', uncheckedOnly: false, includeUnfinishedListItems: false };
 		}
 	}
 
 	function restoreSearch() {
-		if (searchToRestore) startSearch(searchToRestore.query, searchToRestore.mode, searchToRestore.uncheckedOnly);
+		if (searchToRestore) startSearch(searchToRestore.query, searchToRestore);
 	}
 
 	function rememberSearch() {
 		const query = searchQuery.trim();
-		searchToRestore = query ? { query, mode: searchMode, uncheckedOnly: searchUncheckedOnly } : null;
+		searchToRestore = query ? { query, ...searchOptions } : null;
 		showSearch = false;
 		searchQuery = '';
-		searchMode = 'phrase';
+		searchOptions = { mode: 'phrase', uncheckedOnly: searchOptions.uncheckedOnly, includeUnfinishedListItems: false };
 	}
 
 	function openSearchResult(result: SearchResult) {
@@ -1532,7 +1537,7 @@ ${bodyHtml}
 		openItemId = null;
 		breadcrumb = [null];
 		startSearch('#' + tag);
-		searchToRestore = { query: searchQuery, mode: searchMode, uncheckedOnly: searchUncheckedOnly };
+		searchToRestore = { query: searchQuery, ...searchOptions };
 	}} onNavigateTo={(folderId) => {
 		nearbyOpenedTarget = null;
 		openListId = null;
@@ -1766,9 +1771,9 @@ ${bodyHtml}
 		{#if showSavedSearches}
 			<SavedSearchesDialog
 				initialQuery={showSearch ? searchQuery : ''}
-				initialMode={showSearch ? searchMode : 'phrase'}
+				initialMode={showSearch ? searchOptions.mode : 'phrase'}
 				onClose={() => showSavedSearches = false}
-				onRun={({ query, mode }) => { showSavedSearches = false; startSearch(query, mode); }}
+				onRun={(search) => { showSavedSearches = false; startSearch(search.query, search); }}
 			/>
 		{/if}
 
@@ -1776,11 +1781,11 @@ ${bodyHtml}
 			<div class="search-bar">
 				<button
 					class="search-unchecked-btn"
-					class:search-unchecked-active={searchUncheckedOnly}
-					onclick={() => searchUncheckedOnly = !searchUncheckedOnly}
-					title={searchUncheckedOnly ? 'Showing unchecked only' : 'Showing all'}
-					aria-label={searchUncheckedOnly ? 'Show all' : 'Show unchecked only'}
-				>{searchUncheckedOnly ? '☐' : '☑'}</button>
+					class:search-unchecked-active={searchOptions.uncheckedOnly}
+					onclick={() => searchOptions.uncheckedOnly = !searchOptions.uncheckedOnly}
+					title={searchOptions.uncheckedOnly ? 'Showing unchecked only' : 'Showing all'}
+					aria-label={searchOptions.uncheckedOnly ? 'Show all' : 'Show unchecked only'}
+				>{searchOptions.uncheckedOnly ? '☐' : '☑'}</button>
 				<input
 					bind:this={searchInputEl}
 					bind:value={searchQuery}
@@ -1791,7 +1796,7 @@ ${bodyHtml}
 					autocorrect="off"
 					spellcheck={false}
 				/>
-				{#if searchMode !== 'phrase'}<span class="search-mode">{searchMode === 'and' ? 'AND' : 'OR'}</span>{/if}
+				{#if searchOptions.mode !== 'phrase'}<span class="search-mode">{searchOptions.mode === 'and' ? 'AND' : 'OR'}</span>{/if}
 				{#if searchQuery}
 					<button class="search-clear" onclick={() => searchQuery = ''} aria-label="Clear search">✕</button>
 				{/if}

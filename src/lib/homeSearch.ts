@@ -5,6 +5,7 @@ export interface SavedSearch {
 	name: string;
 	query: string;
 	mode: SearchMode;
+	includeUnfinishedListItems: boolean;
 }
 
 export function restoreSavedSearches(value: unknown): SavedSearch[] {
@@ -12,10 +13,13 @@ export function restoreSavedSearches(value: unknown): SavedSearch[] {
 	const searches: SavedSearch[] = [];
 	for (const entry of value) {
 		if (!entry || typeof entry !== 'object') continue;
-		const { id, name, query, mode } = entry;
+		const { id, name, query, mode, includeUnfinishedListItems } = entry;
 		if (typeof id !== 'string' || typeof query !== 'string' || !query.trim()) continue;
 		if (mode !== 'phrase' && mode !== 'and' && mode !== 'or') continue;
-		searches.push({ id, name: (typeof name === 'string' && name.trim()) || query.trim(), query, mode });
+		searches.push({
+			id, name: (typeof name === 'string' && name.trim()) || query.trim(), query, mode,
+			includeUnfinishedListItems: includeUnfinishedListItems === true
+		});
 	}
 	return searches;
 }

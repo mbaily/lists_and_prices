@@ -21,6 +21,7 @@
 	let name = $state('');
 	let query = $state('');
 	let mode = $state<SearchMode>('phrase');
+	let includeUnfinishedListItems = $state(false);
 	let editingId = $state<string | null>(null);
 	let error = $state('');
 
@@ -51,6 +52,7 @@
 		name = search?.name ?? '';
 		query = search?.query ?? initialQuery;
 		mode = search?.mode ?? initialMode;
+		includeUnfinishedListItems = search?.includeUnfinishedListItems ?? false;
 		error = '';
 		view = 'editor';
 		await tick();
@@ -67,7 +69,7 @@
 		const searchQuery = query.trim();
 		if (!searchName || !searchQuery) return;
 		try {
-			const search = { id: editingId ?? crypto.randomUUID(), name: searchName, query: searchQuery, mode };
+			const search = { id: editingId ?? crypto.randomUUID(), name: searchName, query: searchQuery, mode, includeUnfinishedListItems };
 			const savedSearches = editingId
 				? settings.savedSearches.map((entry) => entry.id === search.id ? search : entry)
 				: [...settings.savedSearches, search];
@@ -117,6 +119,10 @@
 					<option value="and">AND (all terms)</option>
 					<option value="or">OR (any term)</option>
 				</select>
+			</label>
+			<label class="checkbox-option">
+				<input type="checkbox" bind:checked={includeUnfinishedListItems} />
+				Include unfinished items from matching lists
 			</label>
 			{#if error}<p role="alert">{error}</p>{/if}
 			<div class="form-actions">
@@ -168,7 +174,7 @@
 	.search-entry small { display: block; color: var(--text2); }
 	form { display: grid; gap: 0.65rem; margin-top: 0.75rem; }
 	label { display: grid; gap: 0.3rem; font-size: 0.9rem; }
-	button, input, select {
+	button, input:not([type='checkbox']), select {
 		box-sizing: border-box;
 		min-height: 2.75rem;
 		padding: 0.4rem 0.65rem;
@@ -178,6 +184,8 @@
 		color: var(--text);
 		font: inherit;
 	}
+	.checkbox-option { display: flex; align-items: center; gap: 0.5rem; min-height: 2.75rem; cursor: pointer; }
+	.checkbox-option input { margin: 0; accent-color: var(--accent); }
 	button { cursor: pointer; }
 	button:disabled { opacity: 0.55; cursor: default; }
 	.save-search { background: var(--accent); color: white; font-weight: 600; }
