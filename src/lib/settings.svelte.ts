@@ -3,7 +3,7 @@
  * Svelte 5 runes-based reactive state.
  */
 import { auth } from './auth.svelte';
-import type { SavedSearch } from './homeSearch';
+import { restoreSavedSearches, type SavedSearch } from './homeSearch';
 
 const SETTINGS_KEY = 'pnl_settings';
 
@@ -41,7 +41,7 @@ function loadSettings(): Settings {
 	try {
 		const saved = JSON.parse(localStorage.getItem(settingsKey()) ?? 'null');
 		if (typeof saved === 'object' && saved !== null && !Array.isArray(saved)) {
-			return { currency: '$', theme: 'light' as const, handedness: 'right' as const, addItemPosition: 'bottom' as const, addListPosition: 'bottom' as const, parentHerePosition: 'bottom' as const, reportFontSize: 14, itemSpacing: 8, favouritesCollapsed: false, quickListFolderId: null, quickListName: 'Quick List', showNearbyReturnLink: true, ...saved, keybindings: { ...DEFAULT_KEYBINDINGS, ...(saved.keybindings || {}) }, savedSearches: Array.isArray(saved.savedSearches) ? saved.savedSearches : [] };
+			return { currency: '$', theme: 'light' as const, handedness: 'right' as const, addItemPosition: 'bottom' as const, addListPosition: 'bottom' as const, parentHerePosition: 'bottom' as const, reportFontSize: 14, itemSpacing: 8, favouritesCollapsed: false, quickListFolderId: null, quickListName: 'Quick List', showNearbyReturnLink: true, ...saved, keybindings: { ...DEFAULT_KEYBINDINGS, ...(saved.keybindings || {}) }, savedSearches: restoreSavedSearches(saved.savedSearches) };
 		}
 	} catch { /* fall through */ }
 	// No saved settings — detect OS preference rather than hardcoding light

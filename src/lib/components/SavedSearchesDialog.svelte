@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { settings, updateSettings } from '$lib/settings.svelte';
 	import type { SavedSearch, SearchMode } from '$lib/homeSearch';
 
@@ -11,17 +11,22 @@
 	} = $props();
 	const titleId = $props.id();
 	const modeLabels: Record<SearchMode, string> = { phrase: 'Phrase', and: 'AND', or: 'OR' };
+	type ListView = 'quick' | 'manage';
 	let dialog: HTMLDialogElement;
-	let queryInput: HTMLInputElement;
+	let list = $state<HTMLUListElement>();
+	let listAction = $state<HTMLButtonElement>();
+	let nameInput = $state<HTMLInputElement>();
+	let view = $state<ListView | 'editor'>('quick');
+	let editorReturnView: ListView = 'manage';
+	let name = $state('');
 	let query = $state('');
 	let mode = $state<SearchMode>('phrase');
 	let editingId = $state<string | null>(null);
 	let error = $state('');
 
 	onMount(() => {
-		query = initialQuery;
-		mode = initialMode;
 		dialog.showModal();
+		void focusList();
 	});
 
 	function run(search: SavedSearch) {
@@ -29,27 +34,40 @@
 		onRun(search);
 	}
 
-	function edit(search: SavedSearch) {
-		editingId = search.id;
-		query = search.query;
-		mode = search.mode;
-		error = '';
-		queryInput.focus();
+	async function focusList() {
+		await tick();
+		(list?.querySelector('button') ?? listAction)?.focus();
 	}
 
-	function resetForm() {
-		editingId = null;
-		query = '';
-		mode = 'phrase';
+	function showList(nextView: ListView) {
+		view = nextView;
+		void focusList();
+	}
+
+	async function openEditor(search?: SavedSearch) {
+		if (view === 'editor') return;
+		editorReturnView = view;
+		editingId = search?.id ?? null;
+		name = search?.name ?? '';
+		query = search?.query ?? initialQuery;
+		mode = search?.mode ?? initialMode;
 		error = '';
-		queryInput.focus();
+		view = 'editor';
+		await tick();
+		nameInput?.focus();
+	}
+
+	function goBack() {
+		if (view === 'quick') dialog.close();
+		else showList(view === 'editor' ? editorReturnView : 'quick');
 	}
 
 	function save() {
-		const trimmed = query.trim();
-		if (!trimmed) return;
+		const searchName = name.trim();
+		const searchQuery = query.trim();
+		if (!searchName || !searchQuery) return;
 		try {
-			const search = { id: editingId ?? crypto.randomUUID(), query: trimmed, mode };
+			const search = { id: editingId ?? crypto.randomUUID(), name: searchName, query: searchQuery, mode };
 			const savedSearches = editingId
 				? settings.savedSearches.map((entry) => entry.id === search.id ? search : entry)
 				: [...settings.savedSearches, search];
@@ -58,7 +76,7 @@
 			error = 'Could not save this search.';
 			return;
 		}
-		resetForm();
+		showList(editorReturnView);
 	}
 
 	function remove() {
@@ -68,52 +86,65 @@
 			error = 'Could not remove this search.';
 			return;
 		}
-		resetForm();
+		showList(editorReturnView);
 	}
 </script>
 
-<dialog bind:this={dialog} aria-labelledby={titleId} onclose={onClose}>
+<dialog bind:this={dialog} aria-labelledby={titleId} onclose={onClose}
+	oncancel={(event) => { if (view !== 'quick') { event.preventDefault(); goBack(); } }}>
 	<div class="dialog-header">
-		<h2 id={titleId}>Saved searches</h2>
-		<button type="button" onclick={() => dialog.close()}>Done</button>
+		<h2 id={titleId}>
+			{#if view === 'editor'}{editingId ? 'Edit saved search' : 'New saved search'}
+			{:else}{view === 'manage' ? 'Manage saved searches' : 'Saved searches'}{/if}
+		</h2>
+		<button type="button" onclick={goBack}>{view === 'quick' ? 'Done' : 'Back'}</button>
 	</div>
 
-	{#if settings.savedSearches.length}
-		<ul>
-			{#each settings.savedSearches as search (search.id)}
-				<li>
-					<button type="button" class="run-search" onclick={() => run(search)}>
-						<span>{search.query}</span>
-						<small>{modeLabels[search.mode]}</small>
-					</button>
-					<button type="button" aria-label={`Edit ${search.query} (${modeLabels[search.mode]})`} onclick={() => edit(search)}>Edit</button>
-				</li>
-			{/each}
-		</ul>
+	{#if view === 'editor'}
+		<form onsubmit={(event) => { event.preventDefault(); save(); }}>
+			<label>
+				Name
+				<input bind:this={nameInput} bind:value={name} required />
+			</label>
+			<label>
+				Search terms
+				<input bind:value={query} required />
+			</label>
+			<label>
+				Match
+				<select bind:value={mode}>
+					<option value="phrase">Phrase (continuous text)</option>
+					<option value="and">AND (all terms)</option>
+					<option value="or">OR (any term)</option>
+				</select>
+			</label>
+			{#if error}<p role="alert">{error}</p>{/if}
+			<div class="form-actions">
+				<button type="submit" class="save-search" disabled={!name.trim() || !query.trim()}>{editingId ? 'Save changes' : 'Save search'}</button>
+				{#if editingId}<button type="button" onclick={remove}>Remove</button>{/if}
+			</div>
+		</form>
+	{:else}
+		{#if settings.savedSearches.length}
+			<ul bind:this={list}>
+				{#each settings.savedSearches as search (search.id)}
+					<li>
+						<button type="button" class="search-entry" onclick={() => view === 'manage' ? openEditor(search) : run(search)}>
+							<span>{search.name}</span>
+							{#if view === 'manage'}<small>{search.query} · {modeLabels[search.mode]}</small>{/if}
+						</button>
+					</li>
+				{/each}
+			</ul>
+		{:else}
+			<p class="empty">No saved searches yet.</p>
+		{/if}
+		{#if view === 'quick' && settings.savedSearches.length}
+			<button bind:this={listAction} type="button" onclick={() => showList('manage')}>Manage</button>
+		{:else}
+			<button bind:this={listAction} type="button" onclick={() => openEditor()}>New search</button>
+		{/if}
 	{/if}
-
-	<form onsubmit={(event) => { event.preventDefault(); save(); }}>
-		<label>
-			Search terms
-			<input bind:this={queryInput} bind:value={query} placeholder="e.g. oat milk" required />
-		</label>
-		<label>
-			Match
-			<select bind:value={mode}>
-				<option value="phrase">Phrase (continuous text)</option>
-				<option value="and">AND (all terms)</option>
-				<option value="or">OR (any term)</option>
-			</select>
-		</label>
-		{#if error}<p role="alert">{error}</p>{/if}
-		<div class="form-actions">
-			<button type="submit" class="save-search" disabled={!query.trim()}>{editingId ? 'Save changes' : 'Save search'}</button>
-			{#if editingId}
-				<button type="button" onclick={resetForm}>Cancel</button>
-				<button type="button" onclick={remove}>Remove</button>
-			{/if}
-		</div>
-	</form>
 </dialog>
 
 <style>
@@ -128,13 +159,13 @@
 		color: var(--text);
 	}
 	dialog::backdrop { background: rgb(0 0 0 / 50%); }
-	.dialog-header, li, .form-actions { display: flex; align-items: center; gap: 0.5rem; }
+	.dialog-header, .form-actions { display: flex; align-items: center; gap: 0.5rem; }
 	.dialog-header { justify-content: space-between; }
 	h2 { margin: 0; font-size: 1.1rem; }
-	ul { display: grid; gap: 0.4rem; padding: 0; margin: 0.75rem 0; }
-	.run-search { flex: 1; min-width: 0; text-align: left; }
-	.run-search span { display: block; overflow-wrap: anywhere; }
-	small { color: var(--text2); }
+	ul { list-style: none; padding: 2px; margin: 0.75rem 0; max-height: 50dvh; overflow-y: auto; }
+	li + li { margin-top: 0.4rem; }
+	.search-entry { width: 100%; text-align: left; overflow-wrap: anywhere; }
+	.search-entry small { display: block; color: var(--text2); }
 	form { display: grid; gap: 0.65rem; margin-top: 0.75rem; }
 	label { display: grid; gap: 0.3rem; font-size: 0.9rem; }
 	button, input, select {
@@ -152,4 +183,5 @@
 	.save-search { background: var(--accent); color: white; font-weight: 600; }
 	.form-actions { flex-wrap: wrap; }
 	p { margin: 0; }
+	.empty { margin: 0.75rem 0; color: var(--text2); }
 </style>
