@@ -6,6 +6,8 @@
 	import { getMutableDoc, getWsProvider, getUndoManager, docState, commitState } from '$lib/yjsStore.svelte';
 	import { getItemYText } from '$lib/data';
 	import { NoteEditSession } from '$lib/noteEditing';
+	import { holdForEditing } from '$lib/dokuwikiClient.svelte';
+	import type * as Y from 'yjs';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 
 	let {
@@ -20,6 +22,11 @@
 	let quill: Quill | null = null;
 	let binding: QuillBinding | null = null;
 	let editSession: NoteEditSession | null = null;
+	// Typing reaches the live document, so hold back DokuWiki writes from the
+	// first unsaved keystroke until Save, Cancel or Close.
+	let releaseHold: (() => void) | null = null;
+	let stopWatching: (() => void) | null = null;
+	function releaseDokuWikiHold() { releaseHold?.(); releaseHold = null; }
 	let editorError = $state<string | null>(null);
 	let editorReady = $state(false);
 	let showConfirmCancel = $state(false);
@@ -86,6 +93,12 @@
 				const yText = getItemYText(doc, itemId);
 				binding = new QuillBinding(yText, quill, getWsProvider()?.awareness);
 				editSession = new NoteEditSession(yText, binding, getUndoManager());
+				const origin = binding;
+				const onTextChange = (_event: Y.YTextEvent, transaction: Y.Transaction) => {
+					if (!releaseHold && (transaction.origin === origin || transaction.origin === editSession?.undoManager)) releaseHold = holdForEditing(itemId);
+				};
+				yText.observe(onTextChange);
+				stopWatching = () => yText.unobserve(onTextChange);
 				editorReady = true;
 				quill.focus();
 			} catch (error) {
@@ -99,8 +112,10 @@
 	});
 
 	onDestroy(() => {
+		stopWatching?.();
 		binding?.destroy();
 		editSession?.destroy();
+		releaseDokuWikiHold();
 	});
 
 	function handleSave() {
@@ -108,6 +123,7 @@
 		const text = binding.type.toString().replace(/\n$/, '');
 		onSave(text);
 		editSession.commit();
+		releaseDokuWikiHold();
 		docState.version++;
 	}
 

@@ -6,8 +6,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type * as Yjs from 'yjs';
 import {
-	DEFAULT_DOKUWIKI_SETTINGS, DOKUWIKI_ORIGIN, applyEntry, badgeFor, dateVariables, expandTemplate, headingFor, markerFor,
-	normalizeBaseUrl, pageIdFor, planEntry, readStatus, renderEntry, xmlRpcUrl, type DokuWikiStatus
+	DEFAULT_DOKUWIKI_SETTINGS, DOKUWIKI_EDITING_MAP, DOKUWIKI_ORIGIN, applyEntry, badgeFor, dateVariables, expandTemplate, headingFor, markerFor,
+	normalizeBaseUrl, pageIdFor, pageUrl, planEntry, sectionAnchor, sectionId, readStatus, renderEntry, xmlRpcUrl, type DokuWikiStatus
 } from '../src/lib/dokuwikiWriter.ts';
 import { decodeResponse, encodeCall, XmlRpcFault } from '../server/xmlrpc.ts';
 import { DokuWikiTokens, DokuWikiWriter, needsWrite, retryDelay } from '../server/dokuwiki.ts';
@@ -206,6 +206,56 @@ test('writes marked items, then updates them in place after edits', async (t) =>
 	assert.ok(pages[pageId].includes(`  * Buy oat milk ${marker}\n    * full cream`));
 });
 
+test('entries with a subnote open in an editor wait until the edit hold is released', async (t) => {
+	const doc = new Y.Doc({ gc: false });
+	doc.getMap('dokuwikiSettings').set('baseUrl', 'https://wiki.example/');
+	const pageId = 'chronological:2026:nov:todo_2026_november';
+	const pages: Record<string, string> = { [pageId]: PAGE };
+	const wiki = fakeWiki(pages);
+	const { tokens } = await tokensIn(t);
+	tokens.set('mark', 'secret', false);
+	const now = Date.parse('2026-11-17T10:00:00Z');
+	addItem(doc, 'i1', 'Buy milk', { dokuwiki: { date: '2026-11-17', requestedAt: '1' } });
+	const child = addItem(doc, 'c1', 'full', { parentId: 'i1' });
+	const holds = doc.getMap(DOKUWIKI_EDITING_MAP);
+	holds.set('session', { itemId: 'c1', expiresAt: new Date(now + 60_000).toISOString() });
+	const writer = new DokuWikiWriter({ documents: fakeDocuments(doc), tokens, fetcher: wiki.fetcher, log: () => {}, now: () => now });
+	t.after(() => holds.clear());
+
+	child.set('name', 'full cr');
+	await writer.process('mark', 'update');
+	assert.deepEqual(wiki.calls, [], 'half-typed text is not written');
+
+	child.set('name', 'full cream');
+	holds.delete('session');
+	await writer.process('mark', 'update');
+	assert.ok(pages[pageId].includes(`  * Buy milk ${markerFor('i1')}\n    * full cream`));
+
+	// A lapsed hold (closed tab) no longer blocks.
+	holds.set('stale', { itemId: 'i1', expiresAt: new Date(now - 1).toISOString() });
+	child.set('name', 'full cream milk');
+	await writer.process('mark', 'update');
+	assert.ok(pages[pageId].includes('    * full cream milk'));
+});
+
+test('section anchors follow DokuWiki: date stripped, repeats numbered', () => {
+	assert.equal(sectionId('2026-11-17 Tue'), 'tue');
+	assert.equal(sectionId('Ünïcode Heading: v1.2'), 'unicode_headingv12');
+	assert.equal(sectionId('2026'), 'section2026');
+	const page = [
+		'====== November 2026 ======',
+		'===== 2026-11-03 Tue =====', '  * a',
+		'===== 2026-11-10 Tue =====', '<code>', '===== 2026-11-12 Tue =====', '</code>',
+		'===== 2026-11-17 Tue =====', '  * b',
+		'===== 2026-11-18 Wed ====='
+	].join('\n');
+	assert.equal(sectionAnchor(page, '===== 2026-11-03 Tue ====='), 'tue');
+	assert.equal(sectionAnchor(page, '===== 2026-11-17 Tue ====='), 'tue2');
+	assert.equal(sectionAnchor(page, '===== 2026-11-18 Wed ====='), 'wed');
+	assert.equal(sectionAnchor(page, '===== 2026-11-19 Thu ====='), null);
+	assert.equal(pageUrl('https://wiki.example/', 'a:b', 'tue2'), 'https://wiki.example/doku.php?id=a:b#tue2');
+});
+
 test('records missing sections, missing tokens and network failures', async (t) => {
 	const doc = new Y.Doc({ gc: false });
 	doc.getMap('dokuwikiSettings').set('baseUrl', 'https://wiki.example/');
@@ -242,13 +292,16 @@ test('records missing sections, missing tokens and network failures', async (t) 
 });
 
 test('retry rules and backoff', () => {
-	const plan = { itemId: 'i', request: { date: '2026-11-17', requestedAt: 'r' }, pageId: 'p', heading: 'h', marker: '#m', text: 't', hash: 'h1' };
+	const plan = { itemId: 'i', request: { date: '2026-11-17', requestedAt: 'r' }, pageId: 'p', heading: 'h', marker: '#m', text: 't', hash: 'h1', ids: ['i'] };
 	const now = Date.parse('2026-11-17T10:00:00Z');
 	const at = (ms: number) => new Date(now + ms).toISOString();
 	const base: DokuWikiStatus = { state: 'error', requestedAt: 'r' };
 	assert.equal(needsWrite(plan, null, 'update', now), true);
 	assert.equal(needsWrite(plan, { ...base, requestedAt: 'old' }, 'update', now), true);
-	assert.equal(needsWrite(plan, { state: 'written', requestedAt: 'r', hash: 'h1' }, 'manual', now), false);
+	assert.equal(needsWrite(plan, { state: 'written', requestedAt: 'r', hash: 'h1', anchor: 'tue' }, 'manual', now), false);
+	// Written before anchors existed: picked up by a sweep, not by every update.
+	assert.equal(needsWrite(plan, { state: 'written', requestedAt: 'r', hash: 'h1' }, 'startup', now), true);
+	assert.equal(needsWrite(plan, { state: 'written', requestedAt: 'r', hash: 'h1' }, 'update', now), false);
 	assert.equal(needsWrite(plan, { state: 'written', requestedAt: 'r', hash: 'h0' }, 'update', now), true);
 	assert.equal(needsWrite(plan, { ...base, retryable: true, nextRetryAt: at(1000) }, 'update', now), false);
 	assert.equal(needsWrite(plan, { ...base, retryable: true, nextRetryAt: at(-1) }, 'timer', now), true);

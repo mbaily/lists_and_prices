@@ -7,6 +7,9 @@
  *  - `doc.getMap('dokuwikiSettings')`: base URL and the templates.
  *  - item key `dokuwiki`: written by clients. `{ date, requestedAt }`.
  *  - item key `dokuwikiStatus`: written only by the server writer.
+ *  - `doc.getMap('dokuwikiEditing')`: open edits, `{ itemId, expiresAt }` per
+ *    editor session. Entries containing an item being edited are not written
+ *    until the edit is saved or closed (or the hold expires).
  */
 
 export interface DokuWikiSettings {
@@ -29,6 +32,13 @@ export const DOKUWIKI_REQUEST_KEY = 'dokuwiki';
 export const DOKUWIKI_STATUS_KEY = 'dokuwikiStatus';
 /** Transaction origin of server status writes; they never re-trigger the writer. */
 export const DOKUWIKI_ORIGIN = 'dokuwiki-writer';
+export const DOKUWIKI_EDITING_MAP = 'dokuwikiEditing';
+/** Transaction origin for edit holds; kept out of the undo history. */
+export const DOKUWIKI_EDITING_ORIGIN = 'dokuwiki-editing';
+/** An edit hold lapses unless renewed, so a closed tab can't block writes forever. */
+export const DOKUWIKI_EDITING_TTL_MS = 15 * 60_000;
+
+export interface DokuWikiEditHold { itemId: string; expiresAt: string }
 
 export interface DokuWikiRequest {
 	/** Local date (YYYY-MM-DD) chosen when the item was marked. */
@@ -44,6 +54,8 @@ export interface DokuWikiStatus {
 	/** The request this status answers. */
 	requestedAt: string;
 	pageId?: string;
+	/** The section's #fragment on the page when last written (e.g. "tue2"). */
+	anchor?: string;
 	/** Hash of the entry text last written, used to detect later edits. */
 	hash?: string;
 	writtenAt?: string;
@@ -134,9 +146,9 @@ export function xmlRpcUrl(baseUrl: string): string | null {
 	return base ? `${base}lib/exe/xmlrpc.php` : null;
 }
 
-export function pageUrl(baseUrl: string, pageId: string): string | null {
+export function pageUrl(baseUrl: string, pageId: string, anchor?: string | null): string | null {
 	const base = normalizeBaseUrl(baseUrl);
-	return base ? `${base}doku.php?id=${encodeURIComponent(pageId).replace(/%3A/gi, ':')}` : null;
+	return base ? `${base}doku.php?id=${encodeURIComponent(pageId).replace(/%3A/gi, ':')}${anchor ? `#${encodeURIComponent(anchor)}` : ''}` : null;
 }
 
 export function pageIdFor(settings: DokuWikiSettings, date: string): string {
@@ -166,7 +178,12 @@ export function markerFor(itemId: string): string {
 
 // ── Building an entry ───────────────────────────────────────────────────────
 
-export interface EntryNode { text: string; children: EntryNode[] }
+export interface EntryNode { text: string; children: EntryNode[]; id?: string }
+
+/** The ids of an entry's item and all its subnotes. */
+export function entryIds(node: EntryNode): string[] {
+	return [...(node.id ? [node.id] : []), ...node.children.flatMap(entryIds)];
+}
 
 const oneLine = (text: string) => text.replace(/\r\n?/g, '\n').split('\n').map((line) => line.trim()).filter(Boolean).join(' \\\\ ');
 
@@ -223,7 +240,7 @@ export function readEntryNode(doc: DocLike, itemId: string): EntryNode | null {
 		const kids = (children.get(id) ?? [])
 			.filter((child) => !seen.has(child.get('id') as string))
 			.sort((a, b) => order(a) - order(b) || String(a.get('id')).localeCompare(String(b.get('id'))));
-		return { text: readName(doc, item), children: kids.map(build) };
+		return { id, text: readName(doc, item), children: kids.map(build) };
 	};
 	return build(root);
 }
@@ -247,6 +264,8 @@ export interface PlannedEntry {
 	marker: string;
 	text: string;
 	hash: string;
+	/** The item and its subnotes. */
+	ids: string[];
 }
 
 export function planEntry(doc: DocLike, settings: DokuWikiSettings, item: ItemMapLike): PlannedEntry | null {
@@ -258,7 +277,22 @@ export function planEntry(doc: DocLike, settings: DokuWikiSettings, item: ItemMa
 	const marker = markerFor(itemId);
 	const text = renderEntry(settings.lineTemplate, node, marker);
 	const pageId = pageIdFor(settings, request.date);
-	return { itemId, request, pageId, heading: headingFor(settings, request.date), marker, text, hash: fnv1a(`${pageId}\n${text}`) };
+	return { itemId, request, pageId, heading: headingFor(settings, request.date), marker, text, hash: fnv1a(`${pageId}\n${text}`), ids: entryIds(node) };
+}
+
+/** Items currently open in an editor, and when the soonest hold lapses. */
+export function readEditHolds(doc: Pick<DocLike, 'getMap'>, now: number): { ids: Set<string>; nextExpiry: number | null } {
+	const ids = new Set<string>();
+	let nextExpiry: number | null = null;
+	doc.getMap(DOKUWIKI_EDITING_MAP).forEach?.((value) => {
+		const hold = value as Partial<DokuWikiEditHold> | null;
+		if (!hold || typeof hold.itemId !== 'string' || typeof hold.expiresAt !== 'string') return;
+		const expires = Date.parse(hold.expiresAt);
+		if (!(expires > now)) return;
+		ids.add(hold.itemId);
+		if (nextExpiry === null || expires < nextExpiry) nextExpiry = expires;
+	});
+	return { ids, nextExpiry };
 }
 
 /** What the badge should show for an item. Null when it is not marked. */
@@ -290,6 +324,55 @@ export function findSection(lines: string[], heading: string): { headingLine: nu
 	// More "=" means a higher-level heading in DokuWiki.
 	while (end < lines.length && !((headingLevel(lines[end]) ?? 0) >= level)) end++;
 	return { headingLine: start, end };
+}
+
+// ── Section anchors (the #fragment DokuWiki gives each heading) ─────────────
+
+/** DokuWiki's cleanID() with the default settings (sepchar "_", deaccent on). */
+export function cleanId(raw: string): string {
+	let id = raw.trim().toLowerCase().replace(/;/g, ':').replace(/\//g, '_');
+	id = id.normalize('NFKD').replace(/\p{M}+/gu, '');
+	id = id.replace(/[^\p{L}\p{N}._:-]+/gu, '_');
+	id = id.replace(/_+/g, '_').replace(/:+/g, ':');
+	id = id.replace(/^[:._-]+|[:._-]+$/g, '');
+	return id.replace(/:[:._-]+/g, ':').replace(/[:._-]+:/g, ':');
+}
+
+/** DokuWiki's sectionID(): the anchor for a heading title. `seen` holds the
+ * anchors already used on the page; repeats get 1, 2, … appended. */
+export function sectionId(title: string, seen?: Set<string>): string {
+	const clean = cleanId(title).replace(/[:.]/g, '');
+	const trimmed = clean.replace(/^[0-9_-]+/, '');
+	const id = trimmed || `section${clean.replace(/[^0-9]+/g, '')}`;
+	if (!seen) return id;
+	let candidate = id;
+	for (let suffix = 1; seen.has(candidate); suffix++) candidate = `${id}${suffix}`;
+	seen.add(candidate);
+	return candidate;
+}
+
+/** The fragment DokuWiki renders for this heading on this page, or null if the
+ * heading isn't there. Headings inside code, file and nowiki blocks don't count. */
+export function sectionAnchor(page: string, heading: string): string | null {
+	const wanted = normalizeHeading(heading);
+	const seen = new Set<string>();
+	let block: string | null = null;
+	for (const line of page.replace(/\r\n?/g, '\n').split('\n')) {
+		if (block) {
+			if (line.includes(`</${block}>`)) block = null;
+			continue;
+		}
+		const open = /<(code|file|nowiki)\b[^>]*>/.exec(line);
+		if (open) {
+			if (!line.slice(open.index).includes(`</${open[1]}>`)) block = open[1];
+			continue;
+		}
+		const match = HEADING.exec(line);
+		if (!match) continue;
+		const id = sectionId(match[2].trim(), seen);
+		if (normalizeHeading(line) === wanted) return id;
+	}
+	return null;
 }
 
 function hasMarker(line: string, marker: string): boolean {

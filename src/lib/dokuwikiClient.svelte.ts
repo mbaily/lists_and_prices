@@ -6,9 +6,9 @@ import * as Y from 'yjs';
 import { getDoc, getMutableDoc, getItems } from './yjsStore.svelte';
 import { appUrl } from './urls';
 import {
-	DOKUWIKI_REQUEST_KEY, DOKUWIKI_SETTINGS_MAP, DOKUWIKI_STATUS_KEY, DEFAULT_DOKUWIKI_SETTINGS,
+	DOKUWIKI_EDITING_MAP, DOKUWIKI_EDITING_ORIGIN, DOKUWIKI_EDITING_TTL_MS, DOKUWIKI_REQUEST_KEY, DOKUWIKI_SETTINGS_MAP, DOKUWIKI_STATUS_KEY, DEFAULT_DOKUWIKI_SETTINGS,
 	badgeFor, localDateString, pageUrl, planEntry, readDokuWikiSettings, readStatus,
-	type DokuWikiBadge, type DokuWikiRequest, type DokuWikiSettings, type DokuWikiStatus
+	type DokuWikiBadge, type DokuWikiEditHold, type DokuWikiRequest, type DokuWikiSettings, type DokuWikiStatus
 } from './dokuwikiWriter';
 
 /** Shared UI state, so any screen can open the one token dialog. */
@@ -44,6 +44,35 @@ export function saveSettings(patch: Partial<DokuWikiSettings>) {
 
 export function isConfigured(): boolean {
 	return Boolean(readSettings().baseUrl.trim());
+}
+
+// ── Edit holds ───────────────────────────────────────────────────────────────
+
+/** Tell the server writer an item is open in an editor whose keystrokes reach
+ * the document live, so half-typed text is never written to the wiki.
+ * Returns the release function: call it on save, cancel or close. The hold is
+ * renewed while open and lapses on its own if the page goes away. */
+export function holdForEditing(itemId: string): () => void {
+	if (!isConfigured()) return () => {};
+	let doc: Y.Doc;
+	try { doc = getMutableDoc(); } catch { return () => {}; }
+	const key = crypto.randomUUID();
+	const map = doc.getMap<DokuWikiEditHold>(DOKUWIKI_EDITING_MAP);
+	const renew = () => doc.transact(() => {
+		const now = Date.now();
+		// Clear lapsed holds left by closed tabs.
+		for (const [other, hold] of map.entries()) if (other !== key && !(Date.parse(hold?.expiresAt) > now)) map.delete(other);
+		map.set(key, { itemId, expiresAt: new Date(now + DOKUWIKI_EDITING_TTL_MS).toISOString() });
+	}, DOKUWIKI_EDITING_ORIGIN);
+	renew();
+	const timer = setInterval(renew, DOKUWIKI_EDITING_TTL_MS / 3);
+	let released = false;
+	return () => {
+		if (released) return;
+		released = true;
+		clearInterval(timer);
+		if (map.has(key)) doc.transact(() => map.delete(key), DOKUWIKI_EDITING_ORIGIN);
+	};
 }
 
 // ── Marking items ────────────────────────────────────────────────────────────
@@ -101,7 +130,7 @@ export function itemBadge(itemId: string): ItemBadge | null {
 	return {
 		badge, status,
 		title: `${LABELS[badge]}${detail} (${plan.pageId}, ${plan.request.date})`,
-		href: pageUrl(settings.baseUrl, plan.pageId)
+		href: pageUrl(settings.baseUrl, plan.pageId, status?.pageId === plan.pageId ? status.anchor : null)
 	};
 }
 

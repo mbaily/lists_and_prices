@@ -20,7 +20,7 @@ import type { TaskDocuments } from './task-documents.ts';
 import { HttpError, XmlRpcFault, xmlRpcCall, type FetchLike, type XmlRpcValue } from './xmlrpc.ts';
 import {
 	DOKUWIKI_ORIGIN, DOKUWIKI_STATUS_KEY, applyEntry, headingFor, localDateString, pageIdFor, planEntry,
-	readDokuWikiSettings, readRequest, readStatus, xmlRpcUrl, type DokuWikiStatus, type PlannedEntry
+	readDokuWikiSettings, readRequest, readStatus, xmlRpcUrl, type DokuWikiStatus, type PlannedEntry, readEditHolds, sectionAnchor
 } from '../src/lib/dokuwikiWriter.ts';
 
 // ── Token storage ────────────────────────────────────────────────────────────
@@ -184,7 +184,8 @@ export function retryDelay(attempts: number): number {
 /** Which marked items need a write now. Exported for tests. */
 export function needsWrite(plan: PlannedEntry, status: DokuWikiStatus | null, reason: Reason, now: number): boolean {
 	if (!status || status.requestedAt !== plan.request.requestedAt) return true;
-	if (status.state === 'written') return status.hash !== plan.hash;
+	// Entries written before anchors were recorded get one on the next sweep.
+	if (status.state === 'written') return status.hash !== plan.hash || (!status.anchor && reason !== 'update');
 	if (reason === 'manual') return true;
 	if (status.retryable) return !status.nextRetryAt || Date.parse(status.nextRetryAt) <= now;
 	return (reason === 'update' || reason === 'startup') && (!status.attemptedAt || now - Date.parse(status.attemptedAt) >= RESYNC_MIN_MS);
@@ -202,6 +203,7 @@ export interface WriterOptions {
 export class DokuWikiWriter {
 	private timers = new Map<string, ReturnType<typeof setTimeout>>();
 	private retryTimers = new Map<string, ReturnType<typeof setTimeout>>();
+	private holdTimers = new Map<string, ReturnType<typeof setTimeout>>();
 	private running = new Map<string, Promise<void>>();
 	private pendingReason = new Map<string, Reason>();
 	private fetcher: FetchLike;
@@ -220,7 +222,10 @@ export class DokuWikiWriter {
 		this.schedule(username, 'update');
 	}
 
-	schedule(username: string, reason: Reason, delay = this.options.debounceMs ?? 5_000) {
+	/** Clients only change the document at steady states (a saved input bar
+	 * edit, a saved or closed note editor), so this only coalesces a burst of
+	 * sync messages. Open editors are held back by edit holds instead. */
+	schedule(username: string, reason: Reason, delay = this.options.debounceMs ?? 300) {
 		// A stronger reason wins over a weaker one while waiting.
 		const current = this.pendingReason.get(username);
 		if (!current || reason === 'manual' || (reason === 'startup' && current !== 'manual')) this.pendingReason.set(username, reason);
@@ -249,8 +254,10 @@ export class DokuWikiWriter {
 
 	async process(username: string, reason: Reason): Promise<void> {
 		const now = this.now();
-		const { settings, jobs } = await this.options.documents.use(username, (doc) => {
+		const { settings, jobs, holdExpiry } = await this.options.documents.use(username, (doc) => {
 			const settings = readDokuWikiSettings(doc as never);
+			const holds = readEditHolds(doc as never, now);
+			let holdExpiry: number | null = null;
 			const jobs: Job[] = [];
 			for (const item of doc.getArray<Yjs.Map<unknown>>('items').toArray()) {
 				if (!readRequest(item)) continue;
@@ -258,10 +265,14 @@ export class DokuWikiWriter {
 				try { plan = planEntry(doc as never, settings, item); } catch { plan = null; }
 				if (!plan) continue;
 				const previous = readStatus(item);
-				if (needsWrite(plan, previous, reason, now)) jobs.push({ plan, previous });
+				if (!needsWrite(plan, previous, reason, now)) continue;
+				// Part of this entry is open in an editor: wait for it to be saved or closed.
+				if (plan.ids.some((id) => holds.ids.has(id))) { holdExpiry = holds.nextExpiry; continue; }
+				jobs.push({ plan, previous });
 			}
-			return { settings, jobs };
+			return { settings, jobs, holdExpiry };
 		});
+		this.scheduleHoldExpiry(username, holdExpiry);
 		if (!jobs.length) return;
 
 		const outcomes: Outcome[] = [];
@@ -273,7 +284,8 @@ export class DokuWikiWriter {
 				message, retryable: kind === 'network', attempts, attemptedAt: new Date(now).toISOString(),
 				...(kind === 'network' ? { nextRetryAt: new Date(now + retryDelay(attempts)).toISOString() } : {}),
 				// Keep what was last written, so a fixed error can still update in place.
-				...(job.previous?.hash ? { hash: job.previous.hash } : {})
+				...(job.previous?.hash ? { hash: job.previous.hash } : {}),
+				...(job.previous?.anchor && job.previous.pageId === job.plan.pageId ? { anchor: job.previous.anchor } : {})
 			};
 			outcomes.push({ plan: job.plan, status });
 		};
@@ -342,6 +354,13 @@ export class DokuWikiWriter {
 				changed ||= result.action !== 'unchanged';
 				outcomes.push({ plan: job.plan, status: { ...base, state: 'written', hash: job.plan.hash, writtenAt: new Date(now).toISOString() } });
 			}
+			// Where the link should land: DokuWiki numbers repeated headings
+			// (tue, tue1, tue2, …), so this depends on the whole page.
+			for (const outcome of outcomes) {
+				if (outcome.status.state !== 'written') continue;
+				const anchor = sectionAnchor(text, outcome.plan.heading);
+				if (anchor) outcome.status.anchor = anchor;
+			}
 			if (!changed) return outcomes;
 			const latest = await api.getPage(pageId);
 			if (latest !== page) { page = latest; continue; }
@@ -350,6 +369,17 @@ export class DokuWikiWriter {
 			return outcomes;
 		}
 		throw new DokuWikiError('network', `${pageId} kept changing while saving; will retry.`);
+	}
+
+	/** Releasing a hold is a document update and triggers a run by itself;
+	 * this covers a hold that lapses because its editor went away. */
+	private scheduleHoldExpiry(username: string, expiry: number | null) {
+		clearTimeout(this.holdTimers.get(username));
+		this.holdTimers.delete(username);
+		if (expiry === null) return;
+		const timer = setTimeout(() => { this.holdTimers.delete(username); this.schedule(username, 'timer', 0); }, Math.max(expiry - this.now(), 0) + 1_000);
+		timer.unref?.();
+		this.holdTimers.set(username, timer);
 	}
 
 	private scheduleRetry(username: string, outcomes: Outcome[]) {

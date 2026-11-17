@@ -12,6 +12,7 @@ import { WebsocketProvider } from 'y-websocket';
 import { observeNoteNames } from './noteText';
 import { encodeCommitState } from './commitSnapshot';
 import { NEARBY_CHECKLIST_MEMBERSHIP_ORIGIN } from './nearbyChecklist';
+import { DOKUWIKI_EDITING_ORIGIN } from './dokuwikiWriter';
 import { compactCache, maintainCache, type CacheCompaction } from './localCache';
 
 export type ItemType = 'plain' | 'priced';
@@ -73,7 +74,7 @@ export function initYjs(username: string, wsUrl: string) {
 	// tracked, nor are remote updates applied with a null origin.
 	_undoManager = new Y.UndoManager(doc, {
 		captureTimeout: 0,
-		captureTransaction: (transaction) => transaction.local && transaction.changed.size > 0 && transaction.origin !== NEARBY_CHECKLIST_MEMBERSHIP_ORIGIN
+		captureTransaction: (transaction) => transaction.local && transaction.changed.size > 0 && transaction.origin !== NEARBY_CHECKLIST_MEMBERSHIP_ORIGIN && transaction.origin !== DOKUWIKI_EDITING_ORIGIN
 	});
 	_stopNoteNames = observeNoteNames(doc);
 
