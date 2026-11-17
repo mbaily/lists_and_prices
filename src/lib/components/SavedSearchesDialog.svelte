@@ -21,6 +21,7 @@
 	let name = $state('');
 	let query = $state('');
 	let mode = $state<SearchMode>('phrase');
+	let uncheckedOnly = $state(false);
 	let includeUnfinishedListItems = $state(false);
 	let editingId = $state<string | null>(null);
 	let error = $state('');
@@ -52,6 +53,7 @@
 		name = search?.name ?? '';
 		query = search?.query ?? initialQuery;
 		mode = search?.mode ?? initialMode;
+		uncheckedOnly = search?.uncheckedOnly ?? false;
 		includeUnfinishedListItems = search?.includeUnfinishedListItems ?? false;
 		error = '';
 		view = 'editor';
@@ -69,7 +71,14 @@
 		const searchQuery = query.trim();
 		if (!searchName || !searchQuery) return;
 		try {
-			const search = { id: editingId ?? crypto.randomUUID(), name: searchName, query: searchQuery, mode, includeUnfinishedListItems };
+			const search: SavedSearch = {
+				id: editingId ?? crypto.randomUUID(),
+				name: searchName,
+				query: searchQuery,
+				mode,
+				uncheckedOnly,
+				includeUnfinishedListItems
+			};
 			const savedSearches = editingId
 				? settings.savedSearches.map((entry) => entry.id === search.id ? search : entry)
 				: [...settings.savedSearches, search];
@@ -123,6 +132,10 @@
 			<label class="checkbox-option">
 				<input type="checkbox" bind:checked={includeUnfinishedListItems} />
 				Include unfinished items from matching lists
+			</label>
+			<label class="checkbox-option">
+				<input type="checkbox" bind:checked={uncheckedOnly} />
+				Exclude completed items
 			</label>
 			{#if error}<p role="alert">{error}</p>{/if}
 			<div class="form-actions">
