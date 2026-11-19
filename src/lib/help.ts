@@ -188,7 +188,7 @@ export const helpTopics: HelpTopic[] = [
 				paragraphs: [
 					'Favourites are shortcuts to folders and lists you use often. Tap the star on a folder or list row on the home screen to add it. A list also has a star in its own header. Tap the star again to remove it from favourites; the original folder or list stays where it is.',
 					'Your favourites appear in a bar on the home and list screens. Choose a folder shortcut to open that folder or a list shortcut to open its list. Favourites can come from different parts of your folder tree, so the bar is useful for keeping work, shopping and personal lists within reach.',
-					'The expand/collapse control changes the bar’s presentation. Expanded entries show their folder paths; collapsed entries use shorter names. If two lists share a name, expand the bar to see their locations. Archiving a favourite or an ancestor folder hides it from the active favourites bar.'
+					'Tap the star in the favourites bar to switch between full paths and shorter names. Full paths wrap onto extra lines when needed. Archiving a favourite or an ancestor folder hides it from the active favourites bar.'
 				]
 			},
 			{
