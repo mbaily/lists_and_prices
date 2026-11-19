@@ -24,15 +24,17 @@
 		reparentItems,
 		moveItemsToDestination,
 		isListEffectivelyArchived,
-		isFolderEffectivelyArchived,
-		getMaxFavouriteOrder,
+		toggleFavourite,
+		buildFavouriteEntries,
+		readFavouriteFolders,
+		favouriteShortcutsInTreeOrder,
 		type Item,
 		type ExportedItem,
 		type ListMeta,
 		type Folder,
 		type FilterView
 	} from '$lib/data';
-	import { settings, updateSettings } from '$lib/settings.svelte';
+	import { settings } from '$lib/settings.svelte';
 	import { extractTags, splitWithTags, type NameSegment } from '$lib/tags';
 	import { billSections, findBillSections, type BillSection } from '$lib/billsInclude';
 	import { calendarSections, calendarLine, findCalendarSections, type CalendarSection } from '$lib/calendarInclude';
@@ -49,6 +51,7 @@
 	import { planItemMove, resolveMarkedItemDestination } from '$lib/itemMove';
 	import NumericKeypad from './NumericKeypad.svelte';
 	import ConfirmDialog from './ConfirmDialog.svelte';
+	import FavouritesBar from './FavouritesBar.svelte';
 	import RowMenu, { type MenuItem } from './RowMenu.svelte';
 	import InfoDialog from './InfoDialog.svelte';
 	import CopyLinkDialog from './CopyLinkDialog.svelte';
@@ -67,6 +70,7 @@
 		onHome,
 		onOpenList,
 		onOpenFavouritesOrder = undefined,
+		favouriteFolderId = $bindable(null),
 		savedSearch = null,
 		onRestoreSearch = undefined,
 		onTagClick = undefined,
@@ -79,6 +83,7 @@
 		onHome: () => void;
 		onOpenList: (id: string) => void;
 		onOpenFavouritesOrder?: () => void;
+		favouriteFolderId?: string | null;
 		savedSearch?: string | null;
 		onRestoreSearch?: () => void;
 		onTagClick?: (tag: string) => void;
@@ -175,13 +180,11 @@
 		}
 		return item.checked ? '✓' : '';
 	}
-	let favouriteLists = $derived(allLists.filter((l) => l.favourite && !isListEffectivelyArchived(l, allFolders)));
-	let favouriteFolders = $derived(allFolders.filter((f) => f.favourite && !isFolderEffectivelyArchived(f.id, allFolders)));
-	let favouriteItems = $derived.by(() => {
-		const folders = favouriteFolders.map((f) => ({ type: 'folder' as const, item: f, order: f.favouriteOrder ?? f.order ?? 0 }));
-		const lists = favouriteLists.map((l) => ({ type: 'list' as const, item: l, order: l.favouriteOrder ?? l.order ?? 0 }));
-		return [...folders, ...lists].sort((a, b) => (a.order !== b.order ? a.order - b.order : a.type === 'folder' && b.type === 'list' ? -1 : a.type === 'list' && b.type === 'folder' ? 1 : 0));
+	const favouriteEntries = $derived.by(() => {
+		void docState.version;
+		return buildFavouriteEntries(allFolders, allLists, readFavouriteFolders());
 	});
+	const favouriteItems = $derived(favouriteShortcutsInTreeOrder(favouriteEntries));
 	function getFavouritePosition() {
 		return favouriteItems.findIndex((favourite) => favourite.type === 'list' && favourite.item.id === listId) + 1;
 	}
@@ -250,38 +253,6 @@
 			{ label: listMeta.name }
 		];
 	});
-
-	function listPath(list: ListMeta): string {
-		const parts: string[] = [];
-		const visited = new Set<string>();
-		let fid: string | null = list.folderId;
-		while (fid !== null) {
-			if (visited.has(fid)) break; // guard against cyclic parentId
-			visited.add(fid);
-			const f = allFolders.find((x) => x.id === fid);
-			if (!f) break;
-			parts.unshift(f.name);
-			fid = f.parentId;
-		}
-		parts.push(list.name);
-		return parts.join(' › ');
-	}
-
-	function folderPath(folder: Folder): string {
-		const parts: string[] = [];
-		const visited = new Set<string>();
-		let fid: string | null = folder.parentId;
-		while (fid !== null) {
-			if (visited.has(fid)) break;
-			visited.add(fid);
-			const f = allFolders.find((x) => x.id === fid);
-			if (!f) break;
-			parts.unshift(f.name);
-			fid = f.parentId;
-		}
-		parts.push(folder.name);
-		return parts.join(' › ');
-	}
 
 	let cursorMemory = $state<Record<string, string>>(
 		(typeof sessionStorage !== 'undefined')
@@ -2035,12 +2006,7 @@
 		<button
 			class="list-fav-btn"
 			class:active={listMeta?.favourite}
-			onclick={() => { 
-				if (listMeta && !commitState.isHistorical) {
-					const nextFav = !listMeta.favourite;
-					updateList(listId, { favourite: nextFav, ...(nextFav && listMeta.favouriteOrder === undefined ? { favouriteOrder: getMaxFavouriteOrder() + 1 } : {}) });
-				}
-			}}
+			onclick={() => { if (canEditList && listMeta) toggleFavourite('list', listId); }}
 			aria-label={listMeta?.favourite ? 'Unfavourite list' : 'Favourite list'}
 			title={listMeta?.favourite ? 'Unfavourite list' : 'Favourite list'}
 			disabled={!canEditList}
@@ -2360,40 +2326,17 @@
 				{/each}
 			</div>
 		{/if}
-		{#if !browseView && favouriteItems.length > 0}
-			<div class="fav-bar" class:fav-bar-collapsed={settings.favouritesCollapsed}>
-				<button
-					class="fav-label"
-					onclick={() => updateSettings({ favouritesCollapsed: !settings.favouritesCollapsed })}
-					aria-label={settings.favouritesCollapsed ? 'Expand favourites' : 'Collapse favourites'}
-					title={settings.favouritesCollapsed ? 'Expand favourites' : 'Collapse favourites'}
-				>★</button>
-				{#if onOpenFavouritesOrder && !commitState.isHistorical}
-					<button
-						class="fav-reorder-btn"
-						onclick={onOpenFavouritesOrder}
-						aria-label="Rearrange favourites"
-						title="Rearrange favourites"
-					>⇅</button>
-				{/if}
-				{#each favouriteItems as fav (fav.type + ':' + fav.item.id)}
-					{#if fav.type === 'folder'}
-						<button
-							class="fav-chip"
-							style="--chip-color:{fav.item.color}"
-							title={folderPath(fav.item)}
-							onclick={() => { if (onNavigateTo) onNavigateTo(fav.item.id); }}
-						>📁 {settings.favouritesCollapsed ? fav.item.name : folderPath(fav.item)}</button>
-					{:else}
-						<button
-							class="fav-chip"
-							class:fav-chip-active={fav.item.id === listId}
-							style="--chip-color:{fav.item.color}"
-							title={listPath(fav.item)}
-							onclick={() => { if (fav.item.id !== listId) onOpenList(fav.item.id); }}
-						>{settings.favouritesCollapsed ? fav.item.name : listPath(fav.item)}</button>
-					{/if}
-				{/each}
+		{#if !browseView && favouriteEntries.length > 0}
+			<div class="fav-bar" role="group" aria-label="Favourites">
+				<FavouritesBar
+					entries={favouriteEntries}
+					folders={allFolders}
+					bind:favouriteFolderId
+					activeListId={listId}
+					onRearrange={commitState.isHistorical ? undefined : onOpenFavouritesOrder}
+					onOpenFolder={onNavigateTo}
+					{onOpenList}
+				/>
 			</div>
 		{/if}
 		{#snippet dokuwikiBadge(item: Item)}{@const dw = item.dokuwiki ? dokuwikiBadges.get(item.id) : undefined}{#if dw}<button type="button" class="dokuwiki-badge dokuwiki-{dw.badge}" title={dw.title} aria-label={dw.title} onpointerdown={(e) => { e.stopPropagation(); cancelLongPress(); }} onkeydown={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); cancelLongPress(); onDokuWikiBadge(item, dw); }}>{dw.badge === 'written' ? '✅' : dw.badge === 'pending' ? '⏳' : dw.badge === 'auth' ? '🔑' : '⚠️'}</button>{/if}{/snippet}
@@ -3599,58 +3542,6 @@
 		padding: 0.4rem 0.75rem;
 		background: var(--bg2);
 		border-bottom: 1px solid var(--border);
-	}
-	.fav-label {
-		background: none;
-		border: none;
-		color: #f59e0b;
-		font-size: 1rem;
-		flex-shrink: 0;
-		cursor: pointer;
-		padding: 0.1rem 0.2rem;
-		line-height: 1;
-	}
-	.fav-label:hover { opacity: 0.75; }
-	.fav-reorder-btn {
-		background: none;
-		border: none;
-		color: var(--text2);
-		font-size: 0.95rem;
-		flex-shrink: 0;
-		cursor: pointer;
-		padding: 0.1rem 0.2rem;
-		line-height: 1;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		transition: color 0.15s ease;
-	}
-	.fav-reorder-btn:hover {
-		color: var(--accent);
-		opacity: 0.9;
-	}
-	.fav-chip {
-		background: none;
-		border: 1px solid var(--chip-color, var(--accent));
-		border-radius: 999px;
-		padding: 0.2rem 0.65rem;
-		font-size: 0.82rem;
-		color: var(--chip-color, var(--accent));
-		cursor: pointer;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		max-width: 200px;
-		transition: max-width 0.15s ease;
-	}
-	.fav-chip.fav-chip-active {
-		background: var(--chip-color, var(--accent));
-		color: #fff;
-	}
-	.fav-bar-collapsed .fav-chip {
-		max-width: 90px;
-		padding: 0.15rem 0.5rem;
-		font-size: 0.78rem;
 	}
 	.list-title {
 		flex: 1;

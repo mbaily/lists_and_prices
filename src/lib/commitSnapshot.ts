@@ -15,7 +15,7 @@ export function encodeCommitState(source: Y.Doc): Uint8Array {
 		copy.transact(() => {
 			for (const key of source.share.keys()) {
 				if (key === 'commits') continue;
-				if (['folders', 'lists', 'items', 'spreadsheets'].includes(key)) {
+				if (['folders', 'lists', 'items', 'spreadsheets', 'favourite-folders'].includes(key)) {
 					copy.getArray(key).push(source.getArray(key).toArray().map(cloneValue));
 				} else if (key.startsWith('note_text_')) {
 					copy.getText(key).applyDelta(source.getText(key).toDelta());

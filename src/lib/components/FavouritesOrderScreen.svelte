@@ -1,160 +1,119 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { docState, commitState } from '$lib/yjsStore.svelte';
 	import {
 		readFolders,
 		readLists,
-		updateFolder,
-		updateList,
+		readFavouriteFolders,
+		buildFavouriteEntries,
+		createFavouriteFolder,
+		renameFavouriteFolder,
+		deleteFavouriteFolder,
+		canMoveFavouriteFolder,
+		moveFavourite,
+		toggleFavourite,
 		saveFavouritesOrder,
-		isFolderEffectivelyArchived,
-		isListEffectivelyArchived,
-		type Folder,
-		type ListMeta
+		favouriteKey,
+		favouritePath,
+		type FavouriteEntry
 	} from '$lib/data';
+	import RowMenu from './RowMenu.svelte';
 
 	let {
 		onBack,
 		onNavigateFolder,
-		onNavigateList
+		onNavigateList,
+		favouriteFolderId = $bindable(null)
 	}: {
 		onBack: () => void;
 		onNavigateFolder?: (folderId: string) => void;
 		onNavigateList?: (listId: string) => void;
+		favouriteFolderId?: string | null;
 	} = $props();
 
-	interface FavEntry {
-		id: string;
-		type: 'folder' | 'list';
-	}
+	type EntryRef = { id: string; type: FavouriteEntry['type'] };
+	type Edit = { kind: 'create'; parentId: string | null }
+		| { kind: 'rename' | 'delete' | 'move'; ref: EntryRef };
 
-	// Reactive stores of all folders and lists to resolve names, paths, colors, and favourite state
-	let allFolders = $derived.by(() => {
+	const data = $derived.by(() => {
 		void docState.version;
-		try {
-			return readFolders();
-		} catch {
-			return [];
-		}
+		return { folders: readFolders(), lists: readLists(), groups: readFavouriteFolders() };
 	});
 
-	let allLists = $derived.by(() => {
-		void docState.version;
-		try {
-			return readLists();
-		} catch {
-			return [];
-		}
-	});
+	// Keep locally unstarred entries available for re-starring until this screen closes.
+	let retained = $state(new Set<string>());
+	const entries = $derived(buildFavouriteEntries(data.folders, data.lists, data.groups, retained));
+	const currentFolder = $derived(data.groups.find(group => group.id === favouriteFolderId));
+	const currentId = $derived(currentFolder?.id ?? null);
+	const currentPath = $derived(currentFolder ? favouritePath(currentFolder.name, currentFolder.parentId, data.groups) : 'Top level');
+	const validEntries = $derived(entries.filter(entry => entry.parentId === currentId));
 
-	// Capture initial favourites on component initialization.
-	// As required: "Here you can also unmark items as favourites. (They remain on the screen until you move away from the favourites rearrangement page)."
-	// Storing `entries` in component state ensures unmarked items stay on screen until leaving this screen.
-	function getInitialFavourites(): FavEntry[] {
-		const rawFolders = readFolders().filter((f) => f.favourite && !isFolderEffectivelyArchived(f.id, readFolders()));
-		const rawLists = readLists().filter((l) => l.favourite && !isListEffectivelyArchived(l, readFolders()));
-		const combined = [
-			...rawFolders.map((f) => ({ id: f.id, type: 'folder' as const, order: f.favouriteOrder ?? f.order ?? 0 })),
-			...rawLists.map((l) => ({ id: l.id, type: 'list' as const, order: l.favouriteOrder ?? l.order ?? 0 }))
-		].sort((a, b) => (a.order !== b.order ? a.order - b.order : a.type === 'folder' && b.type === 'list' ? -1 : a.type === 'list' && b.type === 'folder' ? 1 : 0));
+	let edit = $state<Edit | null>(null);
+	let name = $state('');
+	let moveTo = $state<string | null | undefined>();
+	let editForm: HTMLFormElement | undefined = $state();
+	let nameInput: HTMLInputElement | undefined = $state();
+	let moveSelect: HTMLSelectElement | undefined = $state();
+	const editRef = $derived(edit && edit.kind !== 'create' ? edit.ref : null);
+	const editEntry = $derived(editRef ? entries.find(entry => entry.type === editRef.type && entry.item.id === editRef.id) : undefined);
+	const moveTargets = $derived(editEntry && edit?.kind === 'move'
+		? data.groups
+			.filter(group => group.id !== editEntry.parentId &&
+				(editEntry.type !== 'favourites-folder' || canMoveFavouriteFolder(data.groups, editEntry.item.id, group.id)))
+			.map(group => ({ id: group.id, path: favouritePath(group.name, group.parentId, data.groups) }))
+			.sort((a, b) => a.path.localeCompare(b.path))
+		: []);
 
-		return combined.map(({ id, type }) => ({ id, type }));
+	function entryRef(entry: FavouriteEntry): EntryRef {
+		return { type: entry.type, id: entry.item.id };
 	}
 
-	let entries = $state<FavEntry[]>(getInitialFavourites());
-
-	// Filter out items that have been deleted entirely from Yjs
-	let validEntries = $derived(
-		entries.filter((entry) =>
-			entry.type === 'folder' ? allFolders.some((f) => f.id === entry.id) : allLists.some((l) => l.id === entry.id)
-		)
-	);
-
-	function folderPath(folder: Folder): string {
-		const parts: string[] = [];
-		const visited = new Set<string>();
-		let fid: string | null = folder.parentId;
-		while (fid !== null) {
-			if (visited.has(fid)) break;
-			visited.add(fid);
-			const f = allFolders.find((x) => x.id === fid);
-			if (!f) break;
-			parts.unshift(f.name);
-			fid = f.parentId;
-		}
-		parts.push(folder.name);
-		return parts.join(' › ');
-	}
-
-	function listPath(list: ListMeta): string {
-		const parts: string[] = [];
-		const visited = new Set<string>();
-		let fid: string | null = list.folderId;
-		while (fid !== null) {
-			if (visited.has(fid)) break;
-			visited.add(fid);
-			const f = allFolders.find((x) => x.id === fid);
-			if (!f) break;
-			parts.unshift(f.name);
-			fid = f.parentId;
-		}
-		parts.push(list.name);
-		return parts.join(' › ');
-	}
-
-	function getItemData(entry: FavEntry) {
-		if (entry.type === 'folder') {
-			const folder = allFolders.find((f) => f.id === entry.id);
-			return {
-				name: folder?.name ?? '…',
-				path: folder ? folderPath(folder) : '…',
-				color: folder?.color ?? '#6366f1',
-				favourite: folder?.favourite ?? false,
-				icon: '📁',
-				typeLabel: 'Folder',
-				raw: folder
-			};
-		} else {
-			const list = allLists.find((l) => l.id === entry.id);
-			return {
-				name: list?.name ?? '…',
-				path: list ? listPath(list) : '…',
-				color: list?.color ?? '#6366f1',
-				favourite: list?.favourite ?? false,
-				icon: '📝',
-				typeLabel: 'List',
-				raw: list
-			};
-		}
-	}
-
-	function toggleFavourite(entry: FavEntry) {
+	function editFolder(kind: Edit['kind'], entry?: FavouriteEntry) {
 		if (commitState.isHistorical) return;
-		if (entry.type === 'folder') {
-			const f = allFolders.find((x) => x.id === entry.id);
-			if (f) {
-				updateFolder(f.id, { favourite: !f.favourite });
-			}
-		} else {
-			const l = allLists.find((x) => x.id === entry.id);
-			if (l) {
-				updateList(l.id, { favourite: !l.favourite });
-			}
-		}
+		if (kind === 'create') edit = { kind, parentId: currentId };
+		else if (entry) edit = { kind, ref: entryRef(entry) };
+		name = kind === 'rename' ? (entry?.item.name ?? '') : '';
+		moveTo = undefined;
+		void tick().then(() => {
+			editForm?.scrollIntoView({ block: 'nearest' });
+			(nameInput ?? moveSelect ?? editForm?.querySelector<HTMLButtonElement>('button[type="button"]'))?.focus();
+		});
 	}
 
-	function moveItem(index: number, direction: 'up' | 'down') {
-		if (commitState.isHistorical || index < 0 || index >= validEntries.length) return;
-		const targetIndex = direction === 'up' ? index - 1 : index + 1;
-		if (targetIndex < 0 || targetIndex >= validEntries.length) return;
-		const next = [...validEntries];
+	function submitEdit(event: SubmitEvent) {
+		event.preventDefault();
+		if (!edit || commitState.isHistorical) return;
+		if (edit.kind === 'create') {
+			createFavouriteFolder(name, edit.parentId);
+		} else if (editEntry) {
+			if (edit.kind === 'rename') renameFavouriteFolder(edit.ref.id, name);
+			else if (edit.kind === 'delete') deleteFavouriteFolder(edit.ref.id);
+			else if (moveTo !== undefined) moveFavourite(edit.ref, moveTo);
+		}
+		edit = null;
+	}
+
+	function navigate(entry: FavouriteEntry) {
+		edit = null;
+		if (entry.type === 'favourites-folder') favouriteFolderId = entry.item.id;
+		else if (entry.type === 'folder') onNavigateFolder?.(entry.item.id);
+		else onNavigateList?.(entry.item.id);
+	}
+
+	function toggleShortcut(entry: FavouriteEntry) {
+		if (entry.type === 'favourites-folder' || commitState.isHistorical) return;
+		if (entry.item.favourite) retained = new Set([...retained, favouriteKey(entryRef(entry))]);
+		toggleFavourite(entry.type, entry.item.id, true);
+	}
+
+	function moveItem(index: number, targetIndex: number) {
+		if (commitState.isHistorical || index === targetIndex || !validEntries[index] || !validEntries[targetIndex]) return;
+		const next = validEntries.map(entryRef);
 		const [moved] = next.splice(index, 1);
 		next.splice(targetIndex, 0, moved);
-		saveFavouritesOrder(next);
-		entries = next;
+		saveFavouritesOrder(currentId, next);
 	}
 
-	// ── Touch & pointer drag reorder ─────────────────────────────────────────────
 	let touchDragFrom = $state<number | null>(null);
 	let touchDragOver = $state<number | null>(null);
 
@@ -164,42 +123,31 @@
 		untrack(() => {
 			touchDragFrom = null;
 			touchDragOver = null;
-			// Retain unmarked entries within a view, but never carry live entries into history.
-			entries = getInitialFavourites();
+			retained = new Set();
+			edit = null;
 		});
 	});
 
-	function startDrag(e: PointerEvent, index: number) {
-		if (commitState.isHistorical || index < 0 || index >= validEntries.length) return;
-		e.stopPropagation();
+	function startDrag(event: PointerEvent, index: number) {
+		if (commitState.isHistorical || event.button !== 0) return;
+		event.stopPropagation();
 		touchDragFrom = index;
 		touchDragOver = index;
 	}
 
 	$effect(() => {
 		if (touchDragFrom === null) return;
-		const sourceEntries = untrack(() => validEntries);
-		function onMove(e: PointerEvent) {
-			if (commitState.isHistorical) return;
-			e.preventDefault();
-			const el = document.elementFromPoint(e.clientX, e.clientY);
-			const row = el?.closest('[data-drag-fav-index]') as HTMLElement | null;
-			if (row?.dataset.dragFavIndex !== undefined) {
-				touchDragOver = parseInt(row.dataset.dragFavIndex, 10);
-			}
+		const sourceId = untrack(() => currentId);
+		const sourceEntries = untrack(() => validEntries.map(entry => favouriteKey(entryRef(entry))));
+		function onMove(event: PointerEvent) {
+			event.preventDefault();
+			const row = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-drag-fav-index]');
+			if (row?.dataset.dragFavIndex !== undefined) touchDragOver = Number(row.dataset.dragFavIndex);
 		}
 		function onEnd() {
-			const unchanged = sourceEntries.length === validEntries.length && sourceEntries.every((entry, i) =>
-				entry.id === validEntries[i].id && entry.type === validEntries[i].type);
-			if (!commitState.isHistorical && unchanged && touchDragFrom !== null && touchDragOver !== null && touchDragFrom !== touchDragOver && touchDragFrom >= 0 && touchDragFrom < validEntries.length && touchDragOver >= 0 && touchDragOver < validEntries.length) {
-				const from = touchDragFrom;
-				const to = touchDragOver;
-				const next = [...validEntries];
-				const [moved] = next.splice(from, 1);
-				next.splice(to, 0, moved);
-				saveFavouritesOrder(next);
-				entries = next;
-			}
+			const unchanged = sourceId === currentId && sourceEntries.length === validEntries.length &&
+				sourceEntries.every((key, i) => key === favouriteKey(entryRef(validEntries[i])));
+			if (unchanged && touchDragFrom !== null && touchDragOver !== null) moveItem(touchDragFrom, touchDragOver);
 			onCancel();
 		}
 		function onCancel() {
@@ -216,10 +164,16 @@
 		};
 	});
 
-	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') {
-			onBack();
-		}
+	function goUp() {
+		edit = null;
+		if (currentFolder) favouriteFolderId = currentFolder.parentId;
+		else onBack();
+	}
+
+	function handleKeydown(event: KeyboardEvent) {
+		if (event.key !== 'Escape' || event.defaultPrevented) return;
+		if (edit) edit = null;
+		else goUp();
 	}
 </script>
 
@@ -228,94 +182,129 @@
 <div class="screen">
 	<header>
 		{#if commitState.isHistorical}
-			<div class="historical-banner">
-				<span class="historical-label">Viewing Historical Commit (Read Only)</span>
-			</div>
+			<div class="historical-banner">Viewing Historical Commit (Read Only)</div>
 		{/if}
 		<div class="header-main">
-			<button class="back-btn" onclick={onBack} aria-label="Back">← Back</button>
+			<button class="back-btn" onclick={onBack}>← Back</button>
 			<div class="title-wrap">
 				<span class="title">Rearrange Favourites</span>
-				<span class="subtitle">{commitState.isHistorical ? 'Read-only mode' : 'Drag to change order • Tap ★ to add/remove'}</span>
+				<span class="subtitle" title={currentPath}>{currentPath}</span>
 			</div>
+			{#if !commitState.isHistorical}
+				<button class="back-btn new-folder" onclick={() => editFolder('create')}>+ New folder</button>
+			{/if}
 		</div>
 	</header>
 
 	<div class="content">
+		{#if currentFolder}
+			<div class="level-controls">
+				<button class="back-btn" onclick={goUp}>↑ Up one level</button>
+			</div>
+		{/if}
+		{#if edit && !commitState.isHistorical}
+			<form class="folder-form" bind:this={editForm} onsubmit={submitEdit}>
+				{#if edit.kind === 'create' || (edit.kind === 'rename' && editEntry)}
+					<label>
+						{edit.kind === 'create' ? 'New Favourites folder' : 'Rename Favourites folder'}
+						<input bind:this={nameInput} bind:value={name} placeholder="Folder name" required />
+					</label>
+					<div class="form-actions">
+						<button class="back-btn" type="submit" disabled={!name.trim()}>{edit.kind === 'create' ? 'Create' : 'Save'}</button>
+						<button class="back-btn" type="button" onclick={() => edit = null}>Cancel</button>
+					</div>
+				{:else if edit.kind === 'move' && editEntry}
+					<label>
+						Move {editEntry.item.name} to
+						<select bind:this={moveSelect} bind:value={moveTo} required>
+							<option value={undefined} disabled>Choose a Favourites folder</option>
+							{#if editEntry.parentId !== null}<option value={null}>Top level</option>{/if}
+							{#each moveTargets as target (target.id)}
+								<option value={target.id}>{target.path}</option>
+							{/each}
+						</select>
+					</label>
+					<div class="form-actions">
+						<button class="back-btn" type="submit" disabled={moveTo === undefined}>Move</button>
+						<button class="back-btn" type="button" onclick={() => edit = null}>Cancel</button>
+					</div>
+				{:else if edit.kind === 'delete' && editEntry}
+					<p>Delete “{editEntry.item.name}”? Its contents will move up one level.</p>
+					<div class="form-actions">
+						<button class="back-btn delete" type="submit">Delete folder</button>
+						<button class="back-btn" type="button" onclick={() => edit = null}>Cancel</button>
+					</div>
+				{:else}
+					<p>This favourite is no longer available.</p>
+					<button class="back-btn" type="button" onclick={() => edit = null}>Close</button>
+				{/if}
+			</form>
+		{/if}
 		{#if validEntries.length === 0}
 			<div class="empty-state">
-				<span class="empty-icon">⭐</span>
-				<p>No favourites yet.</p>
-				<p class="empty-hint">Star folders or lists on the main screen to add them to your favourites bar.</p>
+				<p>{currentFolder ? 'This Favourites folder is empty.' : 'No favourites yet.'}</p>
+				{#if !currentFolder}
+					<p class="empty-hint">Star a list or an app folder to add a shortcut.</p>
+				{/if}
 			</div>
 		{:else}
 			<div class="fav-list">
-				{#each validEntries as entry, i (entry.type + ':' + entry.id)}
-					{@const data = getItemData(entry)}
+				{#each validEntries as entry, i (favouriteKey(entryRef(entry)))}
+					{@const isGroup = entry.type === 'favourites-folder'}
+					{@const marked = entry.type === 'favourites-folder' || entry.item.favourite}
+					{@const path = entry.type === 'favourites-folder' ? entry.item.name : favouritePath(entry.item.name, entry.type === 'folder' ? entry.item.parentId : entry.item.folderId, data.folders)}
 					<div
 						class="fav-row"
-						class:unmarked={!data.favourite}
+						class:unmarked={!marked}
 						class:drag-source={touchDragFrom === i}
 						class:drag-above={touchDragOver === i && touchDragFrom !== null && touchDragFrom > i}
 						class:drag-below={touchDragOver === i && touchDragFrom !== null && touchDragFrom < i}
 						data-drag-fav-index={i}
-						style="--row-color: {data.color}"
+						style:--row-color={entry.type === 'favourites-folder' ? 'var(--accent)' : entry.item.color}
 					>
 						{#if !commitState.isHistorical}
-							<button
-								class="drag-handle"
-								aria-label="Drag to reorder"
-								onpointerdown={(e) => startDrag(e, i)}
-							>☰</button>
-
+							<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(event) => startDrag(event, i)}>☰</button>
 							<div class="step-buttons">
-								<button
-									class="step-btn"
-									disabled={i === 0}
-									onclick={() => moveItem(i, 'up')}
-									aria-label="Move up"
-									title="Move up"
-								>▲</button>
-								<button
-									class="step-btn"
-									disabled={i === validEntries.length - 1}
-									onclick={() => moveItem(i, 'down')}
-									aria-label="Move down"
-									title="Move down"
-								>▼</button>
+								<button class="step-btn" disabled={i === 0} onclick={() => moveItem(i, i - 1)} aria-label="Move up" title="Move up">▲</button>
+								<button class="step-btn" disabled={i === validEntries.length - 1} onclick={() => moveItem(i, i + 1)} aria-label="Move down" title="Move down">▼</button>
 							</div>
 						{/if}
 
-						<span class="fav-icon" title={data.typeLabel}>{data.icon}</span>
-
+						<span class="fav-icon" aria-hidden="true">{entry.type === 'list' ? '📝' : isGroup ? '⭐' : '📁'}</span>
 						<button
 							class="fav-name-btn"
-							title={data.path}
-							onclick={() => {
-								if (entry.type === 'folder' && onNavigateFolder) {
-									onNavigateFolder(entry.id);
-								} else if (entry.type === 'list' && onNavigateList) {
-									onNavigateList(entry.id);
-								}
-							}}
+							title={path}
+							aria-label={isGroup ? 'Open Favourites folder ' + entry.item.name : undefined}
+							onclick={() => navigate(entry)}
 						>
-							<span class="fav-path-text">{data.path}</span>
+							<span class="fav-path-text">{path}{isGroup ? ' ›' : ''}</span>
 						</button>
 
-						{#if !data.favourite}
+						{#if !marked}
 							<span class="unmarked-pill">Unmarked</span>
 						{/if}
-
-						<button
-							class="star-btn"
-							class:active={data.favourite}
-							disabled={commitState.isHistorical}
-							onclick={() => toggleFavourite(entry)}
-							aria-label={data.favourite ? 'Remove from favourites' : 'Add to favourites'}
-							title={data.favourite ? 'Remove from favourites' : 'Add to favourites'}
-						>
-							{data.favourite ? '★' : '☆'}
-						</button>
+						{#if !isGroup}
+							<button
+								class="star-btn"
+								class:active={marked}
+								disabled={commitState.isHistorical}
+								onclick={() => toggleShortcut(entry)}
+								aria-label={marked ? 'Remove from favourites' : 'Add to favourites'}
+								title={marked ? 'Remove from favourites' : 'Add to favourites'}
+							>{marked ? '★' : '☆'}</button>
+						{/if}
+						{#if !commitState.isHistorical && marked}
+							{@const canMove = currentId !== null || data.groups.some(group => !isGroup || canMoveFavouriteFolder(data.groups, entry.item.id, group.id))}
+							{#if canMove || isGroup}
+								<RowMenu items={[
+									...(canMove ? [{ label: 'Move to…', action: () => editFolder('move', entry) }] : []),
+									...(isGroup ? [
+										{ label: 'Rename', action: () => editFolder('rename', entry) },
+										{ label: 'Delete folder', danger: true, action: () => editFolder('delete', entry) }
+									] : [])
+								]} />
+							{/if}
+						{/if}
 					</div>
 				{/each}
 			</div>
@@ -384,6 +373,9 @@
 		font-size: 0.75rem;
 		color: var(--text2);
 		line-height: 1.2;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	.content {
 		flex: 1;
@@ -394,15 +386,38 @@
 		margin: 0 auto;
 		box-sizing: border-box;
 	}
+	.new-folder { margin-inline-start: auto; }
+	.level-controls { padding: 0.55rem 1rem; }
+	.folder-form {
+		display: grid;
+		gap: 0.75rem;
+		padding: 0.85rem 1rem;
+		border-bottom: 1px solid var(--border);
+		background: var(--bg2);
+	}
+	.folder-form p { margin: 0; }
+	.folder-form label {
+		display: grid;
+		gap: 0.35rem;
+		font-size: 0.9rem;
+		font-weight: 600;
+	}
+	.folder-form input, .folder-form select {
+		min-width: 0;
+		padding: 0.4rem 0.55rem;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		background: var(--bg);
+		color: var(--text);
+		font: inherit;
+	}
+	.form-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+	.form-actions .back-btn:disabled { opacity: 0.5; cursor: default; }
+	.delete { color: #dc2626; }
 	.empty-state {
 		text-align: center;
 		padding: 3rem 1.5rem;
 		color: var(--text2);
-	}
-	.empty-icon {
-		font-size: 2.5rem;
-		display: block;
-		margin-bottom: 0.5rem;
 	}
 	.empty-state p {
 		margin: 0.25rem 0;

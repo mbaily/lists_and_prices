@@ -192,10 +192,12 @@ export const helpTopics: HelpTopic[] = [
 				]
 			},
 			{
-				title: 'Rearrange your shortcuts',
-				paragraphs: ['Use Rearrange favourites in the bar to open the dedicated ordering screen. Changes take effect as you make them.'],
+				title: 'Organise your shortcuts',
+				paragraphs: ['Open a Favourites folder in the bar to see its contents. Tap the left arrow beside the folder name to go up one level. Newly starred shortcuts appear at the top level.'],
 				steps: [
-					'Drag a row by its handle to a new position, or use its up and down buttons for small changes.',
+					'Open Rearrange favourites from the bar and choose New folder. To create a nested folder, open its parent first.',
+					'Use the row menu to move a shortcut or folder. The same menu lets you rename or delete a Favourites folder. Deleting it moves its contents up one level.',
+					'Drag a row by its handle or use its up and down buttons to reorder it within the current level.',
 					'Use the star beside an entry to remove or restore its favourite status. An entry you unstar can remain dimmed and labelled Unmarked during that visit, so you can star it again easily.',
 					'Select an entry’s name to navigate to it, or use Back to return to the screen you came from.'
 				]

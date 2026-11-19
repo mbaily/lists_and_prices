@@ -2,11 +2,12 @@ import { isFolderDefaultItems } from './folderDefaultItems';
 import type { RichTextOperation } from './noteText';
 
 export const MAX_BACKUP_BYTES = 100 * 1024 * 1024;
-type RecordKind = 'folders' | 'lists' | 'items' | 'sheets';
+type RecordKind = 'folders' | 'favouriteFolders' | 'lists' | 'items' | 'sheets';
 const common = ['id', 'name', 'order', 'createdAt', 'updatedAt'];
-const archivable = ['color', 'favouriteOrder', 'done', 'favourite', 'archived', 'archivedPrevId', 'archivedNextId', 'filterView'];
+const archivable = ['color', 'favouriteOrder', 'favouriteParentId', 'done', 'favourite', 'archived', 'archivedPrevId', 'archivedNextId', 'filterView'];
 const fields: Record<RecordKind, Set<string>> = {
 	folders: new Set([...common, ...archivable, 'parentId', 'foldersFirst', 'localNav', 'checkboxes', 'defaultItems']),
+	favouriteFolders: new Set(['id', 'name', 'parentId', 'order']),
 	lists: new Set([...common, ...archivable, 'folderId', 'type', 'defaultIsNote', 'journalMode']),
 	items: new Set([...common, 'listId', 'price', 'qty', 'checked', 'checks', 'checkedNames', 'heading', 'parentId', 'note', 'pinned', 'fullScreen', 'richText']),
 	sheets: new Set([...common, 'folderId', 'cells'])
@@ -52,7 +53,7 @@ export function validateRecords(records: unknown, kind: RecordKind): asserts rec
 		if (!isRecord(record) || typeof record.id !== 'string' || !record.id.trim() || typeof record.name !== 'string' || ids.has(record.id)) throw new Error(`Invalid or duplicate ${kind} record.`);
 		ids.add(record.id);
 		for (const key of Object.keys(record)) if (!fields[kind].has(key)) throw new Error(`Unrecognized ${kind} field: ${key}. This backup may require a newer app.`);
-		for (const key of ['parentId', 'folderId', 'archivedPrevId', 'archivedNextId']) {
+		for (const key of ['parentId', 'folderId', 'favouriteParentId', 'archivedPrevId', 'archivedNextId']) {
 			if (record[key] != null && (typeof record[key] !== 'string' || !record[key].trim())) throw new Error(`Invalid ${key}.`);
 		}
 		if (record.listId !== undefined && (typeof record.listId !== 'string' || !record.listId.trim())) throw new Error('Invalid listId.');
@@ -71,11 +72,12 @@ export function validateRecords(records: unknown, kind: RecordKind): asserts rec
 				new Set(boxes.map(box => box.id)).size !== boxes.length || new Set(boxes.map(box => box.name.trim().toLowerCase())).size !== boxes.length) throw new Error('Invalid checkbox definitions.');
 		}
 		if (kind === 'folders' && record.defaultItems !== undefined && !isFolderDefaultItems(record.defaultItems)) throw new Error('Invalid default items.');
+		if (kind === 'favouriteFolders' && (!record.name.trim() || typeof record.order !== 'number')) throw new Error('Invalid Favourites folder.');
 		if (record.checkedNames !== undefined && (!Array.isArray(record.checkedNames) || record.checkedNames.some(name => typeof name !== 'string'))) throw new Error('Invalid checkbox names.');
 		if (record.richText !== undefined) validateRichText(record.richText, record.name);
 		if (record.cells !== undefined && (!isRecord(record.cells) || Object.entries(record.cells).some(([key, value]) => !/^(0|[1-9]\d*),(0|[1-9]\d*)$/.test(key) || key.split(',').some(part => !Number.isSafeInteger(Number(part))) || typeof value !== 'string'))) throw new Error('Invalid spreadsheet cells.');
 	}
-	if (kind === 'items' || kind === 'folders') orderParentFirst(records.map(record => ({ id: record.id as string, parentId: record.parentId as string | null | undefined })));
+	if (kind === 'items' || kind === 'folders' || kind === 'favouriteFolders') orderParentFirst(records.map(record => ({ id: record.id as string, parentId: record.parentId as string | null | undefined })));
 }
 
 /** Accept arbitrary file order without flattening children whose parent appears

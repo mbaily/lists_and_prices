@@ -36,6 +36,7 @@ export interface Folder {
 	parentId: string | null;
 	order: number;
 	favouriteOrder?: number;
+	favouriteParentId?: string | null;
 	done: boolean;
 	favourite: boolean;
 	archived: boolean;
@@ -63,6 +64,7 @@ export function readFolders(): Folder[] {
 }
 
 function yMapToFolder(m: Y.Map<unknown>): Folder {
+	const favouriteParentId = m.get('favouriteParentId') as string | null | undefined;
 	return {
 		id: m.get('id') as string,
 		name: m.get('name') as string,
@@ -70,6 +72,7 @@ function yMapToFolder(m: Y.Map<unknown>): Folder {
 		parentId: (m.get('parentId') as string | null) ?? null,
 		order: (m.get('order') as number) ?? 0,
 		favouriteOrder: (m.get('favouriteOrder') as number | undefined) ?? (m.get('order') as number) ?? 0,
+		...(favouriteParentId !== undefined ? { favouriteParentId } : {}),
 		done: (m.get('done') as boolean) ?? false,
 		favourite: (m.get('favourite') as boolean) ?? false,
 		archived: (m.get('archived') as boolean) ?? false,
@@ -363,6 +366,7 @@ export interface ListMeta {
 	type: 'plain' | 'priced' | 'divider';
 	order: number;
 	favouriteOrder?: number;
+	favouriteParentId?: string | null;
 	done: boolean;
 	favourite: boolean;
 	archived: boolean;
@@ -380,6 +384,7 @@ export function readLists(): ListMeta[] {
 }
 
 function yMapToList(m: Y.Map<unknown>): ListMeta {
+	const favouriteParentId = m.get('favouriteParentId') as string | null | undefined;
 	return {
 		id: m.get('id') as string,
 		name: m.get('name') as string,
@@ -388,6 +393,7 @@ function yMapToList(m: Y.Map<unknown>): ListMeta {
 		type: (m.get('type') as 'plain' | 'priced' | 'divider') ?? 'plain',
 		order: (m.get('order') as number) ?? 0,
 		favouriteOrder: (m.get('favouriteOrder') as number | undefined) ?? (m.get('order') as number) ?? 0,
+		...(favouriteParentId !== undefined ? { favouriteParentId } : {}),
 		done: (m.get('done') as boolean) ?? false,
 		favourite: (m.get('favourite') as boolean) ?? false,
 		archived: (m.get('archived') as boolean) ?? false,
@@ -1090,47 +1096,222 @@ export function reorderLists(folderId: string, fromIndex: number, toIndex: numbe
 	doc.transact(() => all.forEach((l, idx) => updateList(l.id, { order: idx })));
 }
 
-export function getMaxFavouriteOrder(): number {
-	const folders = readFolders().filter((f) => f.favourite);
-	const lists = readLists().filter((l) => l.favourite);
-	let max = -1;
-	for (const f of folders) {
-		const fo = f.favouriteOrder ?? 0;
-		if (fo > max) max = fo;
-	}
-	for (const l of lists) {
-		const fo = l.favouriteOrder ?? 0;
-		if (fo > max) max = fo;
-	}
-	return max;
+export interface FavouriteFolder {
+	id: string;
+	name: string;
+	parentId: string | null;
+	order: number;
 }
 
-export function saveFavouritesOrder(items: { id: string; type: 'folder' | 'list' }[]) {
+type FavouriteShortcut = { type: 'folder'; item: Folder } | { type: 'list'; item: ListMeta };
+export type FavouriteEntry = (FavouriteShortcut | { type: 'favourites-folder'; item: FavouriteFolder }) & {
+	parentId: string | null;
+	order: number;
+};
+type FavouriteRef = { type: FavouriteEntry['type']; id: string };
+
+function getFavouriteFolders(doc: Y.Doc): Y.Array<Y.Map<unknown>> {
+	return doc.getArray('favourite-folders');
+}
+
+export function readFavouriteFolders(): FavouriteFolder[] {
+	return resolveParentLinks(getFavouriteFolders(getDoc()).toArray().map(record => ({
+		id: record.get('id') as string,
+		name: record.get('name') as string,
+		parentId: (record.get('parentId') as string | null) ?? null,
+		order: (record.get('order') as number) ?? 0
+	})));
+}
+
+export function favouriteKey({ type, id }: FavouriteRef): string {
+	return type + ':' + id;
+}
+
+function collectFavouriteEntries(
+	folders: Folder[],
+	lists: ListMeta[],
+	groups: FavouriteFolder[],
+	include: (shortcut: FavouriteShortcut) => boolean
+): FavouriteEntry[] {
+	const groupIds = new Set(groups.map(group => group.id));
+	const shortcuts: FavouriteShortcut[] = [
+		...folders.map(item => ({ type: 'folder' as const, item })),
+		...lists.map(item => ({ type: 'list' as const, item }))
+	];
+	return [
+		...shortcuts.filter(include).map(shortcut => ({
+			...shortcut,
+			parentId: shortcut.item.favouriteParentId && groupIds.has(shortcut.item.favouriteParentId) ? shortcut.item.favouriteParentId : null,
+			order: shortcut.item.favouriteOrder ?? shortcut.item.order
+		})),
+		...groups.map(item => ({ type: 'favourites-folder' as const, item, parentId: item.parentId, order: item.order }))
+	].sort((a, b) => a.order - b.order);
+}
+
+export function buildFavouriteEntries(
+	folders: Folder[],
+	lists: ListMeta[],
+	groups: FavouriteFolder[],
+	retained?: ReadonlySet<string>
+): FavouriteEntry[] {
+	return collectFavouriteEntries(folders, lists, groups, ({ type, item }) =>
+		(item.favourite || retained?.has(favouriteKey({ type, id: item.id })) === true) &&
+		(type === 'folder' ? !isFolderEffectivelyArchived(item.id, folders) : !isListEffectivelyArchived(item, folders))
+	);
+}
+
+/** Elide the grouping folders when navigating directly between starred lists. */
+export function favouriteShortcutsInTreeOrder(entries: FavouriteEntry[]): FavouriteEntry[] {
+	const children = new Map<string | null, FavouriteEntry[]>();
+	for (const entry of entries) {
+		const siblings = children.get(entry.parentId) ?? [];
+		siblings.push(entry);
+		children.set(entry.parentId, siblings);
+	}
+	const result: FavouriteEntry[] = [];
+	const stack = [...(children.get(null) ?? [])].reverse();
+	while (stack.length > 0) {
+		const entry = stack.pop()!;
+		if (entry.type === 'favourites-folder') {
+			const siblings = children.get(entry.item.id) ?? [];
+			for (let i = siblings.length - 1; i >= 0; i--) stack.push(siblings[i]);
+		} else {
+			result.push(entry);
+		}
+	}
+	return result;
+}
+
+export function favouritePath(name: string, parentId: string | null, folders: { id: string; name: string; parentId: string | null }[]): string {
+	const names = [name];
+	const visited = new Set<string>();
+	while (parentId !== null && !visited.has(parentId)) {
+		visited.add(parentId);
+		const parent = folders.find(folder => folder.id === parentId);
+		if (!parent) break;
+		names.push(parent.name);
+		parentId = parent.parentId;
+	}
+	return names.reverse().join(' › ');
+}
+
+function storedFavouriteEntries(groups = readFavouriteFolders(), retained?: ReadonlySet<string>): FavouriteEntry[] {
+	return collectFavouriteEntries(readFolders(), readLists(), groups, ({ type, item }) =>
+		item.favourite || item.favouriteParentId != null || retained?.has(favouriteKey({ type, id: item.id })) === true
+	);
+}
+
+function favouriteRecord(doc: Y.Doc, { type, id }: FavouriteRef) {
+	const records = type === 'folder' ? getFolders(doc) : type === 'list' ? getLists(doc) : getFavouriteFolders(doc);
+	return findYMap(records, id);
+}
+
+function setFavouriteOrder(record: Y.Map<unknown>, type: FavouriteRef['type'], order: number) {
+	const field = type === 'favourites-folder' ? 'order' : 'favouriteOrder';
+	if (record.get(field) !== order) record.set(field, order);
+}
+
+function setFavouriteParent(record: Y.Map<unknown>, type: FavouriteRef['type'], parentId: string | null) {
+	const field = type === 'favourites-folder' ? 'parentId' : 'favouriteParentId';
+	if (record.get(field) !== parentId) record.set(field, parentId);
+}
+
+export function toggleFavourite(type: FavouriteShortcut['type'], id: string, keepPlacement = false) {
 	const doc = getMutableDoc();
+	const record = favouriteRecord(doc, { type, id });
+	if (!record) return;
+	const next = !record.get('favourite');
+	const order = next && !keepPlacement
+		? getInsertionOrder(storedFavouriteEntries().filter(entry => entry.parentId === null), 'bottom')
+		: null;
 	doc.transact(() => {
-		items.forEach((item, idx) => {
-			if (item.type === 'folder') {
-				updateFolder(item.id, { favouriteOrder: idx });
-			} else {
-				updateList(item.id, { favouriteOrder: idx });
-			}
-		});
+		record.set('favourite', next);
+		record.set('updatedAt', new Date().toISOString());
+		if (order === null) return;
+		if (record.get('favouriteParentId') != null) setFavouriteParent(record, type, null);
+		setFavouriteOrder(record, type, order);
 	});
 }
 
-export function reorderFavourites(items: { id: string; type: 'folder' | 'list' }[], fromIndex: number, toIndex: number) {
+export function createFavouriteFolder(name: string, parentId: string | null): string | null {
 	const doc = getMutableDoc();
-	const reordered = [...items];
-	const [moved] = reordered.splice(fromIndex, 1);
-	reordered.splice(toIndex, 0, moved);
+	const groups = readFavouriteFolders();
+	name = name.trim();
+	if (!name || (parentId !== null && !groups.some(group => group.id === parentId))) return null;
+	const id = uid();
+	const order = getInsertionOrder(storedFavouriteEntries(groups).filter(entry => entry.parentId === parentId), 'bottom');
+	const record = new Y.Map<unknown>();
+	for (const [key, value] of Object.entries({ id, name, parentId, order })) record.set(key, value);
+	getFavouriteFolders(doc).push([record]);
+	return id;
+}
 
+export function renameFavouriteFolder(id: string, name: string) {
+	const doc = getMutableDoc();
+	const record = favouriteRecord(doc, { type: 'favourites-folder', id });
+	if (record && name.trim()) record.set('name', name.trim());
+}
+
+export function canMoveFavouriteFolder(groups: FavouriteFolder[], id: string, parentId: string | null): boolean {
+	while (parentId !== null) {
+		if (parentId === id) return false;
+		parentId = groups.find(group => group.id === parentId)?.parentId ?? null;
+	}
+	return true;
+}
+
+export function moveFavourite(ref: FavouriteRef, parentId: string | null) {
+	const doc = getMutableDoc();
+	const groups = readFavouriteFolders();
+	if (parentId !== null && !groups.some(group => group.id === parentId)) return;
+	if (ref.type === 'favourites-folder' && !canMoveFavouriteFolder(groups, ref.id, parentId)) return;
+	const entries = storedFavouriteEntries(groups);
+	const entry = entries.find(entry => entry.type === ref.type && entry.item.id === ref.id);
+	const record = favouriteRecord(doc, ref);
+	if (!entry || !record || entry.parentId === parentId || (entry.type !== 'favourites-folder' && !entry.item.favourite)) return;
+	const order = getInsertionOrder(entries.filter(entry => entry.parentId === parentId), 'bottom');
 	doc.transact(() => {
-		reordered.forEach((item, idx) => {
-			if (item.type === 'folder') {
-				updateFolder(item.id, { favouriteOrder: idx });
-			} else {
-				updateList(item.id, { favouriteOrder: idx });
-			}
+		if (ref.type === 'favourites-folder') materializeCycles(getFavouriteFolders(doc), groups);
+		setFavouriteParent(record, ref.type, parentId);
+		setFavouriteOrder(record, ref.type, order);
+	});
+}
+
+export function deleteFavouriteFolder(id: string) {
+	const doc = getMutableDoc();
+	const groups = readFavouriteFolders();
+	const group = groups.find(group => group.id === id);
+	if (!group) return;
+	const entries = storedFavouriteEntries(groups);
+	const children = entries.filter(entry => entry.parentId === id);
+	const siblings = entries.filter(entry => entry.parentId === group.parentId)
+		.flatMap(entry => entry.type === 'favourites-folder' && entry.item.id === id ? children : [entry]);
+	doc.transact(() => {
+		for (const child of children) {
+			const record = favouriteRecord(doc, { type: child.type, id: child.item.id });
+			if (record) setFavouriteParent(record, child.type, group.parentId);
+		}
+		siblings.forEach((entry, order) => {
+			const record = favouriteRecord(doc, { type: entry.type, id: entry.item.id });
+			if (record) setFavouriteOrder(record, entry.type, order);
+		});
+		removeYMap(getFavouriteFolders(doc), id);
+	});
+}
+
+export function saveFavouritesOrder(parentId: string | null, refs: FavouriteRef[]) {
+	const doc = getMutableDoc();
+	const keys = new Set(refs.map(favouriteKey));
+	const siblings = storedFavouriteEntries(undefined, keys).filter(entry => entry.parentId === parentId);
+	const siblingKeys = new Set(siblings.map(entry => favouriteKey({ type: entry.type, id: entry.item.id })));
+	const ordered = refs.filter(ref => siblingKeys.has(favouriteKey(ref)));
+	let index = 0;
+	doc.transact(() => {
+		siblings.forEach((entry, order) => {
+			const ref = { type: entry.type, id: entry.item.id };
+			const target = keys.has(favouriteKey(ref)) ? ordered[index++] : ref;
+			const record = favouriteRecord(doc, target);
+			if (record) setFavouriteOrder(record, target.type, order);
 		});
 	});
 }
@@ -1210,6 +1391,7 @@ export interface BackupFile {
 	items: BackupItem[];
 	sheets?: BackupSheet[];
 	smartFolders?: Record<string, string[]>;
+	favouriteFolders?: FavouriteFolder[];
 	customLocations?: RetailLocation[];
 	locationOptionalTags?: string[];
 	startingLocation?: StartingLocation | null;
@@ -1225,6 +1407,7 @@ export interface BackupFile {
 /** Current application data. Device preferences and named history are separate. */
 export function exportBackup(): BackupFile {
 	const doc = getDoc();
+	const favouriteFolders = readFavouriteFolders();
 	const backup: BackupFile = {
 		version: 2,
 		exported: new Date().toISOString(),
@@ -1237,6 +1420,7 @@ export function exportBackup(): BackupFile {
 		}),
 		sheets: readSheets().map(sheet => ({ ...sheet, cells: readCells(sheet.id) })),
 		smartFolders: readReportAssignments(getDoc()),
+		...(favouriteFolders.length > 0 ? { favouriteFolders } : {}),
 		customLocations: readCustomLocations(),
 		locationOptionalTags: readLocationOptionalTags(),
 		startingLocation: readStartingLocation(),
@@ -1256,11 +1440,12 @@ export function exportBackup(): BackupFile {
 export function validateBackup(value: unknown): asserts value is BackupFile {
 	if (!isRecord(value)) throw new Error('Invalid backup: expected a JSON object.');
 	if (value.version !== 1 && value.version !== 2) throw new Error(`Unsupported backup version: ${String(value.version)}. Update the app if this file came from a newer release.`);
-	const fields = new Set(['version', 'exported', 'folders', 'lists', 'items', 'sheets', 'smartFolders', 'customLocations', 'locationOptionalTags', 'startingLocation', 'nearbyLocationFilterEnabled', 'hotSuburbIds', 'nearbyPreviewLimit', 'nearbyRecentlyModifiedFirst', 'nearbyChecklist', 'pausedErrandTags', 'pausedErrandItemIds']);
+	const fields = new Set(['version', 'exported', 'folders', 'lists', 'items', 'sheets', 'smartFolders', 'favouriteFolders', 'customLocations', 'locationOptionalTags', 'startingLocation', 'nearbyLocationFilterEnabled', 'hotSuburbIds', 'nearbyPreviewLimit', 'nearbyRecentlyModifiedFirst', 'nearbyChecklist', 'pausedErrandTags', 'pausedErrandItemIds']);
 	for (const key of Object.keys(value)) if (!fields.has(key)) throw new Error(`Unrecognized backup section: ${key}. This backup may require a newer app.`);
 	if (value.exported !== undefined && (typeof value.exported !== 'string' || !Number.isFinite(Date.parse(value.exported)))) throw new Error('Invalid backup export date.');
 	const backup = value as unknown as BackupFile;
 	validateRecords(backup.folders, 'folders');
+	validateRecords(backup.favouriteFolders === undefined ? [] : backup.favouriteFolders, 'favouriteFolders');
 	validateRecords(backup.lists, 'lists');
 	validateRecords(backup.items, 'items');
 	if (backup.items.some(item => typeof item.listId !== 'string' || !item.listId.trim())) throw new Error('Invalid item listId.');
@@ -1302,11 +1487,12 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 	validateBackup(backup);
 	const doc = getMutableDoc();
 	const fArr = getFolders(doc);
+	const favouritesArr = getFavouriteFolders(doc);
 	const lArr = getLists(doc);
 	const iArr = getItems(doc);
 	const sArr = getSpreadsheets(doc);
 	// Index once: scanning the full Y.Array for each record freezes large restores.
-	const indexes = new Map([fArr, lArr, iArr, sArr].map(arr => [arr, new Map(arr.toArray().map(record => [record.get('id') as string, record]))]));
+	const indexes = new Map([fArr, favouritesArr, lArr, iArr, sArr].map(arr => [arr, new Map(arr.toArray().map(record => [record.get('id') as string, record]))]));
 
 	// Undo needs an authoritative pre-import baseline even for legacy notes
 	// that have never been opened. Migration itself is not an undo action.
@@ -1317,6 +1503,7 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 	doc.transact(() => {
 		if (mode === 'replace') {
 			if (fArr.length) fArr.delete(0, fArr.length);
+			if (favouritesArr.length) favouritesArr.delete(0, favouritesArr.length);
 			if (lArr.length) lArr.delete(0, lArr.length);
 			if (iArr.length) iArr.delete(0, iArr.length);
 			for (const key of doc.share.keys()) {
@@ -1353,6 +1540,7 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 			}
 		}
 		for (const record of backup.folders) upsert(fArr, record as unknown as Record<string, unknown>, 'folder');
+		for (const record of backup.favouriteFolders ?? []) upsert(favouritesArr, { ...record, parentId: record.parentId ?? null }, 'other');
 		for (const record of backup.lists) upsert(lArr, record as unknown as Record<string, unknown>, 'other');
 		for (const record of backup.items) upsert(iArr, record as unknown as Record<string, unknown>, 'item');
 		for (const record of backup.sheets ?? []) upsert(sArr, record as unknown as Record<string, unknown>, 'other');

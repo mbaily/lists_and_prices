@@ -51,7 +51,7 @@ test('browse toggle follows the menu and exposes its pressed state', () => {
 });
 
 test('browse mode hides shortcuts and summary while retaining selection controls', () => {
-	for (const [className, collection] of [['pin-bar', 'allPinnedItems'], ['fav-bar', 'favouriteItems']]) {
+	for (const [className, collection] of [['pin-bar', 'allPinnedItems'], ['fav-bar', 'favouriteEntries']]) {
 		const guard = guardFor(className);
 		assert.ok(guard);
 		assert.equal(evaluateGuard(guard, { browseView: false, [collection]: [{}] }), true);
