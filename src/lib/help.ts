@@ -196,7 +196,8 @@ export const helpTopics: HelpTopic[] = [
 				paragraphs: ['Open a Favourites folder in the bar to see its contents. Tap the left arrow beside the folder name to go up one level. Newly starred shortcuts appear at the top level.'],
 				steps: [
 					'Open Rearrange favourites from the bar and choose New folder. To create a nested folder, open its parent first.',
-					'Use the row menu to move a shortcut or folder. The same menu lets you rename or delete a Favourites folder. Deleting it moves its contents up one level.',
+					'Choose Move to in the row menu, then search by folder name or path. Choose Top level to move a shortcut or folder out of its current folder.',
+					'Use the row menu to rename or delete a Favourites folder. Deleting it moves its contents up one level.',
 					'Drag a row by its handle or use its up and down buttons to reorder it within the current level.',
 					'Use the star beside an entry to remove or restore its favourite status. An entry you unstar can remain dimmed and labelled Unmarked during that visit, so you can star it again easily.',
 					'Select an entry’s name to navigate to it, or use Back to return to the screen you came from.'

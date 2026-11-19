@@ -18,6 +18,7 @@
 		type FavouriteEntry
 	} from '$lib/data';
 	import RowMenu from './RowMenu.svelte';
+	import FavouriteDestinationPicker from './FavouriteDestinationPicker.svelte';
 
 	let {
 		onBack,
@@ -52,17 +53,19 @@
 	let name = $state('');
 	let moveTo = $state<string | null | undefined>();
 	let editForm: HTMLFormElement | undefined = $state();
-	let nameInput: HTMLInputElement | undefined = $state();
-	let moveSelect: HTMLSelectElement | undefined = $state();
 	const editRef = $derived(edit && edit.kind !== 'create' ? edit.ref : null);
 	const editEntry = $derived(editRef ? entries.find(entry => entry.type === editRef.type && entry.item.id === editRef.id) : undefined);
 	const moveTargets = $derived(editEntry && edit?.kind === 'move'
-		? data.groups
-			.filter(group => group.id !== editEntry.parentId &&
-				(editEntry.type !== 'favourites-folder' || canMoveFavouriteFolder(data.groups, editEntry.item.id, group.id)))
-			.map(group => ({ id: group.id, path: favouritePath(group.name, group.parentId, data.groups) }))
-			.sort((a, b) => a.path.localeCompare(b.path))
+		? [
+			{ id: null, label: 'Top level', disabled: editEntry.parentId === null },
+			...data.groups
+				.filter(group => group.id !== editEntry.parentId &&
+					(editEntry.type !== 'favourites-folder' || canMoveFavouriteFolder(data.groups, editEntry.item.id, group.id)))
+				.map(group => ({ id: group.id, label: favouritePath(group.name, group.parentId, data.groups), disabled: false }))
+				.sort((a, b) => a.label.localeCompare(b.label))
+		]
 		: []);
+	const moveTarget = $derived(moveTargets.find(target => target.id === moveTo && !target.disabled));
 
 	function entryRef(entry: FavouriteEntry): EntryRef {
 		return { type: entry.type, id: entry.item.id };
@@ -76,7 +79,7 @@
 		moveTo = undefined;
 		void tick().then(() => {
 			editForm?.scrollIntoView({ block: 'nearest' });
-			(nameInput ?? moveSelect ?? editForm?.querySelector<HTMLButtonElement>('button[type="button"]'))?.focus();
+			editForm?.querySelector<HTMLElement>('input, button[type="button"]')?.focus();
 		});
 	}
 
@@ -88,7 +91,10 @@
 		} else if (editEntry) {
 			if (edit.kind === 'rename') renameFavouriteFolder(edit.ref.id, name);
 			else if (edit.kind === 'delete') deleteFavouriteFolder(edit.ref.id);
-			else if (moveTo !== undefined) moveFavourite(edit.ref, moveTo);
+			else {
+				if (!moveTarget) return;
+				moveFavourite(edit.ref, moveTarget.id);
+			}
 		}
 		edit = null;
 	}
@@ -207,25 +213,18 @@
 				{#if edit.kind === 'create' || (edit.kind === 'rename' && editEntry)}
 					<label>
 						{edit.kind === 'create' ? 'New Favourites folder' : 'Rename Favourites folder'}
-						<input bind:this={nameInput} bind:value={name} placeholder="Folder name" required />
+						<input bind:value={name} placeholder="Folder name" required />
 					</label>
 					<div class="form-actions">
 						<button class="back-btn" type="submit" disabled={!name.trim()}>{edit.kind === 'create' ? 'Create' : 'Save'}</button>
 						<button class="back-btn" type="button" onclick={() => edit = null}>Cancel</button>
 					</div>
 				{:else if edit.kind === 'move' && editEntry}
-					<label>
-						Move {editEntry.item.name} to
-						<select bind:this={moveSelect} bind:value={moveTo} required>
-							<option value={undefined} disabled>Choose a Favourites folder</option>
-							{#if editEntry.parentId !== null}<option value={null}>Top level</option>{/if}
-							{#each moveTargets as target (target.id)}
-								<option value={target.id}>{target.path}</option>
-							{/each}
-						</select>
-					</label>
+					{#key favouriteKey(edit.ref)}
+						<FavouriteDestinationPicker label={'Move ' + editEntry.item.name + ' to'} options={moveTargets} bind:value={moveTo} />
+					{/key}
 					<div class="form-actions">
-						<button class="back-btn" type="submit" disabled={moveTo === undefined}>Move</button>
+						<button class="back-btn" type="submit" disabled={!moveTarget}>Move</button>
 						<button class="back-btn" type="button" onclick={() => edit = null}>Cancel</button>
 					</div>
 				{:else if edit.kind === 'delete' && editEntry}
@@ -402,7 +401,7 @@
 		font-size: 0.9rem;
 		font-weight: 600;
 	}
-	.folder-form input, .folder-form select {
+	.folder-form input {
 		min-width: 0;
 		padding: 0.4rem 0.55rem;
 		border: 1px solid var(--border);
