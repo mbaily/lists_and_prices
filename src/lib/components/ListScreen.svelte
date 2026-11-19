@@ -2415,13 +2415,16 @@
 				title="Move selected items to next day / list…"
 				aria-label="Move selected items to next day / list…"
 			><span aria-hidden="true">⏭</span></button>
-			<button
-				class="bulk-btn icon-btn sel-folder-move-btn"
-				onclick={() => { if (!folderMoveTarget || folderMoveTarget.id === listId) openRolloverModal('selected'); else moveSelectedToFolderEdge(); }}
-				disabled={!canEditList || selectedIds.size === 0}
-				title={folderMoveTarget && folderMoveTarget.id !== listId ? folderMoveLabel : 'Move selected items to next day / list…'}
-				aria-label={folderMoveTarget && folderMoveTarget.id !== listId ? folderMoveLabel : 'Move selected items to next day / list…'}
-			><span aria-hidden="true">{folderMoveTarget && folderMoveTarget.id !== listId ? (settings.addListPosition === 'top' ? '⤒' : '⤓') : '⤒+'}</span></button>
+			<!-- Only with a destination list: otherwise ⏭ already opens the move dialog. -->
+			{#if folderMoveTarget && folderMoveTarget.id !== listId}
+				<button
+					class="bulk-btn icon-btn sel-folder-move-btn"
+					onclick={moveSelectedToFolderEdge}
+					disabled={!canEditList || selectedIds.size === 0}
+					title={folderMoveLabel}
+					aria-label={folderMoveLabel}
+				><span aria-hidden="true">{settings.addListPosition === 'top' ? '⤒' : '⤓'}</span></button>
+			{/if}
 			<button class="bulk-btn sel-view-btn" onclick={() => showSelectionPanel = !showSelectionPanel}>
 				{showSelectionPanel ? '▾ Hide list' : '▸ View list'}
 			</button>
