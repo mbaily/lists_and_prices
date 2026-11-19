@@ -259,9 +259,9 @@ test('items with includes have no bottom padding, including priced touch layouts
 	assert.match(rules.get('.item-row.priced-row.has-bills'), /padding-bottom:\s*0\s*;/);
 });
 
-test('filtered tree items each block is keyed by item id to maintain inclusion identity', () => {
+test('visible rows each block is keyed by item id to maintain inclusion identity', () => {
 	const text = readFileSync(new URL('../src/lib/components/ListScreen.svelte', import.meta.url), 'utf8');
-	assert.match(text, /\{#each\s+filteredTreeItems\s+as\s+\{[^}]+\}\s*\(\s*item\.id\s*\)\s*\}/);
+	assert.match(text, /\{#each\s+visibleRows\s+as\s+row\s*\(\s*row\.item\.id\s*\)\s*\}/);
 });
 
 test('include refresh button has spinning animation when refreshed', () => {

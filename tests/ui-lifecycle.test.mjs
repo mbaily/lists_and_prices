@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { createApp, componentFunctions, transpile } from './helpers/app.mjs';
 import { importNameKey } from '../server/import-text.ts';
 import { parseClipboardTodos } from '../src/lib/importText.ts';
+import { clipboardEntries } from '../src/lib/listFolders.ts';
 
 function uncheckProbe(selected = false, named = false) {
 	const calls = [];
@@ -62,10 +63,13 @@ function itemCopyProbe(item, folderCheckboxes = []) {
 		getDoc: () => ({}), readItemRichText: () => undefined,
 		navigator: { clipboard: { writeText: async (text) => { writes.push(text); } } },
 		copyRefToClipboard: (id) => refs.push(id), copyStatus: 'idle', copyMessage: '', setTimeout: () => 1,
-		selectedIds: new Set(), selectedItems: [], treeItems: [{ item }], showHeaderMenu: true
+		// The list export covers the selected item; its parent stays in the list.
+		selectedIds: new Set([item.id]), showHeaderMenu: true, viewFolderId: null, listFolders: [],
+		listItems: [...(item.parentId ? [{ id: item.parentId, name: 'Parent', parentId: null, order: 0 }] : []), { order: 1, ...item }],
+		clipboardEntries
 	};
 	const source = componentFunctions('src/lib/components/ListScreen.svelte', [
-		'serializeClipboardItems', 'writeClipboard', 'getCopyMenuItem', 'getDokuWikiMenuItems', 'exportToClipboard'
+		'serializeClipboardItems', 'serializeClipboardEntries', 'viewClipboardJson', 'writeClipboard', 'getCopyMenuItem', 'getDokuWikiMenuItems', 'exportToClipboard'
 	]);
 	const api = new Function('state', `with (state) { ${transpile(source)}; return { getCopyMenuItem, exportToClipboard }; }`)(state);
 	return { state, writes, refs, menu: api.getCopyMenuItem(item), exportList: api.exportToClipboard };
@@ -115,7 +119,7 @@ test('item copy reports clipboard permission errors', async () => {
 function clipboardState(readText) {
 	const calls = [], alerts = [];
 	const state = {
-		isPasting: false, canEditList: true, listId: 'list-a', listContextVersion: 0, isActive: true,
+		isPasting: false, canEditList: true, listId: 'list-a', viewFolderId: null, listContextVersion: 0, isActive: true,
 		settings: { addItemPosition: 'bottom' }, commitState: { isHistorical: false },
 		navigator: { clipboard: { readText } }, readLists: () => [{ id: 'list-a' }, { id: 'list-b' }],
 		readItems: () => [],
@@ -165,7 +169,7 @@ test('clipboard todos import completion and omit cancelled items', async () => {
 		{ id: 'clipboard-1', name: 'Tomatoes', checked: true, parentId: null },
 		{ id: 'clipboard-2', name: 'Tuna can', checked: false, parentId: null },
 		{ id: 'clipboard-3', name: 'Zuchinni', checked: false, parentId: null }
-	], { addPosition: 'bottom', skipExisting: true }]]);
+	], { addPosition: 'bottom', skipExisting: true, listFolderId: null }]]);
 	assert.deepEqual(probe.alerts, []);
 	assert.equal(probe.state.isPasting, false);
 });
@@ -182,7 +186,7 @@ test('normal clipboard import preserves checkbox markers as literal text', async
 	]) {
 		const probe = clipboardState(async () => text);
 		await probe.run();
-		assert.deepEqual(probe.calls, [['text', 'list-a', text.split('\n'), 'bottom']]);
+		assert.deepEqual(probe.calls, [['text', 'list-a', text.split('\n'), 'bottom', null]]);
 		assert.deepEqual(probe.alerts, []);
 	}
 });
@@ -196,7 +200,7 @@ test('task import extracts the example tasks without the timestamp or other text
 		{ id: 'clipboard-1', name: 'Death of the outsider', checked: true, parentId: null },
 		{ id: 'clipboard-2', name: 'Charge phone', checked: true, parentId: null },
 		{ id: 'clipboard-3', name: 'Northland #northland', checked: true, parentId: null }
-	], { addPosition: 'bottom', skipExisting: true }]]);
+	], { addPosition: 'bottom', skipExisting: true, listFolderId: null }]]);
 	assert.deepEqual(probe.alerts, []);
 	assert.equal(probe.state.isPasting, false);
 });
@@ -213,7 +217,7 @@ test('task import reports missing tasks without importing literal text or app JS
 		await probe.run('tasks');
 		assert.deepEqual(probe.calls, [['json', 'list-a', [
 			{ id: 'clipboard-0', name: 'Single task', checked: true, parentId: null }
-		], { addPosition: 'bottom', skipExisting: true }]]);
+		], { addPosition: 'bottom', skipExisting: true, listFolderId: null }]]);
 	}
 });
 
@@ -306,7 +310,7 @@ test('plain text skips existing list names but retains repeated new names and ca
 		return [{ name: ' Milk ' }, { name: 'Child task', parentId: 'parent' }];
 	};
 	await probe.run();
-	assert.deepEqual(probe.calls, [['text', 'list-a', ['Bread', 'Bread', 'milk'], 'top']]);
+	assert.deepEqual(probe.calls, [['text', 'list-a', ['Bread', 'Bread', 'milk'], 'top', null]]);
 	assert.equal(probe.state.copyStatus, 'idle');
 });
 
@@ -324,7 +328,7 @@ test('plain text matches existing names regardless of trailing hashtags on eithe
 	const probe = clipboardState(async () => 'Milk #shopping #weekly\nBread\nEggs #fresh\nCoffee #shopping\nCoffee #weekly');
 	probe.state.readItems = () => [{ name: 'Milk' }, { name: 'Bread #bakery #weekly  ' }, { name: 'Eggs #shopping' }];
 	await probe.run();
-	assert.deepEqual(probe.calls, [['text', 'list-a', ['Coffee #shopping', 'Coffee #weekly'], 'bottom']]);
+	assert.deepEqual(probe.calls, [['text', 'list-a', ['Coffee #shopping', 'Coffee #weekly'], 'bottom', null]]);
 	assert.equal(probe.state.copyStatus, 'idle');
 });
 
@@ -337,7 +341,7 @@ test('plain text preserves inline hashtags, URL fragments and different hashtag-
 	await probe.run();
 	assert.deepEqual(probe.calls, [['text', 'list-a', [
 		'Buy milk', 'https://example.com/#other', '#weekly', 'Milk #shopping later', 'Milk #shopping!'
-	], 'bottom']]);
+	], 'bottom', null]]);
 });
 
 test('plain text checks current names after the clipboard read, while JSON still imports existing names', async () => {
@@ -351,8 +355,8 @@ test('plain text checks current names after the clipboard read, while JSON still
 	probe.state.navigator.clipboard.readText = async () => JSON.stringify({ __list_app__: true, items: exportedItems });
 	await probe.run();
 	assert.deepEqual(probe.calls, [
-		['text', 'list-a', ['Bread'], 'bottom'],
-		['json', 'list-a', exportedItems, { addPosition: 'bottom' }]
+		['text', 'list-a', ['Bread'], 'bottom', null],
+		['json', 'list-a', exportedItems, { addPosition: 'bottom', listFolderId: null }]
 	]);
 });
 

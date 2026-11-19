@@ -243,7 +243,9 @@ export function importTasks(doc: Yjs.Doc, listId: string, names: string[], posit
 			matching.set(key, id); additions.push({ id, name }); results.push({ id, name, status: 'added' });
 		}
 	}
-	const orders = existing.filter(item => (item.get('parentId') ?? null) === null).map(item => item.get('order'))
+	// New tasks go to the list root, which shares order with folders inside the list.
+	const rootFolders = doc.getArray<Yjs.Map<unknown>>('list-folders').toArray().filter(folder => folder.get('listId') === listId && (folder.get('parentId') ?? null) === null);
+	const orders = [...existing.filter(item => (item.get('parentId') ?? null) === null && (item.get('listFolderId') ?? null) === null), ...rootFolders].map(item => item.get('order'))
 		.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
 	const base = !orders.length ? 0 : position === 'top' ? Math.min(...orders) - additions.length : Math.max(...orders) + 1;
 	const now = new Date().toISOString();

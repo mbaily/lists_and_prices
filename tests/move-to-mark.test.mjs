@@ -165,13 +165,19 @@ function selectionProbe() {
 		isListEffectivelyArchived: p.app.data.isListEffectivelyArchived,
 		moveItemsToDestination: p.app.data.moveItemsToDestination, reparentItems: p.app.data.reparentItems, ...p.moving,
 		get allLists() { return this.readLists(); }, get allFolders() { return this.readFolders(); },
-		get allItemsAll() { return this.readAllItems(); }, get items() { return p.app.data.readItems(p.source); }
+		get allItemsAll() { return this.readAllItems(); }, get items() { return p.app.data.readItems(p.source); },
+		// List folders: these tests use the list root view.
+		readListFolders: p.app.data.readListFolders, viewFolderId: null,
+		listFolderPathLabel: p.app.load('src/lib/listFolders.ts').listFolderPathLabel,
+		get listItems() { return p.app.data.readItems(this.listId); }, get listFolders() { return p.app.data.readListFolders(this.listId); },
+		get allListFolders() { return p.app.data.readListFolders(); }
 	};
 	state.latestMarks = state.destinationMarks;
 	state.getDestinationMark = (name) => state.latestMarks[name] ?? null;
 	state.readDestinationMarks = () => state.latestMarks;
-	const source = componentFunctions('src/lib/components/ListScreen.svelte', ['moveSelectedToMark', 'reparentSelectedTo', 'refreshDestinationMarks', 'exitSelectionMode']);
-	const handlers = new Function('state', `with (state) { ${transpile(source)}; return { moveSelectedToMark, reparentSelectedTo }; }`)(state);
+	const source = componentFunctions('src/lib/components/ListScreen.svelte', ['moveSelectedToMark', 'reparentSelectedTo', 'refreshDestinationMarks', 'exitSelectionMode', 'canMoveSelection']);
+	const handlers = new Function('state', `with (state) { ${transpile(source)}; return { moveSelectedToMark, reparentSelectedTo, canMoveSelection }; }`)(state);
+	state.canMoveSelection = handlers.canMoveSelection;
 	const script = readFileSync(path.join(root, 'src/lib/components/ListScreen.svelte'), 'utf8').match(/<script[^>]*>([\s\S]*?)<\/script>/)[1];
 	const ast = ts.createSourceFile('ListScreen.ts', script, ts.ScriptTarget.Latest, true);
 	const derived = ast.statements.filter(ts.isVariableStatement).flatMap((node) => [...node.declarationList.declarations]).find((node) => node.name.getText(ast) === 'compatibleMoveMarks').initializer.arguments[0];

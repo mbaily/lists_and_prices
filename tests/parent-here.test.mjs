@@ -13,7 +13,9 @@ function parentProbe() {
 		universalInputEl: null, settings: { addItemPosition: 'top', parentHerePosition: 'bottom' }, focusInput() {},
 		createItem: app.data.createItem, updateItem: app.data.updateItem, readItems: app.data.readItems,
 		get listMeta() { return app.data.readLists().find((list) => list.id === listId); },
-		get addParentId() { return this.newItemParentId ?? this.parentHereId; }
+		get addParentId() { return this.newItemParentId ?? this.parentHereId; },
+		// The list root view, adding todos and notes rather than folders.
+		addingFolder: false, viewFolderId: null, listFoldersById: new Map()
 	};
 	const source = componentFunctions('src/lib/components/ListScreen.svelte', [
 		'setParentHere', 'cancelParentHere', 'getInfoPinMenuItem', 'toggleNoteTask', 'addItem',

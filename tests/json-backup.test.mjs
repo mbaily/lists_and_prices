@@ -140,7 +140,7 @@ test('clipboard import preserves rich content, full-screen notes and children be
 
 test('clipboard copy includes formatting, paragraph endings and the full-screen flag', t => {
 	const f = fixture(t);
-	const source = componentFunctions('src/lib/components/ListScreen.svelte', ['serializeClipboardItems']);
+	const source = componentFunctions('src/lib/components/ListScreen.svelte', ['serializeClipboardItems', 'serializeClipboardEntries']);
 	const state = { folderCheckboxes: [], getDoc: () => f.c.doc, readItemRichText: f.c.notes.readItemRichText };
 	const serialize = new Function('state', `with(state) { ${transpile(source)}; return serializeClipboardItems; }`)(state);
 	const output = JSON.parse(serialize(f.d.readItems(f.list).filter(item => item.id === f.note)));

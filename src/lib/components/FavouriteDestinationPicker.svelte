@@ -6,11 +6,17 @@
 	let {
 		label,
 		options,
-		value = $bindable()
+		value = $bindable(),
+		placeholder = 'Search Favourites folders…',
+		listLabel = 'Favourites destinations',
+		disabledLabel = 'Current location'
 	}: {
 		label: string;
 		options: Destination[];
 		value?: string | null;
+		placeholder?: string;
+		listLabel?: string;
+		disabledLabel?: string;
 	} = $props();
 
 	const id = $props.id();
@@ -69,7 +75,7 @@
 		aria-expanded={open}
 		aria-controls={`${id}-options`}
 		aria-activedescendant={open && activeIndex >= 0 ? `${id}-option-${activeIndex}` : undefined}
-		placeholder="Search Favourites folders…"
+		{placeholder}
 		autocomplete="off"
 		value={selection?.label ?? query}
 		onfocus={openPicker}
@@ -83,7 +89,7 @@
 		}}
 		onkeydown={handleKey}
 	/>
-	<div id={`${id}-options`} role="listbox" aria-label="Favourites destinations" hidden={!open}>
+	<div id={`${id}-options`} role="listbox" aria-label={listLabel} hidden={!open}>
 		{#each matches as option, index (option.id)}
 			<button
 				id={`${id}-option-${index}`}
@@ -97,7 +103,7 @@
 				onclick={() => choose(option)}
 			>
 				<span>{option.label}</span>
-				{#if option.disabled}<span class="current" aria-hidden="true">Current location</span>{/if}
+				{#if option.disabled}<span class="current" aria-hidden="true">{disabledLabel}</span>{/if}
 			</button>
 		{/each}
 	</div>

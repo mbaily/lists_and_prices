@@ -8,7 +8,7 @@
     import { readLocationOptionalTags, setLocationOptionalTag } from '$lib/data';
     import { groupErrands, errandPreview } from '$lib/errandGroups';
     import { docState, commitState } from '$lib/yjsStore.svelte';
-    import { updateList, readFolders, readLists, readAllItems, readCustomLocations, saveCustomLocation, deleteCustomLocation, readStartingLocation, saveStartingLocation, readNearbyLocationFilterEnabled, saveNearbyLocationFilterEnabled, readHotSuburbIds, saveHotSuburbIds, readNearbyPreviewLimit, saveNearbyPreviewLimit, isItemDone, readNearbyChecklist, nearbyItemFingerprint, rememberNearbyChecklist, dismissNearbyChecklist, setNearbyTodoDone, readPausedErrandTags, setErrandTagPaused, readPausedErrandItemIds, setErrandItemPaused } from '$lib/data';
+    import { updateList, readFolders, readLists, readAllItems, readListFolders, readCustomLocations, saveCustomLocation, deleteCustomLocation, readStartingLocation, saveStartingLocation, readNearbyLocationFilterEnabled, saveNearbyLocationFilterEnabled, readHotSuburbIds, saveHotSuburbIds, readNearbyPreviewLimit, saveNearbyPreviewLimit, isItemDone, readNearbyChecklist, nearbyItemFingerprint, rememberNearbyChecklist, dismissNearbyChecklist, setNearbyTodoDone, readPausedErrandTags, setErrandTagPaused, readPausedErrandItemIds, setErrandItemPaused } from '$lib/data';
     import { collectErrands, nearbyStops, suggestStops, isErrandPaused, isLocationOptionalErrand, locationOptionalTag, type NearbyStop, type Errand } from '$lib/nearbyErrands';
     import { availableLocationTags, matchingLocationTags, validCoordinates, normalizeLocationTag, type Coordinates, type RetailLocation } from '$lib/retailLocations';
     import ConfirmDialog from './ConfirmDialog.svelte';
@@ -17,6 +17,7 @@
     import { suburbById } from '$lib/hotSuburbs';
     import type { Suburb } from '$lib/suburbSearch';
     import { isChecklistDismissed } from '$lib/nearbyChecklist';
+    import { listFolderPathLabel } from '$lib/listFolders';
     import { findInclusionSources, collectIncludedErrands } from '$lib/includedErrands';
     import BillsInclude from './BillsInclude.svelte';
     import CalendarInclude from './CalendarInclude.svelte';
@@ -50,6 +51,12 @@
         await Promise.all([billsInclude?.refresh(), calendarInclude?.refresh()]);
     }
     const savedLocation = $derived.by(() => { void docState.version; return readStartingLocation(); });
+    const listFoldersById = $derived.by(() => { void docState.version; return new Map(readListFolders().map(folder => [folder.id, folder])); });
+    /** The list name, followed by the folders inside it that hold the item. */
+    function errandLocation(errand: Errand): string {
+        const inside = listFolderPathLabel(listFoldersById, errand.item.listFolderId);
+        return inside ? `${errand.list.name} › ${inside}` : errand.list.name;
+    }
     const locationFilterEnabled = $derived.by(() => { void docState.version; return readNearbyLocationFilterEnabled(); });
     const origin = $derived<Coordinates | null>(locationFilterEnabled && savedLocation ? { latitude: savedLocation.latitude, longitude: savedLocation.longitude } : null);
     const originLabel = $derived(savedLocation ? savedLocation.source === 'gps' ? 'Last GPS location' : savedLocation.source === 'suburb' ? `${savedLocation.label} · approximate suburb centre` : `${savedLocation.label} · saved location` : '');
@@ -457,7 +464,7 @@
                     <div class="pause-actions">{#each pausedTags as tag (tag)}<button disabled={commitState.isHistorical} onclick={() => pauseTag(tag, false)}>Resume all #{tag} errands</button>{/each}</div>
                     <ul class="errand-groups">{#each pausedGroups as group (group.id)}
                         {#snippet errandRows()}
-                            {#each group.rows as row (row.errand.item.id)}<li class="checklist-row"><button class="errand" onclick={() => openErrand(row.errand)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}</small>{#if isErrandPaused(row.errand, pausedTags)}<small>Paused by hashtag: {row.errand.tags.map(normalizeLocationTag).filter(tag => pausedTags.includes(tag)).map(tag => '#' + tag).join(', ')}</small>{/if}</button>{#if row.itemPaused}<button class="resume-task" disabled={commitState.isHistorical} onclick={() => pauseItem(row.errand.item.id, false)} aria-label={`Resume ${row.errand.item.name}`} title="Resume this errand"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l14-8z" /></svg></button>{/if}</li>{/each}
+                            {#each group.rows as row (row.errand.item.id)}<li class="checklist-row"><button class="errand" onclick={() => openErrand(row.errand)}><span>{row.errand.item.name}</span><small>{errandLocation(row.errand)}</small>{#if isErrandPaused(row.errand, pausedTags)}<small>Paused by hashtag: {row.errand.tags.map(normalizeLocationTag).filter(tag => pausedTags.includes(tag)).map(tag => '#' + tag).join(', ')}</small>{/if}</button>{#if row.itemPaused}<button class="resume-task" disabled={commitState.isHistorical} onclick={() => pauseItem(row.errand.item.id, false)} aria-label={`Resume ${row.errand.item.name}`} title="Resume this errand"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l14-8z" /></svg></button>{/if}</li>{/each}
                         {/snippet}
                         {@render errandGroup(group, errandRows)}
                     {:else}<li class="hint">No unfinished paused tasks.</li>{/each}</ul>
@@ -471,7 +478,7 @@
                         {#each group.rows as row (row.errand.item.id)}
                             <li class="checklist-row" class:completed={row.done}>
                                 {#if row.errand.inclusion}<span class="note-mark" aria-label={`${row.errand.inclusion.type === 'calendar' ? 'Calendar' : 'Bills'} inclusion`} title="Manage this entry in Simple Todo">↗</span>{:else if row.errand.item.note}<span class="note-mark" aria-label="Note">📝</span>{:else}<input type="checkbox" checked={row.done} disabled={commitState.isHistorical} aria-label={`Completed: ${row.errand.item.name}`} onchange={(event) => setTaskDone(row.errand.item.id, event.currentTarget.checked)} />{/if}
-                                <button class="errand" onclick={() => openErrand(row.errand)}><span>{row.errand.item.name}</span><small>{row.errand.list.name}{row.errand.inclusion ? ' · ' + (row.errand.inclusion.type === 'calendar' ? 'Calendar' : 'Bills') : row.errand.item.note ? ' · Note' : ''}</small>{#if !row.done && isLocationOptionalErrand(row.errand) && !locationIds.has(row.errand.item.id)}<small>{locationOptionalTag(row.errand) === 'bank' ? 'Choose a bank or ATM yourself' : 'Choose a location yourself'} · no saved location needed.</small>{:else if !row.done && (origin || !locationFilterEnabled) && !nearbyIds.has(row.errand.item.id)}<small>{locationFilterEnabled && supportedIds.has(row.errand.item.id) ? `No match within ${radius} km.` : 'No matching location in the database.'}</small>{/if}</button>
+                                <button class="errand" onclick={() => openErrand(row.errand)}><span>{row.errand.item.name}</span><small>{errandLocation(row.errand)}{row.errand.inclusion ? ' · ' + (row.errand.inclusion.type === 'calendar' ? 'Calendar' : 'Bills') : row.errand.item.note ? ' · Note' : ''}</small>{#if !row.done && isLocationOptionalErrand(row.errand) && !locationIds.has(row.errand.item.id)}<small>{locationOptionalTag(row.errand) === 'bank' ? 'Choose a bank or ATM yourself' : 'Choose a location yourself'} · no saved location needed.</small>{:else if !row.done && (origin || !locationFilterEnabled) && !nearbyIds.has(row.errand.item.id)}<small>{locationFilterEnabled && supportedIds.has(row.errand.item.id) ? `No match within ${radius} km.` : 'No matching location in the database.'}</small>{/if}</button>
                                 {#if !row.done}<button class="pause-task" disabled={commitState.isHistorical} onclick={() => pauseItem(row.errand.item.id, true)} aria-label={`Pause ${row.errand.item.name}`} title="Pause this errand"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg></button>{/if}
                                 <button class="dismiss-task" disabled={commitState.isHistorical} onclick={() => dismissTask(row.errand.item.id)} aria-label={`Dismiss from errands: ${row.errand.item.name}`} title="Dismiss from errands">×</button>
                             </li>

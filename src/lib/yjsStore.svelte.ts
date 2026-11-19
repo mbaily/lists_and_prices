@@ -508,6 +508,9 @@ export function getLists(doc: Y.Doc): Y.Array<Y.Map<unknown>> {
 export function getItems(doc: Y.Doc): Y.Array<Y.Map<unknown>> {
 	return doc.getArray('items');
 }
+export function getListFolders(doc: Y.Doc): Y.Array<Y.Map<unknown>> {
+	return doc.getArray('list-folders');
+}
 export function getSpreadsheets(doc: Y.Doc): Y.Array<Y.Map<unknown>> {
         return doc.getArray('spreadsheets');
 }

@@ -2,17 +2,20 @@ import { isFolderDefaultItems } from './folderDefaultItems';
 import type { RichTextOperation } from './noteText';
 
 export const MAX_BACKUP_BYTES = 100 * 1024 * 1024;
-type RecordKind = 'folders' | 'favouriteFolders' | 'lists' | 'items' | 'sheets';
+type RecordKind = 'folders' | 'favouriteFolders' | 'lists' | 'items' | 'listFolders' | 'clipboardItems' | 'sheets';
 const common = ['id', 'name', 'order', 'createdAt', 'updatedAt'];
 const archivable = ['color', 'favouriteOrder', 'favouriteParentId', 'done', 'favourite', 'archived', 'archivedPrevId', 'archivedNextId', 'filterView'];
+const itemFields = [...common, 'price', 'qty', 'checked', 'checks', 'checkedNames', 'heading', 'parentId', 'note', 'pinned', 'fullScreen', 'richText'];
 const fields: Record<RecordKind, Set<string>> = {
 	folders: new Set([...common, ...archivable, 'parentId', 'foldersFirst', 'localNav', 'checkboxes', 'defaultItems']),
 	favouriteFolders: new Set(['id', 'name', 'parentId', 'order']),
 	lists: new Set([...common, ...archivable, 'folderId', 'type', 'defaultIsNote', 'journalMode']),
-	items: new Set([...common, 'listId', 'price', 'qty', 'checked', 'checks', 'checkedNames', 'heading', 'parentId', 'note', 'pinned', 'fullScreen', 'richText']),
+	items: new Set([...itemFields, 'listId', 'listFolderId']),
+	listFolders: new Set([...common, 'listId', 'parentId', 'filterView']),
+	clipboardItems: new Set([...itemFields, 'folder']),
 	sheets: new Set([...common, 'folderId', 'cells'])
 };
-const booleanFields = ['done', 'favourite', 'archived', 'foldersFirst', 'localNav', 'defaultIsNote', 'journalMode', 'checked', 'heading', 'note', 'pinned', 'fullScreen'];
+const booleanFields = ['done', 'favourite', 'archived', 'foldersFirst', 'localNav', 'defaultIsNote', 'journalMode', 'checked', 'heading', 'note', 'pinned', 'fullScreen', 'folder'];
 const unsafeKeys = new Set(['__proto__', 'constructor', 'prototype']);
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -53,7 +56,7 @@ export function validateRecords(records: unknown, kind: RecordKind): asserts rec
 		if (!isRecord(record) || typeof record.id !== 'string' || !record.id.trim() || typeof record.name !== 'string' || ids.has(record.id)) throw new Error(`Invalid or duplicate ${kind} record.`);
 		ids.add(record.id);
 		for (const key of Object.keys(record)) if (!fields[kind].has(key)) throw new Error(`Unrecognized ${kind} field: ${key}. This backup may require a newer app.`);
-		for (const key of ['parentId', 'folderId', 'favouriteParentId', 'archivedPrevId', 'archivedNextId']) {
+		for (const key of ['parentId', 'folderId', 'listFolderId', 'favouriteParentId', 'archivedPrevId', 'archivedNextId']) {
 			if (record[key] != null && (typeof record[key] !== 'string' || !record[key].trim())) throw new Error(`Invalid ${key}.`);
 		}
 		if (record.listId !== undefined && (typeof record.listId !== 'string' || !record.listId.trim())) throw new Error('Invalid listId.');
@@ -73,11 +76,13 @@ export function validateRecords(records: unknown, kind: RecordKind): asserts rec
 		}
 		if (kind === 'folders' && record.defaultItems !== undefined && !isFolderDefaultItems(record.defaultItems)) throw new Error('Invalid default items.');
 		if (kind === 'favouriteFolders' && (!record.name.trim() || typeof record.order !== 'number')) throw new Error('Invalid Favourites folder.');
+		if (kind === 'listFolders' && (!record.name.trim() || typeof record.listId !== 'string' || typeof record.order !== 'number')) throw new Error('Invalid folder inside a list.');
+		if (kind === 'clipboardItems' && record.folder && (!record.name.trim() || Object.keys(record).some(key => !['id', 'name', 'parentId', 'folder'].includes(key)))) throw new Error('Invalid clipboard folder.');
 		if (record.checkedNames !== undefined && (!Array.isArray(record.checkedNames) || record.checkedNames.some(name => typeof name !== 'string'))) throw new Error('Invalid checkbox names.');
 		if (record.richText !== undefined) validateRichText(record.richText, record.name);
 		if (record.cells !== undefined && (!isRecord(record.cells) || Object.entries(record.cells).some(([key, value]) => !/^(0|[1-9]\d*),(0|[1-9]\d*)$/.test(key) || key.split(',').some(part => !Number.isSafeInteger(Number(part))) || typeof value !== 'string'))) throw new Error('Invalid spreadsheet cells.');
 	}
-	if (kind === 'items' || kind === 'folders' || kind === 'favouriteFolders') orderParentFirst(records.map(record => ({ id: record.id as string, parentId: record.parentId as string | null | undefined })));
+	if (kind !== 'lists' && kind !== 'sheets') orderParentFirst(records.map(record => ({ id: record.id as string, parentId: record.parentId as string | null | undefined })));
 }
 
 /** Accept arbitrary file order without flattening children whose parent appears

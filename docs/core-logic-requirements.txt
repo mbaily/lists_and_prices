@@ -111,6 +111,7 @@ one enclosing root map:
   folders                         Y.Array of Y.Map folder records
   lists                           Y.Array of Y.Map list records
   items                           Y.Array of Y.Map item records
+  list-folders                    Y.Array of Y.Map folders inside lists
   spreadsheets                    Y.Array of Y.Map spreadsheet metadata
   commits                         Y.Array of Y.Map history checkpoints
   note_text_<itemId>               Y.Text authoritative item text
@@ -174,11 +175,31 @@ for the errand and integration rules that explicitly exclude it.
   fullScreen                      retained metadata; default false
   createdAt, updatedAt            timestamp or null; default null
   checks                          checkbox-ID-to-boolean projection; default {}
+  listFolderId                    list-folder ID or null; default null
+
+listFolderId is meaningful only for an item without a parent. An item with a
+parent is located wherever its resolved parent is, so subtrees move together.
+A listFolderId that names a missing folder, or a folder of another list,
+resolves to the list root. Root items and root folders of one location share
+one order sequence.
 
 Task, note and heading are stored as flags rather than a tagged union. Preserve
 existing combinations on import; do not silently rewrite them into a new type
 system. Operations generally test heading first, and exclude both headings and
 notes when they mean completable/priced tasks.
+
+3.4a Folder-inside-list fields and read defaults:
+  id, listId                      identifier and owning list ID
+  name                            nonblank text
+  parentId                        list-folder ID in the same list, or null
+  order                           number; default 0
+  filterView                      'all' | 'unchecked' | 'checked'; default 'all'
+  createdAt, updatedAt            timestamp or null; default null
+
+These folders belong to one list and use its pricing and checkbox settings.
+Deleting a list or a folder deletes its folders and their contents
+recursively. Moving a folder carries every folder and item below it, and a
+folder cannot move into itself or a descendant.
 
 3.5 A named checkbox state is stored as chk_<checkboxId> on the item map.
 For legacy compatibility, begin with an item.checks plain-object baseline,

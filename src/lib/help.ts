@@ -109,6 +109,14 @@ export const helpTopics: HelpTopic[] = [
 				]
 			},
 			{
+				title: 'Folders inside a list',
+				paragraphs: [
+					'A list can hold folders as well as items. Tap the ☑/📝/📁 toggle beside the input until it shows 📁, type a name and press Enter. The folder appears in the list order with a folder icon. Tap it to open it; the breadcrumb shows the list and each folder, and tapping one goes back there.',
+					'A folder works like the list itself. It can contain todos, notes, subtasks, subnotes, headings and further folders, and it uses the list’s pricing and named checkboxes. The total, the checked counts, the filter, Uncheck all, delete-checked and the Copy as… options cover only the folder or list root that is open. Each folder remembers its own filter.',
+					'Use the folder’s ⋮ menu to rename, delete, copy it as JSON or mark it as a move destination. Deleting a folder that has contents asks first, then deletes everything inside it. Global search finds folder names and shows the folder path for items inside them.'
+				]
+			},
+			{
 				title: 'Complete and filter work',
 				paragraphs: [
 					'Tick a task when finished. Checked tasks stay in the list with a strikethrough until you remove them or change the filter. The filter control cycles through all, unchecked only and checked only. A hidden task may simply be excluded by the current filter.',
@@ -301,7 +309,9 @@ export const helpTopics: HelpTopic[] = [
 					'To move a folder or list, choose Tag (to move) from its row menu. Navigate to the destination and choose Move Tagged Here. Use the root destination control when moving a folder back to the top level. Clear Tag cancels the pending move. A folder cannot be moved inside itself or its descendants.',
 					'To move tasks, mark a destination list using its row menu, then open the source list and choose Select items from the header menu. Select the items, open View list in the selection bar, choose a compatible destination mark and use Move to mark. Marks are saved for your account on the current device.',
 					'The arrow beside View list moves selected items and their subtrees to the first or last available list in the same folder, following Add lists & folders to. Its tooltip names the destination. Add items to controls placement inside that list. Archived lists and dividers are skipped; the arrow is disabled when you are already in the destination list.',
-					'Within a list, select items and use Reparent selected here from a suitable target item’s menu to put them underneath it. Move selected to root returns them to the top level. The app prevents moves that would create invalid parent relationships. Check the destination and selected items before confirming any move.'
+					'Within a list, select items and use Reparent selected here from a suitable target item’s menu to put them underneath it. Move selected to root returns them to the top level of the folder or list that is open. The app prevents moves that would create invalid parent relationships. Check the destination and selected items before confirming any move.',
+					'Selections can include folders, which move with everything inside them. In View list, Move to folder in this list searches the list root and every folder in the list by path. A selected parent carries its subtasks and subnotes; a child selected without its parent moves on its own, keeping its own children. A folder cannot move into itself or a folder inside it. To move work into a folder in another list, mark that folder from its ⋮ menu and use Move to mark.',
+					'Moving items to the next day or list covers the folder or list that is open. Incomplete items keep their folders: the matching folders are created in the destination when needed. Moving all items moves the folders too, including empty ones.'
 				]
 			}
 		],
@@ -414,7 +424,7 @@ export const helpTopics: HelpTopic[] = [
 				title: 'Download a separate backup',
 				paragraphs: [
 					'Open Settings → Backup & Restore and choose Download backup. Save the JSON file somewhere you can find later. Its filename includes the download date. A downloaded file gives you a separate copy outside the browser’s working cache.',
-					'Backups include folders and their named checkboxes and default items; lists and their journal and default-note settings; formatted item text and attributes; favourite status and ordering; Smart Folder assignments; personal locations; your starting point; hot suburbs; and saved errand state. Browser settings, destination marks and the Version History collection are separate and are not included.',
+					'Backups include folders and their named checkboxes and default items; lists and their journal and default-note settings; folders inside lists; formatted item text and attributes; favourite status and ordering; Smart Folder assignments; personal locations; your starting point; hot suburbs; and saved errand state. Browser settings, destination marks and the Version History collection are separate and are not included.',
 					'New backups also preserve any stored spreadsheet cell values and formulas, although the app’s spreadsheet screen directs you to an external spreadsheet application. The bundled public location catalogue is part of the app itself and is not duplicated into your backup. A backup made while viewing history contains that historical view, rather than current live data.'
 				]
 			},

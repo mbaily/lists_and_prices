@@ -135,7 +135,7 @@
 		if (commitState.isHistorical || !isActive || !idbSynced.done || !pendingBackup) return;
 		try {
 			importBackup(pendingBackup, restoreMode);
-			restoreStatus = `Restored ${pendingBackup.folders.length} folders, ${pendingBackup.lists.length} lists, ${pendingBackup.items.length} items${pendingBackup.sheets?.length ? `, ${pendingBackup.sheets.length} spreadsheets` : ''}.${pendingBackup.version === 1 ? ' This older backup may not contain note formatting or spreadsheet cells.' : ''}`;
+			restoreStatus = `Restored ${pendingBackup.folders.length} folders, ${pendingBackup.lists.length} lists, ${pendingBackup.items.length} items${pendingBackup.listFolders?.length ? `, ${pendingBackup.listFolders.length} folders inside lists` : ''}${pendingBackup.sheets?.length ? `, ${pendingBackup.sheets.length} spreadsheets` : ''}.${pendingBackup.version === 1 ? ' This older backup may not contain note formatting or spreadsheet cells.' : ''}`;
 			restoreError = null;
 		} catch (err) {
 			restoreError = `Restore failed: ${err}`;
@@ -438,7 +438,7 @@
 {#if pendingBackup && !commitState.isHistorical}
 	{@const modeLabel = restoreMode === 'replace' ? 'REPLACE ALL data with' : 'merge in'}
 	<ConfirmDialog
-		message={`Restore and ${modeLabel} ${pendingBackup.folders.length} folders, ${pendingBackup.lists.length} lists, ${pendingBackup.items.length} items${pendingBackup.sheets?.length ? `, ${pendingBackup.sheets.length} spreadsheets` : ''}?${pendingBackup.version === 1 ? ' This older backup may not contain note formatting or spreadsheet cells.' : ''} Download a backup first to keep a separate copy of your current data.`}
+		message={`Restore and ${modeLabel} ${pendingBackup.folders.length} folders, ${pendingBackup.lists.length} lists, ${pendingBackup.items.length} items${pendingBackup.listFolders?.length ? `, ${pendingBackup.listFolders.length} folders inside lists` : ''}${pendingBackup.sheets?.length ? `, ${pendingBackup.sheets.length} spreadsheets` : ''}?${pendingBackup.version === 1 ? ' This older backup may not contain note formatting or spreadsheet cells.' : ''} Download a backup first to keep a separate copy of your current data.`}
 		confirmLabel="Restore"
 		onConfirm={confirmRestore}
 		onCancel={() => pendingBackup = null}

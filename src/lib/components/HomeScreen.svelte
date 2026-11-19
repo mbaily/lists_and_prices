@@ -33,8 +33,11 @@
 		type Folder,
 		type ListMeta,
 		type SheetMeta,
-		type Item
+		type Item,
+		type ListFolder,
+		readListFolders
 	} from '$lib/data';
+	import { listFolderPathLabel } from '$lib/listFolders';
 	import { syncState, docState, idbSynced, commitState, exitCommitView, undoLastAction, canUndo, getUndoCount } from '$lib/yjsStore.svelte';
 	import { auth } from '$lib/auth.svelte';
 	import { settings, updateSettings } from '$lib/settings.svelte';
@@ -70,21 +73,23 @@
 	// ── URL hash navigation ──────────────────────────────────────────────────────
 	// Format: #f/id1/id2  (folder path, skipping the implicit null root)
 	//         #l/listId   (open list)
+	//         #l/listId/folderId (open a folder inside a list)
 	//         #           (root / home)
-	function buildHash(crumbs: (string | null)[], listId: string | null, nearby = false): string {
+	function buildHash(crumbs: (string | null)[], listId: string | null, nearby = false, listFolderId: string | null = null): string {
 		if (nearby) return '#nearby';
-		if (listId) return `#l/${listId}`;
+		if (listId) return listFolderId ? `#l/${listId}/${listFolderId}` : `#l/${listId}`;
 		// crumbs[0] is always null (root) — skip it
 		const ids = crumbs.slice(1).filter((id): id is string => id !== null);
 		return ids.length ? `#f/${ids.join('/')}` : '#';
 	}
 
-	function parseHash(): { breadcrumb: (string | null)[], openListId: string | null, nearby?: boolean, wikiPage?: string, itemId?: string } {
+	function parseHash(): { breadcrumb: (string | null)[], openListId: string | null, listFolderId?: string | null, nearby?: boolean, wikiPage?: string, itemId?: string } {
 		if (typeof window === 'undefined') return { breadcrumb: [null], openListId: null };
 		const hash = window.location.hash.slice(1); // strip '#'
 		if (hash === 'nearby') return { breadcrumb: [null], openListId: null, nearby: true };
 		if (hash.startsWith('l/')) {
-			return { breadcrumb: [null], openListId: hash.slice(2) || null };
+			const [listId, listFolderId] = hash.slice(2).split('/');
+			return { breadcrumb: [null], openListId: listId || null, listFolderId: listFolderId || null };
 		}
 		if (hash.startsWith('f/')) {
 			const parts = hash.slice(2).split('/').filter(Boolean);
@@ -115,6 +120,25 @@
 
 	// ── View state ──────────────────────────────────────────────────────────────
 	let openListId = $state<string | null>(_init.openListId);
+	// The folder inside the open list. Opening another list resets it to the
+	// list root unless the folder was chosen together with the list.
+	let openListFolderId = $state<string | null>(_init.listFolderId ?? null);
+	let listFolderOwnerId: string | null = _init.openListId;
+	let listFolderChosen = false;
+	function openListAt(listId: string, listFolderId: string | null) {
+		if (listId !== openListId) listFolderChosen = true;
+		openListId = listId;
+		openListFolderId = listFolderId;
+	}
+	$effect.pre(() => {
+		const id = openListId;
+		untrack(() => {
+			if (id === listFolderOwnerId) return;
+			if (!listFolderChosen) openListFolderId = null;
+			listFolderChosen = false;
+			listFolderOwnerId = id;
+		});
+	});
 	let openItemId = $state<string | null>(null);
 	let pendingItemId = $state<string | null>(_init.itemId ?? null);
 
@@ -313,7 +337,19 @@
 	type SearchResult =
 		| { kind: 'folder'; data: Folder; path: string }
 		| { kind: 'list'; data: ListMeta; path: string }
-		| { kind: 'item'; data: Item; listData: ListMeta };
+		| { kind: 'list-folder'; data: ListFolder; listData: ListMeta; path: string }
+		| { kind: 'item'; data: Item; listData: ListMeta; path: string };
+	let allListFolders = $derived.by(() => {
+		if (!showSearch || !idbSynced.done) return [] as ListFolder[];
+		void docState.version;
+		try { return readListFolders(); } catch { return [] as ListFolder[]; }
+	});
+	const allListFoldersById = $derived(new Map(allListFolders.map((folder) => [folder.id, folder])));
+	/** A list name followed by the path of folders inside it. */
+	function listLocation(list: ListMeta, listFolderId: string | null | undefined): string {
+		const inside = listFolderPathLabel(allListFoldersById, listFolderId);
+		return inside ? `${list.name} › ${inside}` : list.name;
+	}
 	let searchResults = $derived.by((): SearchResult[] => {
 		const matches = createSearchMatcher(searchQuery, searchOptions.mode);
 		if (!matches) return [];
@@ -331,6 +367,10 @@
 			results.push({ kind: 'list', data: list, path: listPath(list) });
 			if (searchOptions.includeUnfinishedListItems && !list.done) matchingListIds.add(list.id);
 		}
+		for (const folder of allListFolders) {
+			const list = listsById.get(folder.listId);
+			if (list && matches(folder.name)) results.push({ kind: 'list-folder', data: folder, listData: list, path: listLocation(list, folder.parentId) });
+		}
 		for (const item of allItems) {
 			const list = listsById.get(item.listId);
 			if (!list) continue;
@@ -340,7 +380,7 @@
 				const folder = allFolders.find(f => f.id === list.folderId);
 				if (isItemDone(item, folder)) continue;
 			}
-			results.push({ kind: 'item', data: item, listData: list });
+			results.push({ kind: 'item', data: item, listData: list, path: listLocation(list, item.listFolderId) });
 		}
 		// Sort by createdAt descending (newest first); nulls go last
 		results.sort((a, b) => {
@@ -1168,6 +1208,9 @@
 		} else if (result.kind === 'list') {
 			openListId = result.data.id;
 			openItemId = null;
+		} else if (result.kind === 'list-folder') {
+			openListAt(result.listData.id, result.data.id);
+			openItemId = null;
 		} else {
 			openListId = result.listData.id;
 			openItemId = result.data.id;
@@ -1428,7 +1471,7 @@ ${bodyHtml}
 		if (typeof window !== 'undefined' && (window.location.hash.startsWith('#wiki') || window.location.hash.startsWith('#w/') || window.location.hash.startsWith('#item:') || window.location.hash.startsWith('#i/'))) {
 			return;
 		}
-		const hash = buildHash(breadcrumb, openListId, showNearby);
+		const hash = buildHash(breadcrumb, openListId, showNearby, openListFolderId);
 		if (hash !== _lastHash) {
 			history.pushState(null, '', hash || '#');
 			_lastHash = hash;
@@ -1439,7 +1482,7 @@ ${bodyHtml}
 	$effect(() => {
 		if (typeof window === 'undefined') return;
 		function onPopState() {
-			const { breadcrumb: crumbs, openListId: listId, nearby, wikiPage, itemId } = parseHash();
+			const { breadcrumb: crumbs, openListId: listId, listFolderId, nearby, wikiPage, itemId } = parseHash();
 			if (wikiPage) {
 				wikiInitialPage = wikiPage;
 				showWikiModal = true;
@@ -1460,7 +1503,8 @@ ${bodyHtml}
 			}
 			showNearby = nearby ?? false;
 			breadcrumb = crumbs;
-			openListId = listId;
+			if (listId) openListAt(listId, listFolderId ?? null);
+			else openListId = null;
 			openItemId = null;
 			nearbyOpenedTarget = null;
 			_lastHash = window.location.hash;
@@ -1533,7 +1577,7 @@ ${bodyHtml}
 {:else if openSheetId}
 	<SpreadsheetScreen sheetId={openSheetId} onBack={() => openSheetId = null} />
 {:else if openListId}
-	<ListScreen bind:favouriteFolderId listId={openListId} highlightItemId={openItemId} onReturnNearby={nearbyOpenedTarget?.listId === openListId && nearbyOpenedTarget?.itemId === openItemId ? returnToNearby : undefined} orderedLists={navOrderedLists} onHome={() => { nearbyOpenedTarget = null; openListId = null; openItemId = null; breadcrumb = [null]; }} onOpenList={(id) => { nearbyOpenedTarget = null; openItemId = null; openListId = id; }} onOpenFavouritesOrder={() => { if (commitState.isHistorical) return; nearbyOpenedTarget = null; previousListId = openListId; openListId = null; openItemId = null; showFavouritesOrder = true; }} savedSearch={searchToRestore?.query ?? null} onRestoreSearch={() => { nearbyOpenedTarget = null; openListId = null; openItemId = null; breadcrumb = [null]; restoreSearch(); }} onTagClick={(tag) => {
+	<ListScreen bind:favouriteFolderId bind:listFolderId={openListFolderId} onOpenItem={(listId, itemId) => { nearbyOpenedTarget = null; openListId = listId; openItemId = itemId; }} listId={openListId} highlightItemId={openItemId} onReturnNearby={nearbyOpenedTarget?.listId === openListId && nearbyOpenedTarget?.itemId === openItemId ? returnToNearby : undefined} orderedLists={navOrderedLists} onHome={() => { nearbyOpenedTarget = null; openListId = null; openItemId = null; breadcrumb = [null]; }} onOpenList={(id) => { nearbyOpenedTarget = null; openItemId = null; openListId = id; }} onOpenFavouritesOrder={() => { if (commitState.isHistorical) return; nearbyOpenedTarget = null; previousListId = openListId; openListId = null; openItemId = null; showFavouritesOrder = true; }} savedSearch={searchToRestore?.query ?? null} onRestoreSearch={() => { nearbyOpenedTarget = null; openListId = null; openItemId = null; breadcrumb = [null]; restoreSearch(); }} onTagClick={(tag) => {
 		nearbyOpenedTarget = null;
 		openListId = null;
 		openItemId = null;
@@ -1890,13 +1934,20 @@ ${bodyHtml}
 								<span class="result-path">{result.path}</span>
 							</span>
 							<span class="result-kind-badge">List</span>
+						{:else if result.kind === 'list-folder'}
+							<span class="result-icon">📁</span>
+							<span class="result-info">
+								<span class="result-name">{#each splitWithTags(result.data.name) as part}{#if part.type === 'tag'}<span class="tag-pill" style="--pill-color:{result.listData.color}">{part.value}</span>{:else}{part.value}{/if}{/each}</span>
+								<span class="result-path">{result.path}</span>
+							</span>
+							<span class="result-kind-badge">Folder in list</span>
 						{:else}
 							{@const itemFolder = allFolders.find((f) => f.id === result.listData.folderId)}
 							{@const itemDone = isItemDone(result.data, itemFolder)}
 							<span class="result-icon">{itemDone ? '☑' : '📄'}</span>
 							<span class="result-info">
 								<span class="result-name" class:result-done={itemDone}>{#each splitWithTags(result.data.name) as part}{#if part.type === 'tag'}<span class="tag-pill" style="--pill-color:{result.listData.color}">{part.value}</span>{:else}{part.value}{/if}{/each}</span>
-								<span class="result-path">{result.listData.name}</span>
+								<span class="result-path">{result.path}</span>
 							</span>
 							<span class="result-kind-badge">Item</span>
 						{/if}

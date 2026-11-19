@@ -3,12 +3,13 @@
  * All mutations operate on the shared Y.Doc.
  */
 import * as Y from 'yjs';
-import { getFolders, getLists, getItems, getDoc, getMutableDoc, getSpreadsheets, getSheetCells } from './yjsStore.svelte';
+import { getFolders, getLists, getItems, getListFolders, getDoc, getMutableDoc, getSpreadsheets, getSheetCells } from './yjsStore.svelte';
 import { removeFromAllReports } from './smartFolders.svelte';
 import { readFolderCheckboxes, addCheckbox, renameCheckbox, removeCheckbox, orderCheckboxes, replaceFolderCheckboxes, type FolderCheckbox } from './folderCheckboxes';
 import { readFolderDefaultItems, isFolderDefaultItems, addDefaultItem, updateDefaultItem, removeDefaultItem, orderDefaultItems, replaceFolderDefaultItems, type FolderDefaultItem } from './folderDefaultItems';
 import { resolveParentLinks, compareOrder, getInsertionOrder } from './hierarchy';
-import { planItemMove, type ItemMoveDestination } from './itemMove';
+import { planItemMove, planListEntryMove, type ItemMoveDestination } from './itemMove';
+import { listFolderDescendants } from './listFolders';
 import { readItemName, getItemText, hasItemText, initializeItemText, replaceItemText, readItemRichText, replaceItemRichText, type RichTextOperation } from './noteText';
 import { validateRecords, orderParentFirst, isRecord, MAX_BACKUP_BYTES } from './jsonImport';
 import { readReportAssignments, restoreReportAssignments } from './reportAssignments';
@@ -496,6 +497,7 @@ function _deleteListInner(id: string) {
 		.filter((i) => i.get('listId') === id)
 		.map((i) => i.get('id') as string);
 	for (const iid of itemIds) deleteItem(iid);
+	deleteListFolderRecords(doc, new Set(readListFolders(id).map(folder => folder.id)));
 	removeYMap(getLists(doc), id);
 }
 
@@ -508,9 +510,101 @@ export function deleteList(id: string) {
 
 // ─── Items ────────────────────────────────────────────────────────────────────
 
+export interface ListFolder {
+	id: string;
+	listId: string;
+	parentId: string | null;
+	name: string;
+	order: number;
+	filterView: FilterView;
+	createdAt: string | null;
+	updatedAt: string | null;
+}
+
+export function readListFolders(listId?: string): ListFolder[] {
+	const byList = new Map<string, ListFolder[]>();
+	for (const record of getListFolders(getDoc()).toArray()) {
+		const owner = record.get('listId') as string;
+		if (listId !== undefined && owner !== listId) continue;
+		const folders = byList.get(owner) ?? [];
+		folders.push({
+			id: record.get('id') as string,
+			listId: owner,
+			parentId: (record.get('parentId') as string | undefined) ?? null,
+			name: record.get('name') as string,
+			order: (record.get('order') as number | undefined) ?? 0,
+			filterView: (record.get('filterView') as FilterView | undefined) ?? 'all',
+			createdAt: (record.get('createdAt') as string | undefined) ?? null,
+			updatedAt: (record.get('updatedAt') as string | undefined) ?? null
+		});
+		byList.set(owner, folders);
+	}
+	return [...byList.values()].flatMap(resolveParentLinks).sort(compareOrder);
+}
+
+/** Callers use this for root-level items and folders, which share an order. */
+function listRootEntries(listId: string, listFolderId: string | null) {
+	return [
+		...readItems(listId, listFolderId).filter(item => item.parentId === null),
+		...readListFolders(listId).filter(folder => folder.parentId === listFolderId)
+	];
+}
+
+function requireListFolder(doc: Y.Doc, listId: string, listFolderId: string | null) {
+	if (listFolderId !== null && findYMap(getListFolders(doc), listFolderId)?.get('listId') !== listId) {
+		throw new Error('The destination folder no longer exists in this list.');
+	}
+}
+
+export function createListFolder(listId: string, name: string, parentId: string | null = null, position: 'top' | 'bottom' = 'bottom', explicitOrder?: number): string {
+	const doc = getMutableDoc();
+	const list = findYMap(getLists(doc), listId);
+	if (!list || list.get('type') === 'divider') throw new Error('The destination list does not accept folders.');
+	requireListFolder(doc, listId, parentId);
+	if (!name.trim()) throw new Error('Enter a folder name.');
+	const id = uid();
+	const now = new Date().toISOString();
+	const order = explicitOrder ?? getInsertionOrder(listRootEntries(listId, parentId), position);
+	const record = new Y.Map<unknown>();
+	for (const [key, value] of Object.entries({ id, listId, parentId, name: name.trim(), order, createdAt: now, updatedAt: now })) record.set(key, value);
+	getListFolders(doc).push([record]);
+	return id;
+}
+
+export function updateListFolder(id: string, patch: Partial<Pick<ListFolder, 'name' | 'filterView' | 'order'>>) {
+	const doc = getMutableDoc();
+	const record = findYMap(getListFolders(doc), id);
+	if (!record || (patch.name !== undefined && !patch.name.trim())) return;
+	doc.transact(() => {
+		for (const [key, value] of Object.entries(patch)) record.set(key, value);
+		if (patch.name !== undefined) record.set('updatedAt', new Date().toISOString());
+	});
+}
+
+function deleteListFolderRecords(doc: Y.Doc, ids: Set<string>) {
+	const records = getListFolders(doc);
+	const entries = records.toArray();
+	for (let index = entries.length - 1; index >= 0; index--) {
+		if (ids.has(entries[index].get('id') as string)) records.delete(index);
+	}
+}
+
+export function deleteListEntries(listId: string, ids: string[]) {
+	const doc = getMutableDoc();
+	const folderIds = listFolderDescendants(readListFolders(listId), ids);
+	const items = readItems(listId);
+	const selected = new Set(ids);
+	const itemIds = items.filter(item => selected.has(item.id) || (item.listFolderId && folderIds.has(item.listFolderId))).map(item => item.id);
+	doc.transact(() => {
+		deleteItemsBatch(itemIds);
+		deleteListFolderRecords(doc, folderIds);
+	});
+}
+
 export interface Item {
 	id: string;
 	listId: string;
+	listFolderId?: string | null;
 	name: string;
 	price: number | null;
 	qty: number | null;
@@ -531,20 +625,45 @@ export interface Item {
 	dokuwikiStatus?: DokuWikiStatus | null;
 }
 
-export function readItems(listId: string): Item[] {
-	return resolveParentLinks(getItems(getDoc()).toArray()
+export function readItems(listId: string, listFolderId?: string | null): Item[] {
+	const folders = new Set(readListFolders(listId).map(folder => folder.id));
+	const items = resolveItemLocations(getItems(getDoc()).toArray()
 		.filter((m) => m.get('listId') === listId)
-		.map(yMapToItem)).sort(compareOrder);
+		.map(yMapToItem), folders);
+	return (listFolderId === undefined ? items : items.filter(item => (item.listFolderId ?? null) === listFolderId)).sort(compareOrder);
 }
 
 export function readAllItems(): Item[] {
 	const byList = new Map<string, Item[]>();
+	const foldersByList = new Map<string, Set<string>>();
+	for (const folder of readListFolders()) {
+		const ids = foldersByList.get(folder.listId) ?? new Set<string>();
+		ids.add(folder.id);
+		foldersByList.set(folder.listId, ids);
+	}
 	for (const item of getItems(getDoc()).toArray().map(yMapToItem)) {
 		const items = byList.get(item.listId) ?? [];
 		items.push(item);
 		byList.set(item.listId, items);
 	}
-	return [...byList.values()].flatMap(resolveParentLinks);
+	return [...byList].flatMap(([listId, items]) => resolveItemLocations(items, foldersByList.get(listId)));
+}
+
+function resolveItemLocations(items: Item[], folders?: Set<string>): Item[] {
+	// Resolve task ancestry first. If concurrent changes leave a child with an
+	// older location, its still-valid parent determines where it is shown.
+	const ordered = orderParentFirst(resolveParentLinks(items));
+	const orderedById = new Map(ordered.map(item => [item.id, item]));
+	const locations = new Map<string, string | null>();
+	for (const item of ordered) {
+		const location = item.parentId !== null ? locations.get(item.parentId) ?? null
+			: item.listFolderId && folders?.has(item.listFolderId) ? item.listFolderId : null;
+		locations.set(item.id, location);
+	}
+	return items.map(item => {
+		const resolved = orderedById.get(item.id)!;
+		return { ...resolved, listFolderId: locations.get(item.id) ?? null };
+	});
 }
 
 function yMapToItem(m: Y.Map<unknown>): Item {
@@ -560,6 +679,7 @@ function yMapToItem(m: Y.Map<unknown>): Item {
 	return {
 		id: m.get('id') as string,
 		listId: m.get('listId') as string,
+		listFolderId: (m.get('listFolderId') as string | undefined) ?? null,
 		name: readItemName(m.doc!, m),
 		price: (m.get('price') as number | null) ?? null,
 		qty: (m.get('qty') as number | null) ?? null,
@@ -578,28 +698,26 @@ function yMapToItem(m: Y.Map<unknown>): Item {
 	};
 }
 
-export function createItem(listId: string, name: string, price: number | null = null, parentId: string | null = null, note = false, addPosition: 'top' | 'bottom' = 'bottom', explicitOrder?: number): string {
+export function createItem(listId: string, name: string, price: number | null = null, parentId: string | null = null, note = false, addPosition: 'top' | 'bottom' = 'bottom', explicitOrder?: number, listFolderId: string | null = null): string {
 	const doc = getMutableDoc();
 	if (!findYMap(getLists(doc), listId)) throw new Error('The destination list no longer exists.');
+	if (parentId !== null) {
+		const parent = readItems(listId).find(item => item.id === parentId);
+		// A parent at the list root has a null folder, which must win.
+		if (parent) listFolderId = parent.listFolderId ?? null;
+	}
+	requireListFolder(doc, listId, listFolderId);
 	const id = uid();
 	const now = new Date().toISOString();
 	doc.transact(() => {
 		const items = getItems(doc);
-		let newOrder = explicitOrder;
-		if (newOrder === undefined) {
-			const existing = (items.toArray() as Y.Map<unknown>[]).filter(
-				(i) => i.get('listId') === listId
-			);
-			// Order within siblings (same parentId)
-			const siblings = existing.filter((i) => (i.get('parentId') ?? null) === parentId);
-			const orders = siblings.map((sib) => (sib.get('order') as number) ?? 0);
-			newOrder = orders.length === 0 ? 0 : addPosition === 'top'
-				? orders.reduce((min, order) => Math.min(min, order), Infinity) - 1
-				: orders.reduce((max, order) => Math.max(max, order), -Infinity) + 1;
-		}
+		const newOrder = explicitOrder ?? getInsertionOrder(parentId === null
+			? listRootEntries(listId, listFolderId)
+			: readItems(listId, listFolderId).filter(item => item.parentId === parentId), addPosition);
 		const m = new Y.Map<unknown>();
 		m.set('id', id);
 		m.set('listId', listId);
+		if (listFolderId !== null) m.set('listFolderId', listFolderId);
 		m.set('name', name);
 		m.set('price', price);
 		m.set('checked', false);
@@ -703,22 +821,18 @@ export function setItemsChecked(ids: string[], checked: boolean): void {
 	getMutableDoc().transact(() => { for (const id of ids) updateItem(id, { checked }); });
 }
 
-export function createItemsBatch(listId: string, names: string[], addPosition: 'top' | 'bottom' = 'bottom'): void {
+export function createItemsBatch(listId: string, names: string[], addPosition: 'top' | 'bottom' = 'bottom', listFolderId: string | null = null): void {
 	const doc = getMutableDoc();
 	doc.transact(() => {
-		const existing = getItems(doc).toArray().filter(i => i.get('listId') === listId && (i.get('parentId') ?? null) === null);
-		
-		const orders = existing.map((item) => (item.get('order') as number) ?? 0);
-		const baseOrder = orders.length === 0 ? 0 : addPosition === 'top'
-			? orders.reduce((min, order) => Math.min(min, order), Infinity) - names.length
-			: orders.reduce((max, order) => Math.max(max, order), -Infinity) + 1;
-		names.forEach((name, i) => createItem(listId, name, null, null, false, 'bottom', baseOrder + i));
+		const baseOrder = getInsertionOrder(listRootEntries(listId, listFolderId), addPosition, names.length);
+		names.forEach((name, i) => createItem(listId, name, null, null, false, 'bottom', baseOrder + i, listFolderId));
 	});
 }
 
 export interface ExportedItem {
 	id: string;
 	name: string;
+	folder?: boolean;
 	price?: number | null;
 	qty?: number | null;
 	checked?: boolean;
@@ -737,11 +851,17 @@ export interface ExportedItem {
 
 /** Import exported items or parsed clipboard todos, preserving attributes and
  * hierarchy even when children appear before their parents. */
-export function createItemsFromExport(listId: string, exportedItems: ExportedItem[], options: { addPosition?: 'top' | 'bottom'; skipExisting?: boolean } = {}): void {
+export function createItemsFromExport(listId: string, exportedItems: ExportedItem[], options: { addPosition?: 'top' | 'bottom'; skipExisting?: boolean; listFolderId?: string | null } = {}): void {
 	const doc = getMutableDoc();
-	validateRecords(exportedItems, 'items');
+	validateRecords(exportedItems, 'clipboardItems');
+	const listFolderId = options.listFolderId ?? null;
+	requireListFolder(doc, listId, listFolderId);
+	const exportedById = new Map(exportedItems.map(item => [item.id, item]));
+	if (exportedItems.some(item => item.folder && item.parentId && exportedById.has(item.parentId) && !exportedById.get(item.parentId)?.folder)) {
+		throw new Error('A folder must belong to a list or another folder.');
+	}
 	const idMap = new Map<string, string>(); // old id → new id
-	const existing = readItems(listId);
+	const existing = readItems(listId, listFolderId);
 	const existingNames = new Map<string, string>();
 	if (options.skipExisting) {
 		for (const item of existing) {
@@ -750,6 +870,7 @@ export function createItemsFromExport(listId: string, exportedItems: ExportedIte
 		}
 		// Children of a skipped duplicate still belong to the existing parent.
 		for (const ex of exportedItems) {
+			if (ex.folder || (ex.parentId && exportedById.get(ex.parentId)?.folder)) continue;
 			const existingId = existingNames.get(importNameKey(ex.name));
 			if (existingId) idMap.set(ex.id, existingId);
 		}
@@ -757,21 +878,32 @@ export function createItemsFromExport(listId: string, exportedItems: ExportedIte
 	const nextOrders = new Map<string | null, number>();
 	const list = readLists().find((l) => l.id === listId);
 	if (!list) throw new Error('The destination list no longer exists.');
+	if (list.type === 'divider' && exportedItems.some(item => item.folder)) throw new Error('The destination list does not accept folders.');
 	const folder = list ? readFolders().find((f) => f.id === list.folderId) : undefined;
 	const checkboxes = folder?.checkboxes ?? [];
 	doc.transact(() => {
 		for (const ex of orderParentFirst<ExportedItem>(exportedItems)) {
 			if (idMap.has(ex.id)) continue;
-			const resolvedParentId = ex.parentId ? (idMap.get(ex.parentId) ?? null) : null;
+			const mappedParent = ex.parentId ? (idMap.get(ex.parentId) ?? null) : null;
+			const parentIsFolder = Boolean(ex.parentId && exportedById.get(ex.parentId)?.folder);
+			const resolvedParentId = parentIsFolder ? null : mappedParent;
+			const destinationFolderId = parentIsFolder ? mappedParent : listFolderId;
 			let order: number | undefined;
 			if (options.addPosition === 'top') {
-				order = nextOrders.get(resolvedParentId);
+				const destination = resolvedParentId ?? destinationFolderId;
+				order = nextOrders.get(destination);
 				if (order === undefined) {
-					order = getInsertionOrder(existing.filter((item) => item.parentId === resolvedParentId), 'top', exportedItems.length);
+					const siblings = resolvedParentId === null ? listRootEntries(listId, destinationFolderId)
+						: existing.filter(item => item.parentId === resolvedParentId);
+					order = getInsertionOrder(siblings, 'top', exportedItems.length);
 				}
-				nextOrders.set(resolvedParentId, order + 1);
+				nextOrders.set(destination, order + 1);
 			}
-			const newId = createItem(listId, ex.name, ex.price ?? null, resolvedParentId, ex.note ?? false, 'bottom', order);
+			if (ex.folder) {
+				idMap.set(ex.id, createListFolder(listId, ex.name, destinationFolderId, 'bottom', order));
+				continue;
+			}
+			const newId = createItem(listId, ex.name, ex.price ?? null, resolvedParentId, ex.note ?? false, 'bottom', order, destinationFolderId);
 			idMap.set(ex.id, newId);
 			const patch: Partial<Omit<Item, 'id' | 'listId' | 'createdAt' | 'updatedAt' | 'checks'>> = {};
 			if (ex.qty != null) patch.qty = ex.qty;
@@ -798,7 +930,7 @@ export function createItemsFromExport(listId: string, exportedItems: ExportedIte
 
 export function listTotal(listId: string): number {
 	return Math.round(
-		readItems(listId)
+		readItems(listId, null)
 			.filter((i) => !i.heading && !i.note)
 			.reduce((s, i) => s + Math.round((i.price ?? 0) * (i.qty ?? 1) * 100), 0)
 	) / 100;
@@ -900,32 +1032,48 @@ export function unarchiveFolder(id: string) {
 
 /** Move existing records, including descendants, while retaining IDs and note texts. */
 export function moveItemsToDestination(sourceListId: string, ids: string[], destination: ItemMoveDestination, addPosition: 'top' | 'bottom' = 'bottom'): boolean {
+	return moveListEntries(sourceListId, ids, destination, addPosition, false);
+}
+
+function moveListEntries(sourceListId: string, ids: string[], destination: ItemMoveDestination, addPosition: 'top' | 'bottom', allowArchived: boolean): boolean {
 	const doc = getMutableDoc();
 	const lists = readLists();
 	const folders = readFolders();
 	const sourceList = lists.find((list) => list.id === sourceListId);
 	const targetList = lists.find((list) => list.id === destination.listId);
-	if (!sourceList || !targetList || targetList.type === 'divider' || isListEffectivelyArchived(targetList, folders)) return false;
+	if (!sourceList || !targetList || targetList.type === 'divider' || (!allowArchived && isListEffectivelyArchived(targetList, folders))) return false;
 	const sourceFolder = folders.find((folder) => folder.id === sourceList.folderId);
 	const targetFolder = folders.find((folder) => folder.id === targetList.folderId);
+	const crossList = sourceListId !== destination.listId;
 	const source = readItems(sourceListId);
 	const sourceById = new Map(source.map((item) => [item.id, item]));
-	const target = sourceListId === destination.listId ? source : readItems(destination.listId);
-	const plan = planItemMove(source, target, ids, destination.parentId);
-	if (!plan) return false;
+	const target = crossList ? readItems(destination.listId) : source;
+	const sourceListFolders = readListFolders(sourceListId);
+	const targetListFolders = crossList ? readListFolders(destination.listId) : sourceListFolders;
+	const plan = planListEntryMove(source, target, sourceListFolders, targetListFolders, ids, destination);
+	if (!plan || !plan.roots.length) return false;
 	const records = new Map(getItems(doc).toArray().map((item) => [item.get('id') as string, item]));
-	const siblings = target.filter((item) => item.parentId === destination.parentId && !plan.movedIds.has(item.id));
-	let order = getInsertionOrder(siblings, addPosition, plan.roots.length);
+	const folderRecords = new Map(getListFolders(doc).toArray().map((folder) => [folder.get('id') as string, folder]));
+	const moving = new Set([...plan.movedItemIds, ...plan.movedFolderIds]);
+	const siblings = destination.parentId === null
+		? listRootEntries(destination.listId, plan.targetFolderId)
+		: target.filter((item) => item.parentId === destination.parentId);
+	let order = getInsertionOrder(siblings.filter((entry) => !moving.has(entry.id)), addPosition, plan.roots.length);
 	const now = new Date().toISOString();
+	const remapChecks = sourceList.folderId !== targetList.folderId;
 	doc.transact(() => {
 		materializeCycles(getItems(doc), source);
-		if (sourceListId !== destination.listId) materializeCycles(getItems(doc), target);
-		for (const id of plan.movedIds) {
+		if (crossList) materializeCycles(getItems(doc), target);
+		const relocate = (id: string, listFolderId: string | null) => {
 			const record = records.get(id)!;
 			if (record.get('listId') !== destination.listId) record.set('listId', destination.listId);
-			if (sourceListId !== destination.listId) record.set('updatedAt', now);
+			if ((record.get('listFolderId') ?? null) !== listFolderId) {
+				if (listFolderId === null) record.delete('listFolderId');
+				else record.set('listFolderId', listFolderId);
+			}
+			if (crossList) record.set('updatedAt', now);
 			const item = sourceById.get(id)!;
-			if (sourceList.folderId !== targetList.folderId && !item.note && !item.heading) {
+			if (remapChecks && !item.note && !item.heading) {
 				const done = isItemDone(item, sourceFolder);
 				record.set('checked', done);
 				for (const checkbox of targetFolder?.checkboxes ?? []) {
@@ -933,8 +1081,25 @@ export function moveItemsToDestination(sourceListId: string, ids: string[], dest
 					record.set(`chk_${checkbox.id}`, matching ? !!item.checks[matching.id] : done);
 				}
 			}
+		};
+		for (const id of plan.movedItemIds) relocate(id, plan.targetFolderId);
+		// Items inside moved folders keep their own folder membership.
+		for (const item of plan.travellingItems) relocate(item.id, item.listFolderId ?? null);
+		for (const id of plan.movedFolderIds) {
+			const record = folderRecords.get(id)!;
+			if (record.get('listId') !== destination.listId) {
+				record.set('listId', destination.listId);
+				record.set('updatedAt', now);
+			}
 		}
 		for (const id of plan.roots) {
+			const folder = folderRecords.get(id);
+			if (plan.movedFolderIds.has(id) && folder) {
+				folder.set('parentId', plan.targetFolderId);
+				folder.set('order', order++);
+				folder.set('updatedAt', now);
+				continue;
+			}
 			const record = records.get(id)!;
 			record.set('parentId', destination.parentId);
 			record.set('order', order++);
@@ -944,18 +1109,53 @@ export function moveItemsToDestination(sourceListId: string, ids: string[], dest
 	return true;
 }
 
-export function reparentItems(listId: string, ids: string[], targetId: string | null, addPosition: 'top' | 'bottom' = 'bottom'): boolean {
-	const doc = getMutableDoc();
-	const items = readItems(listId);
-	const plan = planItemMove(items, items, ids, targetId);
-	if (!plan) return false;
-	const siblings = items.filter((item) => item.parentId === targetId && !plan.movedIds.has(item.id));
-	let order = getInsertionOrder(siblings, addPosition, plan.roots.length);
-	doc.transact(() => {
-		materializeCycles(getItems(doc), items);
-		for (const id of plan.roots) updateItem(id, { parentId: targetId, order: order++ });
+/** Move items to another list, recreating the folders that hold them below
+ * baseFolderId. Matching folder names at the destination are reused. */
+export function moveItemsKeepingFolders(sourceListId: string, ids: string[], targetListId: string, baseFolderId: string | null, addPosition: 'top' | 'bottom' = 'bottom'): boolean {
+	const lists = readLists();
+	const target = lists.find((list) => list.id === targetListId);
+	if (!target || target.type === 'divider' || isListEffectivelyArchived(target, readFolders()) || sourceListId === targetListId) return false;
+	const source = new Map(readItems(sourceListId).map((item) => [item.id, item]));
+	const folders = new Map(readListFolders(sourceListId).map((folder) => [folder.id, folder]));
+	const groups = new Map<string | null, string[]>();
+	for (const id of ids) {
+		const item = source.get(id);
+		if (!item) return false;
+		const folderId = item.listFolderId ?? null;
+		groups.set(folderId, [...groups.get(folderId) ?? [], id]);
+	}
+	// Validate ancestry before writing: Yjs transactions do not roll back.
+	for (const folderId of groups.keys()) {
+		const visited = new Set<string>();
+		for (let id = folderId; id !== baseFolderId; id = folders.get(id)!.parentId) {
+			if (id === null || !folders.has(id) || visited.has(id)) return false;
+			visited.add(id);
+		}
+	}
+	let moved = true;
+	getMutableDoc().transact(() => {
+		const created = new Map<string | null, string | null>([[baseFolderId, null]]);
+		const ensure = (folderId: string | null): string | null => {
+			if (created.has(folderId)) return created.get(folderId)!;
+			const folder = folders.get(folderId!)!;
+			const parentId = ensure(folder.parentId);
+			const key = folder.name.trim().toLowerCase();
+			const existing = readListFolders(targetListId).find((entry) => entry.parentId === parentId && entry.name.trim().toLowerCase() === key);
+			const id = existing?.id ?? createListFolder(targetListId, folder.name, parentId, addPosition);
+			created.set(folderId, id);
+			return id;
+		};
+		for (const [folderId, groupIds] of groups) {
+			const destination = { listId: targetListId, parentId: null, listFolderId: ensure(folderId) };
+			if (!moveItemsToDestination(sourceListId, groupIds, destination, addPosition)) moved = false;
+		}
 	});
-	return true;
+	return moved;
+}
+
+/** Reparent within one list. A null target means the root of the given view. */
+export function reparentItems(listId: string, ids: string[], targetId: string | null, addPosition: 'top' | 'bottom' = 'bottom', listFolderId: string | null = null): boolean {
+	return moveListEntries(listId, ids, { listId, parentId: targetId, listFolderId }, addPosition, true);
 }
 
 export function reorderItems(listId: string, fromIndex: number, toIndex: number) {
@@ -967,15 +1167,21 @@ export function reorderItems(listId: string, fromIndex: number, toIndex: number)
 	doc.transact(() => items.forEach((item, idx) => updateItem(item.id, { order: idx })));
 }
 
-export function reorderSiblings(listId: string, parentId: string | null, fromIdx: number, toIdx: number) {
+/** Root siblings of a view include its folders, which share item order. */
+export function reorderSiblings(listId: string, parentId: string | null, fromIdx: number, toIdx: number, listFolderId: string | null = null) {
 	const doc = getMutableDoc();
-	const siblings = readItems(listId)
-		.filter((i) => i.parentId === parentId)
-		.sort(compareOrder);
+	const siblings: { id: string; order: number }[] = (parentId === null
+		? listRootEntries(listId, listFolderId)
+		: readItems(listId).filter((i) => i.parentId === parentId)).sort(compareOrder);
 	if (fromIdx < 0 || fromIdx >= siblings.length || toIdx < 0 || toIdx >= siblings.length) return;
 	const [moved] = siblings.splice(fromIdx, 1);
 	siblings.splice(toIdx, 0, moved);
-	doc.transact(() => siblings.forEach((item, idx) => updateItem(item.id, { order: idx })));
+	const folderRecords = new Map(getListFolders(doc).toArray().map((record) => [record.get('id') as string, record]));
+	doc.transact(() => siblings.forEach((entry, idx) => {
+		const folder = folderRecords.get(entry.id);
+		if (folder) { if (folder.get('order') !== idx) folder.set('order', idx); }
+		else updateItem(entry.id, { order: idx });
+	}));
 }
 
 export function reorderFolders(parentId: string | null, fromIndex: number, toIndex: number, visibleIds?: string[]) {
@@ -1392,6 +1598,7 @@ export interface BackupFile {
 	sheets?: BackupSheet[];
 	smartFolders?: Record<string, string[]>;
 	favouriteFolders?: FavouriteFolder[];
+	listFolders?: ListFolder[];
 	customLocations?: RetailLocation[];
 	locationOptionalTags?: string[];
 	startingLocation?: StartingLocation | null;
@@ -1408,19 +1615,25 @@ export interface BackupFile {
 export function exportBackup(): BackupFile {
 	const doc = getDoc();
 	const favouriteFolders = readFavouriteFolders();
+	const listFolders = readListFolders().map(({ createdAt, updatedAt, ...folder }) => ({
+		...folder, ...(createdAt ? { createdAt } : {}), ...(updatedAt ? { updatedAt } : {})
+	})) as ListFolder[];
 	const backup: BackupFile = {
 		version: 2,
 		exported: new Date().toISOString(),
 		folders: readFolders(),
 		lists: readLists(),
 		// DokuWiki write state is not part of backups: a restore must not resend old entries.
-		items: readAllItems().map(({ dokuwiki: _request, dokuwikiStatus: _status, ...item }) => {
+		items: readAllItems().map(({ dokuwiki: _request, dokuwikiStatus: _status, listFolderId, ...rest }) => {
+			// Root items omit the field so backups without folders keep their old shape.
+			const item: BackupItem = listFolderId ? { ...rest, listFolderId } : rest;
 			const richText = readItemRichText(doc, item.id, item.name);
 			return richText === undefined ? item : { ...item, richText };
 		}),
 		sheets: readSheets().map(sheet => ({ ...sheet, cells: readCells(sheet.id) })),
 		smartFolders: readReportAssignments(getDoc()),
 		...(favouriteFolders.length > 0 ? { favouriteFolders } : {}),
+		...(listFolders.length > 0 ? { listFolders } : {}),
 		customLocations: readCustomLocations(),
 		locationOptionalTags: readLocationOptionalTags(),
 		startingLocation: readStartingLocation(),
@@ -1440,7 +1653,7 @@ export function exportBackup(): BackupFile {
 export function validateBackup(value: unknown): asserts value is BackupFile {
 	if (!isRecord(value)) throw new Error('Invalid backup: expected a JSON object.');
 	if (value.version !== 1 && value.version !== 2) throw new Error(`Unsupported backup version: ${String(value.version)}. Update the app if this file came from a newer release.`);
-	const fields = new Set(['version', 'exported', 'folders', 'lists', 'items', 'sheets', 'smartFolders', 'favouriteFolders', 'customLocations', 'locationOptionalTags', 'startingLocation', 'nearbyLocationFilterEnabled', 'hotSuburbIds', 'nearbyPreviewLimit', 'nearbyRecentlyModifiedFirst', 'nearbyChecklist', 'pausedErrandTags', 'pausedErrandItemIds']);
+	const fields = new Set(['version', 'exported', 'folders', 'lists', 'items', 'sheets', 'smartFolders', 'favouriteFolders', 'listFolders', 'customLocations', 'locationOptionalTags', 'startingLocation', 'nearbyLocationFilterEnabled', 'hotSuburbIds', 'nearbyPreviewLimit', 'nearbyRecentlyModifiedFirst', 'nearbyChecklist', 'pausedErrandTags', 'pausedErrandItemIds']);
 	for (const key of Object.keys(value)) if (!fields.has(key)) throw new Error(`Unrecognized backup section: ${key}. This backup may require a newer app.`);
 	if (value.exported !== undefined && (typeof value.exported !== 'string' || !Number.isFinite(Date.parse(value.exported)))) throw new Error('Invalid backup export date.');
 	const backup = value as unknown as BackupFile;
@@ -1448,6 +1661,8 @@ export function validateBackup(value: unknown): asserts value is BackupFile {
 	validateRecords(backup.favouriteFolders === undefined ? [] : backup.favouriteFolders, 'favouriteFolders');
 	validateRecords(backup.lists, 'lists');
 	validateRecords(backup.items, 'items');
+	const listFolders = backup.listFolders === undefined ? [] : backup.listFolders;
+	validateRecords(listFolders, 'listFolders');
 	if (backup.items.some(item => typeof item.listId !== 'string' || !item.listId.trim())) throw new Error('Invalid item listId.');
 	validateRecords(backup.sheets === undefined ? [] : backup.sheets, 'sheets');
 	validateLocations(backup.customLocations === undefined ? [] : backup.customLocations);
@@ -1466,9 +1681,17 @@ export function validateBackup(value: unknown): asserts value is BackupFile {
 		if (!Array.isArray(ids) || ids.some((id) => typeof id !== 'string')) throw new Error('Invalid report assignments.');
 	}
 	const items = new Map(backup.items.map(item => [item.id, item]));
+	const folders = new Map(listFolders.map(folder => [folder.id, folder]));
 	for (const item of backup.items) {
 		const parent = item.parentId ? items.get(item.parentId) : undefined;
 		if (parent && parent.listId !== item.listId) throw new Error('An item parent must belong to the same list.');
+		const folder = item.listFolderId ? folders.get(item.listFolderId) : undefined;
+		if (folder && folder.listId !== item.listId) throw new Error('An item folder must belong to the same list.');
+	}
+	for (const folder of listFolders) {
+		const parent = folder.parentId ? folders.get(folder.parentId) : undefined;
+		if (parent && parent.listId !== folder.listId) throw new Error('A folder inside a list must belong to the same list as its parent folder.');
+		if (folder.filterView !== undefined && !['all', 'unchecked', 'checked'].includes(folder.filterView)) throw new Error('Invalid folder filter.');
 	}
 }
 
@@ -1491,8 +1714,9 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 	const lArr = getLists(doc);
 	const iArr = getItems(doc);
 	const sArr = getSpreadsheets(doc);
+	const lfArr = getListFolders(doc);
 	// Index once: scanning the full Y.Array for each record freezes large restores.
-	const indexes = new Map([fArr, favouritesArr, lArr, iArr, sArr].map(arr => [arr, new Map(arr.toArray().map(record => [record.get('id') as string, record]))]));
+	const indexes = new Map([fArr, favouritesArr, lArr, lfArr, iArr, sArr].map(arr => [arr, new Map(arr.toArray().map(record => [record.get('id') as string, record]))]));
 
 	// Undo needs an authoritative pre-import baseline even for legacy notes
 	// that have never been opened. Migration itself is not an undo action.
@@ -1506,6 +1730,7 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 			if (favouritesArr.length) favouritesArr.delete(0, favouritesArr.length);
 			if (lArr.length) lArr.delete(0, lArr.length);
 			if (iArr.length) iArr.delete(0, iArr.length);
+			if (lfArr.length) lfArr.delete(0, lfArr.length);
 			for (const key of doc.share.keys()) {
 				if (key.startsWith('note_text_')) {
 					const text = doc.getText(key);
@@ -1531,6 +1756,7 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 			if (kind === 'folder' && record.checkboxes !== undefined) replaceFolderCheckboxes(m, record.checkboxes as FolderCheckbox[]);
 			if (kind === 'folder' && record.defaultItems !== undefined) replaceFolderDefaultItems(m, record.defaultItems as FolderDefaultItem[]);
 			if (kind === 'item') {
+				if (record.listFolderId == null) m.delete('listFolderId');
 				if (record.checks !== undefined) {
 					m.delete('checks');
 					for (const key of [...m.keys()]) if (key.startsWith('chk_')) m.delete(key);
@@ -1542,6 +1768,7 @@ export function importBackup(backup: BackupFile, mode: 'replace' | 'merge'): voi
 		for (const record of backup.folders) upsert(fArr, record as unknown as Record<string, unknown>, 'folder');
 		for (const record of backup.favouriteFolders ?? []) upsert(favouritesArr, { ...record, parentId: record.parentId ?? null }, 'other');
 		for (const record of backup.lists) upsert(lArr, record as unknown as Record<string, unknown>, 'other');
+		for (const record of backup.listFolders ?? []) upsert(lfArr, { ...record, parentId: record.parentId ?? null }, 'other');
 		for (const record of backup.items) upsert(iArr, record as unknown as Record<string, unknown>, 'item');
 		for (const record of backup.sheets ?? []) upsert(sArr, record as unknown as Record<string, unknown>, 'other');
 		for (const sheet of backup.sheets ?? []) {

@@ -2,7 +2,7 @@
 	import { docState, commitState, undoLastAction, canUndo, getUndoCount, exitCommitView, getDoc } from '$lib/yjsStore.svelte';
 	import { readItemRichText } from '$lib/noteText';
 	import { onDestroy, tick, untrack } from 'svelte';
-	import { buildItemTreeOrder, canReparentItems, getCompletedNoteIds } from '$lib/hierarchy';
+	import { buildItemTreeOrder, getCompletedNoteIds, type TreeItem } from '$lib/hierarchy';
 	import {
 		readItems,
 		readAllItems,
@@ -23,6 +23,11 @@
 		reorderSiblings,
 		reparentItems,
 		moveItemsToDestination,
+		moveItemsKeepingFolders,
+		readListFolders,
+		createListFolder,
+		updateListFolder,
+		deleteListEntries,
 		isListEffectivelyArchived,
 		toggleFavourite,
 		buildFavouriteEntries,
@@ -32,8 +37,11 @@
 		type ExportedItem,
 		type ListMeta,
 		type Folder,
-		type FilterView
+		type FilterView,
+		type ListFolder
 	} from '$lib/data';
+	import { clipboardEntries, listFolderDescendants, listFolderPath, listFolderPathLabel, listRows, type ClipboardEntry } from '$lib/listFolders';
+	import FavouriteDestinationPicker from './FavouriteDestinationPicker.svelte';
 	import { settings } from '$lib/settings.svelte';
 	import { extractTags, splitWithTags, type NameSegment } from '$lib/tags';
 	import { billSections, findBillSections, type BillSection } from '$lib/billsInclude';
@@ -47,8 +55,8 @@
 	import BillsInclude from './BillsInclude.svelte';
 	import CalendarInclude from './CalendarInclude.svelte';
 	import { importNameKey, parseClipboardTodos } from '$lib/importText';
-	import { DEFAULT_MARK_NAME, readDestinationMarks, getDestinationMark } from '$lib/destinationMarks';
-	import { planItemMove, resolveMarkedItemDestination } from '$lib/itemMove';
+	import { DEFAULT_MARK_NAME, readDestinationMarks, getDestinationMark, setDestinationMark } from '$lib/destinationMarks';
+	import { planListEntryMove, resolveMarkedItemDestination, type ItemMoveDestination } from '$lib/itemMove';
 	import NumericKeypad from './NumericKeypad.svelte';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import FavouritesBar from './FavouritesBar.svelte';
@@ -74,7 +82,9 @@
 		savedSearch = null,
 		onRestoreSearch = undefined,
 		onTagClick = undefined,
-		onNavigateTo = undefined
+		onNavigateTo = undefined,
+		listFolderId = $bindable(null),
+		onOpenItem = undefined
 	}: {
 		listId: string;
 		orderedLists?: { id: string; name: string }[];
@@ -88,15 +98,43 @@
 		onRestoreSearch?: () => void;
 		onTagClick?: (tag: string) => void;
 		onNavigateTo?: (folderId: string | null) => void;
+		/** The folder inside this list that is open; null is the list root. */
+		listFolderId?: string | null;
+		onOpenItem?: (listId: string, itemId: string) => void;
 	} = $props();
 
 	let showUndoConfirm = $state(false);
 	let browseView = $state(false);
 
-	let items = $derived.by(() => {
+	// Every item in the list, including items inside its folders.
+	let listItems = $derived.by(() => {
 		void docState.version;
-		try { return readItems(listId); } catch { return []; }
+		try { return readItems(listId); } catch { return [] as Item[]; }
 	});
+	let listFolders = $derived.by(() => {
+		void docState.version;
+		try { return readListFolders(listId); } catch { return [] as ListFolder[]; }
+	});
+	const listFoldersById = $derived(new Map(listFolders.map((folder) => [folder.id, folder])));
+	// A folder that was moved to another list or deleted falls back to the list root.
+	const viewFolderId = $derived(listFolderId !== null && listFoldersById.has(listFolderId) ? listFolderId : null);
+	const viewFolder = $derived(viewFolderId ? listFoldersById.get(viewFolderId) ?? null : null);
+	// Items in the open view: counts, totals, filters and bulk actions use these.
+	let items = $derived(listItems.filter((item) => (item.listFolderId ?? null) === viewFolderId));
+	const viewFolders = $derived(listFolders.filter((folder) => folder.parentId === viewFolderId));
+	// Items in the open view and every folder below it.
+	const viewSubtreeItems = $derived.by(() => {
+		if (viewFolderId === null) return listItems;
+		const folderIds = listFolderDescendants(listFolders, [viewFolderId]);
+		return listItems.filter((item) => item.listFolderId != null && folderIds.has(item.listFolderId));
+	});
+	function openListFolder(id: string | null) {
+		listFolderId = id;
+	}
+	function openItem(item: Item) {
+		if (onOpenItem) onOpenItem(item.listId, item.id);
+		else onOpenList(item.listId);
+	}
 	// Recomputed on any document change, so settings and subnote edits show.
 	const dokuwikiBadges = $derived.by(() => {
 		void docState.version;
@@ -114,6 +152,13 @@
 	});
 	const listExists = $derived(listMeta !== null);
 	const canEditList = $derived(listExists && !commitState.isHistorical);
+	$effect(() => {
+		if (listExists && listFolderId !== null && viewFolderId === null) untrack(() => { listFolderId = null; });
+	});
+	let allListFolders = $derived.by(() => {
+		void docState.version;
+		try { return readListFolders(); } catch { return [] as ListFolder[]; }
+	});
 
 	let allLists = $derived.by(() => {
 		void docState.version;
@@ -219,8 +264,22 @@
 		} catch { return []; }
 	});
 
+	// Search results and item links open the folder that holds the item.
 	$effect(() => {
 		const itemId = highlightItemId;
+		void listId;
+		if (!itemId) return;
+		// Only a new highlight moves the view. Later edits must not pull the
+		// user back after they navigate to another folder.
+		untrack(() => {
+			const item = listItems.find((entry) => entry.id === itemId);
+			if (item && (item.listFolderId ?? null) !== listFolderId) listFolderId = item.listFolderId ?? null;
+		});
+	});
+
+	$effect(() => {
+		const itemId = highlightItemId;
+		void viewFolderId;
 		if (itemId) {
 			let cancelled = false;
 			tick().then(() => {
@@ -247,10 +306,14 @@
 			folders.unshift({ label: f.name, onNavigate: () => onNavigateTo?.(f.id) });
 			fid = f.parentId;
 		}
+		const path = listFolderPath(listFoldersById, viewFolderId);
+		if (path.length === 0) return [home, ...folders, { label: listMeta.name }];
 		return [
 			home,
 			...folders,
-			{ label: listMeta.name }
+			{ label: listMeta.name, onNavigate: () => openListFolder(null) },
+			...path.slice(0, -1).map((folder): BreadcrumbItem => ({ label: folder.name, onNavigate: () => openListFolder(folder.id) })),
+			{ label: path[path.length - 1].name }
 		];
 	});
 
@@ -456,14 +519,14 @@
 	// ── Tree order (subtasks / subnotes) ──────────────────────────────────────────
 	const treeItems = $derived(buildItemTreeOrder(items));
 	const completedNoteIds = $derived(getCompletedNoteIds(items, isDone));
-	const filterView = $derived<FilterView>(listMeta?.filterView ?? 'all');
+	const filterView = $derived<FilterView>(viewFolder ? viewFolder.filterView : listMeta?.filterView ?? 'all');
 	const filteredTreeItems = $derived(
 		filterView === 'all'
 			? treeItems
 			: (() => {
 				const visibleIds = new Set<string>();
 				for (const { item } of treeItems) {
-					if (item.heading || (item.note && item.parentId === null) || (!item.note && !item.heading && (filterView === 'checked' ? isDone(item) : !isDone(item)))) {
+					if (item.id === highlightItemId || item.heading || (item.note && item.parentId === null) || (!item.note && !item.heading && (filterView === 'checked' ? isDone(item) : !isDone(item)))) {
 						visibleIds.add(item.id);
 					}
 				}
@@ -475,6 +538,12 @@
 				return treeItems.filter(({ item }) => visibleIds.has(item.id));
 			})()
 	);
+	// Folder rows share root order with items and are never hidden by a filter.
+	const allRows = $derived(listRows(treeItems, viewFolders));
+	const visibleRows = $derived.by(() => {
+		const visible = new Set(filteredTreeItems.map(({ item }) => item.id));
+		return allRows.filter((row) => row.folder || visible.has(row.item.id));
+	});
 	let activeCursorIndex = $derived(activeCursorId ? filteredTreeItems.findIndex(i => i.item.id === activeCursorId) : -1);
 	let selectionMode = $state(false);
 	let selectedIds = $state<Set<string>>(new Set());
@@ -514,6 +583,9 @@
 	const addParentId = $derived(newItemParentId ?? parentHereId);
 	const parentHereItem = $derived(items.find((item) => item.id === parentHereId) ?? null);
 	let newItemIsNote = $state(listMeta?.defaultIsNote ?? false);
+	// Folder is a third add mode. It is not saved as the list default.
+	let newItemIsFolder = $state(false);
+	const addingFolder = $derived(newItemIsFolder && addParentId === null);
 
 	$effect(() => {
 		if (newItemParentId === null) {
@@ -562,9 +634,20 @@
 
 	function addItem() {
 		if (!canEditList || !universalValue.trim()) return;
+		if (addingFolder) {
+			try {
+				createListFolder(listId, universalValue.trim(), viewFolderId, settings.addItemPosition);
+			} catch (error) {
+				alert(error instanceof Error ? error.message : String(error));
+				return;
+			}
+			universalValue = '';
+			focusInput();
+			return;
+		}
 		const pos = newItemParentId !== null ? 'bottom'
 			: parentHereId !== null ? settings.parentHerePosition : settings.addItemPosition;
-		createItem(listId, universalValue.trim(), null, addParentId, newItemIsNote, pos);
+		createItem(listId, universalValue.trim(), null, addParentId, newItemIsNote, pos, undefined, viewFolderId);
 		universalValue = '';
 		newItemParentId = null;
 		newItemIsNote = listMeta?.defaultIsNote ?? false;
@@ -573,10 +656,21 @@
 
 	// ── Clipboard import ───────────────────────────────────────────────────
 	function serializeClipboardItems(source: Item[]): string {
+		return serializeClipboardEntries(source.map((item) => ({ kind: 'item', item, parentId: item.parentId })));
+	}
+
+	/** Folders carry their contents; a root item inside an exported folder names it as parent. */
+	function serializeClipboardEntries(entries: ClipboardEntry[]): string {
 		const exportData = {
 			__list_app__: true,
 			version: 2,
-			items: source.map((item) => {
+			items: entries.map((entry) => {
+				if (entry.kind === 'folder') {
+					const ex: ExportedItem = { id: entry.folder.id, name: entry.folder.name, folder: true };
+					if (entry.parentId !== null) ex.parentId = entry.parentId;
+					return ex;
+				}
+				const { item } = entry;
 				const ex: ExportedItem = { id: item.id, name: item.name };
 				if (item.price !== null) ex.price = item.price;
 				if (item.qty !== null) ex.qty = item.qty;
@@ -592,7 +686,7 @@
 				if (item.fullScreen) ex.fullScreen = true;
 				const richText = readItemRichText(getDoc(), item.id, item.name);
 				if (richText !== undefined) ex.richText = richText;
-				if (item.parentId !== null) ex.parentId = item.parentId;
+				if (entry.parentId !== null) ex.parentId = entry.parentId;
 				return ex;
 			})
 		};
@@ -612,9 +706,12 @@
 		}
 	}
 
+	function viewClipboardJson(ids?: ReadonlySet<string>): string {
+		return serializeClipboardEntries(clipboardEntries(listItems, listFolders, viewFolderId, ids));
+	}
+
 	async function exportToClipboard() {
-		const source = selectedIds.size > 0 ? selectedItems : treeItems.map(({ item }) => item);
-		await writeClipboard(serializeClipboardItems(source), '✓ Copied as JSON!');
+		await writeClipboard(viewClipboardJson(selectedIds.size > 0 ? selectedIds : undefined), '✓ Copied as JSON!');
 		showHeaderMenu = false;
 	}
 
@@ -668,6 +765,7 @@
 	async function importFromClipboard(mode: 'items' | 'tasks' = 'items') {
 		if (isPasting || !canEditList) return;
 		const targetListId = listId;
+		const targetFolderId = viewFolderId;
 		const contextVersion = listContextVersion;
 		const addPosition = settings.addItemPosition;
 		const isCurrent = () => isActive && listId === targetListId &&
@@ -690,7 +788,7 @@
 				if (todos === null) {
 					alert('No tasks found in clipboard. Use [ ], [X] or [C] followed by a space and task text.');
 				} else if (todos.length > 0) {
-					createItemsFromExport(targetListId, todos, { addPosition, skipExisting: true });
+					createItemsFromExport(targetListId, todos, { addPosition, skipExisting: true, listFolderId: targetFolderId });
 				}
 				return;
 			}
@@ -712,7 +810,7 @@
 					alert('No valid items found in clipboard export.');
 					return;
 				}
-				createItemsFromExport(targetListId, parsed.items as ExportedItem[], { addPosition });
+				createItemsFromExport(targetListId, parsed.items as ExportedItem[], { addPosition, listFolderId: targetFolderId });
 			} else {
 				if (typeof parsed === 'object' && parsed !== null && 'version' in parsed && 'folders' in parsed && 'lists' in parsed && 'items' in parsed) throw new Error('Restore backup files through Settings → Backup & Restore.');
 				// Plain text: one item per line, excluding blank lines and lines without letters.
@@ -722,9 +820,9 @@
 					return;
 				}
 				// Compare with the list before importing, retaining duplicates within the paste.
-				const existingNames = new Set(readItems(targetListId).map((item) => importNameKey(item.name)));
+				const existingNames = new Set(readItems(targetListId, targetFolderId).map((item) => importNameKey(item.name)));
 				const newLines = lines.filter((line) => !existingNames.has(importNameKey(line)));
-				if (newLines.length > 0) createItemsBatch(targetListId, newLines, addPosition);
+				if (newLines.length > 0) createItemsBatch(targetListId, newLines, addPosition, targetFolderId);
 			}
 		} catch (error) {
 			if (isCurrent()) alert(`Import failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -756,10 +854,22 @@
 		focusInput();
 	}
 
+	function startEditFolderName(folder: ListFolder) {
+		if (!canEditList) return;
+		editingId = folder.id;
+		inputMode = 'edit';
+		universalValue = folder.name;
+		pricingItemId = null;
+		qtyItemId = null;
+		newItemParentId = null;
+		focusInput();
+	}
+
 	function submitEditName() {
 		if (!canEditList || !editingId) return;
 		const trimmed = universalValue.trim();
-		if (trimmed) updateItem(editingId, { name: trimmed });
+		if (trimmed && listFoldersById.has(editingId)) updateListFolder(editingId, { name: trimmed });
+		else if (trimmed) updateItem(editingId, { name: trimmed });
 		universalInputEl?.blur();
 		cancelEdit();
 	}
@@ -1134,13 +1244,14 @@
 		return !isDone(item) && !item.heading && !item.note && !isFolderDefaultItem(item);
 	}
 
+	// Rollover covers the open view and the folders below it.
 	const incompleteItemCount = $derived(
-		items.filter(isItemIncompleteForRollover).length
+		viewSubtreeItems.filter(isItemIncompleteForRollover).length
 	);
 
 	const itemsToRolloverCount = $derived.by(() => {
 		if (rolloverScope === 'selected') return rolloverSelectedIds.size;
-		if (rolloverScope === 'all') return items.length;
+		if (rolloverScope === 'all') return viewSubtreeItems.length;
 		return incompleteItemCount;
 	});
 
@@ -1272,9 +1383,10 @@
 			return [...rolloverSelectedIds];
 		}
 		if (rolloverScope === 'all') {
-			return items.map((i) => i.id);
+			// Folders move whole, including empty ones.
+			return [...items.map((i) => i.id), ...viewFolders.map((folder) => folder.id)];
 		}
-		return items.filter(isItemIncompleteForRollover).map((i) => i.id);
+		return viewSubtreeItems.filter(isItemIncompleteForRollover).map((i) => i.id);
 	}
 
 	function submitRollover() {
@@ -1307,8 +1419,11 @@
 			return;
 		}
 
-		const movedCount = targetIds.length;
-		const success = moveItemsToDestination(listId, targetIds, { listId: targetList.id, parentId: null }, settings.addItemPosition);
+		const movedCount = rolloverScope === 'all' ? viewSubtreeItems.length
+			: targetIds.filter((id) => !listFoldersById.has(id)).length;
+		const success = rolloverScope === 'incomplete'
+			? moveItemsKeepingFolders(listId, targetIds, targetList.id, viewFolderId, settings.addItemPosition)
+			: moveItemsToDestination(listId, targetIds, { listId: targetList.id, parentId: null }, settings.addItemPosition);
 		if (!success) {
 			alert('Cannot move items to the destination list.');
 			return;
@@ -1332,14 +1447,31 @@
 		}, 6000);
 	}
 
+	function canMoveSelection(destination: ItemMoveDestination): boolean {
+		if (!canEditList || selectedIds.size === 0) return false;
+		const sameList = destination.listId === listId;
+		return planListEntryMove(
+			listItems,
+			sameList ? listItems : allItemsAll.filter((item) => item.listId === destination.listId),
+			listFolders,
+			sameList ? listFolders : allListFolders.filter((folder) => folder.listId === destination.listId),
+			selectedIds,
+			destination
+		) !== null;
+	}
+
 	const compatibleMoveMarks = $derived.by(() => {
 		const lists = allLists.filter((list) => list.type !== 'divider' && !isListEffectivelyArchived(list, allFolders));
+		const foldersById = new Map(allListFolders.map((folder) => [folder.id, folder]));
 		return Object.entries(destinationMarks).flatMap(([name, mark]) => {
-			const destination = resolveMarkedItemDestination(mark, lists, allItemsAll);
-			if (!destination || !planItemMove(items, allItemsAll.filter((item) => item.listId === destination.listId), selectedIds, destination.parentId)) return [];
+			const destination = resolveMarkedItemDestination(mark, lists, allItemsAll, allListFolders);
+			if (!destination || !canMoveSelection(destination)) return [];
+			const listName = lists.find((list) => list.id === destination.listId)?.name;
 			const targetName = destination.parentId
 				? allItemsAll.find((item) => item.id === destination.parentId)?.name
-				: lists.find((list) => list.id === destination.listId)?.name;
+				: destination.listFolderId
+					? `${listName ?? '…'} › ${listFolderPathLabel(foldersById, destination.listFolderId)}`
+					: listName;
 			return [{ name, label: `${name} — ${targetName ?? '…'}` }];
 		}).sort((a, b) =>
 			Number(b.name === DEFAULT_MARK_NAME) - Number(a.name === DEFAULT_MARK_NAME) || a.name.localeCompare(b.name)
@@ -1366,13 +1498,80 @@
 		const mark = getDestinationMark(selectedMoveMark);
 		const folders = readFolders();
 		const lists = readLists().filter((list) => list.type !== 'divider' && !isListEffectivelyArchived(list, folders));
-		const destination = mark ? resolveMarkedItemDestination(mark, lists, readAllItems()) : null;
+		const destination = mark ? resolveMarkedItemDestination(mark, lists, readAllItems(), readListFolders()) : null;
 		if (!destination || !moveItemsToDestination(listId, [...selectedIds], destination, settings.addItemPosition)) {
 			markMoveError = 'This mark is no longer compatible with the selection. Choose another destination.';
 			refreshDestinationMarks();
 			return;
 		}
 		exitSelectionMode();
+	}
+
+	// ── Folder destinations inside this list ─────────────────────────────────────
+	let folderMoveDestination = $state<string | null | undefined>(undefined);
+	const ROOT_DESTINATION = '__list_root__';
+	const folderMoveOptions = $derived.by(() => {
+		const moving = listFolderDescendants(listFolders, selectedIds);
+		const rootLabel = `${listMeta?.name ?? 'List'} (list root)`;
+		return [
+			{ id: ROOT_DESTINATION, label: rootLabel, disabled: !canMoveSelection({ listId, parentId: null, listFolderId: null }) },
+			...listFolders
+				.map((folder) => ({ id: folder.id, label: listFolderPathLabel(listFoldersById, folder.id), disabled: moving.has(folder.id) || !canMoveSelection({ listId, parentId: null, listFolderId: folder.id }) }))
+				.sort((a, b) => a.label.localeCompare(b.label))
+		];
+	});
+
+	function moveSelectedToListFolder() {
+		if (!canEditList || selectedIds.size === 0 || folderMoveDestination == null) return;
+		const folderId = folderMoveDestination === ROOT_DESTINATION ? null : folderMoveDestination;
+		if (moveItemsToDestination(listId, [...selectedIds], { listId, parentId: null, listFolderId: folderId }, settings.addItemPosition)) {
+			folderMoveDestination = undefined;
+			exitSelectionMode();
+		} else {
+			alert('Cannot move these items here. A folder cannot move into itself, and the destination may have changed.');
+		}
+	}
+
+	function markListFolder(folder: ListFolder, named = false) {
+		if (!canEditList) return;
+		const name = named ? prompt('Name for this mark', DEFAULT_MARK_NAME) : DEFAULT_MARK_NAME;
+		if (name === null || !name.trim()) return;
+		try {
+			setDestinationMark(name, { kind: 'list-folder', id: folder.id });
+			refreshDestinationMarks();
+			copyMessage = `✓ Marked "${tName(folder.name)}" as "${name.trim()}".`;
+			copyStatus = 'copied';
+			setTimeout(() => { copyStatus = 'idle'; }, 2500);
+		} catch {
+			alert('Could not save the mark on this device. Please try again.');
+		}
+	}
+
+	function folderHasContents(folder: ListFolder): boolean {
+		const folderIds = listFolderDescendants(listFolders, [folder.id]);
+		return folderIds.size > 1 || listItems.some((item) => item.listFolderId != null && folderIds.has(item.listFolderId));
+	}
+
+	function deleteListFolder(folder: ListFolder) {
+		if (!canEditList) return;
+		if (folderHasContents(folder)) {
+			askDelete(`Delete folder "${tName(folder.name)}" and everything in it?`, () => deleteListEntries(listId, [folder.id]));
+		} else {
+			deleteListEntries(listId, [folder.id]);
+		}
+	}
+
+	function getMoveSelectedIntoFolderItem(folder: ListFolder): MenuItem[] {
+		if (canEditList && selectionMode && selectedIds.size > 0 && !selectedIds.has(folder.id) && canMoveSelection({ listId, parentId: null, listFolderId: folder.id })) {
+			return [{ label: '↳ Move selected here', action: () => moveSelectionTo({ listId, parentId: null, listFolderId: folder.id }) }];
+		}
+		return [];
+	}
+
+	function moveSelectionTo(destination: ItemMoveDestination) {
+		if (!canEditList || selectedIds.size === 0) return;
+		if (moveItemsToDestination(listId, [...selectedIds], destination, settings.addItemPosition)) exitSelectionMode();
+		else alert('Cannot move these items here. The destination may have changed, or the move would create an invalid hierarchy.');
 	}
 
 	function enterSelectionMode() {
@@ -1382,6 +1581,7 @@
 		showSelectionPanel = false;
 		selectedMoveMark = '';
 		markMoveError = '';
+		folderMoveDestination = undefined;
 		showHeaderMenu = false;
 		// Cancel any in-progress editing states
 		cancelEdit();
@@ -1408,11 +1608,12 @@
 	const selectedItems = $derived(
 		treeItems.filter(({ item }) => selectedIds.has(item.id)).map(({ item }) => item)
 	);
+	const selectedFolders = $derived(viewFolders.filter((folder) => selectedIds.has(folder.id)));
+	const selectedRows = $derived(allRows.filter((row) => selectedIds.has(row.item.id)));
 
 	async function copySelectedAsText() {
-		const lines = treeItems
-			.filter(({ item }) => selectedIds.has(item.id))
-			.map(({ item, level }) => '  '.repeat(level) + item.name.replace(/\r\n|\r|\n/g, ' '));
+		const lines = selectedRows
+			.map((row) => '  '.repeat(row.level) + (row.folder ? '📁 ' : '') + row.item.name.replace(/\r\n|\r|\n/g, ' '));
 		if (lines.length === 0) return;
 		await writeClipboard(lines.join('\n'), '✓ Copied selected items!');
 	}
@@ -1420,13 +1621,14 @@
 	function deleteSelected() {
 		if (!canEditList) return;
 		const ids = [...selectedIds];
-		deleteItemsBatch(ids);
+		if (selectedFolders.length > 0) deleteListEntries(listId, ids);
+		else deleteItemsBatch(ids);
 		exitSelectionMode();
 	}
 
 	function reparentSelectedTo(targetId: string | null) {
 		if (!canEditList || selectedIds.size === 0) return;
-		if (reparentItems(listId, [...selectedIds], targetId, settings.addItemPosition)) {
+		if (reparentItems(listId, [...selectedIds], targetId, settings.addItemPosition, viewFolderId)) {
 			exitSelectionMode();
 		} else {
 			alert('Cannot move these items here. The destination may have changed, or the move would create an invalid hierarchy.');
@@ -1434,7 +1636,7 @@
 	}
 
 	function getReparentMenuItem(targetId: string) {
-		if (canEditList && selectionMode && selectedIds.size > 0 && canReparentItems(items, selectedIds, targetId)) {
+		if (canEditList && selectionMode && selectedIds.size > 0 && canMoveSelection({ listId, parentId: targetId })) {
 			return [{ label: '↳ Reparent selected here', action: () => reparentSelectedTo(targetId) }];
 		}
 		return [];
@@ -1444,7 +1646,8 @@
 	function cycleFilter() {
 		if (!canEditList) return;
 		const next: FilterView = filterView === 'all' ? 'unchecked' : filterView === 'unchecked' ? 'checked' : 'all';
-		updateList(listId, { filterView: next });
+		if (viewFolder) updateListFolder(viewFolder.id, { filterView: next });
+		else updateList(listId, { filterView: next });
 	}
 
 	function bulkUncheck() {
@@ -1484,7 +1687,7 @@
 		const contextVersion = listContextVersion;
 		longPressTimer = setTimeout(() => {
 			longPressTimer = null;
-			if (!canEditList || sourceListId !== listId || contextVersion !== listContextVersion || !items.some((item) => item.id === id)) return;
+			if (!canEditList || sourceListId !== listId || contextVersion !== listContextVersion || !(items.some((item) => item.id === id) || viewFolders.some((folder) => folder.id === id))) return;
 			if (!selectionMode) enterSelectionMode();
 			toggleSelectionItem(id);
 		}, 500);
@@ -1509,16 +1712,16 @@
 
 	function getDragBelowId(): string | null {
 		if (touchDragFrom === null || touchDragOver === null || touchDragParentKey === null || touchDragFrom >= touchDragOver) return null;
-		const targetIndex = treeItems.findIndex(({ item, sibIdx }) =>
-			(item.parentId ?? '__top__') === touchDragParentKey && sibIdx === touchDragOver);
+		const rowParentKey = (row: (typeof allRows)[number]) => row.folder ? '__top__' : (row.item.parentId ?? '__top__');
+		const targetIndex = allRows.findIndex((row) => rowParentKey(row) === touchDragParentKey && row.sibIdx === touchDragOver);
 		if (targetIndex < 0) return null;
-		const targetLevel = treeItems[targetIndex].level;
-		const visibleIds = new Set(filteredTreeItems.map(({ item }) => item.id));
+		const targetLevel = allRows[targetIndex].level;
+		const visibleIds = new Set(visibleRows.map(({ item }) => item.id));
 		let lastVisibleId: string | null = null;
 		// Use the complete tree for the boundary: filters can hide the next parent
 		// while leaving its children visible, and those belong to another subtree.
-		for (let index = targetIndex; index < treeItems.length && (index === targetIndex || treeItems[index].level > targetLevel); index++) {
-			if (visibleIds.has(treeItems[index].item.id)) lastVisibleId = treeItems[index].item.id;
+		for (let index = targetIndex; index < allRows.length && (index === targetIndex || allRows[index].level > targetLevel); index++) {
+			if (visibleIds.has(allRows[index].item.id)) lastVisibleId = allRows[index].item.id;
 		}
 		return lastVisibleId;
 	}
@@ -1535,6 +1738,7 @@
 	$effect(() => {
 		if (touchDragFrom === null) return;
 		const sourceListId = listId;
+		const sourceFolderId = viewFolderId;
 		const contextVersion = listContextVersion;
 		function onMove(e: PointerEvent) {
 			e.preventDefault();
@@ -1547,7 +1751,7 @@
 		function onEnd() {
 			if (canEditList && sourceListId === listId && contextVersion === listContextVersion && touchDragFrom !== null && touchDragOver !== null && touchDragFrom !== touchDragOver && touchDragParentKey !== null) {
 				const parentId = touchDragParentKey === '__top__' ? null : touchDragParentKey;
-				reorderSiblings(sourceListId, parentId, touchDragFrom, touchDragOver);
+				reorderSiblings(sourceListId, parentId, touchDragFrom, touchDragOver, sourceFolderId);
 			}
 			onCancel();
 		}
@@ -1730,7 +1934,7 @@
 
 	// If a peer deletes the item currently being priced or named, clear stale state
 	$effect(() => {
-		const ids = new Set(items.map((i) => i.id));
+		const ids = new Set([...items.map((i) => i.id), ...viewFolders.map((folder) => folder.id)]);
 		untrack(() => {
 			if (pricingItemId !== null && !ids.has(pricingItemId)) {
 				pricingItemId = null;
@@ -1867,7 +2071,7 @@
 		if (type === 'folder-ref') { onNavigateTo?.(id); return; }
 		if (type === 'wiki-ref') { openWikiPage(id); return; }
 		const target = allItemsById.get(id);
-		if (target) onOpenList(target.listId);
+		if (target) openItem(target);
 	}
 
 	function getRefHref(type: string, id: string): string {
@@ -1903,6 +2107,7 @@
 	// Invalidate asynchronous work and stale editors before changing list/document views.
 	$effect.pre(() => {
 		void listId; // track prop change
+		void viewFolderId; // each folder is its own view
 		void listExists;
 		void commitState.isHistorical;
 		void commitState.commitId;
@@ -1916,6 +2121,8 @@
 			newItemParentId = null;
 			parentHereId = null;
 			newItemIsNote = listMeta?.defaultIsNote ?? false;
+			newItemIsFolder = false;
+			folderMoveDestination = undefined;
 			pricingItemId = null;
 			priceBuffer = '';
 			qtyItemId = null;
@@ -2126,7 +2333,7 @@
 						class="universal-input"
 						class:editing={inputMode === 'edit'}
 						class:has-toggle={inputMode !== 'edit'}
-						placeholder={inputMode === 'edit' ? 'Edit name…' : addParentId ? (newItemIsNote ? 'Add subnote…' : 'Add subtask…') : (newItemIsNote ? 'Add note…' : 'Add item…')}
+						placeholder={inputMode === 'edit' ? 'Edit name…' : addingFolder ? 'Add folder…' : addParentId ? (newItemIsNote ? 'Add subnote…' : 'Add subtask…') : (newItemIsNote ? 'Add note…' : 'Add item…')}
 						bind:value={universalValue}
 						rows="1"
 						enterkeyhint="done"
@@ -2140,17 +2347,24 @@
 					{#if inputMode === 'edit'}
 						<button type="button" class="input-clear" onclick={cancelEdit} aria-label="Cancel edit">✕</button>
 					{:else}
-						<button type="button" class="type-toggle-btn" class:is-note={newItemIsNote} onpointerdown={(e) => { 
+						<button type="button" class="type-toggle-btn" class:is-note={newItemIsNote && !addingFolder} class:is-folder={addingFolder} onpointerdown={(e) => {
 							if (!canEditList) return;
-							e.preventDefault(); 
-							newItemIsNote = !newItemIsNote; 
+							e.preventDefault();
+							// Todo → Note → Folder → Todo. Folders cannot be subtasks.
+							if (addParentId === null && newItemIsNote && !newItemIsFolder) {
+								newItemIsFolder = true;
+								focusInput();
+								return;
+							}
+							newItemIsNote = newItemIsFolder ? false : !newItemIsNote;
+							newItemIsFolder = false;
 							if (newItemParentId === null) {
 								if (listMeta) {
 									updateList(listId, { defaultIsNote: newItemIsNote });
 								}
 							}
-							focusInput(); 
-						}} aria-label="Toggle note/todo">{newItemIsNote ? '📝' : '☑'}</button>
+							focusInput();
+						}} aria-label={addingFolder ? 'Adding a folder. Switch to todo' : newItemIsNote ? (addParentId === null ? 'Adding a note. Switch to folder' : 'Adding a note. Switch to todo') : 'Adding a todo. Switch to note'} title="Switch between todo, note and folder">{addingFolder ? '📁' : newItemIsNote ? '📝' : '☑'}</button>
 					{/if}
 				</div>
 
@@ -2257,9 +2471,20 @@
 	<!-- Selection panel (shown when selectionMode && showSelectionPanel) -->
 	{#if selectionMode && showSelectionPanel && !commitState.isHistorical}
 		<div class="selection-panel">
-			{#if selectedItems.length === 0}
+			{#if selectedIds.size === 0}
 				<p class="sel-empty">No items selected yet. Tap the ◇ next to each item to select it.</p>
 			{:else}
+				<div class="sel-move-section">
+					<FavouriteDestinationPicker
+						label="Move to folder in this list"
+						placeholder="Search folders in this list…"
+						listLabel="Folders in this list"
+						disabledLabel="Unavailable"
+						options={folderMoveOptions}
+						bind:value={folderMoveDestination}
+					/>
+					<button class="sel-move-btn" disabled={folderMoveDestination == null || !canEditList} onclick={moveSelectedToListFolder}>Move {selectedIds.size} selected</button>
+				</div>
 				<div class="sel-move-section">
 					<label for="move-destination-mark">Move to mark</label>
 					{#if compatibleMoveMarks.length > 0}
@@ -2267,26 +2492,28 @@
 							<select id="move-destination-mark" bind:value={selectedMoveMark} onchange={() => markMoveError = ''}>
 								{#each compatibleMoveMarks as mark}<option value={mark.name}>{mark.label}</option>{/each}
 							</select>
-							<button class="sel-move-btn" disabled={!selectedMoveMark || !canEditList} onclick={moveSelectedToMark}>Move {selectedItems.length} item(s)</button>
+							<button class="sel-move-btn" disabled={!selectedMoveMark || !canEditList} onclick={moveSelectedToMark}>Move {selectedIds.size} selected</button>
 						</div>
-						<p class="sel-move-hint">Selected parents move with their subtasks and subnotes.</p>
+						<p class="sel-move-hint">Selected parents move with their subtasks and subnotes. Folders move with everything in them.</p>
 					{:else}
 						<p class="sel-move-hint">No compatible marked destinations. Mark a list using its menu.</p>
 					{/if}
 					{#if markMoveError}<p class="sel-move-error" role="alert">{markMoveError}</p>{/if}
 				</div>
 				<ul class="sel-item-list">
-					{#each selectedItems as item}
+					{#each selectedRows as row (row.item.id)}
 						<li class="sel-item-row">
-							<button class="sel-item-deselect" onclick={() => toggleSelectionItem(item.id)} aria-label="Deselect">✕</button>
-							<span class="sel-item-name">{item.name}</span>
+							<button class="sel-item-deselect" onclick={() => toggleSelectionItem(row.item.id)} aria-label="Deselect">✕</button>
+							<span class="sel-item-name">{row.folder ? '📁 ' : ''}{row.item.name}</span>
 						</li>
 					{/each}
 				</ul>
 				<button class="sel-delete-btn" onclick={() => askDelete(
-					`Delete ${selectedItems.length} selected item(s)?`,
+					selectedFolders.some(folderHasContents)
+						? `Delete ${selectedIds.size} selected entries, including everything inside the selected folders?`
+						: `Delete ${selectedIds.size} selected item(s)?`,
 					deleteSelected
-				)}>🗑 Delete {selectedItems.length} item(s)</button>
+				)}>🗑 Delete {selectedIds.size} selected</button>
 			{/if}
 		</div>
 	{/if}
@@ -2318,7 +2545,7 @@
 							disabled={commitState.isHistorical && inThisList && !pItem.heading && !pItem.note}
 							onclick={() => {
 								if (inThisList && !pItem.heading && !pItem.note) toggleDone(pItem);
-								else onOpenList(pItem.listId);
+								else openItem(pItem);
 							}}
 							title={inThisList ? pItem.name : `${pItem.name} — ${pItemList?.name ?? '…'}`}
 						>{pItem.name}{#if !inThisList}<span class="pin-chip-list"> ({pItemList?.name ?? '…'})</span>{/if}</button>
@@ -2397,7 +2624,58 @@
 			{@const view = calendarIncludes[itemId]?.sectionView(section)}
 			<span class="include-inline">{#if !view || view.status === 'loading'}<span class="include-line include-line-muted">Loading calendar events…</span>{:else if view.status === 'error'}<span class="include-line include-line-muted">{view.message}</span>{:else if view.status === 'unavailable'}<span class="include-line include-line-muted">Section unavailable.</span>{:else if view.entries.length === 0}<span class="include-line include-line-muted">No events.</span>{:else}{#each view.entries as entry}<span class="include-line"><IncludeCheckbox href={simpleTodoPageUrl('calendar', base)} completed={entry.completed} /><IncludeText text={calendarLine(entry.label, entry.title)} href={simpleTodoPageUrl('calendar', base)} completed={entry.completed} {onTagClick} />{#if entry.isImportant}{' '}<span class="calendar-important-badge" title="Important (late and unchecked)">⚠️ Important</span>{/if}</span>{/each}{/if}</span>
 		{/snippet}
-		{#each filteredTreeItems as {item, level, tlIdx, rootTlIdx, sibIdx} (item.id)}
+		{#snippet folderRow(folder: ListFolder, sibIdx: number)}
+			<div
+				id="folder-{folder.id}"
+				class="item-row folder-row"
+				class:selected={selectedIds.has(folder.id)}
+				class:drag-source={touchDragParentKey === '__top__' && sibIdx === touchDragFrom}
+				class:drag-above={touchDragParentKey === '__top__' && touchDragOver === sibIdx && touchDragFrom !== null && touchDragFrom > sibIdx}
+				class:drag-below={dragBelowId === folder.id}
+				data-sibling-index={sibIdx}
+				data-parent-key="__top__"
+				data-folder-id={folder.id}
+			>
+				{#if selectionMode && !commitState.isHistorical}
+					<button
+						class="check-btn sel-check"
+						class:sel-checked={selectedIds.has(folder.id)}
+						onclick={() => toggleSelectionItem(folder.id)}
+						aria-label={selectedIds.has(folder.id) ? 'Deselect' : 'Select'}
+					>{selectedIds.has(folder.id) ? '◆' : '◇'}</button>
+				{:else}
+					<span class="folder-icon" aria-hidden="true">📁</span>
+				{/if}
+				<div role="button" tabindex="0" onkeydown={activateItemName}
+					class="item-name folder-name"
+					class:editing={editingId === folder.id}
+					aria-label={`Open folder ${folder.name}`}
+					onclick={() => selectionMode ? toggleSelectionItem(folder.id) : openListFolder(folder.id)}
+					onpointerdown={(e) => { if (!selectionMode) onPointerDown(e, folder.id); }}
+					onpointermove={cancelLongPress}
+					onpointerup={cancelLongPress}
+					onpointercancel={cancelLongPress}
+				><span class="item-name-text">{folder.name}</span></div>
+				{#if !commitState.isHistorical}
+					<button class="drag-handle" aria-label="Drag to reorder" onpointerdown={(e) => startItemDrag(e, sibIdx, '__top__')}>☰</button>
+					<RowMenu items={[
+						{ label: '✏️ Rename', action: () => startEditFolderName(folder) },
+						{ label: '🏷 Mark', submenu: [
+							{ label: '🏷 Mark', action: () => markListFolder(folder) },
+							{ label: '🏷 Mark named', action: () => markListFolder(folder, true) }
+						] },
+						{ label: '📋 Copy JSON', action: () => writeClipboard(viewClipboardJson(new Set([folder.id])), '✓ Copied as JSON!') },
+						...getMoveSelectedIntoFolderItem(folder),
+						{ label: '🗑 Delete', danger: true, action: () => deleteListFolder(folder) }
+					]} />
+				{/if}
+			</div>
+		{/snippet}
+		{#each visibleRows as row (row.item.id)}
+			{#if row.folder}
+				{@render folderRow(row.folder, row.sibIdx)}
+			{:else}
+			{@const { item, level, sibIdx } = row as TreeItem}
 			{@const canAddChildren = !item.heading && level < 2}
 			{@const linkParts = parseNameParts(item.name)}
 			{@const hasWrappedIncludes = linkParts.some((part) => (part.type === 'bills' || part.type === 'calendar') && part.wrap)}
@@ -2607,6 +2885,7 @@
 					{#if includedCalendarSections.length}<CalendarInclude bind:this={calendarIncludes[item.id]} sections={includedCalendarSections} displaySections={displayedCalendarSections} {onTagClick} />{/if}
 				</div>
 			{/if}
+			{/if}
 		{/each}
 	</div>
 
@@ -2727,7 +3006,7 @@
 			{:else}
 				{#if !commitState.isHistorical}
 					{#if selectionMode && selectedIds.size > 0}
-						<button role="menuitem" disabled={!canEditList || !canReparentItems(items, selectedIds, null)} onclick={() => { showHeaderMenu = false; reparentSelectedTo(null); }}>↳ Move selected to root</button>
+						<button role="menuitem" disabled={!canEditList || !canMoveSelection({ listId, parentId: null, listFolderId: viewFolderId })} onclick={() => { showHeaderMenu = false; reparentSelectedTo(null); }}>↳ Move selected to root</button>
 					{:else}
 						<button role="menuitem" onclick={enterSelectionMode}>☑ Select items</button>
 					{/if}
@@ -4110,6 +4389,18 @@
 	}
 	.tag-ac-item:hover { background: color-mix(in srgb, var(--list-color, var(--accent)) 28%, transparent); }
 	/* ── Subnotes ────────────────────────────────────────────────────────── */
+	.folder-icon {
+		font-size: var(--row-icon-size, 1.1rem);
+		flex-shrink: 0;
+		min-width: 50px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.folder-name {
+		font-weight: 600;
+		cursor: pointer;
+	}
 	.note-icon {
 		font-size: var(--row-icon-size, 1.1rem);
 		flex-shrink: 0;
@@ -4279,6 +4570,11 @@
 		line-height: 1.2;
 		white-space: nowrap;
 	}
+	.type-toggle-btn.is-folder {
+		color: var(--accent);
+		border-color: var(--accent);
+		background: transparent;
+	}
 	.type-toggle-btn.is-note {
 		color: var(--accent);
 		border-color: var(--accent);
@@ -4372,6 +4668,7 @@
 		.item-row { padding-left: 0.25rem; padding-right: 0.25rem; gap: 0.1rem; }
 		.drag-handle { min-width: 24px; }
 		.check-btn { min-width: 32px; }
-		.note-icon { min-width: 32px; }
+		.note-icon, .folder-icon { min-width: 32px; }
 	}
+	.sel-move-section > .sel-move-btn { margin-top: 0.5rem; }
 </style>

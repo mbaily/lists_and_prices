@@ -15,7 +15,11 @@ function fixture(t) {
 	const next = add('Next parent');
 	const nextChild = add('Next child', next);
 	const treeItems = app.hierarchy.buildItemTreeOrder(app.data.readItems(list));
-	const state = { treeItems, filteredTreeItems: treeItems, touchDragFrom: 0, touchDragOver: 1, touchDragParentKey: '__top__' };
+	const state = {
+		treeItems, filteredTreeItems: treeItems, touchDragFrom: 0, touchDragOver: 1, touchDragParentKey: '__top__',
+		// Without folders, rows are the item tree.
+		get allRows() { return this.treeItems; }, get visibleRows() { return this.filteredTreeItems; }
+	};
 	const code = componentFunctions('src/lib/components/ListScreen.svelte', ['getDragBelowId']);
 	const marker = new Function('state', `with(state) { ${transpile(code)}; return getDragBelowId; }`)(state);
 	return { app, list, add, source, parent, child, grandchild, lastChild, next, nextChild, state, marker };
