@@ -2674,6 +2674,17 @@
 				{/if}
 			</div>
 		{/snippet}
+		{#if viewFolder}
+			<button
+				type="button"
+				class="item-row folder-up"
+				onclick={() => openListFolder(viewFolder?.parentId ?? null)}
+				onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}
+			>
+				<span class="folder-icon" aria-hidden="true">↑</span>
+				<span class="item-name folder-name">Up</span>
+			</button>
+		{/if}
 		{#each visibleRows as row (row.item.id)}
 			{#if row.folder}
 				{@render folderRow(row.folder, row.sibIdx)}
@@ -4045,6 +4056,16 @@
 		transition: background 0.15s, opacity 0.15s;
 		line-height: var(--row-line-height, normal);
 	}
+	.folder-up {
+		width: 100%;
+		border-width: 0 0 1px;
+		border-radius: 0;
+		background: none;
+		color: var(--text);
+		cursor: pointer;
+	}
+	.folder-up:hover { background: var(--bg2); }
+	.folder-up:focus-visible { outline-offset: -2px; }
 	.item-row.has-bills { border-bottom: 0; padding-bottom: 0; }
 	.item-bills { border-bottom: 1px solid var(--border); }
 	.item-row.journal-mode {

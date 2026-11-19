@@ -111,7 +111,7 @@ export const helpTopics: HelpTopic[] = [
 			{
 				title: 'Folders inside a list',
 				paragraphs: [
-					'A list can hold folders as well as items. Tap the ☑/📝/📁 toggle beside the input until it shows 📁, type a name and press Enter. The folder appears in the list order with a folder icon. Tap it to open it; the breadcrumb shows the list and each folder, and tapping one goes back there.',
+					'A list can hold folders as well as items. Tap the ☑/📝/📁 toggle beside the input until it shows 📁, type a name and press Enter. Tap the folder row to open it. Use ↑ Up at the top of the items to go up one level, or use the breadcrumb to return to an earlier folder or the list root.',
 					'A folder works like the list itself. It can contain todos, notes, subtasks, subnotes, headings and further folders, and it uses the list’s pricing and named checkboxes. The total, the checked counts, the filter, Uncheck all, delete-checked and the Copy as… options cover only the folder or list root that is open. Each folder remembers its own filter.',
 					'Use the folder’s ⋮ menu to rename, delete, copy it as JSON or mark it as a move destination. Deleting a folder that has contents asks first, then deletes everything inside it. Global search finds folder names and shows the folder path for items inside them.'
 				]
