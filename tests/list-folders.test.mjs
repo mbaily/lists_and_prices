@@ -127,10 +127,33 @@ test('rollover keeps folder structure below the view and reuses matching folders
 		const moved = d.readItems(target);
 		assert.equal(moved.find((item) => item.id === top).listFolderId, null);
 		assert.equal(moved.find((item) => item.id === deep).listFolderId, existing);
-		assert.deepEqual(ids(d.readListFolders(source)).sort(), [view, nested].sort(), 'source folders stay');
+		assert.deepEqual(ids(d.readListFolders(source)), [view], 'emptied source folder is deleted; the open view stays');
 		app.store.getUndoManager().undo();
 		assert.equal(d.readItems(target).length, 0);
+		assert.deepEqual(ids(d.readListFolders(source)).sort(), [view, nested].sort(), 'undo restores the folder');
 		assert.equal(d.moveItemsKeepingFolders(source, [deep], target, d.createListFolder(source, 'Elsewhere')), false);
+	} finally { app.dispose(); }
+});
+
+test('rollover deletes source folders it empties, like a filesystem move', () => {
+	const { app, d, source, target } = fixture();
+	try {
+		const outer = d.createListFolder(source, 'Outer');
+		const inner = d.createListFolder(source, 'Inner', outer);
+		const deep = d.createItem(source, 'Deep', null, null, false, 'bottom', undefined, inner);
+		const mixed = d.createListFolder(source, 'Mixed');
+		const leaving = d.createItem(source, 'Leaving', null, null, false, 'bottom', undefined, mixed);
+		d.createItem(source, 'Staying', null, null, false, 'bottom', undefined, mixed);
+		const empty = d.createListFolder(source, 'Empty');
+		const sibling = d.createListFolder(source, 'Sibling');
+		const keep = d.createListFolder(source, 'Keep', sibling);
+		d.createItem(source, 'Kept', null, null, false, 'bottom', undefined, keep);
+		const sibDeep = d.createListFolder(source, 'Sib deep', sibling);
+		const sibItem = d.createItem(source, 'Sib item', null, null, false, 'bottom', undefined, sibDeep);
+		assert.equal(d.moveItemsKeepingFolders(source, [deep, leaving, sibItem], target, null), true);
+		assert.deepEqual(ids(d.readListFolders(source)).sort(), [mixed, empty, sibling, keep].sort(),
+			'emptied chain Outer/Inner and Sib deep go; folders with remaining content or already empty stay');
+		assert.deepEqual(d.readListFolders(target).map((folder) => folder.name).sort(), ['Inner', 'Mixed', 'Outer', 'Sib deep', 'Sibling']);
 	} finally { app.dispose(); }
 });
 

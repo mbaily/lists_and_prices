@@ -1110,7 +1110,8 @@ function moveListEntries(sourceListId: string, ids: string[], destination: ItemM
 }
 
 /** Move items to another list, recreating the folders that hold them below
- * baseFolderId. Matching folder names at the destination are reused. */
+ * baseFolderId. Matching folder names at the destination are reused. Source
+ * folders below baseFolderId left empty by the move are deleted. */
 export function moveItemsKeepingFolders(sourceListId: string, ids: string[], targetListId: string, baseFolderId: string | null, addPosition: 'top' | 'bottom' = 'bottom'): boolean {
 	const lists = readLists();
 	const target = lists.find((list) => list.id === targetListId);
@@ -1148,6 +1149,23 @@ export function moveItemsKeepingFolders(sourceListId: string, ids: string[], tar
 		for (const [folderId, groupIds] of groups) {
 			const destination = { listId: targetListId, parentId: null, listFolderId: ensure(folderId) };
 			if (!moveItemsToDestination(sourceListId, groupIds, destination, addPosition)) moved = false;
+		}
+		if (!moved) return;
+		// Like a filesystem move: a source folder below baseFolderId that held
+		// only moved entries is now empty and goes too, deepest first.
+		const depth = (folderId: string) => {
+			let count = 0;
+			for (let id: string | null = folderId; id !== baseFolderId; id = folders.get(id!)!.parentId) count++;
+			return count;
+		};
+		const emptied = new Set<string>();
+		for (const folderId of groups.keys()) {
+			for (let id = folderId; id !== baseFolderId; id = folders.get(id!)!.parentId) emptied.add(id!);
+		}
+		for (const folderId of [...emptied].sort((a, b) => depth(b) - depth(a))) {
+			const hasItems = readItems(sourceListId, folderId).length > 0;
+			const hasFolders = readListFolders(sourceListId).some((folder) => folder.parentId === folderId);
+			if (!hasItems && !hasFolders) deleteListFolderRecords(getMutableDoc(), new Set([folderId]));
 		}
 	});
 	return moved;
