@@ -1,0 +1,137 @@
+HANDOFF: FOLDERS INSIDE TODO LISTS
+
+Workspace: /home/mbaily/other_git/list-prices-svelte5
+Status: Implementation started and was interrupted. The edits are uncommitted.
+Resume the implementation from the working tree. The user has answered the spec
+questions and asked to implement the feature.
+
+AGREED BEHAVIOR
+
+- The web app supports folders inside both plain and priced lists. No terminal
+  UI feature is requested.
+- Add item gains a third mode, Folder, alongside Todo and Note. Entering a name
+  creates a folder in the current view. A folder appears as a folder icon and
+  name in the row order. Clicking it opens the folder using the same list
+  interface and adds a level to the breadcrumb.
+- A list folder may contain nested folders, todos, notes, subtasks, subnotes, and
+  heading rows. A folder can belong to a list root or another folder in that
+  list. Whole lists stay in the existing home folder hierarchy.
+- Select items offers an incrementally searchable destination picker with List
+  root and every folder in the owning list, including folders elsewhere in its
+  tree. Show full paths to distinguish repeated names. Moving to List root
+  from any depth means the root of the owning list.
+- Folder rows can be selected and moved with their full contents, both within
+  the list and via existing cross-list actions. Prevent moving a folder into
+  itself or a descendant. A folder can be marked as a destination for moves
+  from another list. Normal bulk move semantics apply to tasks and notes:
+  selecting a parent carries its descendants, and selecting a child by itself
+  detaches it at the destination while preserving its own descendants.
+- Deleting a non-empty folder asks for confirmation and then deletes its
+  contents recursively.
+- Checked counts, price totals, checked filters, bulk actions, spreadsheet
+  copies and journal copies are scoped to the view that is open. Each view
+  has its own checked filter. Folders use the owning list's pricing and
+  checkbox settings.
+- Global search finds folder names and items within folders. Search results
+  and item links open the correct folder with its full breadcrumb. Clipboard
+  JSON export and import recreate nested folders and their contents.
+
+CHANGES ALREADY IN THE WORKING TREE
+
+- src/lib/yjsStore.svelte.ts adds getListFolders(doc), which returns the
+  separate Yjs array list-folders. The existing document-scoped undo manager
+  should track this array.
+- src/lib/data.ts adds the ListFolder model, reading and ordering, create,
+  update and recursive deletion. Deleting a list also deletes its folder
+  records. Items have a nullable listFolderId separate from the task parentId.
+  readItems(listId) still returns items throughout that list. Supplying a
+  second argument scopes it to a particular folder or to the list root with
+  null. readAllItems still returns ordinary items and resolves their
+  locations. createItem and createItemsBatch accept a folder destination.
+  Root items and folder rows share order. createItemsFromExport can import
+  folder entries in a flat clipboard payload where parentId can reference a
+  folder or item. The emitting side has yet to be implemented.
+- src/lib/listFolders.ts is a new, untracked source file. It has helpers for
+  breadcrumbs, folder descendants, and interleaving folders with item trees
+  in stored root-row order.
+- src/lib/itemMove.ts adds a listFolderId destination, resolves marks of kind
+  list-folder, and defines planListEntryMove for a mixed selection. The
+  existing moveItemsToDestination still calls the old planner. Wiring the new
+  planner into the mutation is the next backend step.
+- src/lib/jsonImport.ts validates clipboard folder entries and defines
+  validation for the listFolders backup section and item listFolderId.
+  Backup export, validation and restore in data.ts still need to use these.
+- No edits have been made to ListScreen.svelte or HomeScreen.svelte yet.
+
+NEXT STEPS
+
+1. Complete moveItemsToDestination in data.ts. Use planListEntryMove, move the
+   selected folder roots and their descendants transactionally, keep nested
+   memberships, and update listId for all moved records on a cross-list move.
+   Keep the existing named-checkbox remapping for ordinary tasks when crossing
+   home folders. Preserve IDs, rich note text, selection order, and single
+   action undo. Reparenting to the root of the current view and drag reorder
+   must use the current folder. Reorder of root rows should include both
+   folders and item rows. Review legacy/plain behavior and concurrent or
+   stale destinations.
+2. Finish backups in data.ts. Add listFolders to export, validation, the
+   restore indexes, replace deletion, and merge upserts. Validate matching
+   list ownership for folders, item memberships and item parents. Preserve
+   legacy backup/clipboard support. The backup preview and docs may need a
+   small update if the preview omits new records.
+3. Wire ListScreen to the current list folder. Render mixed rows with
+   listRows, support folder navigation, add mode, rename, selection,
+   destination marking, deletion confirmation, and drag reorder. Apply
+   the current view to add/paste, stats and filters, and view-level actions.
+   Reset transient selection and editing state when the folder changes.
+   Use the new planner for compatible marks and the folder picker. Include
+   folder rows in existing selected cross-list actions, such as the arrow,
+   rollover selection, and Move to mark. Keep ordinary item parenting
+   available. Clipboard JSON needs to emit folder subtrees and a portable
+   parent hierarchy while preserving sibling order. Check exports of a
+   selection, an empty folder row and a nested folder view.
+4. Wire HomeScreen navigation. The existing list URL is #l/<listId>. One
+   option is #l/<listId>/<folderId> with the breadcrumb rebuilt from the
+   saved folder ancestry. Handle browser back and forward, item links,
+   search openings, wiki/nearby/pinned item navigation, and a folder that
+   was moved or deleted. Add folder results and folder paths to search.
+   Review opening a highlighted item hidden by the destination's filter.
+5. Run npm run check, npm test and npm run build. Verify the web flow on
+   desktop and mobile if possible. Add targeted regression coverage for
+   folder subtree moves and cycles, child detach behavior, scoped views,
+   and JSON round trips, including empty folders and rich notes.
+
+INTEGRATION NOTES
+
+- Review the partial code before building on it. In createItem, a valid
+  parent at list root returns null for listFolderId. The current lookup
+  uses a nullish fallback to the requested folder, which should distinguish
+  a missing parent from an existing parent at the root.
+- Preserve current clipboard callers, particularly task-import deduplication
+  and legacy payloads. Verify folder and task type validation before entering
+  Yjs transactions, which do not roll back exceptions.
+- The item tree's depth limit applies to task/note nesting. Folder depth is
+  a separate relationship. Cross-list moves of folder trees should keep the
+  task hierarchy intact.
+- Tests with existing move, clipboard and UI coverage include
+  tests/move-to-mark.test.mjs, tests/move-order.test.mjs,
+  tests/selection-folder-move.test.mjs, tests/parent-here.test.mjs,
+  tests/ui-lifecycle.test.mjs, tests/json-backup.test.mjs and
+  tests/yjs-data.test.mjs. Several load individual component functions with
+  fixtures in tests/helpers/app.mjs. Update their injected dependencies as
+  needed while retaining the assertions about existing behavior.
+- git diff --check passed at handoff. The build, type check, test suite and
+  web flow have yet to be run against these edits.
+
+ADDITIONAL DECISIONS (2026-11-20)
+
+- TUI: no folder support needed; leave it as is.
+- Server task API, DokuWiki export, nearby errands and saved searches of
+  unfinished list items include items inside list folders, labelled with
+  their folder path where a location is shown.
+- Quick list rollover is scoped to the open view and recreates the folders
+  that hold rolled-over items with the same structure. Empty folders are
+  dropped for "incomplete" and kept for "all".
+- Folder rows show the icon and name only, without a count or total badge.
+- When finished and checks pass: bump to v0.0.114, update help.ts, and make
+  one commit.
