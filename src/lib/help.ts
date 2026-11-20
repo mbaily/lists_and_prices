@@ -201,7 +201,7 @@ export const helpTopics: HelpTopic[] = [
 			},
 			{
 				title: 'Organise your shortcuts',
-				paragraphs: ['Open a Favourites folder in the bar to see its contents. Tap the left arrow beside the folder name to go up one level. Newly starred shortcuts appear at the top level.'],
+				paragraphs: ['Open a Favourites folder in the bar to see its contents. Tap the left arrow beside the folder name to go up one level. A newly starred folder or list goes straight after the last starred item from the same app folder, inside the same Favourites folder. If none of its siblings is starred, it takes the place of the sibling you most recently unstarred. Otherwise it appears at the end of the top level.'],
 				steps: [
 					'Open Rearrange favourites from the bar and choose New folder. To create a nested folder, open its parent first.',
 					'Choose Move to in the row menu, then search by folder name or path. Choose Top level to move a shortcut or folder out of its current folder.',

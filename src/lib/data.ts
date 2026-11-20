@@ -1440,20 +1440,77 @@ function setFavouriteParent(record: Y.Map<unknown>, type: FavouriteRef['type'], 
 	if (record.get(field) !== parentId) record.set(field, parentId);
 }
 
+type FavouritePlacement = { parentId: string | null; orders: { ref: FavouriteRef; order: number }[] };
+
+/**
+ * Where a newly starred shortcut goes: straight after the last starred item
+ * from the same app folder, else into the slot of the most recently touched
+ * unstarred sibling that still remembers its place, else the end of the top level.
+ */
+function favouritePlacement(type: FavouriteShortcut['type'], id: string): FavouritePlacement {
+	const doc = getDoc();
+	const folders = readFolders();
+	const lists = readLists();
+	const groups = readFavouriteFolders();
+	const self = type === 'folder' ? folders.find(folder => folder.id === id) : lists.find(list => list.id === id);
+	const container = !self ? undefined : type === 'folder' ? (self as Folder).parentId : (self as ListMeta).folderId;
+	const isSibling = (shortcut: FavouriteShortcut) =>
+		self !== undefined && shortcut.item.id !== id &&
+		(shortcut.type === 'folder' ? shortcut.item.parentId : shortcut.item.folderId) === container;
+
+	let anchor: FavouriteRef | null = null;
+	const visible = favouriteShortcutsInTreeOrder(buildFavouriteEntries(folders, lists, groups));
+	for (let i = visible.length - 1; i >= 0 && !anchor; i--) {
+		const entry = visible[i];
+		if (entry.type !== 'favourites-folder' && isSibling(entry)) anchor = { type: entry.type, id: entry.item.id };
+	}
+	if (!anchor) {
+		let latest = '';
+		const shortcuts: FavouriteShortcut[] = [
+			...folders.map(item => ({ type: 'folder' as const, item })),
+			...lists.map(item => ({ type: 'list' as const, item }))
+		];
+		for (const shortcut of shortcuts) {
+			if (shortcut.item.favourite || !isSibling(shortcut)) continue;
+			if (shortcut.type === 'folder' ? isFolderEffectivelyArchived(shortcut.item.id, folders) : isListEffectivelyArchived(shortcut.item, folders)) continue;
+			if (!favouriteRecord(doc, { type: shortcut.type, id: shortcut.item.id })?.has('favouriteOrder')) continue;
+			const touched = shortcut.item.updatedAt ?? '';
+			if (!anchor || touched > latest) {
+				anchor = { type: shortcut.type, id: shortcut.item.id };
+				latest = touched;
+			}
+		}
+	}
+
+	const selfRef: FavouriteRef = { type, id };
+	const entries = storedFavouriteEntries(groups, anchor ? new Set([favouriteKey(anchor)]) : undefined)
+		.filter(entry => !(entry.type === type && entry.item.id === id));
+	const anchorEntry = anchor && entries.find(entry => entry.type === anchor.type && entry.item.id === anchor.id);
+	if (!anchorEntry) {
+		return { parentId: null, orders: [{ ref: selfRef, order: getInsertionOrder(entries.filter(entry => entry.parentId === null), 'bottom') }] };
+	}
+	const refs: FavouriteRef[] = entries
+		.filter(entry => entry.parentId === anchorEntry.parentId)
+		.map(entry => ({ type: entry.type, id: entry.item.id }));
+	refs.splice(refs.findIndex(ref => ref.type === anchorEntry.type && ref.id === anchorEntry.item.id) + 1, 0, selfRef);
+	return { parentId: anchorEntry.parentId, orders: refs.map((ref, order) => ({ ref, order })) };
+}
+
 export function toggleFavourite(type: FavouriteShortcut['type'], id: string, keepPlacement = false) {
 	const doc = getMutableDoc();
 	const record = favouriteRecord(doc, { type, id });
 	if (!record) return;
 	const next = !record.get('favourite');
-	const order = next && !keepPlacement
-		? getInsertionOrder(storedFavouriteEntries().filter(entry => entry.parentId === null), 'bottom')
-		: null;
+	const placement = next && !keepPlacement ? favouritePlacement(type, id) : null;
 	doc.transact(() => {
 		record.set('favourite', next);
 		record.set('updatedAt', new Date().toISOString());
-		if (order === null) return;
-		if (record.get('favouriteParentId') != null) setFavouriteParent(record, type, null);
-		setFavouriteOrder(record, type, order);
+		if (!placement) return;
+		if (placement.parentId !== null || record.get('favouriteParentId') != null) setFavouriteParent(record, type, placement.parentId);
+		for (const { ref, order } of placement.orders) {
+			const target = favouriteRecord(doc, ref);
+			if (target) setFavouriteOrder(target, ref.type, order);
+		}
 	});
 }
 

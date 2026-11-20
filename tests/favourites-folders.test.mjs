@@ -121,3 +121,36 @@ test('concurrent moves recover cycles and keep all shortcuts reachable', t => {
 	assert.equal(children(a.data, null).length, 1);
 	assert.deepEqual(a.data.favouriteShortcutsInTreeOrder(entries(a.data)).map(entry => entry.item.id), [list]);
 });
+
+test('starring a list places it next to its app-folder siblings', t => {
+	const { data } = openApp(t);
+	const days = data.createFolder('Days', null);
+	const other = data.createFolder('Other', null);
+	const mon = data.createList('Mon', days, 'plain');
+	const tue = data.createList('Tue', days, 'plain');
+	const wed = data.createList('Wed', days, 'plain');
+	const a = data.createList('A', other, 'plain');
+	const b = data.createList('B', other, 'plain');
+	data.toggleFavourite('list', mon);
+	data.toggleFavourite('list', a);
+	data.toggleFavourite('list', b);
+	assert.deepEqual(children(data, null), [mon, a, b]);
+
+	// Starred sibling present: goes straight after it.
+	data.toggleFavourite('list', tue);
+	assert.deepEqual(children(data, null), [mon, tue, a, b]);
+
+	// No starred sibling: takes the slot of the one just unstarred.
+	data.toggleFavourite('list', mon);
+	data.toggleFavourite('list', tue);
+	data.toggleFavourite('list', wed);
+	assert.deepEqual(children(data, null), [wed, a, b]);
+
+	// Inside a Favourites folder, the new star joins that folder.
+	const work = data.createFavouriteFolder('Work', null);
+	data.moveFavourite({ type: 'list', id: wed }, work);
+	data.toggleFavourite('list', wed);
+	data.toggleFavourite('list', mon);
+	assert.deepEqual(children(data, work), [mon]);
+	assert.deepEqual(children(data, null), [a, b, work]);
+});
