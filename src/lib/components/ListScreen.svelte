@@ -75,6 +75,7 @@
 		orderedLists = [],
 		highlightItemId = null,
 		onReturnNearby = undefined,
+		onOpenNearby = undefined,
 		onHome,
 		onOpenList,
 		onOpenFavouritesOrder = undefined,
@@ -90,6 +91,7 @@
 		orderedLists?: { id: string; name: string }[];
 		highlightItemId?: string | null;
 		onReturnNearby?: () => void;
+		onOpenNearby?: () => void;
 		onHome: () => void;
 		onOpenList: (id: string) => void;
 		onOpenFavouritesOrder?: () => void;
@@ -2273,6 +2275,15 @@
 				<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" />
 			</svg>
 		</button>
+		{#if onOpenNearby}
+			<button
+				type="button"
+				class="browse-view-btn nearby-open-btn"
+				onclick={onOpenNearby}
+				aria-label="Nearby errands"
+				title="Nearby errands"
+			>🚗</button>
+		{/if}
 		<div class="header-right">
 			{#if navTotal > 1}
 				<div class="nav-strip">
@@ -3921,6 +3932,7 @@
 		color: var(--accent);
 	}
 	.browse-view-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+	.nearby-open-btn { font-size: 1.05rem; line-height: 1; }
 	.header-right {
 		margin-left: auto;
 		flex-shrink: 0;
